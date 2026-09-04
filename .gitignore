@@ -1,0 +1,17 @@
+# 操作系统/平台垃圾文件 / OS & platform junk files
+.DS_Store
+.DS_Store?
+.AppleDouble
+.LSOverride
+.Trashes
+.fseventsd
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+*.log
+
+# AI 助手缓存目录 / AI assistant cache directories
+.kilo/
+.workbuddy*/
+.agents/

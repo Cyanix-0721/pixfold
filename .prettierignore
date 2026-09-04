@@ -1,0 +1,9 @@
+# Prettier 忽略规则 / Prettier ignore rules
+# 版本控制与依赖目录
+.git/
+node_modules/
+
+# AI 助手工作目录(第三方技能/克隆/记忆,不做格式化)
+.agents/
+.workbuddy*/
+.kilo/

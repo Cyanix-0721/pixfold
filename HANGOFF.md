@@ -1,107 +1,385 @@
-# PixFold — Handoff：图片批量整理跨平台 GUI 应用（Windows + Android）
+# PixFold — 设计交接：图片整理与 CBZ 制作工作台
 
-> 项目名：**PixFold**（英文代号为主，2026-09-03 定名）
-> 状态：规划完成，尚未开始实现（2026-08-31）
+> 项目名：**PixFold**
+> 状态：**设计阶段**（2026-09-03）
+> 目标平台：**Windows、Android（优先）、Linux**
+> 技术栈：**暂不锁定**，先以产品流程、数据模型和平台能力验证为准
 
-## 定位
+## 1. 项目重新定位
 
-将 `scripts/` 下两个 Python CLI 工具整合为一个 Windows + Android 跨平台、带 GUI 的应用，并打包分发（exe / APK）。
-名字侧重**图片批量整理**（批量重命名可独立使用、场景以图片为主），CBZ 打包只是其中一项输出能力，故定名 PixFold。
+PixFold 不是把两个 Python 脚本简单搬进一个窗口，也不是单纯追求“一键批量化”。
 
-## 已确认决策
+真实需求是：把图片整理和 CBZ 制作过程中必须由人判断的部分，变成一个**可预览、可编辑、可逐项确认、可回退的图形化工作流**。
 
-- Android 端需要**完整功能**：手机上选图片文件夹 → 批量重命名 / 打包 CBZ（需深度集成 SAF）
-- 需要打包成 exe / apk 分发给别人
-- 技术选型：**Flutter（单代码库）**
+两个 Python 脚本是现有行为参考和样例来源，但不是最终产品规范。GUI 需要在其基础上补足：
 
-## 技术选型：Flutter
+- 图片排序的可视化检查和人工调整；
+- 命名结构的组成、顺序、清洗规则和逐项覆盖；
+- 漫画目录、系列、卷之间的关系确认；
+- CBZ 的语言、卷号、标题、作者和输出名等元数据录入；
+- 执行前完整计划预览；
+- 冲突处理、失败重试、撤销和结果核对；
+- Windows、Android、Linux 不同文件访问模型下的一致体验。
 
-- Windows 桌面 + Android 一套 UI 代码，Android 为第一公民，APK 打包签名成熟
-- 已验证依赖：`archive`（Zip 打包/更新，支持 ZIP_STORED）、`file_picker`（目录/文件选择、saveFile）
-- **自研点**：Android SAF 批量文件操作需自写 Kotlin MethodChannel 插件封装 `DocumentFile`
-  （社区 `flutter_saf` 过弱：仅列目录/读字节/缩略图，无 rename/move/copy/delete）
-- 备选（均不推荐）：Compose Multiplatform（Kotlin，Android SAF 顺手但 Windows 打包体积大）；
-  Kivy/KivyMD（Python 复用但 Windows 上无法原生构建 Android、SAF 需 pyjnius 胶水、APK 大启动慢）；
-  Tauri v2（Rust，Android SAF 生态最不成熟）
+产品核心价值不是“少点几次确认”，而是让复杂整理过程**看得见、改得动、做得稳、出错能回退**。
 
-## 命名约定
+## 2. 已确认的产品约束
 
-- Dart/Flutter 工程名：`pixfold`（内部标识，保持简洁）
-- Android applicationId / namespace：`com.cyanix.pixfold`
-- Windows 可执行/显示名：PixFold；发布者 Cyanix（Inno Setup AppPublisher / MSIX Publisher）
+- 最终覆盖 Windows、Android、Linux。
+- Android 是优先平台，不能把 Android 当成桌面版的缩小移植。
+- 技术栈暂不强求；在交互原型和平台能力验证前，不锁定 Flutter、Rust、Qt、Tauri、Slint 或其他方案。
+- 现有两个 Python 脚本保留，不删除，继续作为行为参考、回归样例和命令行备用工具。
+- 文件破坏性操作必须经过明确确认；默认不删除源文件，不继承脚本中“强制删除”的危险默认值。
+- 所有重要自动推断都必须展示依据，并允许人工覆盖。
+- 每次实际写入前必须生成操作计划；计划可保存、复查和执行。
 
-## 架构
+## 3. 现有能力范围
 
+### 3.1 图片整理脚本提供的基础能力
+
+`scripts/batch_rename_images.py` 当前包含：
+
+- 递归扫描多层子文件夹；
+- 按名称、修改时间、创建时间、文件大小排序，支持升降序；
+- 自然排序；
+- 根据前缀、根目录名、子路径和原文件名生成新文件名；
+- 移动或复制到根目录；
+- 数字后缀补零和重名冲突处理；
+- 移动后的子文件夹处理策略：强制删除、只删空目录、保留。
+
+### 3.2 CBZ 脚本提供的基础能力
+
+`scripts/batch_pack_cbz.py` 当前包含：
+
+- 递归识别直接包含图片的漫画文件夹；
+- 根据目录层级推导 title、series、writer；
+- 清理作者前缀、括号原作信息和尾部标签；
+- 自动检测或人工输入卷号；
+- 系列级无卷号推断和小数卷重编号；
+- 逐文件夹选择 `LanguageISO`，支持 `ja`、`zh` 或跳过；
+- 生成 `ComicInfo.xml`；
+- 图片按自然顺序写入 CBZ，并重命名为页码；
+- 输出目录、冲突处理、保留/删除源文件夹；
+- 更新已有 CBZ 的 `ComicInfo.xml`；
+- dry-run 预览。
+
+这些能力需要拆成 GUI 中可观察、可修改的步骤，而不是继续堆叠命令行参数。
+
+## 4. 核心用户工作流
+
+### 工作流 A：图片整理与命名
+
+```text
+选择来源
+  ↓
+扫描目录和图片
+  ↓
+确认目录分组
+  ↓
+选择或自定义排序规则
+  ↓
+缩略图 / 联系表 / 大图预览
+  ↓
+拖拽调整顺序或逐项修正
+  ↓
+配置命名结构
+  ↓
+批量生成名称并允许逐项覆盖
+  ↓
+检查冲突、非法字符、重复名称
+  ↓
+生成执行计划
+  ↓
+确认后执行
+  ↓
+结果报告 + 撤销入口
 ```
-pixfold/                       # 本仓库
-  HANGOFF.md                   # 本规划文档
-  README.md                    # 仓库门面
-  LICENSE                      # MIT
-  scripts/                     # Python 规则脚本（规则真值来源，保留不删）
-    batch_rename_images.py     # 批量重命名图片（纯标准库）
-    batch_pack_cbz.py          # 批量打包 CBZ + ComicInfo.xml（依赖 Pillow）
-  app/                         # Flutter 工程（Phase 0 起创建；Dart 包名 pixfold）
-    lib/core/                  # 纯 Dart 规则库（无 Flutter 依赖，可单测）
-      natural_sort.dart        # natural_key（(类型,值) 元组方案）
-      name_parser.dart         # parse_name/strip_original_work/clean_cbz_name/clean_folder_name
-                               # （[作者]/（原作）/[DL]/开头()前缀 解析规则）
-      volume.dart              # detect_volume/infer_volumes/renumber_series_volumes（卷号+小数重编号）
-      rename_engine.dart       # generate_new_filename/ensure_unique_filename/排序/移动复制/删除策略
-      pack_engine.dart         # find_comic_folders/derive_metadata/build_comic_info_xml/create_cbz/update_cbz
-      file_access.dart         # FileAccess 抽象：list/read/write/rename/move/copy/delete（平台无关）
-    lib/platform/
-      desktop_fs.dart          # Windows: dart:io 实现
-      android_saf.dart         # Android: MethodChannel → Kotlin SAF 插件
-    lib/ui/
-      screens/rename_screen.dart、pack_screen.dart（双端共享）
-    android/                   # SafPlugin.kt（DocumentFile/DocumentsContract 封装）
-    test/                      # 规则 golden 测试（从 Python 实测用例移植）
-    windows/                   # flutter build windows → exe
+
+排序不能只提供一个下拉框。至少要支持：
+
+- 名称自然排序；
+- 修改时间、创建时间、文件大小；
+- 升序/降序；
+- 多级排序，例如“先目录名，再文件名”；
+- 手动拖拽调整；
+- 排序结果的缩略图预览；
+- 对单张图片设置固定位置；
+- 记录“自动排序结果”和“人工调整结果”两层状态。
+
+命名不能只提供“前缀 + 连接符”。需要把名称拆成可编排组件，例如：
+
+```text
+[自定义前缀]
+[根目录名]
+[相对目录片段]
+[目录序号]
+[图片序号]
+[原文件名]
+[自定义文本]
+[扩展名策略]
 ```
 
-核心架构关键：两个 engine 只依赖 `FileAccess` 抽象，桌面走 `dart:io`、Android 走 SAF 插件，规则层完全平台无关。
+每个组件需要支持：启用/禁用、顺序调整、分隔符、大小写/空白清洗、序号位数和冲突处理。生成结果必须以表格方式展示“原路径 → 新名称”，允许单项编辑。
 
-## 实施步骤（4 阶段）
+### 工作流 B：CBZ 制作
 
-### Phase 0 规则验证（关键路径，先做）
+```text
+选择漫画库
+  ↓
+识别漫画 / 系列 / 卷候选
+  ↓
+确认目录层级和分组
+  ↓
+确认每卷图片顺序
+  ↓
+编辑 title / series / writer
+  ↓
+选择 language：zh / ja / 其他 / 未知 / 不写入
+  ↓
+确认 volume：自动建议或人工输入
+  ↓
+编辑 CBZ 文件名和输出位置
+  ↓
+预览 ComicInfo.xml 与页码列表
+  ↓
+选择冲突和源文件保留策略
+  ↓
+生成执行计划
+  ↓
+确认后打包
+  ↓
+校验 CBZ + 结果报告
+```
 
-1. `flutter create` 工程 + windows/android 平台
-2. 移植 core 层 `natural_sort` / `name_parser` / `volume`（纯 Dart）
-3. 把 Python 实测用例写成 golden 单测对拍，确认等价（如 `[2,2.5,3]→[2,3,4]`、`系列A3→Vol.3`、`[作者A]单行本→[作者A] 单行本`）
+语言不是可以放心自动推断的字段。默认应当是“未设置”，并明确显示：
 
-### Phase 1 文件访问抽象
+- `zh`：中文；
+- `ja`：日文；
+- 其他 ISO 639-1 代码；
+- 未知；
+- 不写入标签。
 
-4. 定义 `FileAccess` 接口（依赖 2）
-5. Windows `dart:io` 实现（依赖 4）
-6. Android SAF Kotlin 插件 + Dart 封装（依赖 4，与 5 并行）
+如果一个批次中不同卷的语言不同，必须支持逐卷设置，不能用全局选项静默覆盖。
 
-### Phase 2 引擎 + UI
+### 工作流 C：更新已有 CBZ
 
-7. `rename_engine` + `pack_engine`（依赖 4/5/6）
-8. UI 两页面：选目录 → 扫描预览 → 参数设置 → 执行 → 结果日志，适配双端差异（依赖 7）
+更新模式需要先读取现有 `ComicInfo.xml`，将当前值和建议值并排显示，允许用户选择：
 
-### Phase 3 打包分发
+- 保留原值；
+- 使用建议值；
+- 清空该字段；
+- 手动改写。
 
-9. Windows 打 exe（`flutter build windows` + Inno Setup/MSIX）（依赖 8）
-10. Android 打 APK/AAB 签名 + GitHub Actions CI 双端产物（依赖 8，与 9 并行）
-11. 端到端验证：Windows 真机流程 + Android 真机 SAF 全流程（依赖 9/10）
+图片内容默认原样保留，只更新用户确认过的元数据。
 
-## 验证
+## 5. 统一领域模型
 
-1. `dart test`：core 规则 golden 用例全绿
-2. 对拍：同一输入目录，GUI（Windows）结果 == CLI 脚本结果（重命名清单、CBZ 内页名、ComicInfo.xml）
-3. Android 真机：SAF 选目录 → 批量重命名/打包 → CBZ 能被漫画阅读器打开；权限持久化；移动/复制/删除正确
-4. 分发：exe 干净机器可装可跑；APK 签名可安装；CI 双端产物产出
+技术栈未定，但领域边界先固定。建议使用以下概念，不把领域逻辑绑定到路径、Widget 或某个 GUI 框架：
 
-## 风险与待定项
+```text
+Workspace       用户选择的一次工作范围
+SourceItem      来源文件或目录的快照
+Collection      图片集合 / 漫画候选集合
+PageOrder       自动排序结果 + 人工调整结果
+NamingScheme    命名组件和格式化规则
+NameProposal    单个文件的建议名称、来源和警告
+ComicGroup      系列与卷的分组关系
+ComicMetadata   title / series / writer / volume / language 等字段
+PackagePlan     CBZ 输出、页码、XML 和文件策略
+OperationPlan   待执行的重命名、复制、移动、打包操作
+ExecutionReport 执行成功、失败、跳过和警告
+UndoRecord      可撤销操作所需的逆向信息
+```
 
-- **最大风险**：规则迁移精度 → 用 golden 测试 + 真实样例对拍兜底
-- Android SAF 跨目录"移动"无原子操作（read+create+delete），批量大文件注意进度与异常处理
-- heic/avif 宽高：Dart `image` 支持有限 → ComicInfo.xml 可省略 ImageWidth/Height（标准允许），v1 先省略
-- `-u` 更新模式建议进 v1 GUI（规则已迁移，代价小），如需缩范围可后置
-- `scripts/` 下 Python 脚本**保留**为规则真值来源，不删除
+关键原则：
 
-## 参考
+1. **扫描、决策、执行分离**：扫描不改文件；用户决策形成计划；执行只执行已确认计划。
+2. **自动建议和最终值分离**：自动解析出的值必须保留来源和置信/警告信息。
+3. **路径与文档标识分离**：Windows/Linux 可使用路径，Android 需要兼容 SAF URI 或文档 ID，领域层不能假设所有资源都有普通路径。
+4. **计划优先于直接操作**：任何重命名、移动、复制、删除、打包都先生成可检查的计划。
+5. **结果可追溯**：记录原始标识、新标识、操作时间、策略和错误信息。
 
-- 规则细节与实测记录：`scripts/` 下两个 Python 脚本的 docstring
-- ComicInfo.xml 规范：anansi-project/comicinfo v2.0（元素顺序 Title→Series→…→Volume→…→Writer→…→PageCount→LanguageISO→…→Pages）
+## 6. 交互设计原则
+
+### 6.1 默认采用“建议 + 人工确认”
+
+系统可以自动推导，但不能把推导当成事实。每个自动值都要能回答：
+
+- 来源是什么？文件名、目录层级、图片顺序还是用户模板？
+- 如果不正确，用户在哪里修改？
+- 修改后是否只影响当前项，还是影响整个系列？
+
+### 6.2 预览不是日志，而是主要工作区
+
+预览区需要能够：
+
+- 浏览缩略图；
+- 查看大图；
+- 拖拽排序；
+- 编辑名称和元数据；
+- 标记异常；
+- 筛选未确认项、冲突项和推断项；
+- 展开查看原始路径与目标路径。
+
+### 6.3 按批次统一，也允许逐项例外
+
+用户应该可以先对整个系列设置默认值，再对某一卷或某一张图片覆盖。逐项覆盖不能破坏批量配置，也不能在刷新扫描后无提示丢失。
+
+### 6.4 所有破坏性动作可解释
+
+执行前显示：
+
+- 将修改哪些文件；
+- 将创建哪些 CBZ；
+- 将覆盖哪些已有文件；
+- 将删除哪些源目录或文件；
+- 哪些文件因权限、格式或冲突无法处理。
+
+删除操作不应默认出现，并且需要独立确认，不与“开始执行”按钮绑定成隐式行为。
+
+## 7. 平台策略
+
+### Android（优先）
+
+Android 不是后置适配项，设计阶段必须优先验证：
+
+- SAF 目录选择和持久化授权；
+- 目录树下的扫描、读取、创建、重命名和删除能力；
+- 大量图片缩略图生成；
+- 后台任务、进度和应用切后台后的恢复；
+- 目标目录不等于真实路径时，预览和错误信息如何表达；
+- 用户选中的目录权限失效后的恢复流程。
+
+Android 第一版应优先保证“选目录 → 预览 → 手工确认 → 生成 CBZ/命名计划 → 执行”的闭环，不追求一次覆盖所有桌面能力。
+
+### Windows
+
+Windows 适合做完整工作台和开发验证：
+
+- 普通文件路径访问；
+- 大屏多栏布局；
+- 批量拖拽和表格编辑；
+- 快捷键、右键菜单和详细日志；
+- 大批量文件的性能基准。
+
+### Linux
+
+Linux 作为第三目标平台，设计上尽量不依赖 Windows 专有路径和打包机制。需要提前避免：
+
+- 把创建时间当成所有平台都可靠的字段；
+- 把回收站、文件权限和路径分隔符写死；
+- 依赖只在 Windows 有效的原生文件选择器行为。
+
+## 8. 技术栈决策门槛
+
+当前不做“先选框架再适配需求”。技术方案必须通过以下验证后再定：
+
+1. 能否在 Android 上稳定访问 SAF 文档树；
+2. 能否支持高效缩略图和大图预览；
+3. 能否实现拖拽排序和表格/表单编辑；
+4. 能否运行后台任务并可靠报告进度；
+5. 能否实现计划、撤销、错误恢复和离线运行；
+6. 能否覆盖 Windows、Android、Linux 的发布链路；
+7. 核心领域逻辑能否独立测试；
+8. 个人学习成本和长期维护成本是否可接受。
+
+建议做三个小型技术验证，而不是直接开完整工程：
+
+- **Android 文件访问 spike**：选目录、持久化权限、遍历图片、读取字节、创建文件、重命名。
+- **交互原型 spike**：缩略图网格、拖拽排序、名称表格、CBZ 元数据编辑和执行计划预览。
+- **核心处理 spike**：从 Python 样例中抽取排序、命名、ComicInfo.xml、CBZ 生成的最小输入输出测试。
+
+三个 spike 的结果再决定使用 Flutter、Qt/QML、Compose Multiplatform、Tauri、Slint、原生方案或其他组合。技术决策需要单独记录 ADR，不在本文件中提前假定。
+
+## 9. 设计阶段路线
+
+### D0：需求与样例固化
+
+- 整理两个脚本的功能矩阵；
+- 建立真实目录样例和异常样例；
+- 明确哪些字段必须人工确认；
+- 明确 Android 优先闭环；
+- 把当前脚本中的危险默认值标注出来。
+
+### D1：交互原型
+
+先不连接真实文件系统，完成：
+
+- 图片列表/缩略图预览；
+- 拖拽排序；
+- 命名结构编辑器；
+- CBZ 元数据编辑器；
+- 执行计划预览；
+- 冲突和警告展示。
+
+验收标准：用户可以完整走完两个工作流，并且每个必须人工输入的字段都有明确入口。
+
+### D2：平台能力验证
+
+优先 Android SAF，再验证 Windows 和 Linux 文件访问。重点验证最容易推翻技术选型的能力，不先做完整业务。
+
+### D3：领域核心与适配层
+
+将排序、命名、元数据、ComicInfo.xml、CBZ 生成、计划和报告拆成可测试核心；平台层只负责资源访问、缩略图、权限和任务生命周期。
+
+### D4：MVP 闭环
+
+优先交付：
+
+- Android：单目录/单系列，图片预览与人工排序，逐卷元数据，CBZ 生成；
+- Windows：同一流程 + 完整批量命名和计划执行；
+- Linux：完成核心流程和基本文件访问。
+
+### D5：增强功能
+
+- 多系列批处理；
+- 命名模板保存与复用；
+- CBZ 更新模式；
+- 操作历史和撤销；
+- 失败任务重试；
+- 更丰富的图片格式和元数据；
+- Windows/Linux 高级批量快捷操作。
+
+## 10. 验收标准
+
+### 功能
+
+- 用户能看到并调整图片最终顺序；
+- 用户能看到并修改每个文件的最终名称；
+- 用户能逐卷设置 title、series、writer、volume、language；
+- 用户能看到 ComicInfo.xml 和 CBZ 内页顺序预览；
+- 所有文件操作都能在执行前预览；
+- 默认不会删除源文件；
+- 冲突、失败和跳过项都有明确结果。
+
+### 数据正确性
+
+- Python 脚本现有样例作为回归参考；
+- 相同输入和相同人工决策下，核心结果可重复；
+- ComicInfo.xml 字段和页码数量一致；
+- CBZ 可被目标漫画阅读器打开；
+- 执行中断后不会留下无法解释的半成品，或能明确标记待恢复状态。
+
+### 平台
+
+- Android 真机完成 SAF 选目录、授权、扫描、预览、打包闭环；
+- Windows 完成大批量文件和详细预览流程；
+- Linux 完成核心操作和基础发布验证。
+
+## 11. 当前待确认问题
+
+1. 图片排序是否需要“每组一套排序规则”，还是一个批次统一规则？
+2. 手工拖拽后的顺序是否要自动写入文件名序号？
+3. 命名模板是否需要保存为可复用配置？
+4. CBZ 语言除 `zh`、`ja` 外，是否需要完整 ISO 639-1 列表？
+5. 是否需要支持封面页、双页、彩页、广告页等 Page 类型？
+6. 删除是否只允许移动到回收站/系统废纸篓，而不是直接删除？
+7. 是否需要把一次完整工作流保存为项目文件，以便稍后继续？
+8. Android 首版是否先限制为单一授权目录，暂不支持跨目录批处理？
+
+## 12. 参考文件
+
+- 现有行为参考：`scripts/batch_rename_images.py`
+- 现有行为参考：`scripts/batch_pack_cbz.py`
+- 环境交接摘要：[`s_handoff.md`](s_handoff.md)
+- 项目门面：[`README.md`](README.md)
