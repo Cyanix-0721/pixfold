@@ -295,12 +295,12 @@ Linux 作为第三目标平台，设计上尽量不依赖 Windows 专有路径�
 
 > 候选排序与理由,不是最终锁定;最终决策另行记录。环境已装 Flutter 3.47.2 + VS Build Tools(见 §12),属**事实倾向**,spike 中须以同等标准检验,避免"工具就绪"主导结论。
 
-| 排序 | 方案 | 判断 |
-|---|---|---|
-| 主候选 | **Flutter + Dart** | 八条门槛无硬伤;Android/Windows/Linux 三端均 stable;拖拽与自绘 UI 强;桌面数据表格类交互需自建或三方;SAF 无官方方案(社区包或自写 Kotlin channel,参照 LocalSend 开源实践),是唯一真风险,由 §8.2 spike 验证 |
-| 对照 | **Compose Multiplatform + Kotlin** | Android 端即原生 Jetpack Compose,SAF/ContentResolver 直达,是唯一硬胜出项;代价:KMP/Gradle 工程复杂度高、Android 工具链未装、桌面打包生态较新。仅当主候选触发 §8.2 证伪条件时启用对照 |
-| 暂排除 | **Tauri(Rust + Web)** | 桌面成熟,但移动端为 2.x 新路径,与"Android 优先"相悖;SAF 无成熟路径;换栈须以 Rust 重写全部 Python 行为参考,回归基准作废 |
-| 本轮未进入 | Qt/QML、Slint、纯原生 | 单人维护面/生态/学习成本不占优;不排除证伪后重审 |
+| 排序       | 方案                               | 判断                                                                                                                                                                                                   |
+| ---------- | ---------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| 主候选     | **Flutter + Dart**                 | 八条门槛无硬伤;Android/Windows/Linux 三端均 stable;拖拽与自绘 UI 强;桌面数据表格类交互需自建或三方;SAF 无官方方案(社区包或自写 Kotlin channel,参照 LocalSend 开源实践),是唯一真风险,由 §8.2 spike 验证 |
+| 对照       | **Compose Multiplatform + Kotlin** | Android 端即原生 Jetpack Compose,SAF/ContentResolver 直达,是唯一硬胜出项;代价:KMP/Gradle 工程复杂度高、Android 工具链未装、桌面打包生态较新。仅当主候选触发 §8.2 证伪条件时启用对照                    |
+| 暂排除     | **Tauri(Rust + Web)**              | 桌面成熟,但移动端为 2.x 新路径,与"Android 优先"相悖;SAF 无成熟路径;换栈须以 Rust 重写全部 Python 行为参考,回归基准作废                                                                                 |
+| 本轮未进入 | Qt/QML、Slint、纯原生              | 单人维护面/生态/学习成本不占优;不排除证伪后重审                                                                                                                                                        |
 
 ### 8.2 spike 判定与执行顺序(2026-09-07)
 
@@ -314,27 +314,29 @@ Linux 作为第三目标平台，设计上尽量不依赖 Windows 专有路径�
 
 ### 8.3 D2 SAF spike 执行方案(2026-09-07 记录,环境验收后启动)
 
-**状态**:方案已定,**暂不建工程**。前置条件为新终端 `flutter doctor -v` 全绿(见 §12,①–⑥ 已完成,⑦ 待用户终端验收)。
+**状态**:方案已定,**暂不建工程**。前置条件为新终端 `flutter.bat doctor -v` 全绿(见 §12,①–⑥ 已完成,⑦ 待用户终端验收)。
 
 **目标**:最小工程验证 Android SAF 全闭环,用于判定 §8.2 证伪条件 ①②;不做任何业务 UI。
 
 **工程形态**:
+
 - 目录:`C:\Personal\pixfold-spike`(仓库外兄弟目录,不污染设计仓库;非正式工程);
-- `flutter create --platforms=android,windows`,仅作通道验证,不进入 D3 工程。
+- `flutter.bat create --platforms=android,windows`,仅作通道验证,不进入 D3 工程。
 
 **Kotlin(MainActivity,MethodChannel `pixfold/saf`)**:
 
-| 方法 | Android 实现 |
-|---|---|
-| `openTree` | `ACTION_OPEN_DOCUMENT_TREE` + `takePersistableUriPermission` |
-| `listImages` | `DocumentFile.fromTreeUri` 递归,按扩展名筛图,返回相对路径 / uri / size |
-| `readBytes` | `contentResolver.openInputStream` |
-| `renameDoc` | `DocumentsContract.renameDocument` |
-| `createAndWrite` | `DocumentsContract.createDocument` + `openOutputStream` |
+| 方法             | Android 实现                                                           |
+| ---------------- | ---------------------------------------------------------------------- |
+| `openTree`       | `ACTION_OPEN_DOCUMENT_TREE` + `takePersistableUriPermission`           |
+| `listImages`     | `DocumentFile.fromTreeUri` 递归,按扩展名筛图,返回相对路径 / uri / size |
+| `readBytes`      | `contentResolver.openInputStream`                                      |
+| `renameDoc`      | `DocumentsContract.renameDocument`                                     |
+| `createAndWrite` | `DocumentsContract.createDocument` + `openOutputStream`                |
 
 **Dart**:`saf_channel.dart` 封装 + 测试按钮序列:选目录 → 列前 N 张 → 读第 1 张 → 复制改名 → 删除副本(每步回显)。
 
 **验收清单**(全部通过 = 证伪条件 ① 排除,维持 Flutter 主候选):
+
 1. 授权后重启进程仍有效(持久授权);
 2. 500+ 图目录递归遍历耗时可接受;
 3. 读取大图字节数与平台侧一致;
@@ -441,57 +443,56 @@ Windows 开发机工具链已基本就位(git / VS Code / scoop / winget / mise 
 
 ### 12.2 环境实况清单(2026-09-07 更新)
 
-| 组件 | 状态 | 版本 / 位置 |
-|---|---|---|
-| Git | ✅ | 2.55.0(scoop) |
-| VS Code | ✅ | 1.136(scoop apps/vscode) |
-| scoop | ✅ | main / extras / versions / sysinternals / nerd-fonts 桶 |
-| winget | ✅ | v1.29.290 |
-| mise | ✅ | 2026.9.1(全局配置 `C:\Users\Administrator\.config\mise\config.toml`) |
-| **Flutter SDK** | ✅ | **3.47.2 / Dart 3.13.2**,mise 全局管理<br>路径:`C:\Users\Administrator\AppData\Local\mise\installs\flutter\3.47.2` |
-| **VS Build Tools** | ✅ | **18.9.12112.369**(VS 2026,v145 工具集)<br>路径:`C:\Program Files (x86)\Microsoft Visual Studio\18\BuildTools` |
-| JDK | ✅ | temurin-17.0.20+101(mise 2026-09-03 起装);JAVA_HOME 已 setx(2026-09-07) |
-| android-clt(Android SDK) | ✅ | 15859902;`current` 即**完整 SDK**:platforms;android-36、build-tools;36.0.0、platform-tools、cmdline-tools/latest、licenses 均就绪 |
-| ANDROID_HOME | ✅ | 已 setx = `C:\Users\Administrator\scoop\apps\android-clt\current`(2026-09-07) |
-| adb | ✅ 已卸独立版 | 2026-09-07 卸载 scoop adb(37.0.1 / 旧 37.0.0),统一用 SDK platform-tools |
-| WSL | ✅(远期用) | Debian 13 (trixie),podman 5.4.2 ——留给 Linux 目标预览/容器构建 |
+| 组件                     | 状态          | 版本 / 位置                                                                                                                                                                                                                         |
+| ------------------------ | ------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Git                      | ✅            | 2.55.0(scoop)                                                                                                                                                                                                                       |
+| VS Code                  | ✅            | 1.136(scoop apps/vscode)                                                                                                                                                                                                            |
+| scoop                    | ✅            | main / extras / versions / sysinternals / nerd-fonts 桶                                                                                                                                                                             |
+| winget                   | ✅            | v1.29.290                                                                                                                                                                                                                           |
+| mise                     | ✅            | 2026.9.1(全局配置 `C:\Users\Administrator\.config\mise\config.toml`)                                                                                                                                                                |
+| **Flutter SDK**          | ✅            | **3.47.2 / Dart 3.13.2**,mise 全局管理,**版本请求 `latest`**(registry http 后端,2026-09-07 切换;旧自定义源备份于 `config.toml.bak-20260907`,回滚可恢复)<br>路径:`C:\Users\Administrator\AppData\Local\mise\installs\flutter\3.47.2` |
+| **VS Build Tools**       | ✅            | **18.9.12112.369**(VS 2026,v145 工具集)<br>路径:`C:\Program Files (x86)\Microsoft Visual Studio\18\BuildTools`                                                                                                                      |
+| JDK                      | ✅            | temurin-17.0.20+101,请求 `temurin-17`(config.toml);JAVA_HOME 已 setx(2026-09-07)                                                                                                                                                    |
+| android-clt(Android SDK) | ✅            | 15859902;`current` 即**完整 SDK**:platforms;android-36、build-tools;36.0.0、platform-tools、cmdline-tools/latest、licenses 均就绪                                                                                                   |
+| ANDROID_HOME             | ✅            | manifest `env_set` 自动写入安装目录;2026-09-07 手动 setx 冗余确认(值一致)                                                                                                                                                           |
+| adb                      | ✅ 已卸独立版 | 2026-09-07 卸载 scoop adb(37.0.1 / 旧 37.0.0),统一用 SDK platform-tools                                                                                                                                                             |
+| WSL                      | ✅(远期用)    | Debian 13 (trixie),podman 5.4.2 ——留给 Linux 目标预览/容器构建                                                                                                                                                                      |
+
+> 机制注(2026-09-07,读 manifest 核实):`android-clt`(15859902)的 manifest 自带 `env_set:{ANDROID_HOME: <安装目录>}`、`env_add_path:[cmdline-tools/latest/bin, platform-tools]`,并把 SDK 组件目录(add-ons/build-tools/cmake/extras/licenses/ndk/patcher/platforms/skiaparser/sources/system-images)列入 `persist`(current 下为指向 `scoop\persist\android-clt` 的链接)。含义:装完即全局可用 adb / sdkmanager / avdmanager,组件目录在 scoop 更新时保留。**adb 裸命令可用来自 PATH 的 platform-tools,与 ANDROID_HOME 无直接关系**;环境变量写入后需**新终端**才生效(旧进程看不到)。注意:**包本身只含 cmdline-tools**,platform-tools 目录是 pre_install 建的"空壳 PATH 目标",adb/platforms/build-tools 均为 2026-09-03 由 `sdkmanager` 装入;platform-tools 不在 persist,`scoop update android-clt` 后若 adb 消失,用 `sdkmanager "platform-tools"` 补装(platforms/build-tools 等 persist 组件不受影响)。
+
+> 项目级配置(2026-09-07 更新):仓库根 `.mise.toml` **保持纯配置无注释**,说明统一在本注维护。内容:`flutter = "3.47.2"`(**项目固定**当前已验证版本,全局仍 latest;候选栈为 Flutter,工程环境需要稳定可复现;升级 = 改本文件版本号 → `mise install`)与 `java = "temurin-17"`(Android/Gradle 构建所需)。**声明 ≠ 已安装**:新机器上需 `mise install` 才按声明下载。**全局 config.toml 已由 chezmoi 纳管**(源 `~/.local/share/chezmoi/dot_config/mise/config.toml`),改全局声明请编辑 chezmoi 源后 `chezmoi apply`,**勿用 `mise use -g`**(绕过 chezmoi 造成源与实际漂移)。**边界约定**(用户级,勿破坏):Python 由 uv 管理、Node 由 fnm 管理,mise 均不接管。工具版本请求变更请同步维护本节(§12.2)。跨平台调用约定见 §12.5。
 
 ### 12.3 Android 平台验证准备(设计阶段优先)
 
-> **进度(2026-09-07)**:下方 ①–⑥ 已全部执行完毕(含 ANDROID_HOME / JAVA_HOME 落盘、卸载独立 adb)。剩余第 ⑦ 步验收需在自己的新终端执行:`flutter doctor -v`(沙箱内 wmic/reg 被安全策略拦截,无法代跑)。
+> **进度(2026-09-07)**:下方 ①–⑥ 已全部执行完毕(含 ANDROID_HOME / JAVA_HOME 落盘、卸载独立 adb)。**⑦ 验收已于 2026-09-07 通过**(用户 pwsh 实测 `flutter doctor`:Flutter 3.47.2 ✓ / Android toolchain ✓ / VS ✓ / 设备在线;Windows 调用约定见 §12.5:pwsh 已配适配函数可直接敲 `flutter`,git-bash/CI 用全名 `flutter.bat`)。
 
 ```powershell
 # ① JDK 17(sdkmanager 是 Java 程序,必须先有它)
-mise use -g java@temurin-17
-java -version
+# 注:曾用 `mise use -g java@temurin-17`;2026-09-07 起全局声明由 chezmoi 纳管,
+#     等效做法 = 编辑 chezmoi 源 dot_config/mise/config.toml → apply → mise install
+mise install
+
+# ③ ANDROID_HOME:无需手动设置(android-clt manifest env_set 自动写入,见 §12.2 机制注;历史指引为 setx)
 
 # ② Android 命令行工具
 scoop install android-clt
-scoop prefix android-clt          # 记下输出 → 作为 ANDROID_HOME
-
-# ③ 设 ANDROID_HOME(新终端生效)
-setx ANDROID_HOME "（②的输出路径）"
 
 # ④ SDK 组件(Flutter 3.47.2 默认 compileSdk=36)
 sdkmanager "platform-tools" "platforms;android-36" "build-tools;36.0.0"
 
 # ⑤ 同意许可证(之后 Gradle 能自动补装缺失组件)
-flutter doctor --android-licenses    # 一路 y
-
-# ⑥ 卸独立 adb,避免双 adb 版本漂移
-scoop uninstall adb
+flutter.bat doctor --android-licenses    # 一路 y
 
 # ⑦ 体检(验收标准)
-flutter doctor -v
+flutter.bat doctor -v
 # 期望:Flutter ✓ / Android toolchain ✓ / Visual Studio ✓
-# (新终端里若想裸敲 adb,把 %ANDROID_HOME%\platform-tools 加进用户 PATH)
 ```
 
 **环境准备完成** → 插上 Android 16 真机(开发者选项 + USB 调试),先只验证设备和 SAF 所需基础能力:
 
 ```powershell
-flutter devices        # 能看到手机
-flutter doctor -v      # 确认 Android toolchain 可用
+flutter.bat devices        # 能看到手机
+flutter.bat doctor -v      # 确认 Android toolchain 可用
 ```
 
 正式工程框架暂不创建。先完成 spike 与交互原型,再根据 Android SAF、缩略图、拖拽排序和后台任务验证结果决定技术栈(见 §8)。
@@ -499,10 +500,10 @@ flutter doctor -v      # 确认 Android toolchain 可用
 ### 12.4 每日必用命令速查
 
 ```powershell
-flutter doctor -v        # 环境体检(第一排查手段)
-flutter devices          # 列出可用设备
-flutter run              # 热重载开发(r 热重载 / R 全重启 / q 退出)
-flutter create --platforms=windows,android app  # 技术栈确定后再创建正式工程
+flutter.bat doctor -v        # 环境体检(第一排查手段)
+flutter.bat devices          # 列出可用设备
+flutter.bat run              # 热重载开发(r 热重载 / R 全重启 / q 退出)
+flutter.bat create --platforms=windows,android app  # 技术栈确定后再创建正式工程
 sdkmanager --list        # 看 SDK 组件可用版本
 mise ls                  # 看 mise 管的工具版本
 ```
@@ -512,21 +513,24 @@ mise ls                  # 看 mise 管的工具版本
 - **Visual Studio ≠ VS Code**:编译 Windows 桌面要的是 Build Tools 的 C++ 工作负载,VS Code 只是编辑器。
 - **flutter doctor 认 SDK 目录结构**(`$ANDROID_HOME\platform-tools\adb` 等),不认 PATH 上的散装 adb → platform-tools 必装。
 - **双 adb 会打架**:scoop adb 与 SDK platform-tools adb 版本漂移 → 报 `adb server version mismatch`,已定方案是卸 scoop 版(2026-09-07 已卸)。
-- **licenses 不点** → Android toolchain 永远 ❌;`flutter doctor --android-licenses` 一路 y。
+- **licenses 不点** → Android toolchain 永远 ❌;`flutter.bat doctor --android-licenses` 一路 y。
+- **Windows 下 mise 无法为 flutter 生成可用 shim**(2026-09-07 实证):registry http/vfox 后端的 binary 元数据都指向无扩展名 `bin\flutter`(官方 SDK 里的 shell 脚本,非 Windows 可执行)→ mise 生成的 `flutter.exe` shim 报 `No executable found…`;pwsh 命令解析同样会误选该"文档文件"。**已解决(2026-09-07)**:pwsh profile 加 `function global:flutter`(chezmoi 源 `dot_config/powershell/profile.ps1`,每次 apply 自动同步至 `Documents\PowerShell\profile.ps1`)——Windows 检测到 `flutter.bat` 自动转调,Linux/macOS 直接原生,**交互终端统一敲 `flutter` 即可,跨平台命令一致**。`dart` 命令同样适配(随 Flutter 捆绑)。仍须用 `.bat` 全名的场景:git-bash、CI/脚本、`mise x flutter -- flutter.bat`。IDE 用 VS Code 的 `dart.flutterSdkPaths` 填 `mise where flutter` 直连 SDK。删坏 shim 无效(reshim 会重建),但 pwsh 函数优先级高于 PATH 中的 shim,不受影响。
+- **flutter doctor 的 `flutter/dart on your path resolves to ...http-tarballs...` 为 cosmetic 警告**(2026-09-07):SDK 真实安装在 mise `http-tarballs` 缓存,`installs\flutter\3.47.2` 是 symlink,mise activate 注入 PATH 的是解析后的真实路径,与 doctor 判定的 checkout 不一致。功能无影响,可忽略。
+- **mise 两种 Windows shim 模式对 flutter 均无解**(2026-09-07 实验):`windows_shim_mode=exe`(默认)生成的 `flutter.exe` shim 报 `No executable found`;切 `file` 模式生成的 `flutter.cmd` + 无扩展 bash shim 同样失败(bash shim 内部仍解析 `bin/flutter`),且无扩展 bash shim 会干扰 pwsh 命令解析(误选为 document)。结论:**mise 在 Windows 上对"入口为无扩展脚本 + .bat"类 SDK 的支持是结构性缺口**,勿再尝试;Windows 交互一律靠 pwsh 函数(见上条),已恢复 `exe` 模式。
 - **compileSdk 不必 ≥ 手机版本**:手机 Android 16 = API 36,装 `platforms;android-36` 恰好对齐;以后想用新 API 再追加装更高 platform(可多版本并存)。
 - **mise 装 Flutter 若在 Windows 报错** → 回退 `scoop bucket add extras && scoop install flutter`(本次未遇到,mise 3.47.2 一次成功)。
 - **VS Code 报找不到 Flutter** → 设置 `dart.flutterSdkPaths` 填 `mise where flutter` 的输出。
 
 ### 12.6 版本锚点(本机已验证)
 
-| 项 | 版本 |
-|---|---|
-| Flutter stable | 3.47.2(2026-08-26 revision d3b14c87) |
-| Dart | 3.13.2(随 Flutter 捆绑) |
-| compileSdk / minSdk / targetSdk | 36 / 24 / 36(源码 `flutter_tools/.../FlutterExtension.kt` 核实) |
-| Android platform | `platforms;android-36`(Android 16,与真机一致) |
-| VS Build Tools | 18.9.12112.369(VS 2026 / v145) |
-| Material/Cupertino | 以当前 Flutter SDK / 项目模板实际生成结果为准,后续创建工程时再确认依赖 |
+| 项                              | 版本                                                                   |
+| ------------------------------- | ---------------------------------------------------------------------- |
+| Flutter stable                  | 3.47.2(2026-08-26 revision d3b14c87)                                   |
+| Dart                            | 3.13.2(随 Flutter 捆绑)                                                |
+| compileSdk / minSdk / targetSdk | 36 / 24 / 36(源码 `flutter_tools/.../FlutterExtension.kt` 核实)        |
+| Android platform                | `platforms;android-36`(Android 16,与真机一致)                          |
+| VS Build Tools                  | 18.9.12112.369(VS 2026 / v145)                                         |
+| Material/Cupertino              | 以当前 Flutter SDK / 项目模板实际生成结果为准,后续创建工程时再确认依赖 |
 
 ## 13. 参考文件
 

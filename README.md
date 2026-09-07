@@ -57,6 +57,39 @@ D5  增加模板、撤销、更新 CBZ、多系列批处理等增强功能
 
 技术栈先经 spike 验证再锁定:当前候选 Flutter(主候选)、Compose Multiplatform(对照),Tauri 暂排除,详见 HANGOFF §8。
 
+## 开发环境部署(⚠️ 暂定)
+
+> 本节按 **Flutter + Dart 候选**准备,**非最终部署**——技术栈尚未锁定(见 HANGOFF §8),spike 验证通过前随时可能修订。完整步骤、进度与踩坑见 [HANGOFF.md](HANGOFF.md) §12。
+
+- **Flutter / Dart**:由 **mise** 管理,PixFold 在 `.mise.toml` **固定 `3.47.2`**(当前 stable 解析;升级 = 改 `.mise.toml` 版本号 → `mise install`)。Windows 命令行直接敲 `flutter`(pwsh profile 适配,git-bash/CI 用 `flutter.bat`),详见 HANGOFF §12。
+- **JDK**:mise 管理,请求 `temurin-17`,当前 17.0.20+101;`JAVA_HOME` 已 setx 指向 mise 目录。
+- **Android SDK**:`scoop install android-clt`(15859902),其 `current` 目录即完整 SDK 根;`ANDROID_HOME` 由该包 manifest `env_set` **自动写入**(装完新终端生效);`platforms;android-36`、`build-tools;36.0.0` 已装。
+- **adb**:该包**不自带 adb**,需 `sdkmanager "platform-tools"` 装入;PATH 已由 scoop 自动含 `cmdline-tools/latest/bin` 与 `platform-tools`(裸敲 adb/sdkmanager 可用),独立 scoop adb 包已卸载(防双 adb)。
+- **验收(⑦)**:pwsh 新终端直接 `flutter doctor -v`(已配 profile 适配函数:Windows 自动转调 `flutter.bat`,Linux/macOS 原生,见 HANGOFF §12;git-bash/CI 场景仍用 `flutter.bat`),期望 Flutter ✓ / Android toolchain ✓ / Visual Studio ✓。
+
+```powershell
+# ═══ PixFold 候选栈环境重建命令(项目相关步骤;基础工具链 scoop/mise/pwsh 视为已就绪)═══
+
+# 1) 按项目 .mise.toml 安装版本声明(flutter 3.47.2 + java temurin-17;幂等,只补缺失)
+mise install
+
+# 2) Android SDK(android-clt manifest 自动写入 ANDROID_HOME 与 PATH)
+scoop install android-clt
+#   ↑ 新开终端再继续(sdkmanager 才在 PATH)
+
+# 3) Android SDK 组件(与 Flutter 3.47.2 默认 compileSdk=36 对齐)
+sdkmanager "platform-tools" "platforms;android-36" "build-tools;36.0.0"
+
+# 4) Android licenses(首次)
+flutter.bat doctor --android-licenses
+
+# 5) VS Build Tools —— Windows 桌面构建与 doctor 的 Visual Studio ✓(体积大,可选)
+winget install -e --id Microsoft.VisualStudio.BuildTools --override "--add Microsoft.VisualStudio.Workload.VCTools --includeRecommended --passive --norestart"
+
+# 6) 验收:期望 Flutter ✓ / Android toolchain ✓ / Visual Studio ✓
+flutter.bat doctor -v
+```
+
 ## 文档
 
 - [`HANGOFF.md`](HANGOFF.md)：产品定位、工作流、领域模型、平台策略、设计路线、验收标准与开发环境实况(§12)；
