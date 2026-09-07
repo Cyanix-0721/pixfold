@@ -27,7 +27,7 @@ PixFold 不是把两个 Python 脚本简单搬进一个窗口，也不是单纯�
 
 - 最终覆盖 Windows、Android、Linux。
 - Android 是优先平台，不能把 Android 当成桌面版的缩小移植。
-- 技术栈暂不强求；在交互原型和平台能力验证前，不锁定 Flutter、Rust、Qt、Tauri、Slint 或其他方案。
+- 技术栈在 spike 验证完成前不最终锁定;当前候选假设(Flutter 主候选、Compose Multiplatform 对照、Tauri 暂排除)与证伪条件见 §8.1、§8.2(2026-09-07 更新)。
 - 现有两个 Python 脚本保留，不删除，继续作为行为参考、回归样例和命令行备用工具。
 - 文件破坏性操作必须经过明确确认；默认不删除源文件，不继承脚本中“强制删除”的危险默认值。
 - 所有重要自动推断都必须展示依据，并允许人工覆盖。
@@ -289,7 +289,59 @@ Linux 作为第三目标平台，设计上尽量不依赖 Windows 专有路径�
 - **交互原型 spike**：缩略图网格、拖拽排序、名称表格、CBZ 元数据编辑和执行计划预览。
 - **核心处理 spike**：从 Python 样例中抽取排序、命名、ComicInfo.xml、CBZ 生成的最小输入输出测试。
 
-三个 spike 的结果再决定使用 Flutter、Qt/QML、Compose Multiplatform、Tauri、Slint、原生方案或其他组合。技术决策需要单独记录 ADR，不在本文件中提前假定。
+三个 spike 的结果再决定使用 Flutter、Qt/QML、Compose Multiplatform、Tauri、Slint、原生方案或其他组合。技术决策需要单独记录 ADR,不在本文件中提前假定。
+
+### 8.1 当前候选假设(2026-09-07)
+
+> 候选排序与理由,不是最终锁定;最终决策另行记录。环境已装 Flutter 3.47.2 + VS Build Tools(见 §12),属**事实倾向**,spike 中须以同等标准检验,避免"工具就绪"主导结论。
+
+| 排序 | 方案 | 判断 |
+|---|---|---|
+| 主候选 | **Flutter + Dart** | 八条门槛无硬伤;Android/Windows/Linux 三端均 stable;拖拽与自绘 UI 强;桌面数据表格类交互需自建或三方;SAF 无官方方案(社区包或自写 Kotlin channel,参照 LocalSend 开源实践),是唯一真风险,由 §8.2 spike 验证 |
+| 对照 | **Compose Multiplatform + Kotlin** | Android 端即原生 Jetpack Compose,SAF/ContentResolver 直达,是唯一硬胜出项;代价:KMP/Gradle 工程复杂度高、Android 工具链未装、桌面打包生态较新。仅当主候选触发 §8.2 证伪条件时启用对照 |
+| 暂排除 | **Tauri(Rust + Web)** | 桌面成熟,但移动端为 2.x 新路径,与"Android 优先"相悖;SAF 无成熟路径;换栈须以 Rust 重写全部 Python 行为参考,回归基准作废 |
+| 本轮未进入 | Qt/QML、Slint、纯原生 | 单人维护面/生态/学习成本不占优;不排除证伪后重审 |
+
+### 8.2 spike 判定与执行顺序(2026-09-07)
+
+**证伪条件**(任一在 D2 SAF spike 中被 Android 16 真机证实,即启用 CMP 对照 spike,不切 Tauri):
+
+1. 无法稳定完成"选目录 → 持久授权 → 递归遍历 → 读字节 → 创建/重命名"闭环,且社区包 + 自写 channel(LocalSend 同款路线)的修复成本不可接受;
+2. 千级缩略图在目标机型出现不可接受的解码性能或内存问题;
+3. 桌面数据表格类交互在三方包 + 自建基础上仍无法满足 D1 验收。
+
+**顺序调整**:D2 的 SAF spike 可先于 D1 完整交互原型执行——平台风险(可推翻选型)高于交互风险(拖拽/表格在候选方案上均为已知可做),先验证可避免 D1 原型资产因换栈浪费。D1 原型在 spike 通过后启动,此时栈已锁,原型不重做。
+
+### 8.3 D2 SAF spike 执行方案(2026-09-07 记录,环境验收后启动)
+
+**状态**:方案已定,**暂不建工程**。前置条件为新终端 `flutter doctor -v` 全绿(见 §12,①–⑥ 已完成,⑦ 待用户终端验收)。
+
+**目标**:最小工程验证 Android SAF 全闭环,用于判定 §8.2 证伪条件 ①②;不做任何业务 UI。
+
+**工程形态**:
+- 目录:`C:\Personal\pixfold-spike`(仓库外兄弟目录,不污染设计仓库;非正式工程);
+- `flutter create --platforms=android,windows`,仅作通道验证,不进入 D3 工程。
+
+**Kotlin(MainActivity,MethodChannel `pixfold/saf`)**:
+
+| 方法 | Android 实现 |
+|---|---|
+| `openTree` | `ACTION_OPEN_DOCUMENT_TREE` + `takePersistableUriPermission` |
+| `listImages` | `DocumentFile.fromTreeUri` 递归,按扩展名筛图,返回相对路径 / uri / size |
+| `readBytes` | `contentResolver.openInputStream` |
+| `renameDoc` | `DocumentsContract.renameDocument` |
+| `createAndWrite` | `DocumentsContract.createDocument` + `openOutputStream` |
+
+**Dart**:`saf_channel.dart` 封装 + 测试按钮序列:选目录 → 列前 N 张 → 读第 1 张 → 复制改名 → 删除副本(每步回显)。
+
+**验收清单**(全部通过 = 证伪条件 ① 排除,维持 Flutter 主候选):
+1. 授权后重启进程仍有效(持久授权);
+2. 500+ 图目录递归遍历耗时可接受;
+3. 读取大图字节数与平台侧一致;
+4. 重命名 / 创建 / 删除后回读一致;
+5. 顺带测证伪条件②:千级缩略图滚动(`ContentResolver.loadThumbnail` 或 `BitmapFactory inSampleSize`)。
+
+**触发**:任一验收失败且"社区包 + 自写 channel"修复成本不可接受 → 启动 CMP 对照 spike(§8.2)。
 
 ## 9. 设计阶段路线
 
@@ -316,7 +368,9 @@ Linux 作为第三目标平台，设计上尽量不依赖 Windows 专有路径�
 
 ### D2：平台能力验证
 
-优先 Android SAF，再验证 Windows 和 Linux 文件访问。重点验证最容易推翻技术选型的能力，不先做完整业务。
+优先 Android SAF,再验证 Windows 和 Linux 文件访问。重点验证最容易推翻技术选型的能力,不先做完整业务。
+
+顺序注(2026-09-07):SAF spike 可提前至 D1 完整原型之前执行,判定与顺序见 §8.2。
 
 ### D3：领域核心与适配层
 
@@ -377,9 +431,105 @@ Linux 作为第三目标平台，设计上尽量不依赖 Windows 专有路径�
 7. 是否需要把一次完整工作流保存为项目文件，以便稍后继续？
 8. Android 首版是否先限制为单一授权目录，暂不支持跨目录批处理？
 
-## 12. 参考文件
+## 12. 开发环境实况与 Android 验证准备(2026-09-07 由 s_handoff.md 并入)
 
-- 现有行为参考：`scripts/batch_rename_images.py`
-- 现有行为参考：`scripts/batch_pack_cbz.py`
-- 环境交接摘要：[`s_handoff.md`](s_handoff.md)
-- 项目门面：[`README.md`](README.md)
+> 来源:原 `s_handoff.md`,2026-09-07 用户决定并入本文件后删除原文件。此后环境与验证准备以本节为准。
+
+### 12.1 一句话现状
+
+Windows 开发机工具链已基本就位(git / VS Code / scoop / winget / mise / **Flutter 3.47.2** / **VS Build Tools 18.9**),Android SDK 侧亦已就绪(2026-09-07:JDK、android-clt 完整 SDK、ANDROID_HOME、JAVA_HOME、独立 adb 卸载全部完成)。PixFold 仍处设计阶段,下一步先做 spike 与交互原型,不直接创建正式工程。
+
+### 12.2 环境实况清单(2026-09-07 更新)
+
+| 组件 | 状态 | 版本 / 位置 |
+|---|---|---|
+| Git | ✅ | 2.55.0(scoop) |
+| VS Code | ✅ | 1.136(scoop apps/vscode) |
+| scoop | ✅ | main / extras / versions / sysinternals / nerd-fonts 桶 |
+| winget | ✅ | v1.29.290 |
+| mise | ✅ | 2026.9.1(全局配置 `C:\Users\Administrator\.config\mise\config.toml`) |
+| **Flutter SDK** | ✅ | **3.47.2 / Dart 3.13.2**,mise 全局管理<br>路径:`C:\Users\Administrator\AppData\Local\mise\installs\flutter\3.47.2` |
+| **VS Build Tools** | ✅ | **18.9.12112.369**(VS 2026,v145 工具集)<br>路径:`C:\Program Files (x86)\Microsoft Visual Studio\18\BuildTools` |
+| JDK | ✅ | temurin-17.0.20+101(mise 2026-09-03 起装);JAVA_HOME 已 setx(2026-09-07) |
+| android-clt(Android SDK) | ✅ | 15859902;`current` 即**完整 SDK**:platforms;android-36、build-tools;36.0.0、platform-tools、cmdline-tools/latest、licenses 均就绪 |
+| ANDROID_HOME | ✅ | 已 setx = `C:\Users\Administrator\scoop\apps\android-clt\current`(2026-09-07) |
+| adb | ✅ 已卸独立版 | 2026-09-07 卸载 scoop adb(37.0.1 / 旧 37.0.0),统一用 SDK platform-tools |
+| WSL | ✅(远期用) | Debian 13 (trixie),podman 5.4.2 ——留给 Linux 目标预览/容器构建 |
+
+### 12.3 Android 平台验证准备(设计阶段优先)
+
+> **进度(2026-09-07)**:下方 ①–⑥ 已全部执行完毕(含 ANDROID_HOME / JAVA_HOME 落盘、卸载独立 adb)。剩余第 ⑦ 步验收需在自己的新终端执行:`flutter doctor -v`(沙箱内 wmic/reg 被安全策略拦截,无法代跑)。
+
+```powershell
+# ① JDK 17(sdkmanager 是 Java 程序,必须先有它)
+mise use -g java@temurin-17
+java -version
+
+# ② Android 命令行工具
+scoop install android-clt
+scoop prefix android-clt          # 记下输出 → 作为 ANDROID_HOME
+
+# ③ 设 ANDROID_HOME(新终端生效)
+setx ANDROID_HOME "（②的输出路径）"
+
+# ④ SDK 组件(Flutter 3.47.2 默认 compileSdk=36)
+sdkmanager "platform-tools" "platforms;android-36" "build-tools;36.0.0"
+
+# ⑤ 同意许可证(之后 Gradle 能自动补装缺失组件)
+flutter doctor --android-licenses    # 一路 y
+
+# ⑥ 卸独立 adb,避免双 adb 版本漂移
+scoop uninstall adb
+
+# ⑦ 体检(验收标准)
+flutter doctor -v
+# 期望:Flutter ✓ / Android toolchain ✓ / Visual Studio ✓
+# (新终端里若想裸敲 adb,把 %ANDROID_HOME%\platform-tools 加进用户 PATH)
+```
+
+**环境准备完成** → 插上 Android 16 真机(开发者选项 + USB 调试),先只验证设备和 SAF 所需基础能力:
+
+```powershell
+flutter devices        # 能看到手机
+flutter doctor -v      # 确认 Android toolchain 可用
+```
+
+正式工程框架暂不创建。先完成 spike 与交互原型,再根据 Android SAF、缩略图、拖拽排序和后台任务验证结果决定技术栈(见 §8)。
+
+### 12.4 每日必用命令速查
+
+```powershell
+flutter doctor -v        # 环境体检(第一排查手段)
+flutter devices          # 列出可用设备
+flutter run              # 热重载开发(r 热重载 / R 全重启 / q 退出)
+flutter create --platforms=windows,android app  # 技术栈确定后再创建正式工程
+sdkmanager --list        # 看 SDK 组件可用版本
+mise ls                  # 看 mise 管的工具版本
+```
+
+### 12.5 踩坑速查
+
+- **Visual Studio ≠ VS Code**:编译 Windows 桌面要的是 Build Tools 的 C++ 工作负载,VS Code 只是编辑器。
+- **flutter doctor 认 SDK 目录结构**(`$ANDROID_HOME\platform-tools\adb` 等),不认 PATH 上的散装 adb → platform-tools 必装。
+- **双 adb 会打架**:scoop adb 与 SDK platform-tools adb 版本漂移 → 报 `adb server version mismatch`,已定方案是卸 scoop 版(2026-09-07 已卸)。
+- **licenses 不点** → Android toolchain 永远 ❌;`flutter doctor --android-licenses` 一路 y。
+- **compileSdk 不必 ≥ 手机版本**:手机 Android 16 = API 36,装 `platforms;android-36` 恰好对齐;以后想用新 API 再追加装更高 platform(可多版本并存)。
+- **mise 装 Flutter 若在 Windows 报错** → 回退 `scoop bucket add extras && scoop install flutter`(本次未遇到,mise 3.47.2 一次成功)。
+- **VS Code 报找不到 Flutter** → 设置 `dart.flutterSdkPaths` 填 `mise where flutter` 的输出。
+
+### 12.6 版本锚点(本机已验证)
+
+| 项 | 版本 |
+|---|---|
+| Flutter stable | 3.47.2(2026-08-26 revision d3b14c87) |
+| Dart | 3.13.2(随 Flutter 捆绑) |
+| compileSdk / minSdk / targetSdk | 36 / 24 / 36(源码 `flutter_tools/.../FlutterExtension.kt` 核实) |
+| Android platform | `platforms;android-36`(Android 16,与真机一致) |
+| VS Build Tools | 18.9.12112.369(VS 2026 / v145) |
+| Material/Cupertino | 以当前 Flutter SDK / 项目模板实际生成结果为准,后续创建工程时再确认依赖 |
+
+## 13. 参考文件
+
+- 现有行为参考:`scripts/batch_rename_images.py`
+- 现有行为参考:`scripts/batch_pack_cbz.py`
+- 项目门面:[`README.md`](README.md)

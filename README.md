@@ -4,7 +4,7 @@
 
 > 当前状态：**设计阶段**
 > 目标平台：**Windows、Android（优先）、Linux**
-> 技术栈：**暂不锁定**
+> 技术栈：**spike 验证后锁定**；候选假设（Flutter 主候选 / CMP 对照 / Tauri 暂排除）见 HANGOFF §8
 
 ## 项目目标
 
@@ -55,12 +55,11 @@ D4  交付 Android / Windows / Linux 基础闭环
 D5  增加模板、撤销、更新 CBZ、多系列批处理等增强功能
 ```
 
-技术栈会在交互原型和平台能力验证后决定，不预先限定 Flutter、Rust、Qt、Tauri、Slint 或其他方案。
+技术栈先经 spike 验证再锁定:当前候选 Flutter(主候选)、Compose Multiplatform(对照),Tauri 暂排除,详见 HANGOFF §8。
 
 ## 文档
 
-- [`HANGOFF.md`](HANGOFF.md)：产品定位、工作流、领域模型、平台策略、设计路线和验收标准；
-- [`s_handoff.md`](s_handoff.md)：当前开发环境和设计阶段入口；
+- [`HANGOFF.md`](HANGOFF.md)：产品定位、工作流、领域模型、平台策略、设计路线、验收标准与开发环境实况(§12)；
 - [`scripts/`](scripts/)：现有 Python 行为参考和回归样例。
 
 ## License
