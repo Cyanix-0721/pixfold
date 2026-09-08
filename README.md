@@ -2,9 +2,9 @@
 
 图片整理与 CBZ 制作工作台。
 
-> 当前状态：**设计阶段**
+> 当前状态：**设计阶段——D1 交互原型主线**（D2 Android SAF spike 已 5/5 验收）
 > 目标平台：**Windows、Android（优先）、Linux**
-> 技术栈：**spike 验证后锁定**；候选假设（Flutter 主候选 / CMP 对照 / Tauri 暂排除）见 HANGOFF §8
+> 技术栈：**Flutter + Dart（2026-09-08 锁定）**；决策依据与对照方案见 HANGOFF §8
 
 ## 项目目标
 
@@ -55,11 +55,11 @@ D4  交付 Android / Windows / Linux 基础闭环
 D5  增加模板、撤销、更新 CBZ、多系列批处理等增强功能
 ```
 
-技术栈先经 spike 验证再锁定:当前候选 Flutter(主候选)、Compose Multiplatform(对照),Tauri 暂排除,详见 HANGOFF §8。
+> 进度(2026-09-08):D0 已完成;D2 的 Android SAF spike 按 HANGOFF §8.2 提前执行并 **5/5 验收**,证伪条件 ①② 排除,**Flutter + Dart 已锁定**;当前主线为 D1 交互原型(不连真实文件系统)。执行顺序与判定以 HANGOFF §8.2 / §8.3 / §9 为准。
 
 ## 开发环境部署(⚠️ 暂定)
 
-> 本节按 **Flutter + Dart 候选**准备,**非最终部署**——技术栈尚未锁定(见 HANGOFF §8),spike 验证通过前随时可能修订。完整步骤、进度与踩坑见 [HANGOFF.md](HANGOFF.md) §12。
+> 本节按已锁定的 **Flutter + Dart** 准备(2026-09-08,见 HANGOFF §8.1),本机环境已验收(HANGOFF §12);因正式工程尚未创建,部署细节仍可能随 D1/D3 微调。完整步骤、进度与踩坑见 [HANGOFF.md](HANGOFF.md) §12。
 
 - **Flutter / Dart**:由 **mise** 管理,PixFold 在 `.mise.toml` **固定 `3.47.2`**(当前 stable 解析;升级 = 改 `.mise.toml` 版本号 → `mise install`)。Windows 命令行直接敲 `flutter`(pwsh profile 适配,git-bash/CI 用 `flutter.bat`),详见 HANGOFF §12。
 - **JDK**:mise 管理,请求 `temurin-17`,当前 17.0.20+101;`JAVA_HOME` 已 setx 指向 mise 目录。
@@ -68,7 +68,7 @@ D5  增加模板、撤销、更新 CBZ、多系列批处理等增强功能
 - **验收(⑦)**:pwsh 新终端直接 `flutter doctor -v`(已配 profile 适配函数:Windows 自动转调 `flutter.bat`,Linux/macOS 原生,见 HANGOFF §12;git-bash/CI 场景仍用 `flutter.bat`),期望 Flutter ✓ / Android toolchain ✓ / Visual Studio ✓。
 
 ```powershell
-# ═══ PixFold 候选栈环境重建命令(项目相关步骤;基础工具链 scoop/mise/pwsh 视为已就绪)═══
+# ═══ PixFold 开发环境重建命令(项目相关步骤;基础工具链 scoop/mise/pwsh 视为已就绪)═══
 
 # 1) 按项目 .mise.toml 安装版本声明(flutter 3.47.2 + java temurin-17;幂等,只补缺失)
 mise install

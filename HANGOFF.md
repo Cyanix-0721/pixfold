@@ -1,9 +1,9 @@
 # PixFold — 设计交接：图片整理与 CBZ 制作工作台
 
 > 项目名：**PixFold**
-> 状态：**设计阶段**（2026-09-03）
+> 状态：**设计阶段**（2026-09-03 立项；2026-09-08 D2 SAF spike 5/5 验收、技术栈锁定，当前主线 D1 交互原型）
 > 目标平台：**Windows、Android（优先）、Linux**
-> 技术栈：**暂不锁定**，先以产品流程、数据模型和平台能力验证为准
+> 技术栈：**Flutter + Dart（2026-09-08 锁定，D2 SAF spike 5/5 验收，见 §8.1）**
 
 ## 1. 项目重新定位
 
@@ -27,7 +27,7 @@ PixFold 不是把两个 Python 脚本简单搬进一个窗口，也不是单纯�
 
 - 最终覆盖 Windows、Android、Linux。
 - Android 是优先平台，不能把 Android 当成桌面版的缩小移植。
-- 技术栈在 spike 验证完成前不最终锁定;当前候选假设(Flutter 主候选、Compose Multiplatform 对照、Tauri 暂排除)与证伪条件见 §8.1、§8.2(2026-09-07 更新)。
+- 技术栈已锁定 **Flutter + Dart**(2026-09-08,D2 SAF spike 5/5 验收通过,§8.1);对照 CMP 仅当 §8.2 证伪条件 ③ 被 D1 证实且修复成本不可接受时才启用。
 - 现有两个 Python 脚本保留，不删除，继续作为行为参考、回归样例和命令行备用工具。
 - 文件破坏性操作必须经过明确确认；默认不删除源文件，不继承脚本中“强制删除”的危险默认值。
 - 所有重要自动推断都必须展示依据，并允许人工覆盖。
@@ -272,6 +272,8 @@ Linux 作为第三目标平台，设计上尽量不依赖 Windows 专有路径�
 
 ## 8. 技术栈决策门槛
 
+> 状态(2026-09-08):**决策已就地锁定于 §8.1**(未另立 ADR);本节的验证门槛与三 spike 建议是决策前评估的原始记录(2026-09-07 时点),执行情况与顺序调整见 §8.2、§8.3。
+
 当前不做“先选框架再适配需求”。技术方案必须通过以下验证后再定：
 
 1. 能否在 Android 上稳定访问 SAF 文档树；
@@ -289,25 +291,26 @@ Linux 作为第三目标平台，设计上尽量不依赖 Windows 专有路径�
 - **交互原型 spike**：缩略图网格、拖拽排序、名称表格、CBZ 元数据编辑和执行计划预览。
 - **核心处理 spike**：从 Python 样例中抽取排序、命名、ComicInfo.xml、CBZ 生成的最小输入输出测试。
 
-三个 spike 的结果再决定使用 Flutter、Qt/QML、Compose Multiplatform、Tauri、Slint、原生方案或其他组合。技术决策需要单独记录 ADR,不在本文件中提前假定。
+三个 spike 的结果再决定使用 Flutter、Qt/QML、Compose Multiplatform、Tauri、Slint、原生方案或其他组合。**实际决策已按 §8.2 的顺序调整提前执行并就地记录(§8.1),未另立 ADR**;此后如确需新增 ADR(例如 D1 触发证伪条件 ③ 后重审 CMP),先与用户确认再落盘。
 
 ### 8.1 技术栈决策(2026-09-08 锁定)
 
 > **✅ 已锁定:Flutter + Dart**。D2 SAF spike(§8.3)5/5 验收通过,证伪条件 ①② 均已排除(Android 16 真机,一加 Ace 3 Pro);桌面交互风险(D1)按 §8.2 判定为"已知可做",不再构成换栈理由。CMP 对照、Tauri 本轮不启用;若 D1 桌面表格/拖拽触发证伪条件 ③ 且修复成本不可接受,再重审 CMP。
 > 历史:2026-09-07 候选排序见下(归档),环境已装 Flutter 3.47.2 属事实倾向,spike 已按同等标准检验通过,非"工具就绪"主导。
 
-| 排序       | 方案                               | 判断                                                                                                                                                                                                   |
-| ---------- | ---------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| **已锁定** | **Flutter + Dart**                 | D2 spike 5/5 过:SAF 闭环(选目录→持久授权→遍历→读→建/改名/删)全通,851 张 <1s,跨进程授权恢复无弹窗。唯一真风险(SAF)已用自写 Kotlin channel 验证消除                                                                 |
-| 对照(备用) | **Compose Multiplatform + Kotlin** | Android 端即原生 Jetpack Compose,SAF/ContentResolver 直达,是唯一硬胜出项;代价:KMP/Gradle 工程复杂度高、桌面打包生态较新。仅当 D1 触发证伪条件 ③ 且不可修复时启用对照                                                    |
-| 暂排除     | **Tauri(Rust + Web)**              | 桌面成熟,但移动端为 2.x 新路径,与"Android 优先"相悖;SAF 无成熟路径;换栈须以 Rust 重写全部 Python 行为参考,回归基准作废                                                                                 |
-| 本轮未进入 | Qt/QML、Slint、纯原生              | 单人维护面/生态/学习成本不占优;不排除证伪后重审                                                                                                                                                        |
+| 排序       | 方案                               | 判断                                                                                                                                                                 |
+| ---------- | ---------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **已锁定** | **Flutter + Dart**                 | D2 spike 5/5 过:SAF 闭环(选目录→持久授权→遍历→读→建/改名/删)全通,851 张 <1s,跨进程授权恢复无弹窗。唯一真风险(SAF)已用自写 Kotlin channel 验证消除                    |
+| 对照(备用) | **Compose Multiplatform + Kotlin** | Android 端即原生 Jetpack Compose,SAF/ContentResolver 直达,是唯一硬胜出项;代价:KMP/Gradle 工程复杂度高、桌面打包生态较新。仅当 D1 触发证伪条件 ③ 且不可修复时启用对照 |
+| 暂排除     | **Tauri(Rust + Web)**              | 桌面成熟,但移动端为 2.x 新路径,与"Android 优先"相悖;SAF 无成熟路径;换栈须以 Rust 重写全部 Python 行为参考,回归基准作废                                               |
+| 本轮未进入 | Qt/QML、Slint、纯原生              | 单人维护面/生态/学习成本不占优;不排除证伪后重审                                                                                                                      |
 
 ### 8.2 spike 判定与执行顺序(2026-09-07)
 
 **证伪条件判定(2026-09-08)**:D2 spike 已排除 ①②,维持 Flutter(详见 §8.1/§8.3);仅剩 ③ 留待 D1 桌面交互验证——若 D1 中数据表格/拖拽类交互在三方包 + 自建基础上仍无法满足验收,才启用 CMP 对照 spike。
 
 证伪条件清单(历史记录):
+
 1. 无法稳定完成"选目录 → 持久授权 → 递归遍历 → 读字节 → 创建/重命名"闭环,且社区包 + 自写 channel(LocalSend 同款路线)的修复成本不可接受;← **2026-09-08 已排除**
 2. 千级缩略图在目标机型出现不可接受的解码性能或内存问题;← **2026-09-08 已排除(851 张 <1s)**
 3. 桌面数据表格类交互在三方包 + 自建基础上仍无法满足 D1 验收。← 待 D1 验证
@@ -317,6 +320,7 @@ Linux 作为第三目标平台，设计上尽量不依赖 Windows 专有路径�
 ### 8.3 D2 SAF spike 执行方案(2026-09-07 记录,环境验收后启动)
 
 **状态**(2026-09-08):✅ **D2 SAF spike 验收全部通过,证伪条件 ①② 排除,正式锁栈 Flutter**。工程建于 `C:\Personal\pixfold-spike`(临时,不入库),一加 Ace 3 Pro(Android 16/API 36)无线 adb 真机验收。**验收清单 5/5 全过**:
+
 - ① `openTree` 12s(已授权)/ 32s(首次)+ `takePersistableUriPermission`
 - ② `listImages` 851 张 / 962ms、24 张 / 28ms(已授权目录二次调用)
 - ③ `readBytes` 3.4MB JPEG / 42ms,头 `ffd8ffe1...` 真 JPEG 校验通过
@@ -334,12 +338,12 @@ Linux 作为第三目标平台，设计上尽量不依赖 Windows 专有路径�
 
 **Kotlin(MainActivity,MethodChannel `pixfold/saf`)**:
 
-| 方法             | Android 实现                                                           |
-| ---------------- | ---------------------------------------------------------------------- |
-| `openTree`       | `ACTION_OPEN_DOCUMENT_TREE` + `takePersistableUriPermission`           |
-| `listImages`     | `DocumentFile.fromTreeUri` 递归,按扩展名筛图,返回相对路径 / uri / size |
-| `readBytes`      | `contentResolver.openInputStream`                                      |
-| `renameDoc`      | `DocumentsContract.renameDocument`                                     |
+| 方法             | Android 实现                                                                                                                                                                                                                              |
+| ---------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `openTree`       | `ACTION_OPEN_DOCUMENT_TREE` + `takePersistableUriPermission`                                                                                                                                                                              |
+| `listImages`     | `DocumentFile.fromTreeUri` 递归,按扩展名筛图,返回相对路径 / uri / size                                                                                                                                                                    |
+| `readBytes`      | `contentResolver.openInputStream`                                                                                                                                                                                                         |
+| `renameDoc`      | `DocumentsContract.renameDocument`                                                                                                                                                                                                        |
 | `createAndWrite` | **先把 tree URI 经 `getTreeDocumentId` + `buildChildDocumentsUriUsingTree` 转为根目录的 document URI**,再 `DocumentsContract.createDocument` + `openOutputStream`(一加/部分国产 ROM 严格校验,直接传 tree URI 会抛 `Invalid URI`,见 §12.5) |
 
 **Dart**:`saf_channel.dart` 封装 + 测试按钮序列:选目录 → 列前 N 张 → 读第 1 张 → 复制改名 → 删除副本(每步回显)。
@@ -355,6 +359,8 @@ Linux 作为第三目标平台，设计上尽量不依赖 Windows 专有路径�
 **触发**:任一验收失败且"社区包 + 自写 channel"修复成本不可接受 → 启动 CMP 对照 spike(§8.2)。
 
 ## 9. 设计阶段路线
+
+> 进度(2026-09-08):D0 完成;D2 的 Android SAF spike 已按 §8.2 提前执行并验收(§8.3),证伪条件 ①② 排除、Flutter 锁定(§8.1);**当前主线为 D1 交互原型**,后续 D2/D3 的完整平台与领域核心工作尚未启动。
 
 ### D0：需求与样例固化
 
@@ -469,7 +475,7 @@ Windows 开发机工具链已基本就位(git / VS Code / scoop / winget / mise 
 
 > 机制注(2026-09-07,读 manifest 核实):`android-clt`(15859902)的 manifest 自带 `env_set:{ANDROID_HOME: <安装目录>}`、`env_add_path:[cmdline-tools/latest/bin, platform-tools]`,并把 SDK 组件目录(add-ons/build-tools/cmake/extras/licenses/ndk/patcher/platforms/skiaparser/sources/system-images)列入 `persist`(current 下为指向 `scoop\persist\android-clt` 的链接)。含义:装完即全局可用 adb / sdkmanager / avdmanager,组件目录在 scoop 更新时保留。**adb 裸命令可用来自 PATH 的 platform-tools,与 ANDROID_HOME 无直接关系**;环境变量写入后需**新终端**才生效(旧进程看不到)。注意:**包本身只含 cmdline-tools**,platform-tools 目录是 pre_install 建的"空壳 PATH 目标",adb/platforms/build-tools 均为 2026-09-03 由 `sdkmanager` 装入;platform-tools 不在 persist,`scoop update android-clt` 后若 adb 消失,用 `sdkmanager "platform-tools"` 补装(platforms/build-tools 等 persist 组件不受影响)。
 
-> 项目级配置(2026-09-07 更新):仓库根 `.mise.toml` **保持纯配置无注释**,说明统一在本注维护。内容:`flutter = "3.47.2"`(**项目固定**当前已验证版本,全局仍 latest;候选栈为 Flutter,工程环境需要稳定可复现;升级 = 改本文件版本号 → `mise install`)与 `java = "temurin-17"`(Android/Gradle 构建所需)。**声明 ≠ 已安装**:新机器上需 `mise install` 才按声明下载。**全局 config.toml 已由 chezmoi 纳管**(源 `~/.local/share/chezmoi/dot_config/mise/config.toml`),改全局声明请编辑 chezmoi 源后 `chezmoi apply`,**勿用 `mise use -g`**(绕过 chezmoi 造成源与实际漂移)。**边界约定**(用户级,勿破坏):Python 由 uv 管理、Node 由 fnm 管理,mise 均不接管。工具版本请求变更请同步维护本节(§12.2)。跨平台调用约定见 §12.5。
+> 项目级配置(2026-09-07 更新,2026-09-08 技术栈锁定后仍适用):仓库根 `.mise.toml` **保持纯配置无注释**,说明统一在本注维护。内容:`flutter = "3.47.2"`(**项目固定**当前已验证版本,全局仍 latest;技术栈已锁定为 Flutter(§8.1),工程环境需要稳定可复现;升级 = 改本文件版本号 → `mise install`)与 `java = "temurin-17"`(Android/Gradle 构建所需)。**声明 ≠ 已安装**:新机器上需 `mise install` 才按声明下载。**全局 config.toml 已由 chezmoi 纳管**(源 `~/.local/share/chezmoi/dot_config/mise/config.toml`),改全局声明请编辑 chezmoi 源后 `chezmoi apply`,**勿用 `mise use -g`**(绕过 chezmoi 造成源与实际漂移)。**边界约定**(用户级,勿破坏):Python 由 uv 管理、Node 由 fnm 管理,mise 均不接管。工具版本请求变更请同步维护本节(§12.2)。跨平台调用约定见 §12.5。
 
 ### 12.3 Android 平台验证准备(设计阶段优先)
 
