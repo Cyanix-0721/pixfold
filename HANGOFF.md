@@ -291,30 +291,39 @@ Linux 作为第三目标平台，设计上尽量不依赖 Windows 专有路径�
 
 三个 spike 的结果再决定使用 Flutter、Qt/QML、Compose Multiplatform、Tauri、Slint、原生方案或其他组合。技术决策需要单独记录 ADR,不在本文件中提前假定。
 
-### 8.1 当前候选假设(2026-09-07)
+### 8.1 技术栈决策(2026-09-08 锁定)
 
-> 候选排序与理由,不是最终锁定;最终决策另行记录。环境已装 Flutter 3.47.2 + VS Build Tools(见 §12),属**事实倾向**,spike 中须以同等标准检验,避免"工具就绪"主导结论。
+> **✅ 已锁定:Flutter + Dart**。D2 SAF spike(§8.3)5/5 验收通过,证伪条件 ①② 均已排除(Android 16 真机,一加 Ace 3 Pro);桌面交互风险(D1)按 §8.2 判定为"已知可做",不再构成换栈理由。CMP 对照、Tauri 本轮不启用;若 D1 桌面表格/拖拽触发证伪条件 ③ 且修复成本不可接受,再重审 CMP。
+> 历史:2026-09-07 候选排序见下(归档),环境已装 Flutter 3.47.2 属事实倾向,spike 已按同等标准检验通过,非"工具就绪"主导。
 
 | 排序       | 方案                               | 判断                                                                                                                                                                                                   |
 | ---------- | ---------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| 主候选     | **Flutter + Dart**                 | 八条门槛无硬伤;Android/Windows/Linux 三端均 stable;拖拽与自绘 UI 强;桌面数据表格类交互需自建或三方;SAF 无官方方案(社区包或自写 Kotlin channel,参照 LocalSend 开源实践),是唯一真风险,由 §8.2 spike 验证 |
-| 对照       | **Compose Multiplatform + Kotlin** | Android 端即原生 Jetpack Compose,SAF/ContentResolver 直达,是唯一硬胜出项;代价:KMP/Gradle 工程复杂度高、Android 工具链未装、桌面打包生态较新。仅当主候选触发 §8.2 证伪条件时启用对照                    |
+| **已锁定** | **Flutter + Dart**                 | D2 spike 5/5 过:SAF 闭环(选目录→持久授权→遍历→读→建/改名/删)全通,851 张 <1s,跨进程授权恢复无弹窗。唯一真风险(SAF)已用自写 Kotlin channel 验证消除                                                                 |
+| 对照(备用) | **Compose Multiplatform + Kotlin** | Android 端即原生 Jetpack Compose,SAF/ContentResolver 直达,是唯一硬胜出项;代价:KMP/Gradle 工程复杂度高、桌面打包生态较新。仅当 D1 触发证伪条件 ③ 且不可修复时启用对照                                                    |
 | 暂排除     | **Tauri(Rust + Web)**              | 桌面成熟,但移动端为 2.x 新路径,与"Android 优先"相悖;SAF 无成熟路径;换栈须以 Rust 重写全部 Python 行为参考,回归基准作废                                                                                 |
 | 本轮未进入 | Qt/QML、Slint、纯原生              | 单人维护面/生态/学习成本不占优;不排除证伪后重审                                                                                                                                                        |
 
 ### 8.2 spike 判定与执行顺序(2026-09-07)
 
-**证伪条件**(任一在 D2 SAF spike 中被 Android 16 真机证实,即启用 CMP 对照 spike,不切 Tauri):
+**证伪条件判定(2026-09-08)**:D2 spike 已排除 ①②,维持 Flutter(详见 §8.1/§8.3);仅剩 ③ 留待 D1 桌面交互验证——若 D1 中数据表格/拖拽类交互在三方包 + 自建基础上仍无法满足验收,才启用 CMP 对照 spike。
 
-1. 无法稳定完成"选目录 → 持久授权 → 递归遍历 → 读字节 → 创建/重命名"闭环,且社区包 + 自写 channel(LocalSend 同款路线)的修复成本不可接受;
-2. 千级缩略图在目标机型出现不可接受的解码性能或内存问题;
-3. 桌面数据表格类交互在三方包 + 自建基础上仍无法满足 D1 验收。
+证伪条件清单(历史记录):
+1. 无法稳定完成"选目录 → 持久授权 → 递归遍历 → 读字节 → 创建/重命名"闭环,且社区包 + 自写 channel(LocalSend 同款路线)的修复成本不可接受;← **2026-09-08 已排除**
+2. 千级缩略图在目标机型出现不可接受的解码性能或内存问题;← **2026-09-08 已排除(851 张 <1s)**
+3. 桌面数据表格类交互在三方包 + 自建基础上仍无法满足 D1 验收。← 待 D1 验证
 
 **顺序调整**:D2 的 SAF spike 可先于 D1 完整交互原型执行——平台风险(可推翻选型)高于交互风险(拖拽/表格在候选方案上均为已知可做),先验证可避免 D1 原型资产因换栈浪费。D1 原型在 spike 通过后启动,此时栈已锁,原型不重做。
 
 ### 8.3 D2 SAF spike 执行方案(2026-09-07 记录,环境验收后启动)
 
-**状态**:方案已定,**暂不建工程**。前置条件为新终端 `flutter.bat doctor -v` 全绿(见 §12,①–⑥ 已完成,⑦ 待用户终端验收)。
+**状态**(2026-09-08):✅ **D2 SAF spike 验收全部通过,证伪条件 ①② 排除,正式锁栈 Flutter**。工程建于 `C:\Personal\pixfold-spike`(临时,不入库),一加 Ace 3 Pro(Android 16/API 36)无线 adb 真机验收。**验收清单 5/5 全过**:
+- ① `openTree` 12s(已授权)/ 32s(首次)+ `takePersistableUriPermission`
+- ② `listImages` 851 张 / 962ms、24 张 / 28ms(已授权目录二次调用)
+- ③ `readBytes` 3.4MB JPEG / 42ms,头 `ffd8ffe1...` 真 JPEG 校验通过
+- ④ `createAndWrite→renameDoc→deleteDoc` 总 206ms(其中 createDocument 须 **tree URI → document URI** 转换,见 §12.5 踩坑)
+- ⑤ **跨进程持久授权**:SharedPreferences 存 tree URI,杀进程重开自动恢复 → 直接列出、全程无弹窗(系统层持久授权生效,未走 SAF 重选;若授权失效会抛 SecurityException 而非静默) | 千级缩略图 851 张 <1s 无压力
+
+**收束**(2026-09-08):验收清单 5/5 全过,无"待补验"项;证伪条件 ①② 排除,Flutter 已锁定(§8.1)。D2 至此完成,可启动 D1 交互原型(栈已锁,原型资产不浪费)。spike 工程 `C:\Personal\pixfold-spike` 留作 Android SAF 通道参考实现(正式工程可直接迁移 Kotlin channel 代码)。
 
 **目标**:最小工程验证 Android SAF 全闭环,用于判定 §8.2 证伪条件 ①②;不做任何业务 UI。
 
@@ -331,7 +340,7 @@ Linux 作为第三目标平台，设计上尽量不依赖 Windows 专有路径�
 | `listImages`     | `DocumentFile.fromTreeUri` 递归,按扩展名筛图,返回相对路径 / uri / size |
 | `readBytes`      | `contentResolver.openInputStream`                                      |
 | `renameDoc`      | `DocumentsContract.renameDocument`                                     |
-| `createAndWrite` | `DocumentsContract.createDocument` + `openOutputStream`                |
+| `createAndWrite` | **先把 tree URI 经 `getTreeDocumentId` + `buildChildDocumentsUriUsingTree` 转为根目录的 document URI**,再 `DocumentsContract.createDocument` + `openOutputStream`(一加/部分国产 ROM 严格校验,直接传 tree URI 会抛 `Invalid URI`,见 §12.5) |
 
 **Dart**:`saf_channel.dart` 封装 + 测试按钮序列:选目录 → 列前 N 张 → 读第 1 张 → 复制改名 → 删除副本(每步回显)。
 
@@ -515,11 +524,19 @@ mise ls                  # 看 mise 管的工具版本
 - **双 adb 会打架**:scoop adb 与 SDK platform-tools adb 版本漂移 → 报 `adb server version mismatch`,已定方案是卸 scoop 版(2026-09-07 已卸)。
 - **licenses 不点** → Android toolchain 永远 ❌;`flutter.bat doctor --android-licenses` 一路 y。
 - **Windows 下 mise 无法为 flutter 生成可用 shim**(2026-09-07 实证):registry http/vfox 后端的 binary 元数据都指向无扩展名 `bin\flutter`(官方 SDK 里的 shell 脚本,非 Windows 可执行)→ mise 生成的 `flutter.exe` shim 报 `No executable found…`;pwsh 命令解析同样会误选该"文档文件"。**已解决(2026-09-07)**:pwsh profile 加 `function global:flutter`(chezmoi 源 `dot_config/powershell/profile.ps1`,每次 apply 自动同步至 `Documents\PowerShell\profile.ps1`)——Windows 检测到 `flutter.bat` 自动转调,Linux/macOS 直接原生,**交互终端统一敲 `flutter` 即可,跨平台命令一致**。`dart` 命令同样适配(随 Flutter 捆绑)。仍须用 `.bat` 全名的场景:git-bash、CI/脚本、`mise x flutter -- flutter.bat`。IDE 用 VS Code 的 `dart.flutterSdkPaths` 填 `mise where flutter` 直连 SDK。删坏 shim 无效(reshim 会重建),但 pwsh 函数优先级高于 PATH 中的 shim,不受影响。
+- **本机(R7P21)访问 Google 系仓库需显式代理**(2026-09-08):Windows 主力机 R7P21 需 Clash 代理(127.0.0.1:7897);另一台机 Slayer 为透明代理无需配置。Gradle/Java **不读** `HTTP_PROXY` 环境变量,须写 `~/.gradle/gradle.properties` 的 `systemProp.http(s).proxyHost/Port`(已配,仅 R7P21 用户级,不随工程文件);否则 gradle wrapper 下载发行版与依赖解析会超时。工程内不写死任何代理/镜像配置。
 - **flutter doctor 的 `flutter/dart on your path resolves to ...http-tarballs...` 为 cosmetic 警告**(2026-09-07):SDK 真实安装在 mise `http-tarballs` 缓存,`installs\flutter\3.47.2` 是 symlink,mise activate 注入 PATH 的是解析后的真实路径,与 doctor 判定的 checkout 不一致。功能无影响,可忽略。
 - **mise 两种 Windows shim 模式对 flutter 均无解**(2026-09-07 实验):`windows_shim_mode=exe`(默认)生成的 `flutter.exe` shim 报 `No executable found`;切 `file` 模式生成的 `flutter.cmd` + 无扩展 bash shim 同样失败(bash shim 内部仍解析 `bin/flutter`),且无扩展 bash shim 会干扰 pwsh 命令解析(误选为 document)。结论:**mise 在 Windows 上对"入口为无扩展脚本 + .bat"类 SDK 的支持是结构性缺口**,勿再尝试;Windows 交互一律靠 pwsh 函数(见上条),已恢复 `exe` 模式。
 - **compileSdk 不必 ≥ 手机版本**:手机 Android 16 = API 36,装 `platforms;android-36` 恰好对齐;以后想用新 API 再追加装更高 platform(可多版本并存)。
 - **mise 装 Flutter 若在 Windows 报错** → 回退 `scoop bucket add extras && scoop install flutter`(本次未遇到,mise 3.47.2 一次成功)。
 - **VS Code 报找不到 Flutter** → 设置 `dart.flutterSdkPaths` 填 `mise where flutter` 的输出。
+- **Android SAF:tree URI 不能直接当 parent 传给 `DocumentsContract.createDocument`**(2026-09-08 D2 spike 实证):一加/部分国产 ROM 严格校验 parent 必须是 document URI,直接传 tree URI 会抛 `IllegalArgumentException: Invalid URI`(AOSP 行为宽松,国产 ROM 收紧)。**必须先转换**:
+  ```kotlin
+  val treeDocId = DocumentsContract.getTreeDocumentId(treeUri)
+  val parentDocUri = DocumentsContract.buildChildDocumentsUriUsingTree(treeUri, treeDocId)
+  DocumentsContract.createDocument(resolver, parentDocUri, mime, name)
+  ```
+  读/列/改名/删直接用 document URI 无需转换;只有"在树里建子项"才需要这步。`DocumentFile.fromTreeUri(ctx, treeUri).createFile(...)` 内部用同样的 tree URI 路径,在严格 ROM 上也会同样失败,务必手动转换。
 
 ### 12.6 版本锚点(本机已验证)
 
