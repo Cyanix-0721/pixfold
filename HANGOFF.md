@@ -361,7 +361,9 @@ Linux 作为第三目标平台，设计上尽量不依赖 Windows 专有路径�
 ## 9. 设计阶段路线
 
 > 进度(2026-09-08):D0 完成;D2 的 Android SAF spike 已按 §8.2 提前执行并验收(§8.3),证伪条件 ①② 排除、Flutter 锁定(§8.1);**当前主线为 D1 交互原型**,后续 D2/D3 的完整平台与领域核心工作尚未启动。
-> D1 执行注(2026-09-09):D1 原型工程已建 **`C:\Personal\pixfold-d1`**(仓库外,与 spike 同级;不连真实文件系统,确定性 mock 数据)。范围 = 本节 D1 六项交付;验收平台 **Windows + Android 双端**(用户 2026-09-09 决策);拖拽/表格实现策略 = **内置优先 + 少量三方**(唯一三方依赖 `reorderable_grid_view 2.2.8`,网格拖拽——正好实证证伪条件 ③ 的"三方包 + 自建"前提)。领域逻辑(自然排序/多级排序/命名求值/冲突检测/ComicInfo.xml/页码重编号)以可测试纯 Dart 实现,带 6 项冒烟测试。D1 按 §9 验收点 + §10 功能验收走查通过前不宣称完成。
+> D1 执行注(2026-09-09):D1 原型工程已建 **`C:\Personal\pixfold-d1`**(仓库外,与 spike 同级;不连真实文件系统,确定性 mock 数据)。范围 = 本节 D1 六项交付;验收平台 **Windows + Android 双端**(用户 2026-09-09 决策);拖拽/表格实现策略 = **内置优先 + 少量三方**(唯一三方依赖 `reorderable_grid_view 2.2.8`,网格拖拽——正好实证证伪条件 ③ 的"三方包 + 自建"前提)。领域逻辑(自然排序/多级排序/命名求值/冲突检测/ComicInfo.xml/页码重编号)以可测试纯 Dart 实现,带 6 项冒烟测试。
+> 走查修复注(2026-09-09,同日晚):Windows 端用户走查首轮反馈已闭环——① 大图预览改为自适应窗口 + InteractiveViewer 缩放/平移/方向键翻页;② 网格拖拽修复:三方包默认长按 500ms 才拖,桌面端设 `dragStartDelay: Duration.zero`(移动端保留 ~400ms 长按),未换包;③ 中文发虚两层根因:Impeller SDF 文本渲染(`windows/runner/main.cpp` 禁用以回退 Skia)+ CJK 字体回退链落老字体(主题显式 `fontFamilyFallback: ['Microsoft YaHei UI','Microsoft YaHei',...]`,用户确认有效);另全局 `textScaler: linear(1.15)` 放大字号;④ 网格拖拽黑边:`dragWidgetBuilderV2` 用 `Material(elevation:8, surfaceContainerHighest, 圆角)` 包络拖拽物,`placeholderBuilder` 用带子级 `Container` 圆角描边占位(**DecoratedBox 无子元素 = 0x0 不可见,踩坑**)。拖拽时控制台 `Failed to update ui::AXTree` 为 Windows 无障碍桥已知噪音,不影响渲染。D1/D2 验证工程**不入版本控制**(用户约定,与 spike 一致)。D1 按 §9 验收点 + §10 功能验收走查通过前不宣称完成。
+> 走查状态(2026-09-09 深夜):**Windows 端走查进行中**——首轮反馈(预览/拖拽/字体/黑边)已修复待复验,全量验收清单未走完;**Android 端尚未启动测试**(Windows 验证通过后再接真机)。
 
 ### D0：需求与样例固化
 
@@ -546,6 +548,7 @@ mise ls                  # 看 mise 管的工具版本
   读/列/改名/删直接用 document URI 无需转换;只有"在树里建子项"才需要这步。`DocumentFile.fromTreeUri(ctx, treeUri).createFile(...)` 内部用同样的 tree URI 路径,在严格 ROM 上也会同样失败,务必手动转换。
 - **Flutter Windows 默认 Impeller(OpenGLES + SDF 文本渲染)→ 中文小字号发虚**(2026-09-09 D1 原型实测,Flutter 3.47.2):SDF 字形在 CJK 小字号上偏软,已知特性。**解法**:`windows/runner/main.cpp` 中 `project.set_impeller_switch(flutter::ImpellerSwitch::Disabled)` 回退 Skia(文本明显变锐利)。注意:① 对 exe 传命令行 `--no-enable-impeller` **无效**(Windows embedder 不解析进程命令行,只能通过 C++ wrapper 的 DartProject API 或 Android 端 flutter run 开关);② main.cpp 等 MSVC 源码注释**必须纯 ASCII**——中文注释触发 C4819(GBK 代码页)并导致构建失败。
 - **Flutter Windows CJK 字体回退链落到老字体(宋体等)→ 文字持续发虚**(2026-09-09 D1 实测,Impeller 已关仍偏虚的剩余主因):不指定字体时 DirectWrite 回退选择不稳定。**解法(最终修复,用户确认效果)**:`ThemeData.fontFamilyFallback: ['Microsoft YaHei UI', 'Microsoft YaHei', 'Noto Sans CJK SC']`(明暗两套主题都加)。另有辅助缓解:全局 `textScaler: TextScaler.linear(1.15)` 放大字号、UI 字号下限 ≥12px。Android 端无此问题(系统字体链正常)。
+- **`reorderable_grid_view 2.2.8` 拖拽交互与视觉踩坑**(2026-09-09 D1 走查实证):① 默认拖拽启动延迟 = `kLongPressTimeout`(500ms),桌面鼠标"按住即拖"无响应 → 传 `dragStartDelay: Duration.zero`(移动端保留 ~400ms,避免与列表滚动冲突),包本身无需更换;② 拖拽物默认无 Material 包络,Card surface(暗主题下近黑)直接铺成硬方块 → `dragWidgetBuilderV2: DragWidgetBuilderV2(builder: (_, child, __) => Material(elevation: 8, color: colorScheme.surfaceContainerHighest, borderRadius: 8, clipBehavior: antiAlias, child: child))`;③ `placeholderBuilder` **必须返回带子级/可撑满的 `Container`**——`DecoratedBox` 无子元素时尺寸 0×0 不可见,原位置被邻居 Card"视觉顶替"成假黑块;④ 拖拽时控制台刷 `Failed to update ui::AXTree, error: 23` 是 Windows 无障碍桥的已知噪音(widget 跨树搬运触发),不影响渲染与功能,待 Flutter 上游修复,勿被误导去查无障碍。
 
 ### 12.6 版本锚点(本机已验证)
 
