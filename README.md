@@ -65,12 +65,15 @@ D5  增加模板、撤销、更新 CBZ、多系列批处理等增强功能
 
 ## 开发环境部署(⚠️ 暂定)
 
-> 本节已按 **Kotlin + Jetpack Compose**（HANGOFF §8.1）重写，原 Flutter 相关内容已移除。**Kotlin/Gradle 工程侧尚未验证**（当前无工程）。完整清单与待补项见 [HANGOFF.md](HANGOFF.md) §12。
+> 本节已按 **Kotlin + Jetpack Compose**（HANGOFF §8.1）重写，并同步 2026-09-12 的环境实况（**SDK 根改由 Android Studio 管理**）。**Kotlin/Gradle 工程侧尚未验证**（当前无工程）。完整清单与待补项见 [HANGOFF.md](HANGOFF.md) §12。
 
-- **JDK**：mise 管理，`.mise.toml` 声明 `java = "temurin-17"`（当前 17.0.20+101）；`JAVA_HOME` 已 setx 指向 mise 目录。
-- **Android SDK**：`scoop install android-clt`（15859902），其 `current` 目录即完整 SDK 根；`ANDROID_HOME` 由该包 manifest `env_set` **自动写入**（装完新终端生效）；`platforms;android-36`、`build-tools;36.0.0` 已装。
-- **adb**：该包**不自带 adb**，需 `sdkmanager "platform-tools"` 装入；PATH 已由 scoop 自动含 `cmdline-tools/latest/bin` 与 `platform-tools`（裸敲 adb/sdkmanager 可用），独立 scoop adb 包已卸载（防双 adb）。
-- **Gradle / Kotlin**：⬜ **待验证** —— 当前无工程，`gradlew` 构建与 Kotlin 编译尚未在本机跑通。
+- **JDK**：mise 管理，`.mise.toml` 声明 `java = "temurin-17"`（当前 17.0.20+101）；`JAVA_HOME` 已 setx。
+- **Android Studio**：scoop 安装（2026.1.4.7，自带 JBR，无需外部 Java 即可启动）。
+- **Android SDK**：根目录 `C:\Users\Administrator\AppData\Local\Android\Sdk`（Studio 的默认位置，由 Studio 的 SDK Manager 管理）。现有组件：platform-tools 36.0.0、build-tools 35.0.1 / 36.0.0、platforms;android-37.0、sources;android-37.0、emulator、system-images;android-36、licenses、cmdline-tools 19.0（建议升 latest）。
+- **环境变量（Studio 不会设，必须手工设）**：`ANDROID_HOME` 指向上述 SDK 根；用户 PATH 加入 `<sdk>\platform-tools`（adb / fastboot）与 `<sdk>\cmdline-tools\latest\bin`（sdkmanager）。注意 `ANDROID_SDK_HOME` 是历史变量（老工具的 `.android` 位置），**不是** SDK 路径。
+- **adb**：一律来自 SDK 的 platform-tools；不装独立 adb 包（两份 adb 版本漂移会报 `adb server version mismatch`）。
+- **Gradle / Kotlin**：⬜ **待验证** —— 当前无工程，`gradlew` 与 Kotlin 编译尚未在本机跑通；Studio 2026.1.4 新建工程模板给出的是 Gradle 9.6.0 / AGP 9.4.0 / Kotlin 2.2.10。
+- **待办**：装 `platforms;android-36`（目标 36/24/36），并把 SDK 内的 cmdline-tools 升到 latest。
 - **验收**：`sdkmanager --list` 组件齐全 + `adb devices` 能看到手机。
 
 ```powershell
@@ -79,20 +82,24 @@ D5  增加模板、撤销、更新 CBZ、多系列批处理等增强功能
 # 1) 按项目 .mise.toml 安装版本声明(java temurin-17;幂等,只补缺失)
 mise install
 
-# 2) Android SDK(android-clt manifest 自动写入 ANDROID_HOME 与 PATH)
-scoop install android-clt
-#   ↑ 新开终端再继续(sdkmanager 才在 PATH)
+# 2) Android Studio(SDK 由它的 SDK Manager 安装到默认位置)
+scoop install android-studio
+#   首次启动完成 Setup Wizard,勾选 Android SDK Platform-Tools 等组件
 
-# 3) Android SDK 组件
-sdkmanager "platform-tools" "platforms;android-36" "build-tools;36.0.0"
+# 3) 环境变量(Studio 不会设;新终端才生效)
+$sdk = Join-Path $env:LOCALAPPDATA "Android\Sdk"
+[Environment]::SetEnvironmentVariable("ANDROID_HOME", $sdk, "User")
+#   用户 PATH 追加: <sdk>\platform-tools 与 <sdk>\cmdline-tools\latest\bin
 
-# 4) Android licenses(首次;之后 Gradle 能自动补装缺失组件)
-sdkmanager --licenses
+# 4) 平台组件(新终端;目标 compileSdk 36)
+sdkmanager "platforms;android-36" "build-tools;36.0.0"
 
 # 5) 验收:组件齐全 + 设备在线
 sdkmanager --list
 adb devices
 ```
+
+> 安装 `sources;*` 这类含上万个小文件的包前，先把 **SDK 目录**加入杀软信任区，否则可能报 `AccessDeniedException`（见 HANGOFF §12.5）。
 
 ## 文档
 

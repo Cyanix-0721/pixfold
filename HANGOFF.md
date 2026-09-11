@@ -542,49 +542,62 @@ Android 第一版应优先保证“选目录 → 预览 → 手工确认 → 生
 
 > ✅ **2026-09-10 已按换栈重写本节**：技术栈由 Flutter + Dart 改为 **Kotlin + Jetpack Compose(Android 原生)**(§8.1)，原 Flutter 相关条目(Flutter SDK 声明、`flutter doctor` 流程、Impeller/CJK 字体与 mise shim 踩坑、Flutter/Dart 版本锚点)**已全部移除**。**Kotlin/Gradle 工程侧尚未在本机验证**，标注 ⬜ 的条目为待补。
 
+> ✅ **2026-09-12 起 SDK 根改由 Android Studio 管理**:弃用 `scoop android-clt`(已卸载,含 persist 回收)。SDK 根 = `C:\Users\Administrator\AppData\Local\Android\Sdk`(Studio 默认位置);`ANDROID_HOME` 与 `platform-tools` / `cmdline-tools` 的 PATH **由手工设置**(Studio 不会设它们)。
+
 ### 12.1 一句话现状
 
-Windows 开发机的**基础设施**已就位(git / VS Code / scoop / winget / mise),**Android SDK 侧已就绪**(2026-09-07:JDK、android-clt 完整 SDK、ANDROID_HOME、JAVA_HOME、独立 adb 卸载全部完成)。**Kotlin / Gradle 工程侧尚未验证**(当前无工程,待到 D1 原型重建时确认)。PixFold 仍处设计阶段,不直接创建正式工程。
+Windows 开发机的**基础设施**已就位(git / VS Code / scoop / winget / mise),**Android SDK 侧已就绪**:SDK 根 = `C:\Users\Administrator\AppData\Local\Android\Sdk`(Android Studio 的默认位置,由 Studio 的 SDK Manager 管理),`ANDROID_HOME`、`JAVA_HOME`、用户 PATH 均已落盘,`adb` / `fastboot` / `sdkmanager` 裸命令可用,真机走无线调试。**Kotlin / Gradle 工程侧尚未验证**(当前无工程,待到 D1 原型重建时确认)。PixFold 仍处设计阶段,不直接创建正式工程。
 
-### 12.2 环境实况清单(2026-09-07 更新)
+### 12.2 环境实况清单(2026-09-12 更新)
 
-| 组件                     | 状态          | 版本 / 位置                                                                                                                                                                                                                         |
-| ------------------------ | ------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Git                      | ✅            | 2.55.0(scoop)                                                                                                                                                                                                                       |
-| VS Code                  | ✅            | 1.136(scoop apps/vscode)                                                                                                                                                                                                            |
-| scoop                    | ✅            | main / extras / versions / sysinternals / nerd-fonts 桶                                                                                                                                                                             |
-| winget                   | ✅            | v1.29.290                                                                                                                                                                                                                           |
-| mise                     | ✅            | 2026.9.1(全局配置 `C:\Users\Administrator\.config\mise\config.toml`)                                                                                                                                                                |
-| Gradle / Kotlin          | ⬜ 待验证     | 尚未在本机跑通构建(无工程,待到 D1 原型重建时确认) |
-| JDK                      | ✅            | temurin-17.0.20+101,请求 `temurin-17`(config.toml);JAVA_HOME 已 setx(2026-09-07)                                                                                                                                                    |
-| android-clt(Android SDK) | ✅            | 15859902;`current` 即**完整 SDK**:platforms;android-36、build-tools;36.0.0、platform-tools、cmdline-tools/latest、licenses 均就绪                                                                                                   |
-| ANDROID_HOME             | ✅            | manifest `env_set` 自动写入安装目录;2026-09-07 手动 setx 冗余确认(值一致)                                                                                                                                                           |
-| adb                      | ✅ 已卸独立版 | 2026-09-07 卸载 scoop adb(37.0.1 / 旧 37.0.0),统一用 SDK platform-tools                                                                                                                                                             |
-| WSL                      | ⬜ 未使用    | 换栈后无跨端构建需求,本轮不涉及(Debian 13 trixie / podman 5.4.2 仍在)                                                                                                                                                                      |
+| 组件 | 状态 | 版本 / 位置 |
+| --- | --- | --- |
+| Git | ✅ | 2.55.0(scoop) |
+| VS Code | ✅ | 1.136(scoop apps/vscode) |
+| Android Studio | ✅ | 2026.1.4.7(scoop;自带 JBR 25.0.3,不依赖外部 Java 启动) |
+| scoop | ✅ | main / extras / versions / sysinternals / nerd-fonts 桶 |
+| winget | ✅ | v1.29.290 |
+| mise | ✅ | 2026.9.1 |
+| JDK | ✅ | temurin-17.0.20+101(mise 声明 `temurin-17`);`JAVA_HOME` 已 setx |
+| Android SDK 根 | ✅ | `C:\Users\Administrator\AppData\Local\Android\Sdk`(Studio 默认位置) |
+| ANDROID_HOME | ✅ | 指向上述 SDK 根;2026-09-12 手工设为**用户级**(Studio 不会设它,见机制注) |
+| ANDROID_SDK_HOME | ⚠️ 非 SDK 路径变量 | Studio 自动设为同一目录;它只影响老工具创建 `.android` 用户数据的位置,**不能当 SDK 路径用** |
+| 用户 PATH | ✅ | `<sdk>\platform-tools`(adb / fastboot)、`<sdk>\cmdline-tools\latest\bin`(sdkmanager) |
+| SDK 组件 | ✅ | platform-tools **36.0.0**;build-tools **35.0.1 + 36.0.0**;platforms **android-37.0**;sources **android-37.0**;emulator;system-images **android-36**(google_apis_playstore / x86_64);licenses(android-sdk-license) |
+| cmdline-tools | ⚠️ 偏旧 | SDK 根内 `cmdline-tools\latest` = **19.0**(2025-04);建议升到 latest |
+| platforms;android-36 | ⬜ 待装 | 目标 36/24/36(§12.6)需要它,当前只有 android-37.0;装法见 §12.3 |
+| adb / fastboot | ✅ | 均来自 SDK `platform-tools`;未装独立 scoop adb(防双 adb,见 §12.5) |
+| Gradle / Kotlin 工程侧 | ⬜ 待验证 | 无工程;Studio 2026.1.4 模板给出 Gradle 9.6.0 / AGP 9.4.0 / Kotlin 2.2.10(**未跑通构建**) |
+| WSL | ✅ 仅作 agent 宿主 | 跑 Codex,经互操作驱动 Windows 侧构建;WSL 不装 Android SDK、不承担构建(依据见 §12.5 的 I/O 实测) |
 
-> 机制注(2026-09-07,读 manifest 核实):`android-clt`(15859902)的 manifest 自带 `env_set:{ANDROID_HOME: <安装目录>}`、`env_add_path:[cmdline-tools/latest/bin, platform-tools]`,并把 SDK 组件目录(add-ons/build-tools/cmake/extras/licenses/ndk/patcher/platforms/skiaparser/sources/system-images)列入 `persist`(current 下为指向 `scoop\persist\android-clt` 的链接)。含义:装完即全局可用 adb / sdkmanager / avdmanager,组件目录在 scoop 更新时保留。**adb 裸命令可用来自 PATH 的 platform-tools,与 ANDROID_HOME 无直接关系**;环境变量写入后需**新终端**才生效(旧进程看不到)。注意:**包本身只含 cmdline-tools**,platform-tools 目录是 pre_install 建的"空壳 PATH 目标",adb/platforms/build-tools 均为 2026-09-03 由 `sdkmanager` 装入;platform-tools 不在 persist,`scoop update android-clt` 后若 adb 消失,用 `sdkmanager "platform-tools"` 补装(platforms/build-tools 等 persist 组件不受影响)。
+> 机制注(2026-09-12 实测核实):**Android Studio 只把 SDK 路径记在自己的配置里——既不设 `ANDROID_HOME`,也不改 PATH**(IDE 设置项与各工程的 `local.properties` 都在 Studio 侧)。所以命令行侧的 `adb` / `fastboot` / `sdkmanager` 完全依赖上表那两条手工设置。**SDK 组件由 Studio 的 SDK Manager(或 SDK 根内的 `sdkmanager`)安装**;环境变量改动需**新开终端**才生效(旧进程是旧快照)。
 
-> 项目级配置(2026-09-10 更新):仓库根 `.mise.toml` **保持纯配置无注释**,说明统一在本注维护。当前内容仅 `java = "temurin-17"`(Android/Gradle 构建所需);**原 `flutter = "3.47.2"` 已于 2026-09-10 换栈时移除**。**声明 ≠ 已安装**:新机器上需 `mise install` 才按声明下载。**全局 config.toml 已由 chezmoi 纳管**(源 `~/.local/share/chezmoi/dot_config/mise/config.toml`),改全局声明请编辑 chezmoi 源后 `chezmoi apply`,**勿用 `mise use -g`**(绕过 chezmoi 造成源与实际漂移)。**边界约定**(用户级,勿破坏):Python 由 uv 管理、Node 由 fnm 管理,mise 均不接管。工具版本请求变更请同步维护本节(§12.2)。
+> 历史(2026-09-12 之前,已弃用):曾用 `scoop android-clt` 的包目录当 SDK 根——它的 manifest 会 `env_set ANDROID_HOME` 到包目录、并把 `cmdline-tools/latest/bin`、`platform-tools` 写进 PATH,装完即全局可用。但它与"Studio 管理 SDK"并存会产生**两份 SDK 根**,且 Studio 会把 junction 解析成带版本号的实体路径(`...\android-clt\15859902`),`current` 的"跟随最新版"特性对 Studio 无效 → 2026-09-12 卸载并回收。
+
+> 项目级配置(2026-09-12 更新):仓库根 `.mise.toml` **保持纯配置无注释**,说明统一在本注维护。当前内容仅 `java = "temurin-17"`(Android/Gradle 构建所需)。**声明 ≠ 已安装**:新机器上需 `mise install` 才按声明下载。**边界约定**(用户级,勿破坏):Python 由 uv 管理、Node 由 fnm 管理,mise 均不接管;全局工具声明不属本仓库管辖范围。工具版本请求变更请同步维护本节(§12.2)。
 
 ### 12.3 Android 平台验证准备(设计阶段优先)
 
-> **进度(2026-09-07)**:下方 ①–⑤ 已全部执行完毕(含 ANDROID_HOME / JAVA_HOME 落盘、卸载独立 adb)。⑥ 的 Kotlin/Gradle 侧验收**待 D1 原型重建时执行**(当前无工程)。
+> **进度(2026-09-12)**:SDK 侧已由 Android Studio 装齐基础组件(见 §12.2);下面 ①–⑤ 是**新机器**上的等价步骤,现有机器只需补 ④ 里缺的平台。⑥ 的 Kotlin/Gradle 侧验收**待 D1 原型重建时执行**(当前无工程)。
 
 ```powershell
 # ① JDK 17(sdkmanager 是 Java 程序,必须先有它)
-# 注:曾用 `mise use -g java@temurin-17`;2026-09-07 起全局声明由 chezmoi 纳管,
-#     等效做法 = 编辑 chezmoi 源 dot_config/mise/config.toml → apply → mise install
 mise install
 
-# ② Android 命令行工具(ANDROID_HOME 无需手动设置:android-clt manifest env_set 自动写入,见 §12.2 机制注)
-scoop install android-clt
-#   ↑ 新开终端再继续(sdkmanager 才在 PATH)
+# ② Android Studio(SDK 由它自己的 SDK Manager 安装,默认位置 %LOCALAPPDATA%\Android\Sdk)
+scoop install android-studio
+#   首次启动完成 Setup Wizard,勾选 Android SDK Platform-Tools 等组件
 
-# ③ SDK 组件
-sdkmanager "platform-tools" "platforms;android-36" "build-tools;36.0.0"
+# ③ 命令行环境变量(Studio 不会设,必须手工设;用户级,新终端才生效)
+$sdk = Join-Path $env:LOCALAPPDATA "Android\Sdk"
+[Environment]::SetEnvironmentVariable("ANDROID_HOME", $sdk, "User")
+$entries = @((Join-Path $sdk "platform-tools"), (Join-Path $sdk "cmdline-tools\latest\bin"))
+$p = @([Environment]::GetEnvironmentVariable("Path", "User") -split ';' | Where-Object { $_ })
+foreach ($e in $entries) { if ($p -notcontains $e) { $p += $e } }
+[Environment]::SetEnvironmentVariable("Path", ($p -join ';'), "User")
 
-# ④ 同意许可证(之后 Gradle 能自动补装缺失组件)
-sdkmanager --licenses
+# ④ 平台组件(新终端;目标 compileSdk 36)
+sdkmanager "platforms;android-36" "build-tools;36.0.0"
 
 # ⑤ 体检(验收标准)
 sdkmanager --list        # 组件齐全
@@ -593,7 +606,7 @@ adb devices              # 能看到手机
 
 **环境准备完成** → 插上 Android 16 真机(开发者选项 + 无线调试),验证设备与 SAF 所需基础能力。
 
-> **⑥ Kotlin / Gradle 侧(⬜ 待补,2026-09-10 换栈后新增)**:`gradlew` 构建、Kotlin 编译、VS Code 的 Kotlin/Android 扩展配置**均未在本机验证**;D1 原型在新栈重建时一并确认并回写本节。
+> **⑥ Kotlin / Gradle 侧(⬜ 待补)**:`gradlew` 构建与 Kotlin 编译**均未在本机验证**;D1 原型在新栈重建时一并确认并回写本节。
 
 正式工程框架暂不创建。
 
@@ -602,7 +615,7 @@ adb devices              # 能看到手机
 ```powershell
 adb devices              # 列出可用设备(含无线调试)
 adb logcat               # 看运行日志
-sdkmanager --list        # 看 SDK 组件可用版本
+sdkmanager --list        # 看 SDK 组件可用版本(来自 <sdk>\cmdline-tools\latest\bin)
 mise ls                  # 看 mise 管的工具版本
 ./gradlew assembleDebug  # 构建(⬜ 待工程创建后适用)
 ```
@@ -610,8 +623,13 @@ mise ls                  # 看 mise 管的工具版本
 ### 12.5 踩坑速查
 
 - **adb 认 SDK 目录结构**(`$ANDROID_HOME\platform-tools\adb` 等),不认 PATH 上的散装 adb → platform-tools 必装。
-- **双 adb 会打架**:scoop adb 与 SDK platform-tools adb 版本漂移 → 报 `adb server version mismatch`,已定方案是卸 scoop 版(2026-09-07 已卸)。
+- **同一类工具只留一份权威(adb 只留一份)**:历史上 scoop 独立 adb(37.0.1)与 SDK platform-tools 的 adb 版本漂移 → 报 `adb server version mismatch`(2026-09-07 已卸 scoop 版)。现行约定:**adb / fastboot 一律来自 SDK `platform-tools`**;只有在"要 adb 但不做 Android 开发"的机器上才装独立 adb 包,且**不要**与 SDK 那份并存。
 - **licenses 不点** → Gradle 构建会停在缺组件;用 `sdkmanager --licenses` 处理(不再经 flutter doctor)。
+- **Android Studio 会把 junction 解析成实体路径 → SDK 根必须是不随包改名的地方**(2026-09-12 实证):把 Studio 的 SDK Location 指向 `...\android-clt\current`,存盘后变成 `...\android-clt\15859902`(实体版本目录),工程内 `local.properties` 的 `sdk.dir` 同样被写成实体路径。→ SDK 根必须是**稳定路径**(现行 = Studio 默认位置);"用 junction 跟随最新版"这套对 Studio 无效。
+- **`ANDROID_SDK_HOME` 不是 SDK 路径变量**(2026-09-12 查官方"环境变量"文档核实):它只决定**老工具(Studio 4.3 及更早)把 `.android` 用户数据建在哪**;Studio 会自动把它设成 SDK 目录,于是 `<sdk>\.android\` 下出现 `avd/`、`cache/`、`debug.keystore`、`studio/`。**SDK 位置只认 `ANDROID_HOME`**(`ANDROID_SDK_ROOT` 已废弃;若两者都设,官方要求取值一致)。
+- **杀软实时防护会拦 SDK 解包**(2026-09-12 实证;本机为火绒,Defender 已被接管):安装 `sources;*` 这类含上万个小文件的包时随机报 `java.nio.file.AccessDeniedException`(实测卡在 `ScreenCaptureCallbackHandler.java`;zip 本体 CRC 完好,只解出 533/16421)。→ 把 **SDK 目录、`~/.gradle`、工程目录**加入杀软信任区/排除列表(官方文档同样建议);临时关防护可确认因果。
+- **Android 16 引入"次版本号"36.0 / 36.1**(2026-09-12 查一手资料):Android 16 QPR2 是首个带次版本的版本,SDK 版本由 36 → **36.1**;在 SDK 里两者是**独立 platform 包**、可并存(目录名形如 `android-36` 与 `android-36.1`,与现有 `android-37.0` 同类)。运行时用 `Build.getMinorSdkVersion(VERSION_CODES_FULL.BAKLAVA)` 查询;Gradle 侧 DSL 是 `compileSdkMinor`(AGP 9.1+);AGP 9.0 兼容表写明"最高支持 API 36.1",要打 37 需 AGP 9.4+。
+- **构建与 SDK 都放 Windows 侧,不给 WSL**(2026-09-12 实测):WSL 经 `/mnt/d`(NTFS)解包 1500 个 4KB 小文件耗时 **2864ms**,同一操作在 ext4 上只要 **18ms**(159×),而 Gradle 构建全是这类小文件操作。→ 工程留在 D 盘、构建走 Windows 原生;WSL 只作 agent 宿主与代码编辑。
 - **本机(R7P21)访问 Google 系仓库需显式代理**(2026-09-08):Windows 主力机 R7P21 需 Clash 代理(127.0.0.1:7897);另一台机 Slayer 为透明代理无需配置。Gradle/Java **不读** `HTTP_PROXY` 环境变量,须写 `~/.gradle/gradle.properties` 的 `systemProp.http(s).proxyHost/Port`(已配,仅 R7P21 用户级,不随工程文件);否则 gradle wrapper 下载发行版与依赖解析会超时。工程内不写死任何代理/镜像配置。
 - **compileSdk 不必 ≥ 手机版本**:手机 Android 16 = API 36,装 `platforms;android-36` 恰好对齐;以后想用新 API 再追加装更高 platform(可多版本并存)。
 - **Android SAF:tree URI 不能直接当 parent 传给 `DocumentsContract.createDocument`**(2026-09-08 D2 spike 实证):一加/部分国产 ROM 严格校验 parent 必须是 document URI,直接传 tree URI 会抛 `IllegalArgumentException: Invalid URI`(AOSP 行为宽松,国产 ROM 收紧)。**必须先转换**:
@@ -629,14 +647,16 @@ mise ls                  # 看 mise 管的工具版本
 - **拖拽必须用 UI 层测试自测,不能只测数据**(2026-09-10 教训,用户反馈“能拖但不改顺序”反复两轮):GUI 交互无法靠日志/截图验证,须**模拟完整手势**(按下 → 超过 slop 移动 → 移到目标 → 抬起)并断言“拖动中顺序不变 + 松手后落在目标下标”。**换栈后须用 Compose 的测试 API 重建等价用例**——这是“修复自证三层”里 UI 层的要求(§9 D1)。
 - **“数据对了但界面不动”先查状态通知链**(2026-09-10 D1 实测,最隐蔽的一个):当时根因是组合式状态对象(controller 持有子 notifier)只转发了部分通知,导致**数据重排成功、界面永不重建**(日志里 drop/enabled/index 全部正常,极易误判为拖拽组件 bug)。**教训与实现无关:凡“数据对但界面不动”,先查状态变更是否真的传播到了 UI**;换栈到 Compose 后对应的是状态提升 / `mutableStateOf` 的可见性,须在新实现里重新验证。
 
-### 12.6 版本锚点(本机已验证)
+### 12.6 版本锚点
 
-| 项                              | 版本                                                                   |
-| ------------------------------- | ---------------------------------------------------------------------- |
-| Kotlin / Gradle                 | ⬜ 尚未验证(无工程,待到 D1 原型重建时确认)                            |
-| compileSdk / minSdk / targetSdk | 36 / 24 / 36(换栈后需在新工程中重新确认)                              |
-| Android platform                | `platforms;android-36`(Android 16,与真机一致)                          |
-| JDK                             | temurin-17.0.20+101(Android/Gradle 构建所需)                           |
+| 项 | 版本 |
+| --- | --- |
+| Git / VS Code / Android Studio | 2.55.0 / 1.136 / 2026.1.4.7 |
+| JDK | temurin-17.0.20+101(mise;Android/Gradle 构建所需) |
+| Gradle / AGP / Kotlin / Compose BOM | 9.6.0 / 9.4.0 / 2.2.10 / 2026.02.01 —— **来自 Studio 2026.1.4 新建工程模板,尚未跑通构建**,D1 原型重建时确认 |
+| compileSdk / minSdk / targetSdk | 36 / 24 / 36(目标值;Studio 模板默认给的是 37 / 36 / 37,新工程须显式改回) |
+| Android platform | `platforms;android-36`(⬜ 待装,与真机 Android 16 对齐);现有 `android-37.0` 是模板默认带的 |
+| Android SDK 根 | `C:\Users\Administrator\AppData\Local\Android\Sdk` |
 
 ## 13. 参考文件
 
