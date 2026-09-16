@@ -62,4 +62,43 @@ class ProceduralThumbTest {
         val c: Color = seedBaseColor(-12345)
         assertTrue(c.red in 0f..1f && c.green in 0f..1f && c.blue in 0f..1f)
     }
+
+    // ---- 缩略图文字(2026-09-16 用户要求:mock 图写上文字,更直观) ----
+
+    @Test
+    fun `thumbnail caption prefers a trimmed file name`() {
+        assertEquals("IMG_20260701_001", thumbCaption(fileName = "IMG_20260701_001.jpg"))
+        assertEquals("page_01", thumbCaption(fileName = "page_01.png"))
+    }
+
+    @Test
+    fun `thumbnail caption keeps usable short names intact`() {
+        // 目录内文件名才是人核对顺序的依据,不能被截到无法辨认
+        assertEquals("img12", thumbCaption(fileName = "img12.jpg"))
+        assertEquals("封:面?", thumbCaption(fileName = "封:面?.png"))
+    }
+
+    @Test
+    fun `thumbnail caption is unique per item unlike the seed number`() {
+        // 这正是不用 seed 数字的原因:day1 的 seed=1 与 day2 的 seed=101 都显示 "2"
+        val names = listOf("IMG_20260701_001.jpg", "IMG_20260701_002.jpg", "IMG_20260702_001.jpg")
+        val captions = names.map { thumbCaption(fileName = it) }
+        assertEquals(captions.size, captions.toSet().size, "文字应能唯一区分不同图片")
+    }
+
+    @Test
+    fun `thumbnail caption is empty for blank input`() {
+        assertEquals("", thumbCaption(fileName = ""))
+        assertEquals("", thumbCaption(fileName = "   "))
+    }
+
+    @Test
+    fun `thumbnail caption truncates very long names keeping the tail`() {
+        // 长名保留尾部:序号多半在尾部(如 _0001),截尾比截头更易辨认
+        val long = "a".repeat(40) + "_final_0099"
+        val c = thumbCaption(fileName = long, maxChars = 12)
+        assertTrue(c.length <= 13, "应限制长度(实际 ${c.length})")
+        assertTrue(c.endsWith("0099"), "应保留尾部以便辨认序号(实际 $c)")
+        assertTrue(c.startsWith("…"), "截断处应有省略号(实际 $c)")
+    }
 }

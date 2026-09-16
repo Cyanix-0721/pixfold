@@ -36,6 +36,7 @@ fun ThumbCard(
         Column {
             ProceduralThumb(
                 seed = item.seed,
+                fileName = item.fileName,
                 modifier = Modifier
                     .fillMaxWidth()
                     .aspectRatio(1f),

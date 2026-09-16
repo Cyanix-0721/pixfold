@@ -7,6 +7,8 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.text.TextLayoutResult
+import androidx.compose.ui.text.TextMeasurer
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.drawText
 import androidx.compose.ui.text.font.FontWeight
@@ -36,6 +38,37 @@ fun seedLineCount(seed: Int): Int = 2 + (abs(seed) % 3)
 
 /** 中央显示的大序号:1 + seed % 99。 */
 fun seedDisplayNumber(seed: Int): Int = 1 + (abs(seed) % 99)
+
+/**
+ * 缩略图上显示的文字(2026-09-16 用户要求:mock 图写上文字,更直观)。
+ *
+ * 用**去掉扩展名的文件名**而非 seed 派生数字 —— 因为 seed 数字会重复
+ * (day1 的 seed=1 与 day2 的 seed=101 都显示 "2",见 `seedDisplayNumber`),
+ * 无法用来核对拖拽顺序;文件名才是人一眼能对上"这张是哪张"的依据。
+ *
+ * 超长时**保留尾部**并前置省略号:序号多在尾部(如 `_0001`),截尾比截头更难辨认。
+ */
+fun thumbCaption(fileName: String, maxChars: Int = 22): String {
+    val stem = fileName.substringBeforeLast('.', fileName).trim()
+    if (stem.isEmpty()) return ""
+    if (stem.length <= maxChars) return stem
+    return "…" + stem.takeLast(maxChars)
+}
+
+/** 测量一行标题文本;抽成函数以便在缩放循环中复用。 */
+private fun measureCaption(
+    measurer: TextMeasurer,
+    text: String,
+    fontPx: Float,
+): TextLayoutResult = measurer.measure(
+    text = text,
+    style = TextStyle(
+        color = Color.White.copy(alpha = 0.95f),
+        fontSize = fontPx.sp,
+        fontWeight = FontWeight.Bold,
+    ),
+    maxLines = 1,
+)
 
 /**
  * HSL → Color。自行实现以免依赖不同 Compose 版本对 HSL 转换的可用性差异。
@@ -69,6 +102,8 @@ fun ProceduralThumb(
     seed: Int,
     modifier: Modifier = Modifier,
     showIndex: Boolean = true,
+    fileName: String = "",
+    captionMaxChars: Int = 22,
 ) {
     val base = seedBaseColor(seed)
     val accent = seedAccentColor(seed)
@@ -105,18 +140,55 @@ fun ProceduralThumb(
         }
 
         if (showIndex) {
-            val layout = measurer.measure(
-                text = seedDisplayNumber(seed).toString(),
-                style = TextStyle(
-                    color = Color.White.copy(alpha = 0.9f),
-                    fontSize = (h * 0.38f).coerceAtLeast(10f).sp,
-                    fontWeight = FontWeight.Bold,
-                ),
-            )
-            drawText(
-                textLayoutResult = layout,
-                topLeft = Offset((w - layout.size.width) / 2f, (h - layout.size.height) / 2f),
-            )
+            // 显示文件名(去掉扩展名),而非 seed 派生数字 —— 后者会重复、无法用于核对顺序。
+            //
+            // 尺寸策略(真机实证后调整):网格卡片很窄(110dp 约 384px),原先按高度取 0.16h 得到
+            // 17.6sp,导致文字被裁切。改为:
+            //   1) 字号取 `0.10 * 高度`,并按宽高上限夹取;
+            //   2) **实测文本宽度**,若超出可用宽度则逐级缩小字号;
+            //   3) 仍放不下则按可用宽度截断字符数。
+            // 这样任何尺寸(网格 110dp / 预览全屏)都不会裁切或溢出。
+            val maxFontPx = (h * 0.10f).coerceIn(10f, 40f)
+            val usableW = w * 0.90f
+
+            var fontPx = maxFontPx
+            var caption = thumbCaption(fileName, maxChars = captionMaxChars)
+            var layout = measureCaption(measurer, caption, fontPx)
+
+            // 逐级缩小字号,直到宽度合适(最多 6 档,避免退化成不可读)
+            var guard = 0
+            while (layout.size.width > usableW && fontPx > 9f && guard < 6) {
+                fontPx *= 0.85f
+                layout = measureCaption(measurer, caption, fontPx)
+                guard++
+            }
+            // 仍超宽 -> 按可用宽度反推字符数后截断(保留尾部,序号多在尾部)
+            if (layout.size.width > usableW) {
+                val charW = (layout.size.width.toFloat() / caption.length.coerceAtLeast(1))
+                val fitChars = (usableW / charW).toInt().coerceIn(3, captionMaxChars)
+                caption = thumbCaption(fileName, maxChars = fitChars)
+                layout = measureCaption(measurer, caption, fontPx)
+            }
+
+            if (caption.isNotEmpty()) {
+                // 半透明底衬:保证白字在浅色块上也可读(对比度)
+                val padX = 4f
+                val padY = 2f
+                val boxW = (layout.size.width + padX * 2).coerceAtMost(w)
+                val boxH = layout.size.height + padY * 2
+                drawRect(
+                    color = Color.Black.copy(alpha = 0.38f),
+                    topLeft = Offset((w - boxW) / 2f, (h - boxH) / 2f),
+                    size = Size(boxW, boxH),
+                )
+                drawText(
+                    textLayoutResult = layout,
+                    topLeft = Offset(
+                        ((w - layout.size.width) / 2f).coerceAtLeast(0f),
+                        (h - layout.size.height) / 2f,
+                    ),
+                )
+            }
         }
     }
 }

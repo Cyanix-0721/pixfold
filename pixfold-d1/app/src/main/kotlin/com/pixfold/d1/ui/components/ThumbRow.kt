@@ -38,8 +38,10 @@ fun ThumbRow(
             .semantics { contentDescription = item.relPath },
         verticalAlignment = Alignment.CenterVertically,
     ) {
+        // 列表行内已用文字显示文件名,故缩略图不再重复画字(避免噪杂)
         ProceduralThumb(
             seed = item.seed,
+            fileName = item.fileName,
             modifier = Modifier.size(44.dp),
             showIndex = false,
         )
