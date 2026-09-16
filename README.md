@@ -2,7 +2,7 @@
 
 图片整理与 CBZ 制作工作台。
 
-> 当前状态：**设计阶段——D1 交互原型主线**（D2 Android SAF spike 已 5/5 验收；2026-09-10 技术栈重审换栈；2026-09-13 验证工程已删除并归档，原型待在新栈从零重建）
+> 当前状态：**设计阶段——D1 交互原型主线**（D2 Android SAF spike 已 5/5 验收；2026-09-10 技术栈重审换栈为 Kotlin + Jetpack Compose；**2026-09-16 D1 在新栈启动重建**，分支拓扑与七阶段切分见 HANGOFF §9.1）
 > 目标平台：**Android（唯一 GUI 平台）**；Windows / Linux 不再是 GUI 目标平台
 > 技术栈：**Kotlin + Jetpack Compose（Android 原生，2026-09-10 锁定，替换 Flutter）**；决策依据与对照方案见 HANGOFF §8
 
@@ -44,7 +44,7 @@ PixFold 不是简单地把两个命令行脚本包进一个窗口。它要把图
 ```text
 D0  固化需求与真实样例
  ↓
-D1  完成交互原型，不连接真实文件系统          ← 当前：换栈后需从零重建（旧原型已删除/归档）
+D1  完成交互原型，不连接真实文件系统          ← 当前：新栈重建中（7 阶段，见 HANGOFF §9.1）
  ↓
 D2a SAF 闭环 spike（已提前完成 5/5）
  ↓
@@ -67,6 +67,8 @@ D5  增加模板、撤销、更新 CBZ、多系列批处理等增强功能
 
 > 进度(2026-09-16)：**环境复检——修正文档漂移，环境比原记录更完整**。逐项实测后确认：`platforms;android-36` 与 cmdline-tools 23.0.0 **均已就位**（原标 ⬜ 待装 / 偏旧）；Kotlin/Gradle 侧**已有一次成功构建实证**（2026-09-12，Gradle 9.6.0 / AGP 9.4.0 / Kotlin 2.2.10）；**adb / fastboot 曾被 `C:\Windows\System32` 的第三方残留（adb 33.0.0）遮蔽**，已清除并验收通过；归档分支 `archive-flutter-verify` **已推远程**（原先"仅本地"的风险已消除）。详见 HANGOFF §12 顶部横幅与 §12.2 / §12.5 / §12.7。
 
+> 进度(2026-09-16，**D1 启动重建**)：**分支模型与阶段切分固化**——`ready`（设计文档线）→ **`dev`（开发主线）** → 阶段分支 `d1/p1…p7`（从 `dev` 开、完成即合回 `dev` 并回写文档），D1 全绿后 `dev` → `main` 发 release，此后开发继续在 `dev`；原型代码改为**在仓库内**开发（不再放仓库外目录，避免 09-13 的整树丢失），详见 HANGOFF §9.1。**构建链已在 `temurin-17` 下完整实证**（探针工程：`assembleDebug` + 纯 Kotlin JVM 单测 + Robolectric Compose UI 测试 + `lint` 全绿），原"temurin-17 下的完整构建待 D1 确认"一项**已关闭**；同批实测确认两条换栈坑（AGP 9 内置 Kotlin 不得再加 `kotlin-android`、Compose 插件须锁 2.2.10；Kotlin `Regex.split` 丢弃捕获组会导致自然排序静默失效）。证据见 `docs/notes/d1-toolchain-evidence.md`。**⚠️ 当前 `adb devices` 为空（无真机），依赖真机的验收项挂起；不得以离线通过冒充 D1 完成。**
+
 ## 开发环境部署(⚠️ 暂定)
 
 > 本节已按 **Kotlin + Jetpack Compose**（HANGOFF §8.1）重写，并同步 **2026-09-16 复检**的环境实况（SDK 根由 Android Studio 管理）。完整清单、版本锚点与踩坑见 [HANGOFF.md](HANGOFF.md) §12。
@@ -76,7 +78,7 @@ D5  增加模板、撤销、更新 CBZ、多系列批处理等增强功能
 - **Android SDK**：根目录 `C:\Users\Administrator\AppData\Local\Android\Sdk`（Studio 的默认位置，由 Studio 的 SDK Manager 管理）。现有组件：platform-tools **37.0.1**、build-tools 35.0.1 / 36.0.0、platforms **android-36 + android-37.0**、sources android-36 + android-37.0、emulator、system-images;android-36、licenses、cmdline-tools **23.0.0**。
 - **环境变量（Studio 不会设，必须手工设）**：`ANDROID_HOME` 指向上述 SDK 根；用户 PATH 加入 `<sdk>\platform-tools`（adb / fastboot）与 `<sdk>\cmdline-tools\latest\bin`（sdkmanager）。注意 `ANDROID_SDK_HOME` 是历史变量（老工具的 `.android` 位置），**不是** SDK 路径。
 - **adb**：一律来自 SDK 的 platform-tools；不装独立 adb 包。⚠️ **第三方驱动/模拟器可能把 adb 塞进 `C:\Windows\System32`（靠 PATH 顺序遮蔽 SDK 那份）**——验证时用 `Get-Command adb -All` 确认只有一份，详见 HANGOFF §12.5。
-- **Gradle / Kotlin**：✅ **已有构建实证** —— 2026-09-12 一次 `BUILD SUCCESSFUL`（Studio 模板工程，Gradle 9.6.0 / AGP 9.4.0 / Kotlin 2.2.10，跑在 JBR 25 上）；工程事后删除，故 **temurin-17 下的完整构建待 D1 原型重建时确认**。**AGP 9 起 Kotlin 内置，无需单独安装 Kotlin 工具链**，且勿手工加 `kotlin-android` 插件（与新 DSL 冲突，见 §12.5）。
+- **Gradle / Kotlin**：✅ **已有构建实证** —— 2026-09-12 一次 `BUILD SUCCESSFUL`（Studio 模板工程，Gradle 9.6.0 / AGP 9.4.0 / Kotlin 2.2.10，跑在 JBR 25 上）；**2026-09-16 已在 `temurin-17` 下完整复验通过**（探针工程：`assembleDebug` + 纯 JVM 单测 + Robolectric UI 测试 + `lint` 全绿，证据 `docs/notes/d1-toolchain-evidence.md`）。**AGP 9 起 Kotlin 内置，无需单独安装 Kotlin 工具链**，且勿手工加 `kotlin-android` 插件（与新 DSL 冲突，见 §12.5）；**Compose 编译器插件仍需单独应用，版本须锁 AGP 内置的 KGP 版本（2.2.10）**。
 - **验收**：`sdkmanager --list` 组件齐全 + `adb devices` 能看到手机（当前无设备在线，配对记录仍在，重开无线调试即可）。
 
 ```powershell
@@ -107,8 +109,10 @@ Get-Command adb -All      # 应只解析到 <sdk>\platform-tools\adb.exe(见 HAN
 
 ## 文档
 
-- [`HANGOFF.md`](HANGOFF.md)：产品定位、工作流、领域模型、平台策略、设计路线、验收标准与开发环境实况(§12)；
-- [`scripts/`](scripts/)：现有 Python 行为参考和回归样例。
+- [`HANGOFF.md`](HANGOFF.md)：产品定位、工作流、领域模型、平台策略、设计路线（含 §9.1 分支拓扑与阶段切分）、验收标准与开发环境实况(§12)；
+- [`scripts/`](scripts/)：现有 Python 行为参考和回归样例；
+- [`docs/notes/`](docs/notes/)：调研与实证笔记（归档原型领域语义、脚本行为矩阵、构建链实证）；
+- [`docs/superpowers/`](docs/superpowers/)：D1 设计规格（`specs/`）与分阶段实施计划（`plans/`）。
 
 ## License
 

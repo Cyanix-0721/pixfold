@@ -1,7 +1,7 @@
 # AGENTS.md — PixFold(项目级)
 
 > PixFold:图片整理与 CBZ 制作工作台(图形应用),**GUI 只做 Android**(2026-09-10 起;Windows / Linux 不再是 GUI 目标平台)。
-> **当前阶段(快照,2026-09-16):设计期。D2a SAF spike 5/5 通过;技术栈于 09-10 重审,由 Flutter + Dart 换为 **Kotlin + Jetpack Compose(Android 原生)**(§8.1,触发见 §8.2 证伪条件 ③);主线 = **D1 交互原型**:原型工程 `C:\Personal\pixfold-d1` 的 Flutter 代码**作废、需在新栈重建**。**⚠️ 两个验证工程(`pixfold-d1` 原型 / `pixfold-saf-spike`)已于 2026-09-13 从磁盘删除,内容归档在分支 `archive-flutter-verify`(tip `9efef5b`,**已推远程**;本地无同名分支,取用走 `origin/archive-flutter-verify`)——当前无任何原型代码,D1 从零重建;归档中含可参考的 Kotlin SAF 实现(§12.7)**。**验收仍按 HANGOFF §9《D1 验收清单》20 项逐条打勾——判据不因换栈调整**,清单全绿 = D1 退出条件达成,此后才决策正式工程(§9 决策门)。**当前状态:换栈后待重建原型并重跑走查**。流程约定:凡交互/数据改动须走"修复自证三层"(逻辑单测 → UI 层断言 → 真机实证,见 §9 D1)。D1 通过前不建正式工程。仓库内容 = 设计文档 + 行为参考脚本 + 环境记录,不是可交付产品代码。**
+> **当前阶段(快照,2026-09-16):设计期,D1 在新栈重建中。D2a SAF spike 5/5 通过;技术栈于 09-10 重审,由 Flutter + Dart 换为 **Kotlin + Jetpack Compose(Android 原生)**(§8.1,触发见 §8.2 证伪条件 ③);主线 = **D1 交互原型**。**⚠️ 两个旧验证工程(`pixfold-d1` 原型 / `pixfold-saf-spike`)已于 2026-09-13 从磁盘删除,内容归档在分支 `archive-flutter-verify`(tip `9efef5b`,**已推远程**;本地无同名分支,取用走 `origin/archive-flutter-verify`);归档含可参考的 Kotlin SAF 实现(§12.7),其领域语义已提取为 `docs/notes/d1-archive-domain-semantics.md`。****本次 D1 改为在仓库内的阶段分支开发**(不再放仓库外目录,避免 09-13 的整树丢失):`ready` → **`dev`** → 阶段分支 `d1/p1…p7`(完成即合回 `dev` 并回写文档),D1 全绿后 `dev` → `main` 发 release,此后开发继续在 `dev`(拓扑与七阶段切分见 HANGOFF §9.1)。**验收仍按 HANGOFF §9《D1 验收清单》20 项在 Android 真机逐条打勾——判据不因换栈调整**,清单全绿 = D1 退出条件达成,此后才决策正式工程(§9 决策门)。**⚠️ 当前 `adb devices` 为空(无真机),故依赖真机的验收项挂起;离线验证(领域单测 + Robolectric UI 断言 + assembleDebug + lint)已完成构建链实证(`docs/notes/d1-toolchain-evidence.md`),但不得以离线通过冒充 D1 完成。**流程约定:凡交互/数据改动须走"修复自证三层"(逻辑单测 → UI 层断言 → 真机实证,见 §9 D1)。D1 通过前不建正式工程。仓库内容 = 设计文档 + 行为参考脚本 + 环境记录 + 原型代码(在阶段分支/dev),不是可交付产品代码。**
 > 本文件优先级低于用户当回合指令,高于全局 AGENTS.md;技术栈/流程/环境类全局约定见全局文件。
 
 ## 1. 文档层级(谁在哪记录什么)
@@ -12,6 +12,9 @@
 | `README.md`   | 项目概览与门面,内容须与 HANGOFF 一致;含开发环境部署节(⚠️ 暂定,只含项目相关步骤)                                                                                                                                     |
 | `.mise.toml`  | 项目工具版本声明(**纯配置无注释**,说明见 HANGOFF §12.2);变更后需 `mise install`                                                                                                                                     |
 | `scripts/`    | 两个 Python 脚本:现有行为参考、回归样例、命令行备用;**不是最终规范**——GUI 需补全交互并避免静默危险操作                                                                                                              |
+| `docs/notes/` | 调研与实证笔记(非产品权威):`d1-archive-domain-semantics.md`(归档原型领域语义+16 项测试意图)、`scripts-behavior-matrix.md`(脚本行为矩阵+13 条危险默认值)、`d1-toolchain-evidence.md`(新栈构建链实证)。每条结论附来源/命令 |
+| `docs/superpowers/` | D1 流程产物:`specs/`(设计规格)、`plans/`(分阶段实施计划)。**产品决策仍以 HANGOFF 为唯一权威**,此处只承载实现级规格与计划 |
+| `pixfold-d1/` | D1 原型工程(**在阶段分支/dev 上**,不进 `ready`/`main`);`domain/` 纯 Kotlin JVM + `app/` Compose。拓扑见 HANGOFF §9.1 |
 | `.workbuddy/` | WorkBuddy 会话记忆,已在 .gitignore,勿混入产品内容                                                                                                                                                                   |
 | 归档分支      | `archive-flutter-verify`(**已推远程**;本地无同名分支):已删除的 `pixfold-d1` / `pixfold-saf-spike` 整树快照;新栈可参考其中 Kotlin SAF 实现。详见 HANGOFF §12.7                                                       |
 
@@ -39,7 +42,7 @@
 - D1 交互原型(当前主线):范围 = 缩略图/拖拽排序、命名结构编辑、CBZ 元数据编辑、执行计划预览,可不连真实文件系统;**完成判据 = HANGOFF §9《D1 验收清单》20 项在 Android 真机全部勾满(§9 门槛表已把该清单定为 D1 退出条件);判据未满足前不得宣称 D1 完成**;清单已于 2026-09-10 由双列收敛为 **Android 单列**(条目未改);
 - 下一阶段 D2b(完整平台能力,见 §9):缩略图生成策略 / 后台任务与进度 / 授权失效恢复;D2a(SAF 闭环)已于 2026-09-08 提前验收,不再重复;
 - 流程约定(**修复自证三层**,§9 D1):凡交互或数据改动,须依次过"领域单测 → UI 层断言 → 真机实证(埋点 + 模拟输入 + 像素/快照对比)",不得只凭"测试通过"交付;
-- 环境与工具维护:版本声明经 `.mise.toml`(项目);全局工具声明不属本仓库管辖(见 §12.2);**环境已于 2026-09-16 复检**(§12 顶部横幅):`platforms;android-36` / cmdline-tools 23.0.0 均已就位,Kotlin/Gradle 侧有 2026-09-12 的成功构建实证(跑在 Studio JBR 25 上;**temurin-17 下的完整构建仍待 D1 确认**),曾遮蔽 SDK 的 system32 残留 adb 已清除(§12.5);`.mise.toml` 现仅 `java = "temurin-17"`(已去掉 `flutter` 声明)。
+- 环境与工具维护:版本声明经 `.mise.toml`(项目);全局工具声明不属本仓库管辖(见 §12.2);**环境已于 2026-09-16 复检**(§12 顶部横幅):`platforms;android-36` / cmdline-tools 23.0.0 均已就位,**Kotlin/Gradle 侧已在 `temurin-17` 下完整实证**(探针工程:assembleDebug + 纯 JVM 单测 + Robolectric UI 测试 + lint 全绿,证据 `docs/notes/d1-toolchain-evidence.md`;原"待 D1 确认"项已关闭),曾遮蔽 SDK 的 system32 残留 adb 已清除(§12.5);`.mise.toml` 现仅 `java = "temurin-17"`(已去掉 `flutter` 声明)。
 
 **不该做**:
 
@@ -57,4 +60,5 @@
 
 - 语言:与用户用中文交流;仓库文档双语(README)或中文(HANGOFF),新增/修改匹配所在文件的语言风格。
 - Git:本仓库独立于 chezmoi dotfiles 仓库;`.workbuddy*/`、`.agents/` 已 gitignore,勿手动加回。
+- **分支模型(2026-09-16 起)**:`ready`(设计文档线,原型代码永不进)→ **`dev`(开发主线)** → 阶段分支 `d1/pN`。阶段分支从 `dev` 开、**完成即合回 `dev` 并回写文档**、随即删除;D1 全绿后 `dev` → `main` 发 release,此后开发继续在 `dev`。**push 由用户自行处理**,agent 只提交不推送。详见 HANGOFF §9.1。
 - 验收:任何改动对照 `HANGOFF.md` §10(功能 / 数据正确性 / 平台)自检。

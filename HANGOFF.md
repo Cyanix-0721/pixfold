@@ -1,9 +1,10 @@
 # PixFold — 设计交接：图片整理与 CBZ 制作工作台
 
 > 项目名：**PixFold**
-> 状态：**设计阶段**（2026-09-03 立项；2026-09-08 D2 SAF spike 5/5 验收；2026-09-10 重审后换栈为 Android 原生，当前主线仍为 D1 交互原型；**2026-09-13 两个验证工程已删除并归档，见 §12.7**）
+> 状态：**设计阶段**（2026-09-03 立项；2026-09-08 D2 SAF spike 5/5 验收；2026-09-10 重审后换栈为 Android 原生；**2026-09-16 D1 在新栈启动重建**——分支拓扑与七阶段切分见 §9.1，构建链已在 temurin-17 下实证）
 > 目标平台：**Android（唯一 GUI 平台）**；Windows / Linux 不再作为 GUI 目标平台
 > 技术栈：**Kotlin + Jetpack Compose（Android 原生，2026-09-10 重审锁定，替换 09-08 的 Flutter + Dart；判定见 §8.2）**
+> 分支模型（2026-09-16 起）：`ready`（设计文档线）→ **`dev`（开发主线）** → 阶段分支 `d1/pN`（完成即合回 `dev`）；D1 全绿后 `dev` → `main` 发 release，此后开发继续在 `dev`。详见 §9.1
 
 ## 1. 项目重新定位
 
@@ -386,12 +387,13 @@ Android 第一版应优先保证“选目录 → 预览 → 手工确认 → 生
 
 > 进度(2026-09-08):D0 完成;D2 的 Android SAF spike 已按 §8.2 提前执行并验收(§8.3),证伪条件 ①② 排除;当前主线为 D1 交互原型,后续 D2/D3 的完整平台与领域核心工作尚未启动。(**技术栈已于 2026-09-10 重审换栈,见 §8.1/§8.2**。)
 > 进度(2026-09-13):换栈收口——两个验证工程(`pixfold-d1` / `pixfold-saf-spike`)已删除并归档至本地分支,见 §12.7;**D1 原型需在新栈从零重建**,当前无任何原型代码。
+> 进度(2026-09-16):**D1 在新栈启动重建**——分支拓扑与七阶段切分已固化(§9.1),规格与分阶段计划落 `docs/superpowers/`;构建链在 `temurin-17` 下完整实证(`docs/notes/d1-toolchain-evidence.md`)。**真机走查仍缺设备**(`adb devices` 为空),故依赖真机的验收项挂起,不得以离线通过冒充 D1 完成。
 > **阶段门槛(2026-09-10 补,可判定化)**:每阶段的"退出条件"必须达成才进入下一阶段,避免"看起来做完了"就往前推。状态与退出条件一览:
 
 | 阶段                    | 状态                    | 退出条件(可判定)                                                        |
 | ----------------------- | ----------------------- | ----------------------------------------------------------------------- |
 | D0 需求与样例固化       | ✅ 完成                 | 脚本功能矩阵 + 样例目录 + 危险默认值标注(§3)                            |
-| D1 交互原型             | 🔄 换栈后待重建 | 下方《D1 验收清单》20 项**全部勾满**(判据不变)            |
+| D1 交互原型             | 🔄 重建中(2026-09-16 起) | 下方《D1 验收清单》20 项**全部勾满**(判据不变)            |
 | D2a SAF 闭环 spike      | ✅ 完成(提前,2026-09-08) | §8.3 五项验收 5/5                                                       |
 | D2b 完整平台能力        | ⬜ 待办                 | 缩略图策略 / 后台任务与进度 / 授权失效恢复,三项真机可复现且有失败路径提示 |
 | D3 领域核心与适配层     | ⬜ 待办                 | 排序/命名/元数据/打包四类核心逻辑单测通过,且不依赖 UI 与平台层(§5)       |
@@ -399,12 +401,13 @@ Android 第一版应优先保证“选目录 → 预览 → 手工确认 → 生
 | D5 增强功能             | ⬜ 待办                 | 按需排期,不阻塞 D4                                                      |
 
 > **决策门(2026-09-10 更新)**:① **正式工程创建**的触发 = D1 退出条件达成(D1 之前只维护设计文档 + 验证工程,§4);② 换栈触发 = §8.2 证伪条件 ③,**已于 2026-09-10 触发并完成换栈**(→ Kotlin + Jetpack Compose,§8.1);后续 D1 走查若再发现问题,按同一框架记录,**不再预设对照方案**。
-> D1 执行注(2026-09-10 换栈后更新):D1 原型工程 **`C:\Personal\pixfold-d1`**(仓库外,与 spike 同级;不连真实文件系统,确定性 mock 数据)**的 Flutter 代码已作废,需在 Kotlin + Compose 新栈重建**;原 Dart 侧 14 项测试(3 项拖拽手势 + 1 项 UI 重建)随之作废,但**其覆盖的语义必须在新栈重建**。范围 = 本节 D1 六项交付;**验收平台改为 Android 单端**(§2/§7);实现策略 = **内置优先、零三方依赖、拖拽自研**(2026-09-10 用户决策,设计结论见 §12.5)。领域逻辑(自然排序/多级排序/命名求值/冲突检测/ComicInfo.xml/页码重编号)应为**不依赖 UI 的纯 Kotlin 核心**,可跑 JVM 单测。
-> **⚠️ 工程实况(2026-09-13)**:`C:\Personal\pixfold-d1` **目录已从磁盘删除**(与 `pixfold-saf-spike` 一同),`ready` 分支从未包含它。删除前的完整 Flutter 原型(含 `lib/domain/comic.dart` 等领域层与 16 项测试)**归档在本地分支 `archive-flutter-verify`**(tip `9efef5b`)。新栈重建时:**领域层的语义与测试意图可从归档读取参考,但代码本身作废、不迁移**;§12.5 的三条拖拽设计结论已单独保留在正文,不依赖归档。
+> D1 执行注(2026-09-16 更新):D1 原型工程 = **本仓库内的 `pixfold-d1/`**,在**阶段分支**上开发(拓扑见 §9.1),不连真实文件系统、用确定性 mock 数据。原 `C:\Personal\pixfold-d1` 的 Flutter 代码**已作废**,需在 **Kotlin + Compose** 新栈重建;原 Dart 侧 16 项测试随之作废,但**其覆盖的语义必须在新栈重建**(语义已提取为 `docs/notes/d1-archive-domain-semantics.md`)。范围 = 本节 D1 六项交付;**验收平台 = Android 单端**(§2/§7);实现策略 = **内置优先、零三方依赖、拖拽自研**(2026-09-10 用户决策,设计结论见 §12.5)。领域逻辑(自然排序/多级排序/命名求值/冲突检测/ComicInfo.xml/页码重编号)为**不依赖 UI 的纯 Kotlin 核心**,跑 JVM 单测(独立 `domain/` 模块)。
+> **⚠️ 工程实况(2026-09-13,路径已失效)**:`C:\Personal\pixfold-d1` **目录已从磁盘删除**(与 `pixfold-saf-spike` 一同),`ready` 分支从未包含它。删除前的完整 Flutter 原型(含 `lib/domain/comic.dart` 等领域层与 16 项测试)**归档在分支 `archive-flutter-verify`**(tip `9efef5b`,已推远程)。新栈重建时:**领域层的语义与测试意图已提取成笔记可读参考,代码本身作废、不迁移**;§12.5 的三条拖拽设计结论已单独保留在正文,不依赖归档。
 > 走查修复注(2026-09-09,Flutter 原型时期,**已作废**):原 Windows 端首轮反馈(大图预览自适应与缩放、桌面即时拖拽、中文发虚、网格拖拽黑边)已在该原型上闭环。**具体实现随换栈作废**;属于设计意图的部分(预览自适应窗口 + 可缩放平移翻页、拖拽视觉要有包络与占位、UI 字号下限)已入 D1 验收清单 / 交互原则,新栈重建时重新实现并验证。
 > 走查修复注(2026-09-10,Flutter 原型时期):拖拽改自研、**松手落地**语义、`PageOrder.moveItemTo` 统一重排入口 —— 这些**设计结论**继续有效并已归入 §12.5;原型上的具体修复与 3 项手势回归测试随换栈作废,须在新栈重做。
 > 走查状态(2026-09-10 换栈后):**Flutter 原型的走查作废**,待新栈重建原型后重跑 D1 验收清单 20 项(判据不变,见本节《D1 验收清单》前注)。
-> 工程约定:D1/D2 验证工程**不在 `ready` 主线入库**(用户约定,与 spike 一致);**2026-09-13 删除前已整树归档到独立的本地分支 `archive-flutter-verify`,不在主线上**——详见 §12.7。D1 按 §9 验收点 + §10 功能验收走查通过前不宣称完成。
+> 工程约定(2026-09-16 细化):D1/D2 验证工程**不进 `ready` / `main`**;原型代码**在本仓库的阶段分支开发,完成即合入 `dev`**(用户 2026-09-16 决定,取代"放在仓库外目录"的做法——2026-09-13 的整树丢失教训见 §12.7)。**`dev` 产出完整测试版(D1 全绿)后才合并到 `main` 发 release**,此后开发继续在 `dev`;阶段分支完成时**先在 `dev` 回写文档**。分支拓扑与阶段切分见 §9.1。D1 按 §9 验收点 + §10 功能验收走查通过前不宣称完成。
+> 归档先例:2026-09-13 删除前已整树归档到独立分支 `archive-flutter-verify`(**不在主线上**)——详见 §12.7。
 > 走查反馈补回(2026-09-13):Flutter 原型时期的**走查反馈 ④/⑤ 教训**原随换栈一并移除,其中**与实现无关、新栈同样适用**的部分已自归档分支取回并归入 §12.5(反馈④:可选回调"传了但没被使用"是静默缺口,对应清单第 6 项;反馈⑤:排序字段下拉顺序,其结论已固化在 §4 排序键定位)。逐条 Flutter 修复记录本身仍不保留。
 
 ### D0：需求与样例固化
@@ -466,6 +469,56 @@ Android 第一版应优先保证“选目录 → 预览 → 手工确认 → 生
 3. **真机层**:GUI 问题不靠猜,用"埋点日志 → 模拟输入(pywin32 SendInput)→ 像素/快照对比"实证,方法详见 §12.5。
 
 > 教训依据:三轮走查共修 8 项(预览溢出/拖拽不落地/中文发虚/拖拽黑边/列表 0 高度/三方包弃用/字号/通知链断裂),其中"拖拽不改变顺序"反复 4 轮才定位——前 3 轮都停在"测试通过"的假象上。
+
+### D1.1 分支拓扑与阶段切分(2026-09-16 用户决定)
+
+> 背景:换栈后 D1 需从零重建(§9 D1 执行注),原型代码改在**本仓库的阶段分支**开发,
+> 不再放仓库外目录(2026-09-13 的整树丢失教训见 §12.7)。本节固化拓扑,避免"每阶段一分支"被各人各理解。
+
+**分支拓扑**:
+
+```text
+ready ──► dev                          ← ready 整合进 dev,dev 成为开发主线
+            ├─► d1/p1 ─┐
+            ├─► d1/p2 ─┤  每阶段从 dev 开一个分支
+            ├─► …      ├─ 阶段完成 → 合回 dev + 在 dev 回写文档 → 删阶段分支
+            └─► d1/p7 ─┘
+                  │
+                  ▼
+            dev = 完整测试版(D1 验收清单 20 项全绿)
+                  │
+                  ▼
+                main ──► 发 release ──► 此后开发继续走 dev
+```
+
+- 阶段分支**从 `dev` 开、合回 `dev`**,**不直接进 `main`**;`main` 只在 D1 全绿后接收一次合并并打 release。
+- 阶段分支完成时**先在 `dev` 上回写文档**(状态、踩坑、验收进度),再删分支。
+- 原型代码**永不进 `ready`**;`ready` 保持为设计文档线。
+- 提交与推送:**每阶段完成即提交**;push 由用户自行处理(用户 2026-09-16 约定)。
+
+**七个阶段切片**(按能力垂直切,每阶段 = 领域+UI+测试的完整闭环,可独立评审/回滚):
+
+| 阶段 | 交付物 | 覆盖验收项 | 自证层 |
+| --- | --- | --- | --- |
+| **P1** | 脚手架(AGP 9.4/Gradle 9.6/Compose BOM)+ 领域地基(模型、自然排序、多级排序、`PageOrder`/`moveItemTo`/`applyRule`/图钉)+ 确定性 mock 数据 | —(地基) | 第 1 层 |
+| **P2** | 缩略图网格/列表双视图切换、大图预览(自适应窗口/缩放/平移/翻页) | 1, 2 | 1+2 |
+| **P3** | 拖拽排序(网格+列表,松手落地)、图钉入口、排序规则编辑器(多级/批次+本组独立) | 3, 4, 5, 6, 7 | 1+2 |
+| **P4** | 命名结构编辑器、建议表(原路径→新名)、逐项覆盖、冲突与警告 | 8, 9, 10 | 1+2 |
+| **P5** | CBZ 元数据编辑器、ComicInfo.xml 预览、页码列表预览 | 11, 12, 13, 14 | 1+2 |
+| **P6** | 执行计划预览、危险动作独立二次确认、执行报告 + 撤销入口 | 15, 16, 17 | 1+2 |
+| **P7** | 真机走查 20 项 + 首页两条工作流端到端 | 18, 19, 20 | **第 3 层** |
+
+**工程结构**(领域层独立成纯 Kotlin JVM 模块,用 Gradle 边界强制"领域不依赖 UI/平台"):
+
+```text
+pixfold-d1/
+├── domain/     ← 纯 Kotlin JVM,零 Android 依赖;:domain:test 秒级反馈
+└── app/        ← Android + Compose
+```
+
+**领域语义权威**:`docs/notes/d1-archive-domain-semantics.md`(自归档分支 `9efef5b` 提取,含 16 项测试意图逐条还原);
+**构建链实证**:`docs/notes/d1-toolchain-evidence.md`(2026-09-16 探针实测);
+**规格与分阶段计划**:`docs/superpowers/specs/`、`docs/superpowers/plans/`。
 
 ### D2：平台能力验证
 
@@ -585,7 +638,7 @@ Windows 开发机的**基础设施**已就位(git / VS Code / scoop / winget / m
 | cmdline-tools | ✅ | SDK 根内 `cmdline-tools\latest` = **23.0.0**(2026-09-16 复检;原记录 19.0 已过期) |
 | platforms;android-36 | ✅ 已装 | 2026-09-16 复检确认已存在(Platform 16,rev 2),与真机 Android 16 对齐;原 ⬜ 标记作废 |
 | adb / fastboot | ✅ | 均来自 SDK `platform-tools` **37.0.1**,PATH 中各仅一份;未装独立 scoop adb(防双 adb,见 §12.5) |
-| Gradle / Kotlin 工程侧 | ✅ 有构建实证 | 2026-09-12 一次 `BUILD SUCCESSFUL in 4m 45s`(Studio 模板 `MyApplication`,Gradle **9.6.0** / AGP **9.4.0** / Kotlin **2.2.10**,跑在 Studio JBR 25 上);工程事后已删,无残留代码。**AGP 9 起 Kotlin 为内置**(不再需要单独装 kotlinc) |
+| Gradle / Kotlin 工程侧 | ✅ 有构建实证 | 2026-09-12 一次 `BUILD SUCCESSFUL in 4m 45s`(Studio 模板 `MyApplication`,Gradle **9.6.0** / AGP **9.4.0** / Kotlin **2.2.10**,跑在 Studio JBR 25 上);**2026-09-16 在 `temurin-17` 下完整复验通过**(探针工程:assembleDebug + 纯 JVM 单测 + Robolectric UI 测试 + lint 全绿);工程事后已删,无残留代码。**AGP 9 起 Kotlin 为内置**(不再需要单独装 kotlinc) |
 | WSL | ✅ 仅作 agent 宿主 | 跑 Codex,经互操作驱动 Windows 侧构建;WSL 不装 Android SDK、不承担构建(依据见 §12.5 的 I/O 实测) |
 | 模拟器加速 | ⚠️ 未就绪 | 无任何 AVD(`~/.android/avd` 不存在);`HypervisorPlatform`(WHPX)= Disabled 而 Hyper-V 已启用;`aehd` 驱动已装但服务 STOPPED(AEHD 与 Hyper-V 互斥)。**D1 走真机,暂不需处理** |
 | 真机连接 | ⬜ 当前无设备 | `adb devices` 为空;配对记录仍在(`~/.android/adb_known_hosts.pb`),重开无线调试即可 |
@@ -600,7 +653,7 @@ Windows 开发机的**基础设施**已就位(git / VS Code / scoop / winget / m
 
 ### 12.3 Android 平台验证准备(设计阶段优先)
 
-> **进度(2026-09-16 复检)**:SDK 侧已由 Android Studio 装齐基础组件(见 §12.2),**原记录的待补项(`platforms;android-36`、cmdline-tools 升级)均已完成**。下面 ①–⑤ 是**新机器**上的等价步骤。⑥ 的 Kotlin/Gradle 侧已有一次成功构建实证(2026-09-12),但**"temurin-17 下完整编译 AGP 9.4 工程"仍未被直接验证**(那次跑在 JBR 25 上)——D1 原型重建时一并确认并回写本节。
+> **进度(2026-09-16 复检)**:SDK 侧已由 Android Studio 装齐基础组件(见 §12.2),**原记录的待补项(`platforms;android-36`、cmdline-tools 升级)均已完成**。下面 ①–⑤ 是**新机器**上的等价步骤。⑥ 的 Kotlin/Gradle 侧**已于 2026-09-16 在 `temurin-17` 下完整实证**(见 ⑥ 与 `docs/notes/d1-toolchain-evidence.md`)。
 
 ```powershell
 # ① JDK 17(sdkmanager 是 Java 程序,必须先有它)
@@ -630,7 +683,7 @@ adb devices              # 能看到手机
 
 **环境准备完成** → 插上 Android 16 真机(开发者选项 + 无线调试),验证设备与 SAF 所需基础能力。
 
-> **⑥ Kotlin / Gradle 侧(部分验证)**:2026-09-12 有一次 `BUILD SUCCESSFUL`(Studio 模板工程,Gradle 9.6.0 / AGP 9.4.0 / Kotlin 2.2.10,跑在 Studio JBR 25 上);工程事后删除,故**"temurin-17 下的完整构建"仍待 D1 原型重建时确认并回写**。**AGP 9 起 Kotlin 内置**(见 §12.5 相应条目),无需单独安装 Kotlin 工具链。
+> **⑥ Kotlin / Gradle 侧(2026-09-16 已实证,遗留项关闭)**:2026-09-12 曾有一次 `BUILD SUCCESSFUL`(Studio 模板工程,Gradle 9.6.0 / AGP 9.4.0 / Kotlin 2.2.10,跑在 Studio JBR 25 上)。**2026-09-16 用一次性探针工程在 `temurin-17` 下复验完成**:`:app:assembleDebug`、`:domain:test`(纯 Kotlin JVM)、Robolectric Compose UI 测试、`:app:lintDebug` **全部通过**,故原"temurin-17 下的完整构建待 D1 确认"**已关闭**。同批实测确认两条换栈坑:① **AGP 9 内置 Kotlin**,不可再应用 `kotlin-android`,但 Compose 编译器插件(`org.jetbrains.kotlin.plugin.compose`)仍需单独应用且**版本必须 = AGP 内置 KGP(2.2.10)**;② Kotlin `Regex.split` **丢弃捕获组**(与 Python `re.split` 不同),移植脚本的自然排序会**静默返回原序**。完整证据与复现命令见 `docs/notes/d1-toolchain-evidence.md`。**AGP 9 起 Kotlin 内置**(见 §12.5 相应条目),无需单独安装 Kotlin 工具链。
 
 正式工程框架暂不创建。
 
@@ -656,7 +709,9 @@ mise ls                  # 看 mise 管的工具版本
 - **Android 16 引入"次版本号"36.0 / 36.1**(2026-09-12 查一手资料):Android 16 QPR2 是首个带次版本的版本,SDK 版本由 36 → **36.1**;在 SDK 里两者是**独立 platform 包**、可并存(目录名形如 `android-36` 与 `android-36.1`,与现有 `android-37.0` 同类)。运行时用 `Build.getMinorSdkVersion(VERSION_CODES_FULL.BAKLAVA)` 查询;Gradle 侧 DSL 是 `compileSdkMinor`(AGP 9.1+);AGP 9.0 兼容表写明"最高支持 API 36.1",要打 37 需 AGP 9.4+。
 - **构建与 SDK 都放 Windows 侧,不给 WSL**(2026-09-12 实测):WSL 经 `/mnt/d`(NTFS)解包 1500 个 4KB 小文件耗时 **2864ms**,同一操作在 ext4 上只要 **18ms**(159×),而 Gradle 构建全是这类小文件操作。→ 工程留在 D 盘、构建走 Windows 原生;WSL 只作 agent 宿主与代码编辑。
 - **代理:按机器区分,勿混用**(2026-09-08 记 R7P21 / 2026-09-16 复检 SLAYER):**R7P21** 需 Clash 代理(127.0.0.1:7897),Gradle/Java **不读** `HTTP_PROXY` 环境变量,须写 `~/.gradle/gradle.properties` 的 `systemProp.http(s).proxyHost/Port`(已配,仅 R7P21 用户级,不随工程文件),否则 gradle wrapper 下载发行版与依赖解析会超时。**SLAYER(本机)**走透明代理**无需配置**——2026-09-16 实测 `dl.google.com` 与 `repo1.maven.org` 均 HTTP 200,且 `~/.gradle/gradle.properties` **不存在**;勿在 SLAYER 上照抄代理配置。工程内一律不写死任何代理/镜像配置。
-- **AGP 9 起 Kotlin 内置,别再手工加 kotlin-android 插件**(2026-09-16 查一手资料核实,D1 重建必读):AGP 9.0 引入 built-in Kotlin 并**默认开启**,对 KGP **2.2.10** 有运行时依赖——**不再需要声明 KGP 版本,也不需要单独安装 Kotlin 工具链**(本机确实没有 `kotlinc`,KGP/Compose 编译器均由 Gradle 自动拉取)。**关键坑**:`org.jetbrains.kotlin.android`(`kotlin-android`)插件**与新 DSL 不兼容**,照抄旧教程会撞 `ClassCastException`。官方逃生门是 `gradle.properties` 里设 `android.newDsl=false`,但**AGP 10 会移除该选项**,不应作为长期方案。来源:[AGP 9.0 release notes](https://developer.android.com/build/releases/agp-9-0-0-release-notes)(`JDK 最低 17` / built-in Kotlin / 运行时依赖 KGP 2.2.10 均见其兼容表与 Built-in Kotlin 节)。
+- **AGP 9 起 Kotlin 内置,别再手工加 kotlin-android 插件**(2026-09-16 查一手资料 + **探针实测**核实,D1 重建必读):AGP 9.0 引入 built-in Kotlin 并**默认开启**,对 KGP **2.2.10** 有运行时依赖——**不再需要声明 KGP 版本,也不需要单独安装 Kotlin 工具链**(本机确实没有 `kotlinc`,KGP/Compose 编译器均由 Gradle 自动拉取)。**关键坑**:`org.jetbrains.kotlin.android`(`kotlin-android`)插件**与新 DSL 不兼容**,照抄旧教程会撞 `ClassCastException`;实测还会撞 `Cannot add extension with name 'kotlin'`。官方逃生门是 `gradle.properties` 里设 `android.newDsl=false`(+ `android.builtInKotlin=false`),但**AGP 10 会移除该选项**,不应作为长期方案。来源:[AGP 9.0 release notes](https://developer.android.com/build/releases/agp-9-0-0-release-notes)(`JDK 最低 17` / built-in Kotlin / 运行时依赖 KGP 2.2.10 均见其兼容表与 Built-in Kotlin 节)。
+  > **两条配套实测结论(2026-09-16)**:① **Compose 编译器插件仍需单独应用**——内置 Kotlin 只取代 `kotlin-android`,不取代 `org.jetbrains.kotlin.plugin.compose`;其**版本必须等于 AGP 内置的 KGP 版本**(AGP 9.4.0 → **2.2.10**),不匹配是**运行期**报错。来源:[Kotlin Compose 编译器迁移指南](https://kotlinlang.org/docs/compose-compiler-migration-guide.html)。② **子模块声明 Kotlin 插件不能带版本号**——否则报 `The request for this plugin could not be satisfied because the plugin is already on the classpath with an unknown version`;正确做法是根 `build.gradle.kts` 以 `apply false` 声明版本,子模块只写 id。
+- **Kotlin `Regex.split` 丢弃捕获组,与 Python `re.split` 不同(移植陷阱)**(2026-09-16 探针实测,静默失败):`Regex("(\\d+)").split(s)` **不会**把捕获的数字段放进结果(与 Python `re.split` 保留捕获组的行为相反),于是自然排序的"数字段 vs 字符段"切分全部失效、每次比较返回 0 → **排序静默返回原序**。表象是"顺序没变",极易误判为 UI 或状态通知问题。**正确做法**:用 `Regex("\\d+").findAll()` 手动扫描切记号。`scripts/batch_pack_cbz.py` 的自然排序是 Python 实现,移植时**必须**配一条"切分行为"单测钉死。
 - **compileSdk 不必 ≥ 手机版本**:手机 Android 16 = API 36,装 `platforms;android-36` 恰好对齐;以后想用新 API 再追加装更高 platform(可多版本并存)。
 - **Android SAF:tree URI 不能直接当 parent 传给 `DocumentsContract.createDocument`**(2026-09-08 D2 spike 实证):一加/部分国产 ROM 严格校验 parent 必须是 document URI,直接传 tree URI 会抛 `IllegalArgumentException: Invalid URI`(AOSP 行为宽松,国产 ROM 收紧)。**必须先转换**:
   ```kotlin
@@ -671,6 +726,7 @@ mise ls                  # 看 mise 管的工具版本
   3. **统一重排入口**:`PageOrder.moveItemTo(id, targetIndex)` 是唯一重排入口,UI 不各自改顺序。
   > 原 Flutter 侧的具体坑(`StackFit.expand` 遇无界高度压成 0、`Draggable`/`LongPressDraggable` 分支)随换栈作废,不在此保留。
 - **拖拽必须用 UI 层测试自测,不能只测数据**(2026-09-10 教训,用户反馈“能拖但不改顺序”反复两轮):GUI 交互无法靠日志/截图验证,须**模拟完整手势**(按下 → 超过 slop 移动 → 移到目标 → 抬起)并断言“拖动中顺序不变 + 松手后落在目标下标”。**换栈后须用 Compose 的测试 API 重建等价用例**——这是“修复自证三层”里 UI 层的要求(§9 D1)。
+  > **2026-09-16 补充(探针实测)**:该层**可以离线跑**——`Robolectric 4.17 + createComposeRule` 在纯 JVM 单测里跑通 Compose UI 断言(首跑约 65s)。**但"能通过"不等于"能失败"**:探针专门做了负向对照(用普通 `var` 而非 `mutableStateOf` 承载状态,制造"数据变了但界面不动"),断言**如期失败** → 证明该层不是空转。新栈的 UI 断言应照此**同时保留一个负向对照用例**。
 - **“数据对了但界面不动”先查状态通知链**(2026-09-10 D1 实测,最隐蔽的一个):当时根因是组合式状态对象(controller 持有子 notifier)只转发了部分通知,导致**数据重排成功、界面永不重建**(日志里 drop/enabled/index 全部正常,极易误判为拖拽组件 bug)。**教训与实现无关:凡“数据对但界面不动”,先查状态变更是否真的传播到了 UI**;换栈到 Compose 后对应的是状态提升 / `mutableStateOf` 的可见性,须在新实现里重新验证。
 - **“可选回调传了但没被使用”是静默缺口**(2026-09-10 晚走查反馈 ④,原在 Flutter 原型上发现;**教训与实现无关,2026-09-13 自归档分支补回**):当时网格卡片 `ThumbCard` 收了 `onPin` 参数,却只在“已固定”时画一个静态角标,**没有任何可点入口**(列表行有自己的 `IconButton`,所以只有网格模式缺)——**类型检查与常规单测都发现不了**。修复:网格卡片右下角改为可点圆形按钮(未固定=空心图钉 / 已固定=实心,带 tooltip),并补逻辑 + UI 两项测试钉死(固定 → 换排序规则仍在原位;点空心图钉 → 变实心)。
   > **对应 D1 验收清单第 6 项**(固定位置项在重新应用排序后保持原位)。**Compose 侧同样会踩**:`Modifier.clickable`/回调参数“声明了但没接到可点区域”与 Flutter 一样不会被编译器发现。**唯一可靠的发现方式是按验收清单逐条真机核对**(或 UI 层断言“点得中”),不能只靠“组件已接收该参数”。
@@ -681,7 +737,7 @@ mise ls                  # 看 mise 管的工具版本
 | --- | --- |
 | Git / VS Code / Android Studio | 2.55.0.windows.5 / 1.138.0 / 2026.1.4.7 |
 | JDK | temurin-17.0.20+101(mise;Android/Gradle 构建所需);另有 Studio 内置 **JBR 25.0.3** 可用(完整 JDK) |
-| Gradle / AGP / Kotlin / Compose BOM | 9.6.0 / 9.4.0 / 2.2.10 / 2026.02.01 —— **来自 Studio 2026.1.4 新建工程模板**;2026-09-12 有一次成功构建实证(跑在 JBR 25 上),**temurin-17 下的完整构建待 D1 确认** |
+| Gradle / AGP / Kotlin / Compose BOM | 9.6.0 / 9.4.0 / 2.2.10 / 2026.02.01 —— **来自 Studio 2026.1.4 新建工程模板**;2026-09-12 有成功构建实证(跑在 JBR 25 上),**2026-09-16 已在 temurin-17 下完整复验通过**(探针工程,证据见 `docs/notes/d1-toolchain-evidence.md`) |
 | compileSdk / minSdk / targetSdk | 36 / 24 / 36(目标值;Studio 模板默认给的是 37 / 36 / 37,新工程须显式改回) |
 | Android platform | `platforms;android-36`(**已装**,与真机 Android 16 对齐);`android-37.0` 也在(模板默认带的) |
 | Android SDK 根 | `C:\Users\Administrator\AppData\Local\Android\Sdk` |
@@ -706,8 +762,15 @@ mise ls                  # 看 mise 管的工具版本
 
 **备份状态与取用**(2026-09-16 复检):归档分支**已在 `origin` 上**,原先"唯一副本只在本地、有丢失风险"的隐患**已消除**(§12.7 原"建议 push"一项已完成)。取用方式:`git show origin/archive-flutter-verify:<路径>`(或直接 `git show 9efef5b:<路径>`,该 commit 对象在本地已存在),需要整树则 `git worktree add <目录> origin/archive-flutter-verify`。
 
+> **⚠️ 教训与约定变更(2026-09-16)**:上一次的丢失风险根因是**原型代码放在仓库外的 `C:\Personal\` 目录**、且不在任何分支上——目录一删就只剩事后补的归档分支。故**本次 D1 重建改为在仓库内开阶段分支开发**(见 §9.1):代码从第一天起就在版本控制里,且每阶段完成即提交。**归档分支从此只作历史参考,不再是"唯一副本"的存放处。**
+> 归档中**已提取为独立笔记**的部分(便于新栈直接取用,不必再读 Dart 源码):领域语义与 16 项测试意图 → `docs/notes/d1-archive-domain-semantics.md`。
+
 ## 13. 参考文件
 
 - 现有行为参考:`scripts/batch_rename_images.py`
 - 现有行为参考:`scripts/batch_pack_cbz.py`
+- 现有行为参考矩阵(危险默认值逐条):`docs/notes/scripts-behavior-matrix.md`
+- 归档原型领域语义与测试意图:`docs/notes/d1-archive-domain-semantics.md`
+- 新栈构建链实证(2026-09-16 探针):`docs/notes/d1-toolchain-evidence.md`
+- D1 规格与分阶段计划:`docs/superpowers/specs/`、`docs/superpowers/plans/`
 - 项目门面:[`README.md`](README.md)
