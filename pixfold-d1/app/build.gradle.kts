@@ -27,6 +27,12 @@ android {
     testOptions {
         unitTests {
             isIncludeAndroidResources = true
+            all {
+                // U0 负向对照预期失败,默认任务中排除;单独用 -PincludeNegativeControl 运行
+                if (!project.hasProperty("includeNegativeControl")) {
+                    it.exclude("**/NegativeControlTest.class")
+                }
+            }
         }
     }
 }
@@ -43,6 +49,7 @@ dependencies {
     implementation(libs.activity.compose)
 
     testImplementation(composeBom)
+    testImplementation(kotlin("test"))
     testImplementation(libs.junit)
     testImplementation(libs.robolectric)
     testImplementation(libs.compose.ui.test.junit4)

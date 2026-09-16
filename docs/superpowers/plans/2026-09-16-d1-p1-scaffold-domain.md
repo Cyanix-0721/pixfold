@@ -257,6 +257,7 @@ dependencies {
     implementation(libs.activity.compose)
 
     testImplementation(composeBom)
+    testImplementation(kotlin("test"))
     testImplementation(libs.junit)
     testImplementation(libs.robolectric)
     testImplementation(libs.compose.ui.test.junit4)
