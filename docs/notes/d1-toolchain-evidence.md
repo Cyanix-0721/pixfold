@@ -105,3 +105,64 @@ cmd.exe /c "D:\\Programing\\Personal\\pixfold\\.probe-agp\\run-gradle.bat :app:l
 - **真机实证**:当前无设备,`adb devices` 为空 → D1 验收清单中依赖真机的条目**尚未验证**(见计划文档)。
 - **模拟器**:无 AVD 且 WHPX/AEHD 未就绪(§12.2),不作为替代路径。
 - **首次依赖下载**:本次依赖多来自缓存/直连;全新机器上首次解析耗时未测(SLAYER 走透明代理,§12.5 已确认无需配代理)。
+
+## 7. Material 3 Expressive 可用性核实(2026-09-16)
+
+> **背景**:用户要求"UI 要符合 MD 最新设计"。这属版本敏感事实,故按调研纪律只认一手来源并**实测**核实,
+> 而非沿用文档印象。结论直接决定 D1 的 UI 基准(HANGOFF §6.5)。
+
+### 7.1 结论
+
+| 问题 | 实测结论 |
+| --- | --- |
+| 当前"最新 MD"是什么 | **Material 3 Expressive(M3E)**——`MaterialExpressiveTheme`、`MotionScheme`、`ButtonGroup`、`SplitButton`、`ToggleButton`、`LoadingIndicator`、`FloatingToolbar`、`WideNavigationRail` 等 |
+| 我们锁定的 Compose BOM 2026.02.01 提供哪个 material3 | **1.4.0** |
+| 最新 **stable** material3 | **仍是 1.4.0**(此后全是 `1.5.0-alphaNN`) |
+| 最新 Compose BOM 2026.09.00 呢 | **也仍锁 material3 1.4.0** |
+| stable 1.4.0 里 M3E 能用吗 | **不能**——M3E 类型全部 `internal`,应用层调用会编译失败 |
+| 哪个版本能用 | **只有 `material3:1.5.0-alpha28`**(alpha) |
+| 有无独立 `material3-expressive` 构件 | **无**(仓库 404) |
+
+### 7.2 关键证据(可复现)
+
+**① stable 1.4.0 含 M3E 类文件,但为 internal**：
+
+```bash
+# 下载 material3 1.4.0 并列出相关类
+curl -s -o m3.aar https://dl.google.com/dl/android/maven2/androidx/compose/material3/material3-android/1.4.0/material3-android-1.4.0.aar
+unzip -o -q m3.aar classes.jar
+unzip -l classes.jar | grep -iE 'Expressive|MotionScheme'
+# -> 出现 ExperimentalMaterial3ExpressiveApi / MaterialThemeKt$MaterialExpressiveTheme$1 /
+#    MotionScheme / MotionScheme$ExpressiveMotionSchemeImpl / ExpressiveMotionTokens 等
+```
+
+**② 但编译直接失败**(在真实工程里写 `MaterialExpressiveTheme` + `MotionScheme.expressive()`)：
+
+```
+e: Cannot access 'annotation class ExperimentalMaterial3ExpressiveApi': it is internal in file.
+e: Cannot access 'fun MaterialExpressiveTheme(...)': it is internal in file.
+e: Cannot access 'interface MotionScheme': it is internal in file.
+e: Cannot access 'fun expressive(): MotionScheme': it is internal in 'MotionScheme.Companion'.
+```
+
+**③ 同一份代码在 1.5.0-alpha28 上编译通过**(`BUILD SUCCESSFUL`),且可见公开签名：
+
+```
+MotionScheme$Companion:
+  public final MotionScheme standard();
+  public final MotionScheme expressive();
+```
+
+**④ stable 1.4.0 下确实可用的 M3 能力**(探针编译通过,即本阶段实现手段)：
+
+`lightColorScheme()` / `darkColorScheme()`(静态配色)、`dynamicLightColorScheme(ctx)` /
+`dynamicDarkColorScheme(ctx)`(**动态取色,Android 12+**)、`MaterialTheme.colorScheme` /
+`MaterialTheme.typography` / `MaterialTheme.shapes`。
+
+### 7.3 影响与决定
+
+- **决定(用户 2026-09-16)**:本阶段用 **stable `1.4.0`** 按 HANGOFF §6.5 的 6 条做实 M3 合规;
+  **M3E 留到 P7 真机走查后评估**。若届时确需 M3E 观感,再单独决策是否引入 alpha 依赖——
+  那将是"零三方依赖"(规格 §2 约束 3)的**显式例外**,须记录并锁版本。
+- **反面教训**:M3E 类文件**存在于** stable 构件里,单看 `unzip -l` 会误判"stable 已支持";
+  必须**编译**才能确认可见性。这与本项目"断言必须实证"的一贯要求一致。

@@ -244,6 +244,43 @@ UndoRecord      可撤销操作所需的逆向信息
 
 删除操作不应默认出现，并且需要独立确认，不与“开始执行”按钮绑定成隐式行为。
 
+### 6.5 UI 须符合最新 Material Design(2026-09-16 用户确认)
+
+> **决策**:UI 采用 **Material Design 3(M3)最新可用形态**——Material You 的动态取色、M3 色彩/字型/形状体系、
+> 按语义分层的排版与 48dp 触控目标;组件一律用 `androidx.compose.material3`。
+> **不自行发明视觉语言**,不混用 M2 组件与自定义“仿 MD”样式。
+
+**"最新 MD"的落地边界(2026-09-16 一手核实 + 编译实测)**:
+
+- Google 当前的"最新 MD"是 **Material 3 Expressive(M3E)**(`MaterialExpressiveTheme` / `MotionScheme` /
+  `ButtonGroup` / `SplitButton` / `LoadingIndicator` 等)。
+- **但 M3E 的公开 API 目前只在 `material3:1.5.0-alpha28` 中可用**;最新 **stable** 为 **`1.4.0`**,
+  其中 M3E 相关类型**全部标记 `internal`、应用层无法调用**(实测编译报
+  `Cannot access 'MaterialExpressiveTheme' … it is internal in file`)。
+  **连最新的 Compose BOM `2026.09.00` 也仍锁 material3 `1.4.0`**;亦**不存在**独立的
+  `material3-expressive` 构件(仓库返回 404)。
+- **故本阶段决定(用户 2026-09-16 拍板)**:**先用 stable `1.4.0` 把布局与信息密度做出来**,
+  **M3E 留到 P7 真机走查后评估**——届时若确需 M3E 观感,再单独决策是否引入 alpha 依赖
+  (属"零三方依赖"约定的例外,须显式记录并锁版本)。
+- **stable 1.4.0 下已实测可用**(探针编译通过):`lightColorScheme` / `darkColorScheme`(静态配色)、
+  `dynamicLightColorScheme` / `dynamicDarkColorScheme`(**动态取色,Android 12+**)、
+  `MaterialTheme` 的 `colorScheme` / `typography` / `shapes`。**这些是本阶段 M3 合规的实现手段。**
+
+**执行要求**(纳入 D1 各 UI 阶段的验收自检):
+
+1. **颜色**:用 `MaterialTheme.colorScheme` 的语义角色(不再硬编码色值);支持深色模式;
+   Android 12+ 优先走动态取色,低版本回退静态 scheme。
+2. **排版**:用 `MaterialTheme.typography` 的语义层级(`headlineMedium`/`titleMedium`/`bodyMedium`/`labelSmall` 等),
+   不手写 `fontSize`。
+3. **形状**:用 `MaterialTheme.shapes` 语义层级而非写死圆角。
+4. **触控与可访问性**:触控目标 ≥ 48dp;正文 ≥ 14sp;为纯图标按钮提供 `contentDescription`。
+5. **组件**:按钮/卡片/输入/开关/对话框一律取自 material3;底部操作等按 M3 模式表达。
+6. **信息密度**(换栈的直接动因,§8.2 证伪条件 ③):在 M3 规范内通过间距与列数控制密度,
+   **不得复现**"元素过大、一屏看不了多少"的旧问题。
+
+> 与归档原型的关系:归档的 `ThemeData(colorSchemeSeed: indigo, useMaterial3: true)` 只是 M3 的入门用法;
+> 本阶段按上面 6 条**做实**。归档的 CJK 字体回退链属 Flutter 桌面问题,Android 侧不适用。
+
 ## 7. 平台策略
 
 ### Android（唯一 GUI 平台）

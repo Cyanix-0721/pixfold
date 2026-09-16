@@ -60,6 +60,13 @@ D1 六项交付(HANGOFF §9 D1):图片列表/缩略图预览、拖拽排序、�
 11. **单位与阈值取自归档语义,不得臆造**:超长阈值 **180**、非法字符集 `\ / : * ? " < > |` + 控制字符、
     多级排序上限 **4**、至少 **1** 级、页码补零 `>=100 ? 4 : 3` 位、默认 `indexStart=1`/`indexPadding=3`。
 12. **提交粒度**:每阶段完成即提交(只 commit,**push 由用户处理**);阶段分支完成即合回 `dev` 并回写文档。
+13. **UI 须符合最新 Material Design**(HANGOFF §6.5):用 material3 组件的**语义角色**而非硬编码值——
+    颜色走 `MaterialTheme.colorScheme`(支持深色模式;Android 12+ 动态取色,低版本回退静态 scheme)、
+    排版走 `MaterialTheme.typography` 语义层级(不手写 `fontSize`)、圆角走 `MaterialTheme.shapes`;
+    触控目标 ≥ 48dp、正文 ≥ 14sp、纯图标按钮须有 `contentDescription`。
+    **本阶段基准 = material3 `1.4.0`(stable)**;**M3E(Material 3 Expressive)不在本阶段范围**——
+    其公开 API 仅存在于 `1.5.0-alpha28`,stable 与最新 BOM 均为 1.4.0 且 M3E 类型为 `internal`
+    (实测见 `docs/notes/d1-toolchain-evidence.md`)。M3E 留到 P7 走查后评估(HANGOFF §6.5)。
 
 ---
 
@@ -638,9 +645,14 @@ order.mapIndexed { i, item -> item to "${(i + 1).toString().padStart(padding, '0
 
 ### 10.3 UI 约定
 
+- **Material Design**:全部遵循 §2 约束 13(HANGOFF §6.5)。颜色/排版/形状一律取 material3 语义角色,
+  不硬编码色值与字号;支持深色模式;Android 12+ 动态取色。
 - **触摸目标 ≥ 48dp**;正文 ≥ 14sp(归档的"UI 字号下限"设计意图)。
 - Android 系统字体天然支持中文,**无需自定义 CJK 字体**(归档的"中文发虚"是桌面 Flutter 问题,不适用)。
-- 视觉:Material 3,`colorSchemeSeed` 取 indigo 系。
+- **组件**:按钮/卡片/输入/开关/对话框/底部操作一律取自 `androidx.compose.material3`;
+  纯图标按钮必须给 `contentDescription`(可访问性 + 可测性)。
+- **信息密度**(换栈直接动因,§8.2 证伪条件 ③):在 M3 规范内用间距与网格列数控制密度,
+  **不得复现**"元素过大、一屏看不了多少"。
 - **拖动中不重排,松手才落地**(§12.1 契约);拖动中仅高亮目标格;拖到自己格不高亮。
 - 网格卡片必须提供**可点图钉入口**(不能只有状态角标——归档走查反馈 ④ 的静默缺口,对应验收第 6 项)。
 

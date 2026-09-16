@@ -28,6 +28,10 @@
 4. **批次统一 + 逐项例外**:批量设置后允许单项覆盖。
 5. **破坏性动作可解释**:默认保留源文件;删除必须独立确认并列出影响范围。
 6. **Android SAF 优先验证**:目录授权、遍历、读写、缩略图、后台任务。
+7. **UI 符合最新 Material Design**(§6.5):用 material3 语义角色(颜色/排版/形状),不硬编码;
+   支持深色模式;Android 12+ 动态取色;触控 ≥48dp;纯图标按钮给 `contentDescription`。
+   **当前基准 = material3 1.4.0(stable)**;M3E 的公开 API 只在 1.5.0-alpha28,不在本阶段范围
+   (P7 走查后评估,详见 §6.5 与 `docs/notes/d1-toolchain-evidence.md` §7)。
 
 ## 3. 领域词汇
 
