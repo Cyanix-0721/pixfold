@@ -298,7 +298,7 @@ Android 第一版应优先保证“选目录 → 预览 → 手工确认 → 生
 >
 > **继承与作废**:D2a spike(§8.3)的结论与 Kotlin 代码**全部继承**——它本就是 Android 原生代码,由参考实现升级为正式平台层;①② 的验证结果继续有效。`C:\Personal\pixfold-d1` 的 Flutter 原型代码**作废**,需在新栈重建;但 **D1 验收清单 20 项与走查结论是与实现无关的交互契约,继续作为 D1 退出条件**(判据不因换栈调整)。
 >
-> **⚠️ 工程实况(2026-09-13,本节路径已失效)**:`pixfold-d1`(Flutter 原型)与 `pixfold-saf-spike`(SAF spike)**两个验证工程的目录已从磁盘删除**,**`ready` 分支从未包含过它们**。删除前的内容整体归档在**本地分支 `archive-flutter-verify`**(tip `9efef5b`;`ready` 为其祖先,领先 3 个提交)。故上文及 §8.3/§9 中 `C:\Personal\pixfold-d1`、`C:\Personal\pixfold-spike` 的路径**均已不存在**,引用它们时按"归档分支中的历史快照"理解,勿当作可访问目录。归档分支**仅存在于本地,未推远程**,详见 §12.7。
+> **⚠️ 工程实况(2026-09-13,本节路径已失效;归档位置 2026-09-16 复检)**:`pixfold-d1`(Flutter 原型)与 `pixfold-saf-spike`(SAF spike)**两个验证工程的目录已从磁盘删除**,**`ready` 分支从未包含过它们**。删除前的内容整体归档在分支 `archive-flutter-verify`(tip `9efef5b`;`ready` 为其祖先,领先 3 个提交)。故上文及 §8.3/§9 中 `C:\Personal\pixfold-d1`、`C:\Personal\pixfold-spike` 的路径**均已不存在**,引用它们时按"归档分支中的历史快照"理解,勿当作可访问目录。归档分支**已推远程**(本地无同名分支,取用走 `origin/archive-flutter-verify`),详见 §12.7。
 
 | 排序 | 方案 | 判断 |
 | ---- | ---- | ---- |
@@ -553,35 +553,42 @@ Android 第一版应优先保证“选目录 → 预览 → 手工确认 → 生
 
 > 来源:原 `s_handoff.md`,2026-09-07 用户决定并入本文件后删除原文件。此后环境与验证准备以本节为准。
 
-> ✅ **2026-09-10 已按换栈重写本节**：技术栈由 Flutter + Dart 改为 **Kotlin + Jetpack Compose(Android 原生)**(§8.1)，原 Flutter 相关条目(Flutter SDK 声明、`flutter doctor` 流程、Impeller/CJK 字体与 mise shim 踩坑、Flutter/Dart 版本锚点)**已全部移除**。**Kotlin/Gradle 工程侧尚未在本机验证**，标注 ⬜ 的条目为待补。
+> ✅ **2026-09-10 已按换栈重写本节**：技术栈由 Flutter + Dart 改为 **Kotlin + Jetpack Compose(Android 原生)**(§8.1)，原 Flutter 相关条目(Flutter SDK 声明、`flutter doctor` 流程、Impeller/CJK 字体与 mise shim 踩坑、Flutter/Dart 版本锚点)**已全部移除**。(当时标注的"Kotlin/Gradle 工程侧尚未在本机验证"**已于 2026-09-16 复检更新**,见下条横幅。)
 
 > ✅ **2026-09-12 起 SDK 根改由 Android Studio 管理**:弃用 `scoop android-clt`(已卸载,含 persist 回收)。SDK 根 = `C:\Users\Administrator\AppData\Local\Android\Sdk`(Studio 默认位置);`ANDROID_HOME` 与 `platform-tools` / `cmdline-tools` 的 PATH **由手工设置**(Studio 不会设它们)。
 
+> ✅ **2026-09-16 环境复检(逐项实测,修正下列文档漂移)**:① 上文标注 ⬜ 的 `platforms;android-36` **实为已装**,cmdline-tools **已是 23.0.0**(非 19.0);② Gradle/AGP/Kotlin **并非"未跑通"**——2026-09-12 曾有一次 `BUILD SUCCESSFUL`(Studio 模板工程,详见 §12.2 末行);③ **adb/fastboot 曾被 `C:\Windows\System32` 的第三方残留遮蔽**,已清除,详见 §12.5;④ 归档分支**已推远程**(§12.7)。**结论:环境比原记录更完整,唯一需动手项(adb 遮蔽)已修复。**
+
 ### 12.1 一句话现状
 
-Windows 开发机的**基础设施**已就位(git / VS Code / scoop / winget / mise),**Android SDK 侧已就绪**:SDK 根 = `C:\Users\Administrator\AppData\Local\Android\Sdk`(Android Studio 的默认位置,由 Studio 的 SDK Manager 管理),`ANDROID_HOME`、`JAVA_HOME`、用户 PATH 均已落盘,`adb` / `fastboot` / `sdkmanager` 裸命令可用,真机走无线调试。**Kotlin / Gradle 工程侧尚未验证**(当前无工程,待到 D1 原型重建时确认)。PixFold 仍处设计阶段,不直接创建正式工程。
+Windows 开发机的**基础设施**已就位(git / VS Code / scoop / winget / mise),**Android SDK 侧已就绪**:SDK 根 = `C:\Users\Administrator\AppData\Local\Android\Sdk`(Android Studio 的默认位置,由 Studio 的 SDK Manager 管理),`ANDROID_HOME`、`JAVA_HOME`、用户 PATH 均已落盘,`adb` / `fastboot` / `sdkmanager` 裸命令可用,真机走无线调试。**Kotlin / Gradle 工程侧已具备构建能力**(2026-09-12 有一次成功构建实证;JDK 门槛见 §12.6)。PixFold 仍处设计阶段,不直接创建正式工程。
 
-### 12.2 环境实况清单(2026-09-12 更新)
+> 2026-09-16 复检补注:该机主机名为 **`SLAYER`**(走透明代理,无需配 Gradle 代理;`~/.gradle/gradle.properties` 确实不存在——与 §12.5 代理条目的机器区分一致)。
+
+### 12.2 环境实况清单(2026-09-16 复检更新)
 
 | 组件 | 状态 | 版本 / 位置 |
 | --- | --- | --- |
-| Git | ✅ | 2.55.0(scoop) |
-| VS Code | ✅ | 1.136(scoop apps/vscode) |
-| Android Studio | ✅ | 2026.1.4.7(scoop;自带 JBR 25.0.3,不依赖外部 Java 启动) |
+| Git | ✅ | 2.55.0.windows.5(scoop) |
+| VS Code | ✅ | 1.138.0(scoop apps/vscode) |
+| Android Studio | ✅ | 2026.1.4.7(scoop;自带 JBR **25.0.3**,不依赖外部 Java 启动) |
 | scoop | ✅ | main / extras / versions / sysinternals / nerd-fonts 桶 |
 | winget | ✅ | v1.29.290 |
-| mise | ✅ | 2026.9.1 |
+| mise | ✅ | 2026.9.9(Windows) |
 | JDK | ✅ | temurin-17.0.20+101(mise 声明 `temurin-17`);`JAVA_HOME` 已 setx |
 | Android SDK 根 | ✅ | `C:\Users\Administrator\AppData\Local\Android\Sdk`(Studio 默认位置) |
 | ANDROID_HOME | ✅ | 指向上述 SDK 根;2026-09-12 手工设为**用户级**(Studio 不会设它,见机制注) |
+| ANDROID_SDK_ROOT | ✅ 留空 | 官方要求:与 `ANDROID_HOME` 二者只设其一,或取值一致 |
 | ANDROID_SDK_HOME | ⚠️ 非 SDK 路径变量 | Studio 自动设为同一目录;它只影响老工具创建 `.android` 用户数据的位置,**不能当 SDK 路径用** |
 | 用户 PATH | ✅ | `<sdk>\platform-tools`(adb / fastboot)、`<sdk>\cmdline-tools\latest\bin`(sdkmanager) |
-| SDK 组件 | ✅ | platform-tools **36.0.0**;build-tools **35.0.1 + 36.0.0**;platforms **android-37.0**;sources **android-37.0**;emulator;system-images **android-36**(google_apis_playstore / x86_64);licenses(android-sdk-license) |
-| cmdline-tools | ⚠️ 偏旧 | SDK 根内 `cmdline-tools\latest` = **19.0**(2025-04);建议升到 latest |
-| platforms;android-36 | ⬜ 待装 | 目标 36/24/36(§12.6)需要它,当前只有 android-37.0;装法见 §12.3 |
-| adb / fastboot | ✅ | 均来自 SDK `platform-tools`;未装独立 scoop adb(防双 adb,见 §12.5) |
-| Gradle / Kotlin 工程侧 | ⬜ 待验证 | 无工程;Studio 2026.1.4 模板给出 Gradle 9.6.0 / AGP 9.4.0 / Kotlin 2.2.10(**未跑通构建**) |
+| SDK 组件 | ✅ | platform-tools **37.0.1**;build-tools **35.0.1 + 36.0.0**;platforms **android-36 + android-37.0**;sources **android-36 + android-37.0**;emulator **37.1.11**;system-images **android-36**(google_apis_playstore / x86_64);licenses(android-sdk-license) |
+| cmdline-tools | ✅ | SDK 根内 `cmdline-tools\latest` = **23.0.0**(2026-09-16 复检;原记录 19.0 已过期) |
+| platforms;android-36 | ✅ 已装 | 2026-09-16 复检确认已存在(Platform 16,rev 2),与真机 Android 16 对齐;原 ⬜ 标记作废 |
+| adb / fastboot | ✅ | 均来自 SDK `platform-tools` **37.0.1**,PATH 中各仅一份;未装独立 scoop adb(防双 adb,见 §12.5) |
+| Gradle / Kotlin 工程侧 | ✅ 有构建实证 | 2026-09-12 一次 `BUILD SUCCESSFUL in 4m 45s`(Studio 模板 `MyApplication`,Gradle **9.6.0** / AGP **9.4.0** / Kotlin **2.2.10**,跑在 Studio JBR 25 上);工程事后已删,无残留代码。**AGP 9 起 Kotlin 为内置**(不再需要单独装 kotlinc) |
 | WSL | ✅ 仅作 agent 宿主 | 跑 Codex,经互操作驱动 Windows 侧构建;WSL 不装 Android SDK、不承担构建(依据见 §12.5 的 I/O 实测) |
+| 模拟器加速 | ⚠️ 未就绪 | 无任何 AVD(`~/.android/avd` 不存在);`HypervisorPlatform`(WHPX)= Disabled 而 Hyper-V 已启用;`aehd` 驱动已装但服务 STOPPED(AEHD 与 Hyper-V 互斥)。**D1 走真机,暂不需处理** |
+| 真机连接 | ⬜ 当前无设备 | `adb devices` 为空;配对记录仍在(`~/.android/adb_known_hosts.pb`),重开无线调试即可 |
 
 > 机制注(2026-09-12 实测核实):**Android Studio 只把 SDK 路径记在自己的配置里——既不设 `ANDROID_HOME`,也不改 PATH**(IDE 设置项与各工程的 `local.properties` 都在 Studio 侧)。所以命令行侧的 `adb` / `fastboot` / `sdkmanager` 完全依赖上表那两条手工设置。**SDK 组件由 Studio 的 SDK Manager(或 SDK 根内的 `sdkmanager`)安装**;环境变量改动需**新开终端**才生效(旧进程是旧快照)。
 
@@ -589,9 +596,11 @@ Windows 开发机的**基础设施**已就位(git / VS Code / scoop / winget / m
 
 > 项目级配置(2026-09-12 更新):仓库根 `.mise.toml` **保持纯配置无注释**,说明统一在本注维护。当前内容仅 `java = "temurin-17"`(Android/Gradle 构建所需)。**声明 ≠ 已安装**:新机器上需 `mise install` 才按声明下载。**边界约定**(用户级,勿破坏):Python 由 uv 管理、Node 由 fnm 管理,mise 均不接管;全局工具声明不属本仓库管辖范围。工具版本请求变更请同步维护本节(§12.2)。
 
+> **JDK 归属(2026-09-16 复检)**:Gradle **不读** `.mise.toml`——mise 只负责"把 JDK 拉下来",构建期用的是 `JAVA_HOME`(现指向 mise 的 temurin-17)或 Studio 内置 JBR。本机存在**两个可用 JDK**:mise temurin-17.0.20+101 与 Studio JBR 25.0.3(**是完整 JDK**,含 `javac` / `jlink` / `jmod` / `jar`,仅缺 `jpackage`)。Gradle 9.6.0 在两者下均实测可启动;AGP 9.x 官方兼容表要求 **JDK 最低 17**(默认 17),故两者都满足。**取舍**:Studio 的 JBR 路径随 IDE 升级/重装漂移(`current` 是 junction,实体目录带版本号),不宜当系统 JDK;`.mise.toml` 的声明提供与 IDE 解耦的稳定构建 JDK,**建议保留**。若确要去掉 mise,须同步把 `JAVA_HOME` 改指 JBR,否则命令行 `gradlew` 会因 `JAVA_HOME` 悬空而失败。
+
 ### 12.3 Android 平台验证准备(设计阶段优先)
 
-> **进度(2026-09-12)**:SDK 侧已由 Android Studio 装齐基础组件(见 §12.2);下面 ①–⑤ 是**新机器**上的等价步骤,现有机器只需补 ④ 里缺的平台。⑥ 的 Kotlin/Gradle 侧验收**待 D1 原型重建时执行**(当前无工程)。
+> **进度(2026-09-16 复检)**:SDK 侧已由 Android Studio 装齐基础组件(见 §12.2),**原记录的待补项(`platforms;android-36`、cmdline-tools 升级)均已完成**。下面 ①–⑤ 是**新机器**上的等价步骤。⑥ 的 Kotlin/Gradle 侧已有一次成功构建实证(2026-09-12),但**"temurin-17 下完整编译 AGP 9.4 工程"仍未被直接验证**(那次跑在 JBR 25 上)——D1 原型重建时一并确认并回写本节。
 
 ```powershell
 # ① JDK 17(sdkmanager 是 Java 程序,必须先有它)
@@ -615,11 +624,13 @@ sdkmanager "platforms;android-36" "build-tools;36.0.0"
 # ⑤ 体检(验收标准)
 sdkmanager --list        # 组件齐全
 adb devices              # 能看到手机
+# 注意:裸 `adb` 必须解析到 <sdk>\platform-tools\adb.exe —— 先 `Get-Command adb` 确认,
+#       若指向 C:\Windows\System32\adb.exe 说明有第三方残留遮蔽,见 §12.5
 ```
 
 **环境准备完成** → 插上 Android 16 真机(开发者选项 + 无线调试),验证设备与 SAF 所需基础能力。
 
-> **⑥ Kotlin / Gradle 侧(⬜ 待补)**:`gradlew` 构建与 Kotlin 编译**均未在本机验证**;D1 原型在新栈重建时一并确认并回写本节。
+> **⑥ Kotlin / Gradle 侧(部分验证)**:2026-09-12 有一次 `BUILD SUCCESSFUL`(Studio 模板工程,Gradle 9.6.0 / AGP 9.4.0 / Kotlin 2.2.10,跑在 Studio JBR 25 上);工程事后删除,故**"temurin-17 下的完整构建"仍待 D1 原型重建时确认并回写**。**AGP 9 起 Kotlin 内置**(见 §12.5 相应条目),无需单独安装 Kotlin 工具链。
 
 正式工程框架暂不创建。
 
@@ -637,13 +648,15 @@ mise ls                  # 看 mise 管的工具版本
 
 - **adb 认 SDK 目录结构**(`$ANDROID_HOME\platform-tools\adb` 等),不认 PATH 上的散装 adb → platform-tools 必装。
 - **同一类工具只留一份权威(adb 只留一份)**:历史上 scoop 独立 adb(37.0.1)与 SDK platform-tools 的 adb 版本漂移 → 报 `adb server version mismatch`(2026-09-07 已卸 scoop 版)。现行约定:**adb / fastboot 一律来自 SDK `platform-tools`**;只有在"要 adb 但不做 Android 开发"的机器上才装独立 adb 包,且**不要**与 SDK 那份并存。
+- **第三方驱动/模拟器会把 adb 塞进系统目录,靠 PATH 顺序遮蔽 SDK 那份**(2026-09-16 实测发现并修复;比上一条更隐蔽):本机 `C:\Windows\System32\` 与 `C:\Windows\SysWOW64\` 下各有一份 **adb 33.0.0(2023-06,32 位)+ fastboot 36.0.0**,来源是历史安装的 **OnePlus USB Drivers**(`C:\Program Files (x86)\OnePlus USB Drivers\Android\`,内含 2016 年版 adb/fastboot;MuMu 模拟器也自带 adb 但不在 PATH 上)。**根因是 PATH 求值顺序**:Windows 先拼完 Machine PATH 再拼 User PATH,`C:\Windows\system32` 在 Machine 段第 3 位、`<sdk>\platform-tools` 在 User 段第 29 位 → **后者永远追不上**,裸 `adb` 实际跑的是 32 位的 `SysWOW64\adb.exe`,与 Studio 用的 SDK 版并存(实测曾出现两个 server 交替接管:先由 33.0.0 启动、kill 后由 37.0.1 启动)。**修复**:删除系统目录下这 4 个文件(`adb.exe` / `fastboot.exe` / `AdbWinApi.dll` / `AdbWinUsbApi.dll`,System32 与 SysWOW64 各一份,需管理员),**备份后删**,不卸载 OnePlus 驱动本身。**验收**:`Get-Command adb` 应指向 `<sdk>\platform-tools\adb.exe`;`adb version` 应为 37.0.1;反复 `adb devices` 时 server PID 不变(不再重启)。**教训:凡"版本对不上/行为诡异",先 `Get-Command adb -All` 看有几份、谁在 PATH 前面,不要只看 `adb version`。**
 - **licenses 不点** → Gradle 构建会停在缺组件;用 `sdkmanager --licenses` 处理(不再经 flutter doctor)。
 - **Android Studio 会把 junction 解析成实体路径 → SDK 根必须是不随包改名的地方**(2026-09-12 实证):把 Studio 的 SDK Location 指向 `...\android-clt\current`,存盘后变成 `...\android-clt\15859902`(实体版本目录),工程内 `local.properties` 的 `sdk.dir` 同样被写成实体路径。→ SDK 根必须是**稳定路径**(现行 = Studio 默认位置);"用 junction 跟随最新版"这套对 Studio 无效。
 - **`ANDROID_SDK_HOME` 不是 SDK 路径变量**(2026-09-12 查官方"环境变量"文档核实):它只决定**老工具(Studio 4.3 及更早)把 `.android` 用户数据建在哪**;Studio 会自动把它设成 SDK 目录,于是 `<sdk>\.android\` 下出现 `avd/`、`cache/`、`debug.keystore`、`studio/`。**SDK 位置只认 `ANDROID_HOME`**(`ANDROID_SDK_ROOT` 已废弃;若两者都设,官方要求取值一致)。
 - **杀软实时防护会拦 SDK 解包**(2026-09-12 实证;本机为火绒,Defender 已被接管):安装 `sources;*` 这类含上万个小文件的包时随机报 `java.nio.file.AccessDeniedException`(实测卡在 `ScreenCaptureCallbackHandler.java`;zip 本体 CRC 完好,只解出 533/16421)。→ 把 **SDK 目录、`~/.gradle`、工程目录**加入杀软信任区/排除列表(官方文档同样建议);临时关防护可确认因果。
 - **Android 16 引入"次版本号"36.0 / 36.1**(2026-09-12 查一手资料):Android 16 QPR2 是首个带次版本的版本,SDK 版本由 36 → **36.1**;在 SDK 里两者是**独立 platform 包**、可并存(目录名形如 `android-36` 与 `android-36.1`,与现有 `android-37.0` 同类)。运行时用 `Build.getMinorSdkVersion(VERSION_CODES_FULL.BAKLAVA)` 查询;Gradle 侧 DSL 是 `compileSdkMinor`(AGP 9.1+);AGP 9.0 兼容表写明"最高支持 API 36.1",要打 37 需 AGP 9.4+。
 - **构建与 SDK 都放 Windows 侧,不给 WSL**(2026-09-12 实测):WSL 经 `/mnt/d`(NTFS)解包 1500 个 4KB 小文件耗时 **2864ms**,同一操作在 ext4 上只要 **18ms**(159×),而 Gradle 构建全是这类小文件操作。→ 工程留在 D 盘、构建走 Windows 原生;WSL 只作 agent 宿主与代码编辑。
-- **本机(R7P21)访问 Google 系仓库需显式代理**(2026-09-08):Windows 主力机 R7P21 需 Clash 代理(127.0.0.1:7897);另一台机 Slayer 为透明代理无需配置。Gradle/Java **不读** `HTTP_PROXY` 环境变量,须写 `~/.gradle/gradle.properties` 的 `systemProp.http(s).proxyHost/Port`(已配,仅 R7P21 用户级,不随工程文件);否则 gradle wrapper 下载发行版与依赖解析会超时。工程内不写死任何代理/镜像配置。
+- **代理:按机器区分,勿混用**(2026-09-08 记 R7P21 / 2026-09-16 复检 SLAYER):**R7P21** 需 Clash 代理(127.0.0.1:7897),Gradle/Java **不读** `HTTP_PROXY` 环境变量,须写 `~/.gradle/gradle.properties` 的 `systemProp.http(s).proxyHost/Port`(已配,仅 R7P21 用户级,不随工程文件),否则 gradle wrapper 下载发行版与依赖解析会超时。**SLAYER(本机)**走透明代理**无需配置**——2026-09-16 实测 `dl.google.com` 与 `repo1.maven.org` 均 HTTP 200,且 `~/.gradle/gradle.properties` **不存在**;勿在 SLAYER 上照抄代理配置。工程内一律不写死任何代理/镜像配置。
+- **AGP 9 起 Kotlin 内置,别再手工加 kotlin-android 插件**(2026-09-16 查一手资料核实,D1 重建必读):AGP 9.0 引入 built-in Kotlin 并**默认开启**,对 KGP **2.2.10** 有运行时依赖——**不再需要声明 KGP 版本,也不需要单独安装 Kotlin 工具链**(本机确实没有 `kotlinc`,KGP/Compose 编译器均由 Gradle 自动拉取)。**关键坑**:`org.jetbrains.kotlin.android`(`kotlin-android`)插件**与新 DSL 不兼容**,照抄旧教程会撞 `ClassCastException`。官方逃生门是 `gradle.properties` 里设 `android.newDsl=false`,但**AGP 10 会移除该选项**,不应作为长期方案。来源:[AGP 9.0 release notes](https://developer.android.com/build/releases/agp-9-0-0-release-notes)(`JDK 最低 17` / built-in Kotlin / 运行时依赖 KGP 2.2.10 均见其兼容表与 Built-in Kotlin 节)。
 - **compileSdk 不必 ≥ 手机版本**:手机 Android 16 = API 36,装 `platforms;android-36` 恰好对齐;以后想用新 API 再追加装更高 platform(可多版本并存)。
 - **Android SAF:tree URI 不能直接当 parent 传给 `DocumentsContract.createDocument`**(2026-09-08 D2 spike 实证):一加/部分国产 ROM 严格校验 parent 必须是 document URI,直接传 tree URI 会抛 `IllegalArgumentException: Invalid URI`(AOSP 行为宽松,国产 ROM 收紧)。**必须先转换**:
   ```kotlin
@@ -666,20 +679,20 @@ mise ls                  # 看 mise 管的工具版本
 
 | 项 | 版本 |
 | --- | --- |
-| Git / VS Code / Android Studio | 2.55.0 / 1.136 / 2026.1.4.7 |
-| JDK | temurin-17.0.20+101(mise;Android/Gradle 构建所需) |
-| Gradle / AGP / Kotlin / Compose BOM | 9.6.0 / 9.4.0 / 2.2.10 / 2026.02.01 —— **来自 Studio 2026.1.4 新建工程模板,尚未跑通构建**,D1 原型重建时确认 |
+| Git / VS Code / Android Studio | 2.55.0.windows.5 / 1.138.0 / 2026.1.4.7 |
+| JDK | temurin-17.0.20+101(mise;Android/Gradle 构建所需);另有 Studio 内置 **JBR 25.0.3** 可用(完整 JDK) |
+| Gradle / AGP / Kotlin / Compose BOM | 9.6.0 / 9.4.0 / 2.2.10 / 2026.02.01 —— **来自 Studio 2026.1.4 新建工程模板**;2026-09-12 有一次成功构建实证(跑在 JBR 25 上),**temurin-17 下的完整构建待 D1 确认** |
 | compileSdk / minSdk / targetSdk | 36 / 24 / 36(目标值;Studio 模板默认给的是 37 / 36 / 37,新工程须显式改回) |
-| Android platform | `platforms;android-36`(⬜ 待装,与真机 Android 16 对齐);现有 `android-37.0` 是模板默认带的 |
+| Android platform | `platforms;android-36`(**已装**,与真机 Android 16 对齐);`android-37.0` 也在(模板默认带的) |
 | Android SDK 根 | `C:\Users\Administrator\AppData\Local\Android\Sdk` |
 
 ### 12.7 验证工程归档(2026-09-13)
 
-> 背景:换栈后 `pixfold-d1`(Flutter 原型)与 `pixfold-saf-spike`(SAF spike)已作废,2026-09-13 按用户指令从磁盘删除。两者**从未进入 `ready` 分支**——删除前先整树提交到**本地归档分支**,再删除工作区目录。
+> 背景:换栈后 `pixfold-d1`(Flutter 原型)与 `pixfold-saf-spike`(SAF spike)已作废,2026-09-13 按用户指令从磁盘删除。两者**从未进入 `ready` 分支**——删除前先整树提交到**归档分支**,再删除工作区目录。
 
 | 项 | 内容 |
 | --- | --- |
-| 分支 | **`archive-flutter-verify`**(⚠️ **仅本地存在,未推远程**;`origin` 上只有 `main` / `ready`) |
+| 分支 | **`archive-flutter-verify`** —— ✅ **已推远程**(2026-09-16 复检:`origin/archive-flutter-verify` = `9efef5b` 存在);⚠️ **本地无同名分支**,取用请走 `origin/archive-flutter-verify` |
 | tip | `9efef5b`(`feat(verify): 验证工程入库 ready——D1 交互原型…与 SAF 可行性 spike…`) |
 | 相对 `ready` | 领先 3 个提交(`ready` 为其祖先):`81d84b2`(走查反馈④) → `556107b`(§4 排序键 + 走查反馈⑤) → `9efef5b`(两工程入库) |
 | 内容 | `pixfold-d1/`(Flutter D1 原型,零三方依赖 + 自研拖拽,**16 项测试**,含 `lib/domain/` 下 `comic.dart` / `models.dart` / `naming.dart` 领域层)、`pixfold-saf-spike/`(SAF spike) |
@@ -691,7 +704,7 @@ mise ls                  # 看 mise 管的工具版本
 - **`pixfold-saf-spike` 的 Kotlin SAF 实现** —— `android/app/src/main/kotlin/com/example/pixfold_saf_spike/MainActivity.kt`,含 `openTree` / `listImages` / `readBytes` / `renameDoc` / `createAndWrite` / `deleteDoc` 六方法及 tree URI→document URI 转换;**新栈平台层可直接参考**(§8.3 的方法表在正文保留)。
 - **`pixfold-d1` 的领域层语义与测试意图** —— 代码本身作废,但测试覆盖的语义(拖拽落位、固定位置、危险项默认关闭等)须在新栈重建(§9 D1 执行注)。
 
-**风险与操作**:归档分支**只在本地**,当前是这两份工程的唯一副本;若清理本地仓库或换机将永久丢失。**建议 `git push origin archive-flutter-verify` 备份**(用户决定,本仓库 push 一贯由用户执行)。取用方式:`git show 9efef5b:<路径>` 或 `git worktree add <目录> archive-flutter-verify`。
+**备份状态与取用**(2026-09-16 复检):归档分支**已在 `origin` 上**,原先"唯一副本只在本地、有丢失风险"的隐患**已消除**(§12.7 原"建议 push"一项已完成)。取用方式:`git show origin/archive-flutter-verify:<路径>`(或直接 `git show 9efef5b:<路径>`,该 commit 对象在本地已存在),需要整树则 `git worktree add <目录> origin/archive-flutter-verify`。
 
 ## 13. 参考文件
 
