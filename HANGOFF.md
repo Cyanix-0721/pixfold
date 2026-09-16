@@ -558,12 +558,21 @@ pixfold-d1/
 **规格与分阶段计划**:`docs/superpowers/specs/`、`docs/superpowers/plans/`。
 
 **P1 完成记录(2026-09-16)**:`pixfold-d1/` 双模块工程落地(`domain/` 纯 Kotlin JVM + `app/` Compose),
-领域地基与 mock 数据完成。**验证实况**:`:domain:test` **30 项通过**、`:app:testDebugUnitTest` **3 项通过**、
+领域地基与 mock 数据完成。**验证实况**:`:domain:test` **30 项通过**、`:app:testDebugUnitTest` **6 项通过**、
 `:app:assembleDebug` 成功、`:app:lintDebug` **零告警**(`warningsAsErrors = true`,报告 "No issues found")。
 **负向对照已生效**:`NegativeControlTest` 用普通 `var` 承载状态制造"数据变了界面不动",
 默认任务排除、`-PincludeNegativeControl` 运行时**如期失败** —— 证明第 2 层 UI 断言不是空转。
 **执行中新增的测试**:变异测试发现 `applyRule` 的"固定项冲突向左找空位"分支在正常路径**不可达**
-(改右扫时 25 项全过),已补退化状态用例钉死(现 30 项)。**真机项仍未验证**(无设备,见下)。
+(改右扫时 25 项全过),已补退化状态用例钉死(现 30 项)。
+
+**P1 真机实证(2026-09-16,第 3 层)**:设备 = **PJX110 / Android 16(API 36)/ arm64-v8a / 1264x2780 / 560dpi**
+(用户手机固定无线调试地址 `192.168.43.1:4444`;另有一台 `emulator-5556` 在线,`pixfold-d1/adb.bat` 默认锁定真机)。
+APK 安装启动成功、点击与横竖屏切换无崩溃(同 PID 未重启)。**真机走查发现并修复 2 处前两层漏掉的缺陷**:
+① **深色模式下窗口背景恒为近白** `(250,250,250)`——XML 主题写死 `Theme.Material.Light`,而设备处于深色模式;
+修复 = 新增 `values-night/themes.xml` + Compose 侧 `Surface(color = colorScheme.background)`
+(复验背景变为 `(26,17,18)`)。② **标题被状态栏/挖孔遮挡**——targetSdk 36 强制 edge-to-edge 而应用未消费系统栏 inset;
+修复 = 首页消费 `WindowInsets.safeDrawing`,并补 `HomeScreenTest`「consumes injected top inset」回归用例
+(Robolectric 下 inset 恒为 0,故注入 40dp 断言标题顶部 ≈ 56dp;**变异验证可捕获**)。详见 §12.5。
 
 ### D2：平台能力验证
 
@@ -770,6 +779,18 @@ mise ls                  # 看 mise 管的工具版本
   2. **不要做“悬停实时重排”**:拖拽期间指针微动会反复触发重排 → 顺序来回换位,用户看到的是“拖了但没变”。**正确语义 = 松手落地**(拖动中仅高亮目标格,松手才提交)。
   3. **统一重排入口**:`PageOrder.moveItemTo(id, targetIndex)` 是唯一重排入口,UI 不各自改顺序。
   > 原 Flutter 侧的具体坑(`StackFit.expand` 遇无界高度压成 0、`Draggable`/`LongPressDraggable` 分支)随换栈作废,不在此保留。
+- **深色模式下窗口底色不能靠 Compose 兜底**(2026-09-16 真机实证,P1):只写 `values/themes.xml` 的
+  `Theme.Material.Light.NoActionBar` 时,**设备处于深色模式也不会切换窗口底色**——实测窗口背景恒为
+  `(250,250,250)` 近白,而 Compose 卡片已是深色,观感割裂。**修复 = 同时提供 `values-night/themes.xml`
+  (parent 用非 Light 的 `Theme.Material.NoActionBar`)**,并让 Compose 根节点用
+  `Surface(color = colorScheme.background)`。**验证方式**:`adb shell cmd uimode night yes|no` 切换后
+  `screencap` + 取空白区像素,应分别得到深/浅底色。**教训:XML 窗口主题与 Compose 主题是两套东西,
+  前者不会随 Compose 的 `darkColorScheme` 自动变**。
+- **targetSdk 36 起强制 edge-to-edge,系统栏 inset 必须应用自己消费**(2026-09-16 真机实证,P1):
+  布局直接顶到顶部会被**状态栏/挖孔遮挡**(实测标题 `PixFold` 被压住一半)。**修复 = 页面消费
+  `WindowInsets.safeDrawing`**(或 `Scaffold` 的 `contentWindowInsets`)。**测试注意**:Robolectric 下系统
+  inset 恒为 0,只断言 `top > 0` 会因内边距而**假通过**;正确做法是**把 inset 做成可注入参数**,
+  注入已知值(如 40dp)后断言偏移量(已验证:不消费 inset 时该用例失败)。
 - **拖拽必须用 UI 层测试自测,不能只测数据**(2026-09-10 教训,用户反馈“能拖但不改顺序”反复两轮):GUI 交互无法靠日志/截图验证,须**模拟完整手势**(按下 → 超过 slop 移动 → 移到目标 → 抬起)并断言“拖动中顺序不变 + 松手后落在目标下标”。**换栈后须用 Compose 的测试 API 重建等价用例**——这是“修复自证三层”里 UI 层的要求(§9 D1)。
   > **2026-09-16 补充(探针实测)**:该层**可以离线跑**——`Robolectric 4.17 + createComposeRule` 在纯 JVM 单测里跑通 Compose UI 断言(首跑约 65s)。**但"能通过"不等于"能失败"**:探针专门做了负向对照(用普通 `var` 而非 `mutableStateOf` 承载状态,制造"数据变了但界面不动"),断言**如期失败** → 证明该层不是空转。新栈的 UI 断言应照此**同时保留一个负向对照用例**。
 - **“数据对了但界面不动”先查状态通知链**(2026-09-10 D1 实测,最隐蔽的一个):当时根因是组合式状态对象(controller 持有子 notifier)只转发了部分通知,导致**数据重排成功、界面永不重建**(日志里 drop/enabled/index 全部正常,极易误判为拖拽组件 bug)。**教训与实现无关:凡“数据对但界面不动”,先查状态变更是否真的传播到了 UI**;换栈到 Compose 后对应的是状态提升 / `mutableStateOf` 的可见性,须在新实现里重新验证。
