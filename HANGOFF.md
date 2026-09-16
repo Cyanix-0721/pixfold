@@ -500,7 +500,7 @@ ready ──► dev                          ← ready 整合进 dev,dev 成为�
 
 | 阶段 | 交付物 | 覆盖验收项 | 自证层 |
 | --- | --- | --- | --- |
-| **P1** | 脚手架(AGP 9.4/Gradle 9.6/Compose BOM)+ 领域地基(模型、自然排序、多级排序、`PageOrder`/`moveItemTo`/`applyRule`/图钉)+ 确定性 mock 数据 | —(地基) | 第 1 层 |
+| **P1** | 脚手架(AGP 9.4/Gradle 9.6/Compose BOM)+ 领域地基(模型、自然排序、多级排序、`PageOrder`/`moveItemTo`/`applyRule`/图钉)+ 确定性 mock 数据 ✅ **完成(2026-09-16)** | —(地基) | 第 1 层 |
 | **P2** | 缩略图网格/列表双视图切换、大图预览(自适应窗口/缩放/平移/翻页) | 1, 2 | 1+2 |
 | **P3** | 拖拽排序(网格+列表,松手落地)、图钉入口、排序规则编辑器(多级/批次+本组独立) | 3, 4, 5, 6, 7 | 1+2 |
 | **P4** | 命名结构编辑器、建议表(原路径→新名)、逐项覆盖、冲突与警告 | 8, 9, 10 | 1+2 |
@@ -519,6 +519,14 @@ pixfold-d1/
 **领域语义权威**:`docs/notes/d1-archive-domain-semantics.md`(自归档分支 `9efef5b` 提取,含 16 项测试意图逐条还原);
 **构建链实证**:`docs/notes/d1-toolchain-evidence.md`(2026-09-16 探针实测);
 **规格与分阶段计划**:`docs/superpowers/specs/`、`docs/superpowers/plans/`。
+
+**P1 完成记录(2026-09-16)**:`pixfold-d1/` 双模块工程落地(`domain/` 纯 Kotlin JVM + `app/` Compose),
+领域地基与 mock 数据完成。**验证实况**:`:domain:test` **30 项通过**、`:app:testDebugUnitTest` **3 项通过**、
+`:app:assembleDebug` 成功、`:app:lintDebug` **零告警**(`warningsAsErrors = true`,报告 "No issues found")。
+**负向对照已生效**:`NegativeControlTest` 用普通 `var` 承载状态制造"数据变了界面不动",
+默认任务排除、`-PincludeNegativeControl` 运行时**如期失败** —— 证明第 2 层 UI 断言不是空转。
+**执行中新增的测试**:变异测试发现 `applyRule` 的"固定项冲突向左找空位"分支在正常路径**不可达**
+(改右扫时 25 项全过),已补退化状态用例钉死(现 30 项)。**真机项仍未验证**(无设备,见下)。
 
 ### D2：平台能力验证
 
