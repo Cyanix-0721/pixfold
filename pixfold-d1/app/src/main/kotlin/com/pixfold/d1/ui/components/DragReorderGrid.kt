@@ -22,7 +22,10 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
 import com.pixfold.d1.domain.model.SourceItem
 
-const val TAG_DRAG_GRID = "drag-grid"
+/** 网格容器 tag;与工作流 A 页面的 TAG_GRID 取同一值,便于测试定位。 */
+const val TAG_GRID_CONTAINER = "view-grid"
+
+
 
 /**
  * 可拖拽排序的缩略图网格(**拖拽自研**)。
@@ -53,7 +56,7 @@ fun DragReorderGrid(
             columns = GridCells.Fixed(columns),
             modifier = Modifier
                 .fillMaxSize()
-                .testTag(TAG_DRAG_GRID),
+                .testTag(TAG_GRID_CONTAINER),
             contentPadding = PaddingValues(8.dp),
         ) {
             itemsIndexed(items, key = { _, it -> it.id }) { index, item ->

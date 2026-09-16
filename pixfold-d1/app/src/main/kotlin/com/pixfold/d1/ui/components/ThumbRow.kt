@@ -1,6 +1,9 @@
 package com.pixfold.d1.ui.components
 
 import androidx.compose.foundation.clickable
+import androidx.compose.ui.graphics.Color
+import androidx.compose.material3.Surface
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -27,6 +30,8 @@ fun ThumbRow(
     item: SourceItem,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
+    isPinned: Boolean = false,
+    onPin: (() -> Unit)? = null,
 ) {
     Row(
         modifier = modifier
@@ -45,7 +50,7 @@ fun ThumbRow(
             modifier = Modifier.size(44.dp),
             showIndex = false,
         )
-        Column(modifier = Modifier.padding(start = 12.dp)) {
+        Column(modifier = Modifier.padding(start = 12.dp).weight(1f)) {
             Text(
                 text = item.fileName,
                 style = MaterialTheme.typography.bodyMedium,
@@ -60,6 +65,33 @@ fun ThumbRow(
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
+        }
+
+        // 图钉入口必须可点(验收第 6 项 / 走查反馈④的静默缺口)
+        if (onPin != null) {
+            Surface(
+                modifier = Modifier
+                    .size(40.dp)
+                    .testTag(pinTag(item.id))
+                    .clickable(onClick = onPin)
+                    .semantics {
+                        contentDescription =
+                            if (isPinned) "${item.fileName} 已固定" else "${item.fileName} 固定位置"
+                    },
+                shape = MaterialTheme.shapes.small,
+                color = if (isPinned) {
+                    MaterialTheme.colorScheme.primary
+                } else {
+                    MaterialTheme.colorScheme.surfaceVariant
+                },
+            ) {
+                Box(contentAlignment = Alignment.Center) {
+                    Text(
+                        text = if (isPinned) "★" else "☆",
+                        color = if (isPinned) Color.White else MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
         }
     }
 }
