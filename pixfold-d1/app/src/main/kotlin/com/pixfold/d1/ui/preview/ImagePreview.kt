@@ -81,9 +81,12 @@ fun ImagePreview(
             .background(Color.Black),
     ) {
         // 图片区:占满可用空间 = 自适应窗口;手势自研。
+        // 预览显示文件名(去掉扩展名),便于确认"当前看的是哪一张"。
         ProceduralThumb(
             seed = current.seed,
-            showIndex = false,
+            fileName = current.fileName,
+            showIndex = true,
+            captionMaxChars = 28,
             modifier = Modifier
                 .fillMaxSize()
                 .testTag(TAG_PREVIEW_IMAGE)
