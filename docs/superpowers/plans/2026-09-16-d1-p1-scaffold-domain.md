@@ -257,6 +257,7 @@ dependencies {
     implementation(libs.activity.compose)
 
     testImplementation(composeBom)
+    testImplementation(kotlin("test"))
     testImplementation(libs.junit)
     testImplementation(libs.robolectric)
     testImplementation(libs.compose.ui.test.junit4)
@@ -589,6 +590,7 @@ import com.pixfold.d1.domain.model.SortField
 import com.pixfold.d1.domain.model.SortKey
 import com.pixfold.d1.domain.model.SortRule
 import com.pixfold.d1.domain.model.SourceItem
+import com.pixfold.d1.domain.model.defaultRule
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
@@ -968,8 +970,44 @@ class PageOrderTest {
         assertTrue(togglePin(s, id).isPinned(id))
         assertFalse(togglePin(togglePin(s, id), id).isPinned(id))
     }
+
+    @Test
+    fun `pinned collision falls back to the nearest free slot on the left`() {
+        // 归档规则:固定项落位被占时"向左找第一个空位"。
+        // 正常路径下记录下标互不相同且升序,slot 不会碰撞 —— 该分支仅在退化状态(页序长于全集)可达。
+        // 这里直接构造退化状态,把这条文档化语义钉死;否则"向左"被写成"向右"不会有任何测试察觉。
+        val all = items(3)
+        fun extra(id: String, base: String) = SourceItem(
+            id = id, collectionId = "c", dir = "", baseName = base, ext = "jpg",
+            sizeBytes = 1, modifiedEpochMillis = 0, createdEpochMillis = 0, seed = 0,
+        )
+        val e4 = extra("i4", "img4")
+        val e5 = extra("i5", "img5")
+
+        val degenerate = PageOrderState(
+            images = all,                                        // slots 只有 3 格(下标 0..2)
+            rule = defaultRule(),
+            order = listOf(all[0], all[1], all[2], e4, e5),       // 固定项记录下标 3 与 4
+            pinnedIds = setOf(e4.id, e5.id),
+        )
+
+        val applied = applyRule(degenerate, defaultRule())
+
+        // 两个固定项的夹取目标都是下标 2:
+        //   先处理记录下标 3(e4) -> 落 slots[2]
+        //   再处理记录下标 4(e5) -> slots[2] 已占 -> 向左找到 slots[1]
+        // 若实现误为"向右",第二项会越界或落错位,本断言即失败。
+        assertEquals(e4.id, applied.order[2].id, "先处理的固定项应落在夹取位")
+        assertEquals(e5.id, applied.order[1].id, "撞位的固定项应向左落到最近空位")
+        assertEquals(3, applied.order.size, "结果长度应等于全集长度")
+    }
 }
 ```
+
+> **该用例的由来(执行时补加)**:实施本任务时用**变异测试**发现,把"向左找空位"改成"向右"时
+> **全部 25 个测试仍然通过** —— 因为正常路径下固定项的记录下标互不相同且升序,该分支不可达。
+> 故补上此用例直接构造退化状态(页序长于全集),使这条文档化语义真正被钉死。
+> 变异复验:改回右扫 → 该用例失败;恢复左扫 → 通过。
 
 - [ ] **步骤 2：运行测试并确认其失败**
 
