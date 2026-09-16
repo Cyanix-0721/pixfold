@@ -589,6 +589,7 @@ import com.pixfold.d1.domain.model.SortField
 import com.pixfold.d1.domain.model.SortKey
 import com.pixfold.d1.domain.model.SortRule
 import com.pixfold.d1.domain.model.SourceItem
+import com.pixfold.d1.domain.model.defaultRule
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
