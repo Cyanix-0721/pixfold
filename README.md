@@ -2,7 +2,7 @@
 
 图片整理与 CBZ 制作工作台。
 
-> 当前状态：**设计阶段——D1 交互原型主线**（D2 Android SAF spike 已 5/5 验收；2026-09-10 技术栈重审换栈为 Kotlin + Jetpack Compose；**2026-09-16 D1 在新栈启动重建**，分支拓扑与七阶段切分见 HANGOFF §9.1）
+> 当前状态：**设计阶段——D1 交互原型主线**（D2 Android SAF spike 已 5/5 验收；2026-09-10 技术栈重审换栈为 Kotlin + Jetpack Compose；**2026-09-16 D1 在新栈启动重建，2026-09-17 P1–P3 已交付、真机已接入**；分支拓扑与七阶段切分见 HANGOFF §9.1；**验收进度 6/20**（第 1、2、3、5、6、20 项；第 7 项部分完成），逐项状态见 HANGOFF §9）
 > 目标平台：**Android（唯一 GUI 平台）**；Windows / Linux 不再是 GUI 目标平台
 > 技术栈：**Kotlin + Jetpack Compose（Android 原生，2026-09-10 锁定，替换 Flutter）**；决策依据与对照方案见 HANGOFF §8
 
@@ -68,7 +68,9 @@ D5  增加模板、撤销、更新 CBZ、多系列批处理等增强功能
 
 > 进度(2026-09-16)：**环境复检——修正文档漂移，环境比原记录更完整**。逐项实测后确认：`platforms;android-36` 与 cmdline-tools 23.0.0 **均已就位**（原标 ⬜ 待装 / 偏旧）；Kotlin/Gradle 侧**已有一次成功构建实证**（2026-09-12，Gradle 9.6.0 / AGP 9.4.0 / Kotlin 2.2.10）；**adb / fastboot 曾被 `C:\Windows\System32` 的第三方残留（adb 33.0.0）遮蔽**，已清除并验收通过；归档分支 `archive-flutter-verify` **已推远程**（原先"仅本地"的风险已消除）。详见 HANGOFF §12 顶部横幅与 §12.2 / §12.5 / §12.7。
 
-> 进度(2026-09-16，**D1 启动重建**)：**分支模型与阶段切分固化**——`ready`（设计文档线）→ **`dev`（开发主线）** → 阶段分支 `d1/p1…p7`（从 `dev` 开、完成即合回 `dev` 并回写文档），D1 全绿后 `dev` → `main` 发 release，此后开发继续在 `dev`；原型代码改为**在仓库内**开发（不再放仓库外目录，避免 09-13 的整树丢失），详见 HANGOFF §9.1。**构建链已在 `temurin-17` 下完整实证**（探针工程：`assembleDebug` + 纯 Kotlin JVM 单测 + Robolectric Compose UI 测试 + `lint` 全绿），原"temurin-17 下的完整构建待 D1 确认"一项**已关闭**；同批实测确认两条换栈坑（AGP 9 内置 Kotlin 不得再加 `kotlin-android`、Compose 插件须锁 2.2.10；Kotlin `Regex.split` 丢弃捕获组会导致自然排序静默失效）。证据见 `docs/notes/d1-toolchain-evidence.md`。**⚠️ 当前 `adb devices` 为空（无真机），依赖真机的验收项挂起；不得以离线通过冒充 D1 完成。**
+> 进度(2026-09-16，**D1 启动重建**)：**分支模型与阶段切分固化**——`ready`（设计文档线）→ **`dev`（开发主线）** → 阶段分支 `d1/p1…p7`（从 `dev` 开、完成即合回 `dev` 并回写文档），D1 全绿后 `dev` → `main` 发 release，此后开发继续在 `dev`；原型代码改为**在仓库内**开发（不再放仓库外目录，避免 09-13 的整树丢失），详见 HANGOFF §9.1。**构建链已在 `temurin-17` 下完整实证**（探针工程：`assembleDebug` + 纯 Kotlin JVM 单测 + Robolectric Compose UI 测试 + `lint` 全绿），原"temurin-17 下的完整构建待 D1 确认"一项**已关闭**；同批实测确认两条换栈坑（AGP 9 内置 Kotlin 不得再加 `kotlin-android`、Compose 插件须锁 2.2.10；Kotlin `Regex.split` 丢弃捕获组会导致自然排序静默失效）。证据见 `docs/notes/d1-toolchain-evidence.md`。
+
+> 进度(2026-09-17，**P1–P3 交付 / 真机接入**)：**真机已接入**（用户手机固定无线调试地址 `192.168.43.1:4444`，PJX110 / Android 16），依赖真机的验收项不再挂起。**P1**（AGP 9.4 / Gradle 9.6 / Compose BOM 2026.02.01 + material3 1.4.0 脚手架、领域地基、确定性 mock 数据）与 **P2**（缩略图网格/列表双视图、大图预览含自适应/双击缩放/平移/翻页）**完成**；**P3 部分完成**——网格拖拽（松手落地）、图钉入口、人工调整标记与一键重置、多级排序规则编辑器已交付并真机实证，但**验收第 4 项（列表拖拽）尚未实现**、**第 7 项后半（批次默认 / 本组独立接入 UI）未完成**。**D1 验收清单当前 6/20 通过**（第 1、2、3、5、6、20 项；第 7 项部分完成），逐项状态与证据见 HANGOFF §9。离线自证：领域 39 项 + UI 55 项测试全绿，`lint` 零告警。**真机走查方法提醒**：`adb shell input swipe` 触发不了长按手势，拖拽须用 `adb shell input draganddrop`（详见 HANGOFF §12.5 的"假阴性陷阱"）。
 
 ## 开发环境部署(⚠️ 暂定)
 
