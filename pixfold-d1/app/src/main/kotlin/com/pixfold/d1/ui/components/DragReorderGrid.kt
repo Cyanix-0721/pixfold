@@ -1,0 +1,116 @@
+package com.pixfold.d1.ui.components
+
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.itemsIndexed
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateMapOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.layout.boundsInRoot
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.unit.dp
+import com.pixfold.d1.domain.model.SourceItem
+
+const val TAG_DRAG_GRID = "drag-grid"
+
+/**
+ * 可拖拽排序的缩略图网格(**拖拽自研**)。
+ *
+ * 目标格判定由**父容器**负责:卡片只上报指针位置,这里用各格的实际
+ * [boundsInRoot] 命中最接近的格子 —— 卡片自身看不到兄弟节点,无法自己算目标。
+ *
+ * **松手落地**:拖动中只更新 [hoveredIndex] 用于高亮,[onMoveTo] 只在抬起时回调一次。
+ * 这避免了"悬停实时重排 → 指针微动反复换位"(HANGOFF §12.5 结论 2)。
+ */
+@Composable
+fun DragReorderGrid(
+    items: List<SourceItem>,
+    onMoveTo: (String, Int) -> Unit,
+    onPin: (String) -> Unit,
+    isPinned: (String) -> Boolean,
+    onClick: (Int) -> Unit,
+    modifier: Modifier = Modifier,
+    columns: Int = 3,
+) {
+    val slotBounds = remember { mutableStateMapOf<Int, Rect>() }
+    var draggingIndex by remember { mutableStateOf<Int?>(null) }
+    var pointerInRoot by remember { mutableStateOf(Offset.Zero) }
+    var hoveredIndex by remember { mutableStateOf<Int?>(null) }
+
+    Box(modifier = modifier) {
+        LazyVerticalGrid(
+            columns = GridCells.Fixed(columns),
+            modifier = Modifier
+                .fillMaxSize()
+                .testTag(TAG_DRAG_GRID),
+            contentPadding = PaddingValues(8.dp),
+        ) {
+            itemsIndexed(items, key = { _, it -> it.id }) { index, item ->
+                Box(
+                    modifier = Modifier
+                        .padding(4.dp)
+                        .onGloballyPositioned { coords ->
+                            slotBounds[index] = coords.boundsInRoot()
+                        },
+                ) {
+                    DraggableThumbCard(
+                        item = item,
+                        isPinned = isPinned(item.id),
+                        isHovered = hoveredIndex != null && hoveredIndex == index && draggingIndex != index,
+                        isDragging = draggingIndex == index,
+                        onClick = { onClick(index) },
+                        onPin = { onPin(item.id) },
+                        onDragStart = { localOffset ->
+                            draggingIndex = index
+                            // 本地坐标 -> 根坐标,便于与各格 bounds 比较
+                            val b = slotBounds[index]
+                            pointerInRoot = if (b != null) b.topLeft + localOffset else localOffset
+                            hoveredIndex = null
+                        },
+                        onDrag = { position ->
+                            val b = slotBounds[index]
+                            pointerInRoot = if (b != null) b.topLeft + position else position
+                            hoveredIndex = findSlotAt(pointerInRoot, slotBounds)
+                        },
+                        onDragEnd = {
+                            val from = draggingIndex
+                            val target = hoveredIndex
+                            draggingIndex = null
+                            hoveredIndex = null
+                            // 松手才落地;拖到自己格/无目标 -> 不提交
+                            if (from != null && target != null && target != from) {
+                                onMoveTo(items[from].id, target)
+                            }
+                        },
+                        onDragCancel = {
+                            draggingIndex = null
+                            hoveredIndex = null
+                        },
+                    )
+                }
+            }
+        }
+    }
+}
+
+/** 在已知各格 bounds 中找出包含该点的下标;找不到则取**最近格中心**(容错)。 */
+internal fun findSlotAt(point: Offset, bounds: Map<Int, Rect>): Int? {
+    bounds.entries.firstOrNull { (_, r) -> r.contains(point) }?.let { return it.key }
+    if (bounds.isEmpty()) return null
+    return bounds.entries.minByOrNull { (_, r) ->
+        val dx = point.x - r.center.x
+        val dy = point.y - r.center.y
+        dx * dx + dy * dy
+    }?.key
+}
