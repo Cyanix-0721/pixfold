@@ -58,6 +58,7 @@
 | `app/.../PixFoldApp.kt` | 应用根 Composable |
 | `app/src/test/.../HomeScreenTest.kt` | U1 首页渲染断言 |
 | `app/src/test/.../NegativeControlTest.kt` | U0 负向对照（证明 UI 断言非空转） |
+| `app/src/test/.../ui/theme/ThemeTest.kt` | M3 合规断言（语义角色 + 深色模式确实切换配色） |
 
 **任务顺序**：1 脚手架 → 2 自然排序 → 3 多级排序 → 4 PageOrder 三重状态 → 5 mock 数据 → 6 首页骨架 → 7 阶段收口。
 
@@ -1300,6 +1301,7 @@ git commit -m "feat(d1/domain): 确定性 mock 数据(含重名/非法字符/大
 - 修改：`pixfold-d1/app/src/main/kotlin/com/pixfold/d1/MainActivity.kt`
 - 测试：`pixfold-d1/app/src/test/kotlin/com/pixfold/d1/ui/HomeScreenTest.kt`
 - 测试：`pixfold-d1/app/src/test/kotlin/com/pixfold/d1/NegativeControlTest.kt`
+- 测试：`pixfold-d1/app/src/test/kotlin/com/pixfold/d1/ui/theme/ThemeTest.kt`
 
 **接口：**
 - 依赖输入：任务 5 的 `MockData`
@@ -1424,26 +1426,54 @@ private fun SilentStateScreen() {
 
 - [ ] **步骤 3：编写主题与首页**
 
-`ui/theme/Theme.kt`：
+`ui/theme/Theme.kt`（**已按 HANGOFF §6.5「UI 须符合最新 Material Design」落实**：语义角色 + 深色模式 +
+Android 12+ 动态取色，API<31 回退静态 scheme；基准 material3 1.4.0 stable）：
 
 ```kotlin
 package com.pixfold.d1.ui.theme
 
+import android.os.Build
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.darkColorScheme
+import androidx.compose.material3.dynamicDarkColorScheme
+import androidx.compose.material3.dynamicLightColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
+
+@Composable
+fun PixFoldTheme(
+    darkTheme: Boolean = isSystemInDarkTheme(),
+    dynamicColor: Boolean = true,
+    content: @Composable () -> Unit,
+) {
+    val context = LocalContext.current
+    val colorScheme = when {
+        dynamicColor && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S -> {
+            if (darkTheme) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)
+        }
+        darkTheme -> DarkColors
+        else -> LightColors
+    }
+    MaterialTheme(colorScheme = colorScheme, content = content)
+}
 
 private val LightColors = lightColorScheme(
     primary = Color(0xFF3F51B5),
     secondary = Color(0xFF5C6BC0),
 )
 
-@Composable
-fun PixFoldTheme(content: @Composable () -> Unit) {
-    MaterialTheme(colorScheme = LightColors, content = content)
-}
+private val DarkColors = darkColorScheme(
+    primary = Color(0xFF9FA8DA),
+    secondary = Color(0xFFB0BEC5),
+)
 ```
+
+> **M3E 不在本阶段范围**：Material 3 Expressive 的公开 API 仅存在于 `material3:1.5.0-alpha28`；
+> 最新 stable 为 1.4.0，且最新 BOM 2026.09.00 亦锁 1.4.0、其中 M3E 类型为 `internal`（编译实测）。
+> 留待 P7 走查后评估（HANGOFF §6.5、`docs/notes/d1-toolchain-evidence.md` §7）。
 
 `ui/HomeScreen.kt`：
 
