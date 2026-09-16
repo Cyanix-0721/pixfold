@@ -1,4 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <!-- 浅色窗口主题(深色对应项见 values-night/themes.xml)。
+         Compose 侧另有 Surface 负责实际背景;此处只保证"Compose 首帧之前"的窗口底色正确,
+         避免深色模式下出现白底闪一下或透出白底(真机实证发现)。 -->
     <style name="Theme.PixFold" parent="android:Theme.Material.Light.NoActionBar" />
 </resources>
