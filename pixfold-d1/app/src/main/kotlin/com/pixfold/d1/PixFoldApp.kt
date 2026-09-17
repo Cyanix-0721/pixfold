@@ -46,8 +46,14 @@ fun PixFoldApp() {
         ) {
             var screen by remember { mutableStateOf<Screen>(Screen.Home) }
 
-            // 工作流 A 用第一个集合(trip,30 张)作为默认演示数据。
-            val items = remember { MockData.workspaceA.collections.first().images }
+            // 工作流 A 演示数据:trip(30 张)+ scan(16 张)+ misc(12 张),
+            // 多集合用于演示"批次默认 + 本组独立"(验收第 7 项)。
+            val collections = remember { MockData.workspaceA.collections }
+            // 预览跟随**当前集合**:切集合后打开预览应看到该集合的图,
+            // 否则页码与图片会对不上(索引来自当前集合)。
+            var activeCollectionId by remember { mutableStateOf(collections.first().id) }
+            val previewItems = collections.firstOrNull { it.id == activeCollectionId }?.images
+                ?: collections.first().images
 
             when (val current = screen) {
                 Screen.Home -> HomeScreen(
@@ -56,12 +62,13 @@ fun PixFoldApp() {
                 )
 
                 Screen.WorkflowA -> SortAndPreviewPage(
-                    items = items,
+                    collections = collections,
                     onOpenPreview = { index -> screen = Screen.Preview(index) },
+                    onActiveCollectionChange = { activeCollectionId = it },
                 )
 
                 is Screen.Preview -> ImagePreview(
-                    items = items,
+                    items = previewItems,
                     initialIndex = current.index,
                     onClose = { screen = Screen.WorkflowA },
                 )

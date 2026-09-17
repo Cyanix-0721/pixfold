@@ -38,6 +38,9 @@ fun ruleLevelTag(i: Int) = "$TAG_RULE_LEVEL_PREFIX$i"
 /** 规则级 i 的删除按钮 testTag。 */
 fun ruleRemoveTag(i: Int) = "$TAG_RULE_REMOVE_PREFIX$i"
 
+/** 规则级 i 的升/降序切换 testTag。 */
+fun ascendingTag(i: Int) = "rule-ascending-$i"
+
 /**
  * 排序规则编辑器(验收第 7 项):多级排序可**增删改**,每级独立升/降序。
  *
@@ -47,12 +50,16 @@ fun ruleRemoveTag(i: Int) = "$TAG_RULE_REMOVE_PREFIX$i"
  *  - 字段下拉顺序 = [SortField] 枚举声明顺序(产品定序,不得重排)。
  *
  * 编辑用**草稿**:点"应用排序"才落地(归档语义:编辑不实时生效)。
+ *
+ * @param scopeLabel 该规则的作用范围说明(批次默认 / 本组独立),
+ *   让用户知道"应用排序"会影响哪些集合(§5.4)。
  */
 @Composable
 fun SortRuleEditor(
     rule: SortRule,
     onApply: (SortRule) -> Unit,
     modifier: Modifier = Modifier,
+    scopeLabel: String? = null,
 ) {
     var draft by remember(rule) { mutableStateOf(rule.keys) }
 
@@ -68,11 +75,20 @@ fun SortRuleEditor(
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Text(
-                text = "排序规则（${draft.size}/${SortRule.MAX_LEVELS} 级）",
-                style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.onBackground,
-            )
+            Column {
+                Text(
+                    text = "排序规则（${draft.size}/${SortRule.MAX_LEVELS} 级）",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onBackground,
+                )
+                if (scopeLabel != null) {
+                    Text(
+                        text = scopeLabel,
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.primary,
+                    )
+                }
+            }
             Row {
                 TextButton(
                     onClick = { draft = draft + SortKey(SortField.NaturalName, true) },
@@ -119,9 +135,11 @@ fun SortRuleEditor(
                 AssistChip(
                     onClick = { draft = draft.toMutableList().also { it[index] = key.copy(ascending = !key.ascending) } },
                     label = { Text(if (key.ascending) "升序" else "降序") },
-                    modifier = Modifier.semantics {
-                        contentDescription = "第${index + 1}级${if (key.ascending) "升序" else "降序"}"
-                    },
+                    modifier = Modifier
+                        .testTag(ascendingTag(index))
+                        .semantics {
+                            contentDescription = "第${index + 1}级${if (key.ascending) "升序" else "降序"}"
+                        },
                 )
 
                 // 删除该级(至少保留 1 级)
