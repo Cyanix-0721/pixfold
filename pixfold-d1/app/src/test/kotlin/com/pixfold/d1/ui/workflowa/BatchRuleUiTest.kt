@@ -100,13 +100,17 @@ class BatchRuleUiTest {
         val scan = collections.first { it.id == "scan" }
         val scanAscendingFirst = scan.images.first().fileName // 自然升序时的首张
 
-        // 集合 1(trip)转为独立,并把第 1 级改为**降序**,再"应用排序"
+        // 集合 1(trip)转为独立;第 1 级设为"文件名(自然)"并再次点击 -> 降序,再"应用排序"
+        // (新交互:再次点击已选中字段即切换升降序)
         rule.onNodeWithTag(TAG_CUSTOM_RULE_TOGGLE).performClick()
-        rule.onNodeWithTag(ascendingTag(0)).performClick()
+        rule.onNodeWithTag(fieldTag(0, SortField.NaturalName)).performClick()
+        rule.onNodeWithTag(fieldTag(0, SortField.NaturalName)).performClick()
         rule.onNodeWithTag(TAG_RULE_APPLY).performClick()
 
-        // trip 自己应已变为降序(证明"应用"确实生效,避免测试空转)
-        val tripDescendingFirst = trip.images.last().fileName
+        // trip 第 1 级=文件名(自然)降序 -> 文件名最大者(IMG_20260702_012)排首
+        // 注意:不能直接用 images.last() —— 那是"集合原始顺序的末项",
+        // 与"按文件名降序后的首项"不必然相同(trip 原始序是按 day1→day2 构造的)。
+        val tripDescendingFirst = trip.images.maxByOrNull { it.fileName }!!.fileName
         assertTrue(
             hasCardWithText(tripDescendingFirst),
             "独立集合应用降序后,首张应变为 $tripDescendingFirst",
@@ -131,21 +135,48 @@ class BatchRuleUiTest {
         )
     }
 
-    /** 当前网格里是否存在包含该文本的卡片(用 contentDescription 判定,避免匹配多个节点)。 */
-    private fun hasCardWithText(text: String): Boolean =
-        rule.onAllNodesWithTag("grid-card")
+    /**
+     * 当前网格里是否存在包含该文本的卡片。
+     *
+     * 注意(踩过的坑):语义树**只包含可见项**,而网格在切换集合/重排后会**保留滚动位置**,
+     * 故直接读会得到"视口中段"而非列表头部,容易误判顺序。
+     * 这里先**滚动到顶部**,再按视觉位置(y,x)读取,保证读到的是真正的首项。
+     */
+    private fun hasCardWithText(text: String, scrollTopFirst: Boolean = true): Boolean {
+        if (scrollTopFirst) scrollGridToTop()
+        val key = androidx.compose.ui.semantics.SemanticsProperties.ContentDescription
+        return rule.onAllNodesWithTag("grid-card")
             .fetchSemanticsNodes()
             .any { node ->
-                val key = androidx.compose.ui.semantics.SemanticsProperties.ContentDescription
                 node.config.contains(key) && node.config[key].any { it.contains(text) }
             }
+    }
+
+    /** 把网格滚到顶部(语义 Action),使可见项 = 列表头部。 */
+    private fun scrollGridToTop() {
+        val action = androidx.compose.ui.semantics.SemanticsActions.ScrollToIndex
+        val node = rule.onNodeWithTag(TAG_GRID).fetchSemanticsNode()
+        node.config[action].action?.invoke(0)
+        rule.waitForIdle()
+    }
 
     @Test
-    fun `ascending toggle is available for each level`() {
+    fun `each level shows a direction indicator on its selected field`() {
         setPage()
-        // 至少第 1 级有升降序开关(验收第 7 项要求"可增删改")
-        rule.onNodeWithTag(ascendingTag(0)).assertIsDisplayed()
-        rule.onNodeWithTag(ascendingTag(1)).assertIsDisplayed()
+        // 新交互:方向由"选中字段后的实心三角"表示,每级各有一个
+        val l0 = rule.onNodeWithTag(TAG_SORT_RULE_EDITOR).fetchSemanticsNode()
+        // 默认规则两级:第1级 DirName,第2级 NaturalName
+        assertTrue(
+            rule.onAllNodesWithTag(directionTag(0, SortField.DirName), useUnmergedTree = true)
+                .fetchSemanticsNodes().isNotEmpty(),
+            "第1级选中字段应带方向三角",
+        )
+        assertTrue(
+            rule.onAllNodesWithTag(directionTag(1, SortField.NaturalName), useUnmergedTree = true)
+                .fetchSemanticsNodes().isNotEmpty(),
+            "第2级选中字段应带方向三角",
+        )
+        assertTrue(l0.size.height > 0)
     }
 
     @Test

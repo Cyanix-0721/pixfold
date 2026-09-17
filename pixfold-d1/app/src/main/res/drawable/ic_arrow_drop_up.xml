@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Material Symbols "arrow_drop_up" — 升序指示(实心正三角)。官方几何数据,未自行改动。
+  Source : https://github.com/google/material-design-icons
+           symbols/web/arrow_drop_up/materialsymbolsoutlined/arrow_drop_up_24px.svg
+  License: Apache License 2.0
+  用法:仅显示在排序规则中**被选中**的字段名之后,表示该级为升序。
+-->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="960"
+    android:viewportHeight="960">
+    <path
+        android:fillColor="#FF000000"
+        android:pathData="m280-400 200-200 200 200H280Z" />
+</vector>
