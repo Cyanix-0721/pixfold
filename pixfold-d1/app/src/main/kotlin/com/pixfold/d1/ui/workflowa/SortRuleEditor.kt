@@ -14,10 +14,6 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
@@ -33,7 +29,6 @@ import com.pixfold.d1.domain.model.SortRule
 const val TAG_RULE_LEVEL_PREFIX = "rule-level-"
 const val TAG_RULE_ADD = "rule-add"
 const val TAG_RULE_REMOVE_PREFIX = "rule-remove-"
-const val TAG_RULE_APPLY = "rule-apply"
 
 /** 规则级 i 的字段选择器 testTag。 */
 fun ruleLevelTag(i: Int) = "$TAG_RULE_LEVEL_PREFIX$i"
@@ -58,7 +53,9 @@ fun ruleRemoveTag(i: Int) = "$TAG_RULE_REMOVE_PREFIX$i"
  *  - **至少保留 1 级**(只剩 1 级时删除按钮禁用);
  *  - 字段顺序 = [SortField] 枚举声明顺序(产品定序,不得重排)。
  *
- * 编辑用**草稿**:点"应用排序"才落地(归档语义:编辑不实时生效)。
+ * **变动即自动应用**(用户 2026-09-17 指定):不再有"应用排序"按钮与草稿态 ——
+ * 每次改动(换字段 / 翻转方向 / 增删级)立即通过 [onRuleChange] 上报。
+ * 注:此前的"草稿 + 手动应用"取自归档语义(规格 §5.4),现按用户决定覆盖。
  *
  * **升降序交互(用户 2026-09-17 指定,替换原独立切换按钮)**:
  *  - 每级默认**升序**;
@@ -68,16 +65,18 @@ fun ruleRemoveTag(i: Int) = "$TAG_RULE_REMOVE_PREFIX$i"
  *  这样把"选谁"和"什么方向"合并在一个控件里,少一行控件、少一次点击。
  *
  * @param scopeLabel 该规则的作用范围说明(批次默认 / 本组独立),
- *   让用户知道"应用排序"会影响哪些集合(§5.4)。
+ *   让用户知道当前规则会作用于哪些集合(§5.4)。
  */
 @Composable
 fun SortRuleEditor(
     rule: SortRule,
-    onApply: (SortRule) -> Unit,
+    onRuleChange: (SortRule) -> Unit,
     modifier: Modifier = Modifier,
     scopeLabel: String? = null,
 ) {
-    var draft by remember(rule) { mutableStateOf(rule.keys) }
+    // 无草稿:直接以传入规则为唯一事实来源,任何变动立刻上报(单一数据源,避免双份状态不同步)
+    val draft = rule.keys
+    fun emit(keys: List<SortKey>) = onRuleChange(SortRule(keys))
 
     Column(
         modifier = modifier
@@ -107,19 +106,13 @@ fun SortRuleEditor(
             }
             Row {
                 TextButton(
-                    onClick = { draft = draft + SortKey(SortField.NaturalName, true) },
+                    onClick = { emit(draft + SortKey(SortField.NaturalName, true)) },
                     enabled = draft.size < SortRule.MAX_LEVELS,
                     modifier = Modifier
                         .testTag(TAG_RULE_ADD)
                         .semantics { contentDescription = "添加排序级" },
                 ) { Text("添加") }
 
-                TextButton(
-                    onClick = { onApply(SortRule(draft)) },
-                    modifier = Modifier
-                        .testTag(TAG_RULE_APPLY)
-                        .semantics { contentDescription = "应用排序" },
-                ) { Text("应用排序") }
             }
         }
 
@@ -144,7 +137,7 @@ fun SortRuleEditor(
                     FilterChip(
                         selected = selected,
                         onClick = {
-                            draft = draft.toMutableList().also {
+                            emit(draft.toMutableList().also {
                                 it[index] = if (selected) {
                                     // 再次点击已选中字段 -> 只翻转方向,不换字段
                                     key.copy(ascending = !key.ascending)
@@ -152,7 +145,7 @@ fun SortRuleEditor(
                                     // 换字段 -> 回到默认升序
                                     SortKey(field, true)
                                 }
-                            }
+                            })
                         },
                         label = { Text(field.label) },
                         // 方向三角只挂在**选中**字段之后(用户指定)
@@ -189,7 +182,7 @@ fun SortRuleEditor(
 
                 // 删除该级(至少保留 1 级)
                 TextButton(
-                    onClick = { draft = draft.toMutableList().also { it.removeAt(index) } },
+                    onClick = { emit(draft.toMutableList().also { it.removeAt(index) }) },
                     enabled = draft.size > 1,
                     modifier = Modifier
                         .testTag(ruleRemoveTag(index))

@@ -190,7 +190,7 @@ fun SortAndPreviewPage(
         SortRuleEditor(
             rule = state.effectiveRule(activeId),
             scopeLabel = batchLabel(activeId, isCustom),
-            onApply = { newRule -> state = applyRuleToCollection(state, activeId, newRule) },
+            onRuleChange = { newRule -> state = applyRuleToCollection(state, activeId, newRule) },
         )
 
         when (mode) {

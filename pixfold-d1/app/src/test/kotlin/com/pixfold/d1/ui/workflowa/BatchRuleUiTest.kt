@@ -103,9 +103,9 @@ class BatchRuleUiTest {
         // 集合 1(trip)转为独立;第 1 级设为"文件名(自然)"并再次点击 -> 降序,再"应用排序"
         // (新交互:再次点击已选中字段即切换升降序)
         rule.onNodeWithTag(TAG_CUSTOM_RULE_TOGGLE).performClick()
+        // 变动即自动应用(已无"应用排序"按钮)
         rule.onNodeWithTag(fieldTag(0, SortField.NaturalName)).performClick()
         rule.onNodeWithTag(fieldTag(0, SortField.NaturalName)).performClick()
-        rule.onNodeWithTag(TAG_RULE_APPLY).performClick()
 
         // trip 第 1 级=文件名(自然)降序 -> 文件名最大者(IMG_20260702_012)排首
         // 注意:不能直接用 images.last() —— 那是"集合原始顺序的末项",
