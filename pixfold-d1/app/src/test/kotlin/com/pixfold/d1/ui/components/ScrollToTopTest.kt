@@ -127,6 +127,43 @@ class ScrollToTopTest {
             "回到顶部后应隐藏回顶按钮",
         )
     }
+
+    // ---- 缺陷回归(用户 2026-09-17 指出):划到**最底部**时按钮消失 ----
+
+    @Test
+    fun `grid keeps the button visible at the very bottom`() {
+        // 原判据用 canScrollForward(下方还有内容),而**滑到底部时它恰为 false**,
+        // 于是最需要回顶时按钮反而消失 —— 不符合常规操作逻辑。
+        // 正确判据:canScrollBackward(上方还有内容 = 不在顶部)。
+        setGrid(60)
+
+        rule.onNodeWithTag(TAG_GRID_CONTAINER).performScrollToIndexCompat(59) // 最后一项
+        rule.onNodeWithTag(TAG_SCROLL_TO_TOP).assertIsDisplayed()
+    }
+
+    @Test
+    fun `list keeps the button visible at the very bottom`() {
+        setList(60)
+
+        rule.onNodeWithTag(TAG_LIST_CONTAINER).performScrollToIndexCompat(59)
+        rule.onNodeWithTag(TAG_SCROLL_TO_TOP).assertIsDisplayed()
+    }
+
+    @Test
+    fun `button hides again right after returning to the top from the bottom`() {
+        setGrid(60)
+
+        rule.onNodeWithTag(TAG_GRID_CONTAINER).performScrollToIndexCompat(59)
+        rule.onNodeWithTag(TAG_SCROLL_TO_TOP).assertIsDisplayed()
+
+        rule.onNodeWithTag(TAG_SCROLL_TO_TOP).performClick()
+        rule.waitForIdle()
+
+        assertTrue(
+            rule.onAllNodesWithTag(TAG_SCROLL_TO_TOP).fetchSemanticsNodes().isEmpty(),
+            "从底部回顶后也应隐藏",
+        )
+    }
 }
 
 /** 用语义 Action 滚动到指定 index(LazyGrid/LazyList 通用)。 */

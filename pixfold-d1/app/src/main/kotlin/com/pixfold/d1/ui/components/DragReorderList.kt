@@ -106,9 +106,10 @@ fun DragReorderList(
         }
 
         // W2:下滑后显示回顶按钮(右下角);判据同网格(下方还有内容 且 确实下滑过)
-        // 同网格:用 derivedStateOf 过滤,避免每像素滚动都重组。
+        // 同网格:判据用 canScrollBackward(不在顶部即显示),
+        // 不用 canScrollForward(滑到底部会变 false,导致按钮消失)。
         val showTop by remember {
-            derivedStateOf { listState.canScrollForward && listState.firstVisibleItemIndex > 0 }
+            derivedStateOf { listState.canScrollBackward }
         }
         ScrollToTopButton(
             visible = showTop,

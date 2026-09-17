@@ -116,10 +116,11 @@ fun DragReorderGrid(
 
         // W2:下滑后显示回顶按钮(右下角)。判据同时要求"下方还有内容"与"确实下滑过",
         // 以免内容不足一屏或已在顶部时误显。
-        // 用 derivedStateOf 过滤:只在"是否已下滑"翻转时触发重组,而非每像素滚动都重组
-        // (lint FrequentlyChangingValue 指出的性能问题)。
+        // 判据用 canScrollBackward(**上方还有内容** = 不在顶部)。
+        // 注意:不能用 canScrollForward —— 它表示"下方还有内容",**滑到底部时恰为 false**,
+        // 会导致最需要回顶时按钮消失(2026-09-17 用户指出的缺陷)。
         val showTop by remember {
-            derivedStateOf { gridState.canScrollForward && gridState.firstVisibleItemIndex > 0 }
+            derivedStateOf { gridState.canScrollBackward }
         }
         ScrollToTopButton(
             visible = showTop,

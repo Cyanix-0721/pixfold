@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Material Symbols "push_pin" (filled) — 官方几何数据,未自行改动。
+  Source : https://github.com/google/material-design-icons
+           symbols/web/push_pin/materialsymbolsoutlined/push_pin_fill1_24px.svg
+  License: Apache License 2.0
+  View   : https://fonts.google.com/icons?selected=Material+Symbols+Outlined:push_pin
+
+  为什么用 VectorDrawable(painterResource)而不是 material-icons 依赖:
+  官方已弃用 material-icons-extended(体积巨大),且 PushPin 不在 material-icons-core 子集内;
+  VectorDrawable 是 Android 资源系统的原生矢量格式,零新增依赖、可随 M3 语义色着色,
+  也是官方现在推荐的做法。填充色留空由 Compose `Icon(tint=...)` 统一着色。
+-->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <path
+        android:fillColor="#FF000000"
+        android:pathData="m16 12 2 2v2h-5v6l-1 1-1-1v-6H6v-2l2-2V5H7V3h10v2h-1Z" />
+</vector>
