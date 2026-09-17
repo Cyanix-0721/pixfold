@@ -10,6 +10,7 @@ import androidx.compose.ui.test.performClick
 import com.pixfold.d1.domain.mock.MockData
 import com.pixfold.d1.domain.model.ImageCollection
 import com.pixfold.d1.domain.model.SortField
+import com.pixfold.d1.ui.components.TAG_SCROLL_TO_TOP
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -111,5 +112,33 @@ class RuleAutoApplyPageTest {
         val after = firstCardName()
         assertTrue(after.isNotEmpty(), "新增排序级后网格仍应有内容")
         assertEquals(before, after, "仅追加升序并列键不应改变首项")
+    }
+
+    @Test
+    fun `changing the rule scrolls the grid back to top`() {
+        // W4(用户 2026-09-17 指定):规则变更后自动回顶。
+        // 理由:重排会让"当前位置"失去意义 —— 用户看到的是中段而非新首项。
+        setPage()
+
+        // 先下滑,使回顶按钮出现(证明确实不在顶部)
+        val action = SemanticsActions.ScrollToIndex
+        // trip 集合 30 张,滚动到最后一项(index 29)以离开顶部
+        rule.onNodeWithTag(TAG_GRID).fetchSemanticsNode().config[action].action?.invoke(29)
+        rule.waitForIdle()
+        assertTrue(
+            rule.onAllNodesWithTag(TAG_SCROLL_TO_TOP, useUnmergedTree = true)
+                .fetchSemanticsNodes().isNotEmpty(),
+            "前置条件:下滑后应显示回顶按钮",
+        )
+
+        // 改排序规则(换字段)-> 应自动回顶(按钮随之隐藏)
+        rule.onNodeWithTag(fieldTag(0, SortField.FileName)).performClick()
+        rule.waitForIdle()
+
+        assertTrue(
+            rule.onAllNodesWithTag(TAG_SCROLL_TO_TOP, useUnmergedTree = true)
+                .fetchSemanticsNodes().isEmpty(),
+            "规则变更后应自动回顶(回顶按钮随之隐藏)",
+        )
     }
 }

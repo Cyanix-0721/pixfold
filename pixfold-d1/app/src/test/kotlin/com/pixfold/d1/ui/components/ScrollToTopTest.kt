@@ -2,6 +2,9 @@ package com.pixfold.d1.ui.components
 
 import androidx.compose.foundation.layout.size
 import androidx.compose.ui.Modifier
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithTag
@@ -163,6 +166,90 @@ class ScrollToTopTest {
             rule.onAllNodesWithTag(TAG_SCROLL_TO_TOP).fetchSemanticsNodes().isEmpty(),
             "从底部回顶后也应隐藏",
         )
+    }
+
+    // ---- 外部驱动回顶(W4:规则变更后自动回顶,用户 2026-09-17 指定) ----
+
+    @Test
+    fun `incrementing scrollToTopSignal scrolls grid back to top`() {
+        var signal by mutableStateOf(0)
+        rule.setContent {
+            DragReorderGrid(
+                items = items(60),
+                onMoveTo = { _, _ -> },
+                onPin = {},
+                isPinned = { false },
+                onClick = {},
+                modifier = Modifier.size(360.dp, 600.dp),
+                scrollToTopSignal = signal,
+            )
+        }
+
+        rule.onNodeWithTag(TAG_GRID_CONTAINER).performScrollToIndexCompat(30)
+        rule.onNodeWithTag(TAG_SCROLL_TO_TOP).assertIsDisplayed()
+
+        signal++                    // 外部信号(模拟"排序规则变更")
+        rule.waitForIdle()
+
+        assertTrue(
+            rule.onAllNodesWithTag(TAG_SCROLL_TO_TOP).fetchSemanticsNodes().isEmpty(),
+            "收到回顶信号后应回到顶部(按钮随之隐藏)",
+        )
+    }
+
+    @Test
+    fun `incrementing scrollToTopSignal scrolls list back to top`() {
+        var signal by mutableStateOf(0)
+        rule.setContent {
+            DragReorderList(
+                items = items(60),
+                onMoveTo = { _, _ -> },
+                onPin = {},
+                isPinned = { false },
+                onClick = {},
+                modifier = Modifier.size(360.dp, 600.dp),
+                scrollToTopSignal = signal,
+            )
+        }
+
+        rule.onNodeWithTag(TAG_LIST_CONTAINER).performScrollToIndexCompat(30)
+        rule.onNodeWithTag(TAG_SCROLL_TO_TOP).assertIsDisplayed()
+
+        signal++
+        rule.waitForIdle()
+
+        assertTrue(
+            rule.onAllNodesWithTag(TAG_SCROLL_TO_TOP).fetchSemanticsNodes().isEmpty(),
+            "收到回顶信号后应回到顶部(按钮随之隐藏)",
+        )
+    }
+
+    @Test
+    fun `unrelated recomposition does not scroll back to top`() {
+        // 防误伤:只有 signal **变化**才回顶,普通重组不得把用户拽回顶部
+        var signal by mutableStateOf(0)
+        var noise by mutableStateOf(0)
+        rule.setContent {
+            val n = noise
+            DragReorderGrid(
+                items = items(60),
+                onMoveTo = { _, _ -> },
+                onPin = {},
+                isPinned = { false },
+                onClick = {},
+                modifier = Modifier.size(360.dp, 600.dp),
+                scrollToTopSignal = signal,
+            )
+            if (n < 0) Unit   // 读取 noise,制造无关重组
+        }
+
+        rule.onNodeWithTag(TAG_GRID_CONTAINER).performScrollToIndexCompat(30)
+        rule.onNodeWithTag(TAG_SCROLL_TO_TOP).assertIsDisplayed()
+
+        noise++                    // 无关状态变化 -> 不应回顶
+        rule.waitForIdle()
+
+        rule.onNodeWithTag(TAG_SCROLL_TO_TOP).assertIsDisplayed()
     }
 }
 

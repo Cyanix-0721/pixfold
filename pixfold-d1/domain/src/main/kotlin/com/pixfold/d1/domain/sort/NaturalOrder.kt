@@ -32,9 +32,17 @@ private fun stripLeadingZeros(s: String): String {
  * 自然排序:数字段按数值比较,非数字段按单字符码点比较。
  * 语义对齐归档原型 naturalCompare,但对超长数字串不溢出。
  */
-fun naturalCompare(a: String, b: String): Int {
-    val ta = tokenizeNatural(a)
-    val tb = tokenizeNatural(b)
+fun naturalCompare(a: String, b: String): Int =
+    compareNaturalTokens(tokenizeNatural(a), tokenizeNatural(b))
+
+/**
+ * 比较两个**已分词**的记号序列。
+ *
+ * 抽出来是为了让调用方能**预计算分词**:排序时每次比较都重新分词是纯浪费
+ * (n=3000 时约 1.7 万次比较 → 本可只分词 3000 次;见 2026-09-17 性能实测)。
+ * 比较语义**只有这一份实现**,`naturalCompare` 与 `sortItems` 共用,避免两处逻辑漂移。
+ */
+fun compareNaturalTokens(ta: List<String>, tb: List<String>): Int {
     val n = minOf(ta.size, tb.size)
     for (i in 0 until n) {
         val x = ta[i]

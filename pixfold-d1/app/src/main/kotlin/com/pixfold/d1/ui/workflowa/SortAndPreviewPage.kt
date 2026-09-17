@@ -21,6 +21,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -87,6 +88,8 @@ fun SortAndPreviewPage(
     var activeId by remember {
         mutableStateOf(initialCollectionId ?: collections.firstOrNull()?.id.orEmpty())
     }
+    // W4:每次排序规则变更自增 -> 通知网格/列表回顶(用户 2026-09-17 指定)
+    var scrollSignal by remember { mutableIntStateOf(0) }
     // 初始集合也要通知上层,避免预览与当前集合不一致
     androidx.compose.runtime.LaunchedEffect(activeId) { onActiveCollectionChange(activeId) }
 
@@ -190,7 +193,12 @@ fun SortAndPreviewPage(
         SortRuleEditor(
             rule = state.effectiveRule(activeId),
             scopeLabel = batchLabel(activeId, isCustom),
-            onRuleChange = { newRule -> state = applyRuleToCollection(state, activeId, newRule) },
+            onRuleChange = { newRule ->
+                state = applyRuleToCollection(state, activeId, newRule)
+                // W4(用户 2026-09-17 指定):规则变更后**自动回顶**。
+                // 因为重排会让"当前位置"失去意义(用户看到的是中段而非新首项)。
+                scrollSignal++
+            },
         )
 
         when (mode) {
@@ -203,6 +211,7 @@ fun SortAndPreviewPage(
                 isPinned = { id -> order.isPinned(id) },
                 onClick = { index -> onOpenPreview(index) },
                 modifier = Modifier.fillMaxSize(),
+                scrollToTopSignal = scrollSignal,
             )
 
             ViewMode.List -> DragReorderList(
@@ -214,6 +223,7 @@ fun SortAndPreviewPage(
                 isPinned = { id -> order.isPinned(id) },
                 onClick = { index -> onOpenPreview(index) },
                 modifier = Modifier.fillMaxSize(),
+                scrollToTopSignal = scrollSignal,
             )
         }
     }

@@ -8,6 +8,7 @@ import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.itemsIndexed
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateMapOf
@@ -51,9 +52,16 @@ fun DragReorderGrid(
     modifier: Modifier = Modifier,
     columns: Int = 3,
     onScrollToTopClick: (() -> Unit)? = null,
+    scrollToTopSignal: Int = 0,
 ) {
     val gridState = rememberLazyGridState()
     val scope = rememberCoroutineScope()
+
+    // 外部驱动的回顶(W4:排序规则变更后自动回顶,用户 2026-09-17 指定)。
+    // 只在 signal **变化**时触发 -> 无关重组不会把用户拽回顶部。
+    LaunchedEffect(scrollToTopSignal) {
+        if (scrollToTopSignal > 0) gridState.animateScrollToItem(0)
+    }
     val slotBounds = remember { mutableStateMapOf<Int, Rect>() }
     var draggingIndex by remember { mutableStateOf<Int?>(null) }
     var pointerInRoot by remember { mutableStateOf(Offset.Zero) }
