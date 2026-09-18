@@ -58,6 +58,23 @@ fun setOverride(state: NamingState, id: String, name: String?): NamingState {
  */
 fun updateScheme(state: NamingState, scheme: NamingScheme): NamingState = state.copy(scheme = scheme)
 
+/**
+ * 用户显式指定根目录名 -> 记为"逐项例外",不再跟随集合。
+ * 传入 null/空 -> **撤销覆盖,恢复跟随集合**(清空输入框 = 回到默认,与 override 同一约定)。
+ */
+fun setRootDirName(state: NamingState, name: String?): NamingState =
+    state.copy(rootDirNameOverride = name?.takeIf { it.isNotEmpty() })
+
+/** 恢复"根目录名跟随集合"(清除逐项例外)。 */
+fun clearRootDirNameOverride(state: NamingState): NamingState = state.copy(rootDirNameOverride = null)
+
+/** 在**已生效**的 scheme 上改根目录名:同时写进 scheme 与 override,保证立刻可见且后续跟随被关闭。 */
+fun setRootDirNameOnScheme(state: NamingState, name: String): NamingState =
+    state.copy(
+        scheme = state.scheme.copy(rootDirName = name),
+        rootDirNameOverride = name.takeIf { it.isNotEmpty() },
+    )
+
 /** 改单个组件(按下标);越界则原样返回。 */
 fun updateComponent(state: NamingState, index: Int, transform: (NameComponent) -> NameComponent): NamingState {
     val components = state.scheme.components

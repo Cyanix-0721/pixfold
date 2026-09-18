@@ -44,7 +44,9 @@ import com.pixfold.d1.domain.model.NamingScheme
 import com.pixfold.d1.domain.model.NamingState
 import com.pixfold.d1.domain.naming.addComponent
 import com.pixfold.d1.domain.naming.moveComponent
+import com.pixfold.d1.domain.naming.clearRootDirNameOverride
 import com.pixfold.d1.domain.naming.removeComponent
+import com.pixfold.d1.domain.naming.setRootDirNameOnScheme
 import com.pixfold.d1.domain.naming.toggleComponent
 import com.pixfold.d1.domain.naming.updateComponent
 import com.pixfold.d1.domain.naming.updateScheme
@@ -58,6 +60,10 @@ const val TAG_SCHEME_INDEX_PADDING = "scheme-index-padding"
 
 /** "自动清洗"说明入口(圆形感叹号图标)。 */
 const val TAG_SCHEME_SANITIZE_INFO = "scheme-sanitize-info"
+
+/** 根目录名跟随状态标签 / 恢复跟随按钮。 */
+const val TAG_ROOT_DIR_FOLLOW_LABEL = "root-dir-follow-label"
+const val TAG_ROOT_DIR_FOLLOW_RESET = "root-dir-follow-reset"
 
 /** 说明对话框及其确认按钮。 */
 const val TAG_SCHEME_SANITIZE_INFO_DIALOG = "scheme-sanitize-info-dialog"
@@ -99,8 +105,11 @@ fun SchemeEditor(
     state: NamingState,
     onChange: (NamingState) -> Unit,
     modifier: Modifier = Modifier,
+    effective: NamingScheme = state.scheme,
 ) {
-    val scheme = state.scheme
+    // 显示与编辑一律用**生效结构**:根目录名默认跟随集合,
+    // 用户改过则以用户的为准(判定内聚在 effectiveScheme,见 NamingState 注释)。
+    val scheme = effective
 
     Column(
         modifier = modifier
@@ -150,7 +159,7 @@ fun SchemeEditor(
         ) {
             OutlinedTextField(
                 value = scheme.rootDirName,
-                onValueChange = { onChange(updateScheme(state, scheme.copy(rootDirName = it))) },
+                onValueChange = { onChange(setRootDirNameOnScheme(state, it)) },
                 label = { Text("根目录名") },
                 singleLine = true,
                 modifier = Modifier
@@ -171,6 +180,35 @@ fun SchemeEditor(
                 min = 1,
                 onValue = { onChange(updateScheme(state, scheme.copy(indexPadding = it))) },
             )
+        }
+
+        // 根目录名的跟随状态:默认跟随集合;用户改过则提示并可一键恢复跟随
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(4.dp),
+        ) {
+            Text(
+                text = if (state.hasRootDirNameOverride) {
+                    "根目录名：已手动指定（不再跟随集合）"
+                } else {
+                    "根目录名：跟随当前集合"
+                },
+                style = MaterialTheme.typography.labelSmall,
+                color = if (state.hasRootDirNameOverride) {
+                    MaterialTheme.colorScheme.primary
+                } else {
+                    MaterialTheme.colorScheme.onSurfaceVariant
+                },
+                modifier = Modifier.testTag(TAG_ROOT_DIR_FOLLOW_LABEL),
+            )
+            TextButton(
+                onClick = { onChange(clearRootDirNameOverride(state)) },
+                enabled = state.hasRootDirNameOverride,
+                modifier = Modifier
+                    .testTag(TAG_ROOT_DIR_FOLLOW_RESET)
+                    .semantics { contentDescription = "恢复根目录名跟随集合" },
+            ) { Text("跟随集合") }
         }
         Row(
             modifier = Modifier.fillMaxWidth(),

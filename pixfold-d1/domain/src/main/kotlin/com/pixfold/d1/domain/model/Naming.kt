@@ -117,8 +117,38 @@ data class NameProposal(
  * 命名批次状态(规格 §6.3)。
  *
  * [overrides] 键 = `SourceItem.id`,值 = 用户输入的完整文件名;**空值即移除**(清空输入框 = 撤销覆盖)。
+ *
+ * [rootDirNameOverride] 是"根目录名"的**逐项例外**:
+ *  - `null`(默认)= **跟随当前集合** —— 切集合时根目录名随之变化
+ *    (用户 2026-09-18 明确要求:"根目录名跟随集合");
+ *  - 非 null = 用户显式改过,则不再跟随。
+ *
+ * 这正是 HANGOFF §2 约束 4「批次统一 + 逐项例外」在命名组件上的落法:
+ * 命名的其余部分(组件/分隔符/补零/扩展名…)是批次级;而根目录名有天然的
+ * 逐集合来源([ImageCollection.rootDirName]),故默认取集合值、允许用户覆盖。
  */
 data class NamingState(
     val scheme: NamingScheme,
     val overrides: Map<String, String> = emptyMap(),
-)
+    val rootDirNameOverride: String? = null,
+) {
+    /** 根目录名是否已被用户显式指定(不再跟随集合)。 */
+    val hasRootDirNameOverride: Boolean get() = rootDirNameOverride != null
+}
+
+/**
+ * 计算**当前生效**的命名结构(唯一入口)。
+ *
+ * 根目录名:用户改过 -> 用用户的;否则 -> 用当前集合的 [ImageCollection.rootDirName]。
+ * 其余字段一律取自 [NamingState.scheme](批次级)。
+ *
+ * **为什么不直接把集合名写回 `scheme.rootDirName`**:那样就分不清"跟随集合的默认值"
+ * 与"用户手输的值" —— 切集合会把用户输入冲掉,或反过来永远不跟随。
+ * 用独立的可空字段表达"是否覆盖",语义无歧义。
+ */
+fun effectiveScheme(state: NamingState, collection: ImageCollection): NamingScheme =
+    if (state.rootDirNameOverride != null) {
+        state.scheme.copy(rootDirName = state.rootDirNameOverride)
+    } else {
+        state.scheme.copy(rootDirName = collection.rootDirName)
+    }

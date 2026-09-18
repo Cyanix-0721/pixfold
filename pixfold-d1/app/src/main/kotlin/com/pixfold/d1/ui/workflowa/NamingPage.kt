@@ -26,6 +26,7 @@ import com.pixfold.d1.domain.model.NamingState
 import com.pixfold.d1.domain.model.SourceItem
 import com.pixfold.d1.domain.naming.buildProposals
 import com.pixfold.d1.domain.naming.buildRenamePlan
+import com.pixfold.d1.domain.model.effectiveScheme
 import com.pixfold.d1.domain.naming.clearOverride
 import com.pixfold.d1.domain.naming.setOverride
 import com.pixfold.d1.domain.sort.PageOrderState
@@ -72,9 +73,12 @@ fun NamingPage(
         onStateChange(next)
     }
 
-    // 唯一求值入口:页序 + 结构 + 覆盖 -> 建议(含警告)
+    // 唯一求值入口:页序 + **生效结构** + 覆盖 -> 建议(含警告)。
+    // 生效结构 = 批次级 scheme,但根目录名默认**跟随当前集合**
+    // (用户 2026-09-18 指定);用户改过则以用户的为准(effectiveScheme 内聚该判定)。
     val pageOrder: List<SourceItem> = order.order
-    val proposals = buildProposals(pageOrder, state.scheme, overrides = state.overrides)
+    val effective = effectiveScheme(state, collection)
+    val proposals = buildProposals(pageOrder, effective, overrides = state.overrides)
     val plan = buildRenamePlan(proposals)
     val skipped = plan.count { it.isSkipped }
     val conflictCount = proposals.count { it.hasConflict }
@@ -107,7 +111,11 @@ fun NamingPage(
                             .testTag(TAG_NAMING_TITLE),
                     )
 
-                    SchemeEditor(state = state, onChange = { update(it) })
+                    SchemeEditor(
+                        state = state,
+                        effective = effective,
+                        onChange = { update(it) },
+                    )
 
                     if (skipped > 0) {
                         Text(

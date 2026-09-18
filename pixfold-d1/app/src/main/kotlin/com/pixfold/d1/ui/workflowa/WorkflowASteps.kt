@@ -1,5 +1,6 @@
 package com.pixfold.d1.ui.workflowa
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
@@ -9,7 +10,7 @@ import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Tab
-import androidx.compose.material3.TabRow
+import androidx.compose.material3.PrimaryTabRow
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -57,6 +58,7 @@ fun WorkflowASteps(
     contentInsets: WindowInsets = WindowInsets.safeDrawing,
     onOpenPreview: (Int) -> Unit = {},
     onActiveCollectionChange: (String) -> Unit = {},
+    onBack: () -> Unit = {},
 ) {
     var stepIndex by remember { mutableIntStateOf(0) }
     // 跨步骤共享的唯一状态源
@@ -72,6 +74,17 @@ fun WorkflowASteps(
         )
     }
 
+    // 返回手势/返回键(用户 2026-09-18 反馈:真机上按返回会直接退出应用)。
+    //
+    // 统一在**一个** handler 内按层级决策,而不是"非首步才启用 + 靠外层兜底":
+    //   - 步骤 2 -> 回步骤 1;
+    //   - 已在步骤 1 -> 回调 [onBack](由上层回首页)。
+    // 这样注册始终是 enabled(系统据此知道"返回有去处",预测性返回动画才会
+    // 走"应用内后退"而非"退出应用"),且不存在依赖注册顺序的隐式耦合。
+    BackHandler {
+        if (stepIndex > 0) stepIndex = 0 else onBack()
+    }
+
     val activeCollection = collections.firstOrNull { it.id == activeId } ?: collections.firstOrNull()
 
     Column(
@@ -79,7 +92,7 @@ fun WorkflowASteps(
             .fillMaxSize()
             .windowInsetsPadding(contentInsets),
     ) {
-        TabRow(
+        PrimaryTabRow(
             selectedTabIndex = stepIndex,
             modifier = Modifier
                 .fillMaxWidth()

@@ -1,9 +1,10 @@
 package com.pixfold.d1
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.material3.MaterialTheme
@@ -46,7 +47,7 @@ fun PixFoldApp() {
         ) {
             var screen by remember { mutableStateOf<Screen>(Screen.Home) }
 
-            // 工作流 A 演示数据:trip(30 张)+ scan(16 张)+ misc(12 张),
+            // 工作流 A 演示数据:trip(30 张)+ scan(14 张)+ misc(12 张),
             // 多集合用于演示"批次默认 + 本组独立"(验收第 7 项)。
             val collections = remember { MockData.workspaceA.collections }
             // 预览跟随**当前集合**:切集合后打开预览应看到该集合的图,
@@ -55,6 +56,10 @@ fun PixFoldApp() {
             val previewItems = collections.firstOrNull { it.id == activeCollectionId }?.images
                 ?: collections.first().images
 
+            // 返回手势/返回键:按**层级**逐级后退,而不是一步退出应用。
+            // 真机实测(2026-09-18):未处理时在"命名结构"步骤按返回会**直接退出到桌面**,
+            // 用户丢失当前浏览位置,与 Android 的层级返回预期不符。
+            // 注意:BackHandler 注册在**最内层**,故各级返回由内向外依次生效。
             when (val current = screen) {
                 Screen.Home -> HomeScreen(
                     onOpenWorkflowA = { screen = Screen.WorkflowA },
@@ -65,15 +70,25 @@ fun PixFoldApp() {
                     collections = collections,
                     onOpenPreview = { index -> screen = Screen.Preview(index) },
                     onActiveCollectionChange = { activeCollectionId = it },
+                    // 在工作流 A 内按返回 -> 回首页(步骤内的返回由 WorkflowASteps 自己处理)
+                    onBack = { screen = Screen.Home },
                 )
 
-                is Screen.Preview -> ImagePreview(
-                    items = previewItems,
-                    initialIndex = current.index,
-                    onClose = { screen = Screen.WorkflowA },
-                )
+                is Screen.Preview -> {
+                    // 预览是最内层:返回即关闭预览,回到工作流 A。
+                    // (ImagePreview 内部也有自己的关闭按钮;二者语义一致。)
+                    BackHandler { screen = Screen.WorkflowA }
+                    ImagePreview(
+                        items = previewItems,
+                        initialIndex = current.index,
+                        onClose = { screen = Screen.WorkflowA },
+                    )
+                }
 
-                Screen.WorkflowB -> PlaceholderPage("工作流 B · 待实现（P5）")
+                Screen.WorkflowB -> {
+                    BackHandler { screen = Screen.Home }
+                    PlaceholderPage("工作流 B · 待实现（P5）")
+                }
             }
         }
     }

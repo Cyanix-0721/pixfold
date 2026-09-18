@@ -24,6 +24,7 @@ import com.pixfold.d1.domain.model.NameComponentKind
 import com.pixfold.d1.domain.model.NamingScheme
 import com.pixfold.d1.domain.model.NamingState
 import com.pixfold.d1.domain.model.SourceItem
+import com.pixfold.d1.domain.naming.setRootDirNameOnScheme
 import com.pixfold.d1.domain.sort.PageOrderState
 import com.pixfold.d1.domain.sort.pageOrderOf
 import org.junit.Rule
@@ -180,7 +181,8 @@ class NamingPageTest {
     @Test
     fun `adding a component changes proposed names`() {
         val comps = listOf(NameComponent(NameComponentKind.RootDir))
-        show(initial = NamingState(NamingScheme("根", components = comps)))
+        // 显式指定根目录名(否则按新语义跟随集合 = 旅行照片)
+        show(initial = setRootDirNameOnScheme(NamingState(NamingScheme("根", components = comps)), "根"))
         val firstId = trip.images.first().id
         assertField(firstId, "根.jpg")
 
@@ -202,7 +204,14 @@ class NamingPageTest {
 
     @Test
     fun `extension policy strip removes extension from proposed names`() {
-        show(initial = NamingState(NamingScheme("根", components = listOf(NameComponent(NameComponentKind.RootDir)), extPolicy = ExtPolicy.Strip)))
+        show(
+            initial = setRootDirNameOnScheme(
+                NamingState(
+                    NamingScheme("根", components = listOf(NameComponent(NameComponentKind.RootDir)), extPolicy = ExtPolicy.Strip),
+                ),
+                "根",
+            ),
+        )
         val firstId = trip.images.first().id
         assertField(firstId, "根")
     }
@@ -385,7 +394,9 @@ class NamingPageTest {
         val colB = ImageCollection("b", "B", "B", listOf(item("b1"), item("b2")))
         val scheme = NamingScheme("根")
         var current by androidx.compose.runtime.mutableStateOf(colA)
-        var naming by androidx.compose.runtime.mutableStateOf<NamingState?>(NamingState(scheme))
+        var naming by androidx.compose.runtime.mutableStateOf<NamingState?>(
+            setRootDirNameOnScheme(NamingState(scheme), "根"),
+        )
 
         rule.setContent {
             val c = current
@@ -422,7 +433,9 @@ class NamingPageTest {
         val id = trip.images.first().id
         rule.onNodeWithTag(proposalFieldTag(id)).performTextReplacement("覆盖了.jpg")
 
-        // 该行确实显示了警告
+        // 该行确实显示了警告(输入后该行可能滚出视口 -> 先滚回来)
+        rule.onNodeWithTag(TAG_PROPOSAL_LIST)
+            .performScrollToNode(androidx.compose.ui.test.hasTestTag(proposalWarningTag(id)))
         rule.onNodeWithTag(proposalWarningTag(id)).assertIsDisplayed()
         // 汇总必须把它计入(至少 1)
         val summary = rule.onNodeWithTag(TAG_PROPOSAL_SUMMARY).fetchSemanticsNode()
