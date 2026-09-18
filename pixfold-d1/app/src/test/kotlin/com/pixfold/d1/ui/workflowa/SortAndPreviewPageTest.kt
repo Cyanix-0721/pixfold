@@ -6,7 +6,6 @@ import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
 import com.pixfold.d1.domain.mock.MockData
-import com.pixfold.d1.domain.model.SourceItem
 import com.pixfold.d1.ui.components.TAG_GRID_CARD
 import com.pixfold.d1.ui.components.TAG_LIST_ROW
 import org.junit.Rule
@@ -25,18 +24,18 @@ class SortAndPreviewPageTest {
     @get:Rule
     val rule = createComposeRule()
 
-    private val items: List<SourceItem> =
-        MockData.workspaceA.collections.first { it.id == "misc" }.images
+    private val onlyCollection =
+        MockData.workspaceA.collections.filter { it.id == "misc" }
 
     @Test
     fun `defaults to grid view`() {
-        rule.setContent { SortAndPreviewPage(items) }
+        rule.setContent { SortAndPreviewPage(onlyCollection) }
         rule.onNodeWithTag(TAG_GRID).assertIsDisplayed()
     }
 
     @Test
     fun `toggling switches to list and back`() {
-        rule.setContent { SortAndPreviewPage(items) }
+        rule.setContent { SortAndPreviewPage(onlyCollection) }
         rule.onNodeWithTag(TAG_GRID).assertIsDisplayed()
 
         // 点"列表"选项(而非整行 toggle —— 整行中心可能落在两按钮之间)
@@ -49,7 +48,7 @@ class SortAndPreviewPageTest {
 
     @Test
     fun `grid renders cards`() {
-        rule.setContent { SortAndPreviewPage(items, initialMode = ViewMode.Grid) }
+        rule.setContent { SortAndPreviewPage(onlyCollection, initialMode = ViewMode.Grid) }
         assertTrue(
             rule.onAllNodesWithTag(TAG_GRID_CARD).fetchSemanticsNodes().isNotEmpty(),
             "网格应渲染卡片",
@@ -58,7 +57,7 @@ class SortAndPreviewPageTest {
 
     @Test
     fun `list renders rows`() {
-        rule.setContent { SortAndPreviewPage(items, initialMode = ViewMode.List) }
+        rule.setContent { SortAndPreviewPage(onlyCollection, initialMode = ViewMode.List) }
         assertTrue(
             rule.onAllNodesWithTag(TAG_LIST_ROW).fetchSemanticsNodes().isNotEmpty(),
             "列表应渲染行",
@@ -69,7 +68,7 @@ class SortAndPreviewPageTest {
     fun `clicking a grid card reports its index`() {
         var opened = -1
         rule.setContent {
-            SortAndPreviewPage(items, initialMode = ViewMode.Grid, onOpenPreview = { opened = it })
+            SortAndPreviewPage(onlyCollection, initialMode = ViewMode.Grid, onOpenPreview = { opened = it })
         }
         rule.onAllNodesWithTag(TAG_GRID_CARD)[0].performClick()
         assertEquals(0, opened)
@@ -79,7 +78,7 @@ class SortAndPreviewPageTest {
     fun `clicking a list row reports its index`() {
         var opened = -1
         rule.setContent {
-            SortAndPreviewPage(items, initialMode = ViewMode.List, onOpenPreview = { opened = it })
+            SortAndPreviewPage(onlyCollection, initialMode = ViewMode.List, onOpenPreview = { opened = it })
         }
         rule.onAllNodesWithTag(TAG_LIST_ROW)[0].performClick()
         assertEquals(0, opened)

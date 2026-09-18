@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Material Symbols "arrow_drop_down" — 降序指示(实心倒三角,尖朝下)。
+  License: Apache License 2.0
+
+  坑与取舍同 ic_arrow_drop_up:
+  1) 官网负坐标(viewBox 0 -960 960 960)照抄到 Android 会**画到画布外 -> 不可见**;
+  2) 官方 24x24 留白过多(图形仅 10x5)导致偏小 —— 故保持 24x24 方形视口,
+     但把图形按 **1.6 倍**放大并居中(保持 2:1 宽高比,不会拉伸)。
+
+  几何(以图形中心 (12,12.5) 为基准放大 1.6 倍):
+    原始三角顶点 (7,10) (12,15) (17,10)
+    -> 放大后     (4,8.5) (12,16.5) (20,8.5)
+  放大后图形 = 16 宽 x 8 高,完整落在 24x24 视口内。
+
+  Source: https://github.com/google/material-design-icons
+          symbols/web/arrow_drop_down/materialsymbolsoutlined/arrow_drop_down_24px.svg
+  用法:仅显示在排序规则中**被选中**的字段名之后,表示该级为**降序**。
+-->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <path
+        android:fillColor="#FF000000"
+        android:pathData="M4,8.5 L12,16.5 L20,8.5 Z" />
+</vector>

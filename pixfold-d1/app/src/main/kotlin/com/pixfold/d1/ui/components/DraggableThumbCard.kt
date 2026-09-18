@@ -34,9 +34,6 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.pixfold.d1.domain.model.SourceItem
 
-/** 图钉按钮的 testTag;测试与"可点入口"断言共用。 */
-fun pinTag(id: String): String = "pin-$id"
-
 /** 目标格高亮描边(拖动中)。 */
 private val HoverBorder = Color(0xCC3F51B5)
 
@@ -127,47 +124,14 @@ fun DraggableThumbCard(
             )
         }
 
-        PinButton(
+        PinToggle(
             isPinned = isPinned,
             itemName = item.fileName,
-            id = item.id,
-            onPin = onPin,
-            modifier = Modifier.align(Alignment.TopEnd),
+            onClick = onPin,
+            modifier = Modifier
+                .align(Alignment.TopEnd)
+                .padding(4.dp),
+            tag = pinTag(item.id),
         )
-    }
-}
-
-/** 图钉按钮:未固定=空心样式,已固定=实心主色。必须可点(走查反馈④)。 */
-@Composable
-private fun PinButton(
-    isPinned: Boolean,
-    itemName: String,
-    id: String,
-    onPin: () -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    Surface(
-        modifier = modifier
-            .padding(4.dp)
-            .size(32.dp)
-            .testTag(pinTag(id))
-            .clickable(onClick = onPin)
-            .semantics {
-                contentDescription = if (isPinned) "$itemName 已固定" else "$itemName 固定位置"
-            },
-        shape = MaterialTheme.shapes.small,
-        color = if (isPinned) {
-            MaterialTheme.colorScheme.primary
-        } else {
-            MaterialTheme.colorScheme.surface.copy(alpha = 0.85f)
-        },
-    ) {
-        Box(contentAlignment = Alignment.Center) {
-            Text(
-                text = if (isPinned) "★" else "☆",
-                style = MaterialTheme.typography.labelMedium,
-                color = if (isPinned) Color.White else MaterialTheme.colorScheme.onSurface,
-            )
-        }
     }
 }

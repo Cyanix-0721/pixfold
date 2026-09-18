@@ -36,12 +36,13 @@ class SortAndPreviewDragTest {
     @get:Rule
     val rule = createComposeRule()
 
-    private val items: List<SourceItem> =
-        MockData.workspaceA.collections.first().images  // trip,30 张,day1/IMG_..._001..
+    private val onlyCollection =
+        MockData.workspaceA.collections.filter { it.id == "trip" } // 30 张,day1/IMG_..._001..
+    private val items: List<SourceItem> = onlyCollection.first().images
 
     private fun setPage() {
         rule.setContent {
-            SortAndPreviewPage(items = items, contentInsets = WindowInsets(0, 0, 0, 0))
+            SortAndPreviewPage(collections = onlyCollection, contentInsets = WindowInsets(0, 0, 0, 0))
         }
     }
 

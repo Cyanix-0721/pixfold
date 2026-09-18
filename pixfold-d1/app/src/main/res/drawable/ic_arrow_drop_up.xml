@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Material Symbols "arrow_drop_up" — 升序指示(实心正三角,尖朝上)。
+  License: Apache License 2.0
+
+  ⚠️ 踩过的坑与取舍(勿再犯):
+  1) **坐标系**:Material Symbols 官网 SVG 用 `viewBox="0 -960 960 960"`(**负 y**),
+     而 Android VectorDrawable **没有 viewBox 偏移**语义 ——
+     照抄负坐标会把图形画到画布**之外**,表现为"**占了宽度但什么都看不见**"。
+     故必须先换算为常规正坐标(官方原始 `m280-400 200-200 200 200H280Z`
+     -> 24x24 等价 `M7,14 L12,9 L17,14 Z`,已独立换算验证逐点一致)。
+  2) **官方留白过多导致偏小**:官方 24x24 里三角仅占 **10 宽 x 5 高**,
+     在芯片图标槽里只画出很窄一条,观感偏小(用户 2026-09-17 指出)。
+     故这里**保持 24x24 方形视口**(与其它图标一致,不会被非等比拉伸),
+     但把**图形按 1.6 倍放大**并保持居中。
+
+  几何(以图形中心 (12,11.5) 为基准放大 1.6 倍):
+    原始三角顶点 (7,14) (12,9) (17,14)
+    -> 放大后     (4,15.5) (12,7.5) (20,15.5)
+  放大后图形 = 16 宽 x 8 高,仍完整落在 24x24 视口内,且宽高比 2:1 不变。
+
+  Source: https://github.com/google/material-design-icons
+          symbols/web/arrow_drop_up/materialsymbolsoutlined/arrow_drop_up_24px.svg
+  用法:仅显示在排序规则中**被选中**的字段名之后,表示该级为**升序**。
+-->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <path
+        android:fillColor="#FF000000"
+        android:pathData="M4,15.5 L12,7.5 L20,15.5 Z" />
+</vector>

@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Material Symbols "push_pin" (outlined) — 官方几何数据,未自行改动。
+  Source : https://github.com/google/material-design-icons
+           symbols/web/push_pin/materialsymbolsoutlined/push_pin_24px.svg
+  License: Apache License 2.0
+
+  与 filled 版配成一对:未固定显示 outlined,已固定显示 filled,
+  两态形状确有区别(不只靠颜色),与 Material Symbols 的语义一致。
+-->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <path
+        android:fillColor="#FF000000"
+        android:pathData="m16 12 2 2v2h-5v6l-1 1-1-1v-6H6v-2l2-2V5H7V3h10v2h-1Zm-7.15 2h6.3L14 12.85V5h-4v7.85ZM12 14Z" />
+</vector>
