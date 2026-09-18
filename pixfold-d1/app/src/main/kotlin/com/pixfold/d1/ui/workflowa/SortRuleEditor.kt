@@ -161,7 +161,10 @@ fun SortRuleEditor(
                                     ),
                                     contentDescription = null, // 方向由下方 semantics 统一播报
                                     modifier = Modifier
-                                        .size(16.dp)
+                                        // 18dp + 资源内图形已放大 1.6 倍(见 drawable 注释)
+                                        // -> 实际三角约 12x6dp,比初版(~6.7dp 宽)大约 1.8 倍,
+                                        // 清晰可辨但不与字段名抢视觉重心。
+                                        .size(18.dp)
                                         .testTag(directionTag(index, field)),
                                 )
                             }
