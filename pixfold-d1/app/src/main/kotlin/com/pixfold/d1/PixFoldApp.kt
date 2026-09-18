@@ -21,7 +21,7 @@ import com.pixfold.d1.domain.mock.MockData
 import com.pixfold.d1.ui.HomeScreen
 import com.pixfold.d1.ui.preview.ImagePreview
 import com.pixfold.d1.ui.theme.PixFoldTheme
-import com.pixfold.d1.ui.workflowa.SortAndPreviewPage
+import com.pixfold.d1.ui.workflowa.WorkflowASteps
 
 /**
  * 应用根。用**状态驱动的轻量导航**(密封类 + `mutableStateOf`),不引入 Navigation 组件
@@ -61,7 +61,7 @@ fun PixFoldApp() {
                     onOpenWorkflowB = { screen = Screen.WorkflowB },
                 )
 
-                Screen.WorkflowA -> SortAndPreviewPage(
+                Screen.WorkflowA -> WorkflowASteps(
                     collections = collections,
                     onOpenPreview = { index -> screen = Screen.Preview(index) },
                     onActiveCollectionChange = { activeCollectionId = it },
