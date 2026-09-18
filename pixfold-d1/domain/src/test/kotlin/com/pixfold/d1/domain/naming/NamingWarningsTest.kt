@@ -220,6 +220,58 @@ class NamingWarningsTest {
         assertTrue(ps.none { it.hasConflict }, "覆盖消除了整组重名(这正是逐项覆盖的用途)")
     }
 
+    // ---- 汇总一致性:凡行内显示的警告都必须被计入(真机实测发现的缺陷) ----
+
+    @Test
+    fun `overridden warning counts as a warning`() {
+        // 真机缺陷:行内显示「人工覆盖」,汇总却写「警告 0」。
+        // 根因是 hasWarningOnly 用了枚举白名单,漏掉了 Overridden。
+        // 判据用"取反"表达:有警告且非冲突 -> 必属警告。
+        val order = listOf(item("a", base = "orig"))
+        val p = buildProposals(order, scheme(components = origOnly), overrides = mapOf("a" to "x.jpg"))[0]
+        assertTrue(ProposalWarningType.Overridden in typesOf(p))
+        assertFalse(p.hasConflict)
+        assertTrue(p.hasWarningOnly, "人工覆盖是警告,必须被 hasWarningOnly 计入")
+    }
+
+    @Test
+    fun `every displayed warning is counted in exactly one bucket`() {
+        // 不变量:每个提案恰好落在 冲突 / 纯警告 / 无警告 三者之一
+        val order = listOf(
+            item("dup1", base = "same"),
+            item("dup2", base = "same"),
+            item("case1", base = "Pg"),
+            item("case2", base = "pg"),
+            item("long", base = "n".repeat(200)),
+            item("clean", base = "ok"),
+        )
+        val ps = buildProposals(order, scheme(components = origOnly))
+        ps.forEach { p ->
+            val buckets = listOf(p.hasConflict, p.hasWarningOnly, p.warnings.isEmpty()).count { it }
+            assertEquals(1, buckets, "提案 ${p.image.id} 必须恰好属于一个桶(warnings=${p.warnings.map { it.type }})")
+        }
+        // 且"有警告"的总数 = 冲突数 + 纯警告数
+        assertEquals(
+            ps.count { it.hasConflict } + ps.count { it.hasWarningOnly },
+            ps.count { it.warnings.isNotEmpty() },
+            "冲突数 + 纯警告数 必须等于有警告的项数(否则汇总会与实际显示不一致)",
+        )
+    }
+
+    @Test
+    fun `override plus duplicate counts as conflict not plain warning`() {
+        // 同时有冲突与人工覆盖 -> 归入冲突桶(不重复计入警告)
+        val order = listOf(item("a", base = "same"), item("b", base = "same"))
+        val ps = buildProposals(
+            order,
+            scheme(components = origOnly),
+            overrides = mapOf("a" to "same.jpg"),
+        )
+        val a = ps.first { it.image.id == "a" }
+        assertTrue(a.hasConflict, "与 b 同名 -> 冲突")
+        assertFalse(a.hasWarningOnly, "已计入冲突,不得重复计入纯警告")
+    }
+
     // ---- 计划:跳过语义 ----
 
     @Test

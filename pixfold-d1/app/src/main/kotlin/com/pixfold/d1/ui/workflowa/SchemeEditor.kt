@@ -1,18 +1,18 @@
 package com.pixfold.d1.ui.workflowa
 
-import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ExposedDropdownMenuAnchorType
 import androidx.compose.material3.ExposedDropdownMenuBox
 import androidx.compose.material3.ExposedDropdownMenuDefaults
 import androidx.compose.material3.FilterChip
@@ -55,6 +55,13 @@ const val TAG_SCHEME_SANITIZE = "scheme-sanitize"
 const val TAG_SCHEME_ROOT_DIR = "scheme-root-dir"
 const val TAG_SCHEME_INDEX_START = "scheme-index-start"
 const val TAG_SCHEME_INDEX_PADDING = "scheme-index-padding"
+
+/** "自动清洗"说明入口(圆形感叹号图标)。 */
+const val TAG_SCHEME_SANITIZE_INFO = "scheme-sanitize-info"
+
+/** 说明对话框及其确认按钮。 */
+const val TAG_SCHEME_SANITIZE_INFO_DIALOG = "scheme-sanitize-info-dialog"
+const val TAG_SCHEME_SANITIZE_INFO_OK = "scheme-sanitize-info-ok"
 
 /** 组件 i 的启用开关。 */
 fun compToggleTag(i: Int) = "scheme-comp-toggle-$i"
@@ -167,31 +174,88 @@ fun SchemeEditor(
         }
         Row(
             modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            horizontalArrangement = Arrangement.spacedBy(4.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             ExtPolicyField(
                 value = scheme.extPolicy,
                 onValue = { onChange(updateScheme(state, scheme.copy(extPolicy = it))) },
             )
-            CasePolicyHint()
+            // 把"自动清洗"整组推到右侧;说明改由图标承载后,这里不再需要长文案,
+            // weight 得以正常吸收剩余空间(此前长文案会把它压到 0,开关被挤出屏幕)。
             Spacer(Modifier.weight(1f))
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(
-                    text = "自动清洗",
-                    style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-                Switch(
-                    checked = scheme.sanitize,
-                    onCheckedChange = { onChange(updateScheme(state, scheme.copy(sanitize = it))) },
-                    modifier = Modifier
-                        .padding(start = 4.dp)
-                        .testTag(TAG_SCHEME_SANITIZE)
-                        .semantics { contentDescription = "自动清洗非法字符" },
-                )
-            }
+
+            Text(
+                text = "自动清洗",
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            SanitizeInfoButton()
+            Switch(
+                checked = scheme.sanitize,
+                onCheckedChange = { onChange(updateScheme(state, scheme.copy(sanitize = it))) },
+                modifier = Modifier
+                    .testTag(TAG_SCHEME_SANITIZE)
+                    .semantics { contentDescription = "自动清洗非法字符" },
+            )
         }
+    }
+}
+
+/**
+ * "自动清洗"的说明文案。
+ *
+ * 用**原始字符串**:它把非法字符集里的 `\` 与 `"` 原样保留(无需转义),
+ * 且**不含跨行拼接** —— 后者会被 lint 的 `TextConcatSpace` 判为"可能漏空格"
+ * (中文其实不需要空格,但项目要求 lint 零告警,故从结构上避免)。
+ */
+private val SANITIZE_EXPLANATION = """
+    开启后，文件名中的非法字符（\ / : * ? " < > | 以及控制字符）会被替换为「_」。
+
+    注意：清洗只替换字符，「不会去重」—— 清洗后不同文件名可能变成同一个，仍会以「重名」提示。
+""".trimIndent()
+
+/**
+ * "自动清洗"说明入口:圆形感叹号图标,点击弹出说明(用户 2026-09-18 指定)。
+ *
+ * **为什么不再用行内文案**:原先把说明写成一行长文案,它占满剩余宽度、
+ * 把右侧"自动清洗"开关**挤出屏幕**(真机实测)。改为图标后:
+ *  - 行内只占一个固定宽度的触控目标(48dp),不再与开关抢宽度;
+ *  - 说明内容由对话框承载,反而可以写得更完整(非法字符集 + "不会去重"的提醒)。
+ */
+@Composable
+private fun SanitizeInfoButton() {
+    var showInfo by remember { mutableStateOf(false) }
+
+    IconButton(
+        onClick = { showInfo = true },
+        modifier = Modifier
+            .testTag(TAG_SCHEME_SANITIZE_INFO)
+            .semantics { contentDescription = "自动清洗说明" },
+    ) {
+        Icon(
+            painter = painterResource(R.drawable.ic_exclamation_circle),
+            contentDescription = null, // 语义由外层 contentDescription 统一播报
+            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.size(18.dp),
+        )
+    }
+
+    if (showInfo) {
+        AlertDialog(
+            onDismissRequest = { showInfo = false },
+            title = { Text("自动清洗") },
+            text = { Text(SANITIZE_EXPLANATION) },
+            confirmButton = {
+                TextButton(
+                    onClick = { showInfo = false },
+                    modifier = Modifier
+                        .testTag(TAG_SCHEME_SANITIZE_INFO_OK)
+                        .semantics { contentDescription = "知道了" },
+                ) { Text("知道了") }
+            },
+            modifier = Modifier.testTag(TAG_SCHEME_SANITIZE_INFO_DIALOG),
+        )
     }
 }
 
@@ -203,16 +267,6 @@ fun SchemeEditor(
  * 用户(和测试)都够不到(实测:上移按钮不可见,导致"顺序可调"实际不可操作)。
  * 改为两行后,屏幕宽度内全部可达;纵向空间在手机上更宽裕。
  */
-/** 说明自动清洗的作用,避免用户误以为它总会去重。 */
-@Composable
-private fun CasePolicyHint() {
-    Text(
-        text = "清洗把非法字符替换为 _ ；清洗后仍可能重名",
-        style = MaterialTheme.typography.labelSmall,
-        color = MaterialTheme.colorScheme.onSurfaceVariant,
-    )
-}
-
 @Composable
 private fun ComponentRow(
     index: Int,
@@ -352,7 +406,7 @@ private fun KindField(value: NameComponentKind, index: Int, onValue: (NameCompon
             label = { Text("组件") },
             trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
             modifier = Modifier
-                .menuAnchor(androidx.compose.material3.MenuAnchorType.PrimaryNotEditable)
+                .menuAnchor(ExposedDropdownMenuAnchorType.PrimaryNotEditable)
                 .widthInChars(12)
                 .testTag(compKindTag(index)),
         )
@@ -382,7 +436,7 @@ private fun CaseField(value: CasePolicy, index: Int, onValue: (CasePolicy) -> Un
             label = { Text("大小写") },
             trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
             modifier = Modifier
-                .menuAnchor(androidx.compose.material3.MenuAnchorType.PrimaryNotEditable)
+                .menuAnchor(ExposedDropdownMenuAnchorType.PrimaryNotEditable)
                 .widthInChars(9)
                 .testTag("scheme-comp-case-$index"),
         )
@@ -412,7 +466,7 @@ private fun ExtPolicyField(value: ExtPolicy, onValue: (ExtPolicy) -> Unit) {
             label = { Text("扩展名") },
             trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
             modifier = Modifier
-                .menuAnchor(androidx.compose.material3.MenuAnchorType.PrimaryNotEditable)
+                .menuAnchor(ExposedDropdownMenuAnchorType.PrimaryNotEditable)
                 .widthInChars(12)
                 .testTag(TAG_SCHEME_EXT_POLICY),
         )

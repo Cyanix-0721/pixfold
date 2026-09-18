@@ -101,9 +101,16 @@ data class NameProposal(
             it.type == ProposalWarningType.Duplicate || it.type == ProposalWarningType.IllegalChar
         }
 
-    /** 仅警告、不跳过计划的类型(CaseCollision / TooLong / Overridden)。 */
+    /**
+     * 是否有**不导致跳过**的警告。
+     *
+     * 定义 = "有警告,且都不是会导致跳过的类型"。**不要**写成枚举白名单
+     * (`CaseCollision || TooLong`)—— 那样 [ProposalWarningType.Overridden] 会被漏掉,
+     * 出现"行里显示了警告、汇总却写 0"的不一致(真机实测踩过)。
+     * 用"取反"表达,新增警告类型时自动被计入,不会再漏。
+     */
     val hasWarningOnly: Boolean
-        get() = warnings.any { it.type == ProposalWarningType.CaseCollision || it.type == ProposalWarningType.TooLong }
+        get() = warnings.isNotEmpty() && !hasConflict
 }
 
 /**

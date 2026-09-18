@@ -11,6 +11,7 @@ import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollToNode
+import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.performTextClearance
 import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.test.performTextReplacement
@@ -119,8 +120,9 @@ class NamingPageTest {
         rule.onNodeWithTag(TAG_SCHEME_ROOT_DIR).assertIsDisplayed()
         rule.onNodeWithTag(TAG_SCHEME_INDEX_START).assertIsDisplayed()
         rule.onNodeWithTag(TAG_SCHEME_INDEX_PADDING).assertIsDisplayed()
-        rule.onNodeWithTag(TAG_SCHEME_EXT_POLICY).assertExists()
-        rule.onNodeWithTag(TAG_SCHEME_SANITIZE).assertExists()
+        rule.onNodeWithTag(TAG_SCHEME_EXT_POLICY).assertIsDisplayed()
+        rule.onNodeWithTag(TAG_SCHEME_SANITIZE).assertIsDisplayed()
+        rule.onNodeWithTag(TAG_SCHEME_SANITIZE_INFO).assertIsDisplayed()
         rule.onNodeWithTag(TAG_SCHEME_ADD).assertIsDisplayed()
     }
 
@@ -217,6 +219,84 @@ class NamingPageTest {
             initial = NamingState(NamingScheme("ROOT", components = comps)),
         )
         assertField(col.images.first().id, "root.jpg")
+    }
+
+    // ============ "自动清洗"说明改用图标承载(用户 2026-09-18 指定)============
+
+    @Test
+    fun `the long inline hint is gone and replaced by an icon`() {
+        show()
+        // 行内不再有那段长文案(它正是把开关挤出屏幕的元凶)
+        assertTrue(
+            rule.onAllNodesWithText("清洗把非法字符替换为 _ ；清洗后仍可能重名")
+                .fetchSemanticsNodes().isEmpty(),
+            "行内长文案应已被图标取代",
+        )
+        rule.onNodeWithTag(TAG_SCHEME_SANITIZE_INFO).assertIsDisplayed()
+    }
+
+    @Test
+    fun `tapping the icon opens an explanation dialog`() {
+        show()
+        // 初始没有对话框
+        assertTrue(
+            rule.onAllNodesWithTag(TAG_SCHEME_SANITIZE_INFO_DIALOG).fetchSemanticsNodes().isEmpty(),
+            "未点击时不应有说明对话框",
+        )
+
+        rule.onNodeWithTag(TAG_SCHEME_SANITIZE_INFO).performClick()
+        rule.onNodeWithTag(TAG_SCHEME_SANITIZE_INFO_DIALOG).assertIsDisplayed()
+        // 说明内容要点:替换为 _ ;且**不会去重**
+        rule.onNodeWithText("不会去重", substring = true).assertIsDisplayed()
+        rule.onNodeWithText("会被替换为「_」", substring = true).assertIsDisplayed()
+    }
+
+    @Test
+    fun `the explanation dialog can be dismissed`() {
+        show()
+        rule.onNodeWithTag(TAG_SCHEME_SANITIZE_INFO).performClick()
+        rule.onNodeWithTag(TAG_SCHEME_SANITIZE_INFO_DIALOG).assertIsDisplayed()
+
+        rule.onNodeWithTag(TAG_SCHEME_SANITIZE_INFO_OK).performClick()
+        assertTrue(
+            rule.onAllNodesWithTag(TAG_SCHEME_SANITIZE_INFO_DIALOG).fetchSemanticsNodes().isEmpty(),
+            "点「知道了」后对话框应关闭",
+        )
+    }
+
+    @Test
+    fun `the icon opens and closes repeatedly`() {
+        // 防"只能开一次":状态必须在每次点击时正确翻转
+        show()
+        repeat(2) {
+            rule.onNodeWithTag(TAG_SCHEME_SANITIZE_INFO).performClick()
+            rule.onNodeWithTag(TAG_SCHEME_SANITIZE_INFO_DIALOG).assertIsDisplayed()
+            rule.onNodeWithTag(TAG_SCHEME_SANITIZE_INFO_OK).performClick()
+            assertTrue(
+                rule.onAllNodesWithTag(TAG_SCHEME_SANITIZE_INFO_DIALOG).fetchSemanticsNodes().isEmpty(),
+                "第 ${it + 1} 轮关闭后对话框应消失",
+            )
+        }
+    }
+
+    /**
+     * **窄屏回归(真机宽度)**:
+     * 真机 1264px / 560dpi → **361dp**,比测试默认的 400dp 更窄。
+     * 此前那行长文案正是在真机上把"自动清洗"开关挤出了屏幕。
+     * 这里显式用 360dp 复现真机宽度,断言开关**仍然可见**。
+     */
+    @Test
+    @Config(qualifiers = "w360dp-h800dp")
+    fun `the sanitize switch stays on screen at device width`() {
+        show()
+        // 先把该行滚进视口(纵向),再断言横向也没被挤出屏幕
+        rule.onNodeWithTag(TAG_PROPOSAL_LIST)
+            .performScrollToNode(androidx.compose.ui.test.hasTestTag(TAG_SCHEME_SANITIZE))
+        rule.waitForIdle()
+
+        rule.onNodeWithTag(TAG_SCHEME_SANITIZE).assertIsDisplayed()
+        rule.onNodeWithTag(TAG_SCHEME_SANITIZE_INFO).assertIsDisplayed()
+        rule.onNodeWithTag(TAG_SCHEME_EXT_POLICY).assertIsDisplayed()
     }
 
     // ================= 验收第 9 项:逐项覆盖 + 改结构后不丢失(U7) =================
@@ -331,6 +411,38 @@ class NamingPageTest {
         current = colA
         rule.waitForIdle()
         assertField("a1", "A1改.jpg")
+    }
+
+    @Test
+    fun `summary warning count matches the warnings actually shown`() {
+        // 真机缺陷回归:行内显示「人工覆盖」警告,汇总却写「警告 0」。
+        // 根因:hasWarningOnly 用枚举白名单,漏掉 Overridden。
+        // 这里断言"汇总的警告数 >= 实际有警告的行数",锁死两者一致。
+        show()
+        val id = trip.images.first().id
+        rule.onNodeWithTag(proposalFieldTag(id)).performTextReplacement("覆盖了.jpg")
+
+        // 该行确实显示了警告
+        rule.onNodeWithTag(proposalWarningTag(id)).assertIsDisplayed()
+        // 汇总必须把它计入(至少 1)
+        val summary = rule.onNodeWithTag(TAG_PROPOSAL_SUMMARY).fetchSemanticsNode()
+            .config[androidx.compose.ui.semantics.SemanticsProperties.Text]
+            .joinToString("") { it.text }
+        assertTrue(
+            !summary.contains("警告 0"),
+            "行内有警告但汇总写「警告 0」:$summary —— hasWarningOnly 不得漏掉 Overridden",
+        )
+    }
+
+    @Test
+    fun `override plus conflict is counted as conflict only`() {
+        val images = listOf(item("d1", base = "same"), item("d2", base = "same"))
+        val col = ImageCollection("dup", "重复", "重复", images)
+        val scheme = NamingScheme("根", components = listOf(NameComponent(NameComponentKind.OrigName)))
+        show(collection = col, order = pageOrderOf(col.images), initial = NamingState(scheme))
+
+        // 两行本来就重名 -> 冲突 2
+        rule.onNodeWithTag(TAG_PROPOSAL_SUMMARY).assertTextEquals("共 2 项 · 冲突 2 · 警告 0")
     }
 
     // ================= 验收第 10 项:冲突与警告可见 =================
