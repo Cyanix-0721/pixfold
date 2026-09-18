@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  圆形内嵌感叹号(用户 2026-09-18 指定:清洗说明改用此图标承载,点击展开)。
+
+  与 ic_arrow_drop_* 同策略:官方矢量资源 + painterResource,不引入 material-icons 依赖。
+
+  实现要点:外圈实心圆 + 内部"感叹号"两个子路径。
+
+  **实测澄清(2026-09-18)**:挖空**实际来自两个子路径的绕向相反**
+  (圆为一向、感叹号为反向)—— 故默认的 `nonZero` 也会挖空,
+  删掉 `fillType` 画出来完全一样(**已实测**,不是推断)。
+  保留 `fillType="evenOdd"` 是为了把意图写明、并对后续改动圆的走向更稳,
+  并非"没有它就看不见"。
+
+  真正的失败模式是**感叹号子路径缺失、或与圆同向填充** —— 那时图标退化成
+  "只有一个实心圆"。由 ExclamationIconRenderTest 的"圆内应有洞"断言守住:
+  变异验证(删掉感叹号子路径)该断言确实变红。
+-->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <path
+        android:fillColor="#FF000000"
+        android:fillType="evenOdd"
+        android:pathData="M12,2C6.48,2 2,6.48 2,12s4.48,10 10,10 10,-4.48 10,-10S17.52,2 12,2zM11,6h2v8h-2zM11,16h2v2h-2z" />
+</vector>

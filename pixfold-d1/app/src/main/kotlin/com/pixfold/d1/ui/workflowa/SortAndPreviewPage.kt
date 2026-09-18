@@ -35,6 +35,7 @@ import com.pixfold.d1.domain.model.ImageCollection
 import com.pixfold.d1.domain.sort.moveItemTo
 import com.pixfold.d1.domain.sort.resetToAuto
 import com.pixfold.d1.domain.sort.togglePin
+import com.pixfold.d1.domain.workflowa.WorkflowAState
 import com.pixfold.d1.domain.workflowa.applyRuleToCollection
 import com.pixfold.d1.domain.workflowa.toggleCustomRule
 import com.pixfold.d1.domain.workflowa.updatePageOrder
@@ -51,6 +52,7 @@ const val TAG_RESET_MANUAL = "reset-manual"
 const val TAG_SORT_RULE_EDITOR = "sort-rule-editor"
 const val TAG_CUSTOM_RULE_TOGGLE = "custom-rule-toggle"
 const val TAG_COLLECTION_ROW = "collection-row"
+const val TAG_NEXT_STEP = "next-step"
 
 /** 集合选择按钮的 testTag。 */
 fun collectionTag(id: String) = "collection-$id"
@@ -72,6 +74,11 @@ fun batchLabel(collectionId: String, isCustom: Boolean): String =
  * @param contentInsets 系统栏 inset;可注入以便测试(Robolectric 下系统 inset 恒为 0)。
  * @param initialCollectionId 初始集合;默认第一个。
  * @param onActiveCollectionChange 当前集合变化回调(供上层让预览跟随当前集合)。
+ * @param externalState 由上层持有的批次状态。**步骤 2(命名)必须看到步骤 1 的最终页序**
+ *   (命名序号跟随页序,规格 §6.2),故进入多步骤流程时由上层持有、两页共享;
+ *   传 null 时本页自持状态(单独使用/测试场景,行为不变)。
+ * @param onStateChange 状态变化上报(仅上层持有状态时有意义)。
+ * @param onNext 进入步骤 2 的回调;为 null 时不显示"下一步"按钮(单独使用场景)。
  */
 @Composable
 fun SortAndPreviewPage(
@@ -82,9 +89,18 @@ fun SortAndPreviewPage(
     onOpenPreview: (Int) -> Unit = {},
     initialCollectionId: String? = null,
     onActiveCollectionChange: (String) -> Unit = {},
+    externalState: WorkflowAState? = null,
+    onStateChange: (WorkflowAState) -> Unit = {},
+    onNext: (() -> Unit)? = null,
 ) {
     var mode by remember { mutableStateOf(initialMode) }
-    var state by remember { mutableStateOf(workflowAStateOf(collections)) }
+    // 本地状态权威,初值取自 externalState,每次变更上报上层(理由同 NamingPage:
+    // `externalState ?: local` 会让上层的值冻结就地编辑)。
+    var state by remember { mutableStateOf(externalState ?: workflowAStateOf(collections)) }
+    fun updateState(next: WorkflowAState) {
+        state = next
+        onStateChange(next)
+    }
     var activeId by remember {
         mutableStateOf(initialCollectionId ?: collections.firstOrNull()?.id.orEmpty())
     }
@@ -150,7 +166,7 @@ fun SortAndPreviewPage(
                 }
                 TextButton(
                     onClick = {
-                        state = updatePageOrder(state, activeId, resetToAuto(order))
+                        updateState(updatePageOrder(state, activeId, resetToAuto(order)))
                     },
                     enabled = order.hasManual,
                     modifier = Modifier
@@ -171,8 +187,8 @@ fun SortAndPreviewPage(
         ) {
             ModeToggle(mode = mode, onChange = { mode = it })
 
-            // "本组独立"开关(验收第 7 项后半:此前该能力在界面上不存在)
             Row(verticalAlignment = Alignment.CenterVertically) {
+                // "本组独立"开关(验收第 7 项后半:此前该能力在界面上不存在)
                 Text(
                     text = "本组独立",
                     style = MaterialTheme.typography.labelMedium,
@@ -180,12 +196,23 @@ fun SortAndPreviewPage(
                 )
                 Switch(
                     checked = isCustom,
-                    onCheckedChange = { state = toggleCustomRule(state, activeId) },
+                    onCheckedChange = { updateState(toggleCustomRule(state, activeId)) },
                     modifier = Modifier
                         .padding(start = 4.dp)
                         .testTag(TAG_CUSTOM_RULE_TOGGLE)
                         .semantics { contentDescription = "本组独立规则" },
                 )
+
+                // 步骤 2 入口(验收第 8/9/10 项)。仅在上层接入多步骤流程时出现。
+                if (onNext != null) {
+                    TextButton(
+                        onClick = onNext,
+                        modifier = Modifier
+                            .padding(start = 4.dp)
+                            .testTag(TAG_NEXT_STEP)
+                            .semantics { contentDescription = "下一步 命名结构" },
+                    ) { Text("下一步") }
+                }
             }
         }
 
@@ -194,7 +221,7 @@ fun SortAndPreviewPage(
             rule = state.effectiveRule(activeId),
             scopeLabel = batchLabel(activeId, isCustom),
             onRuleChange = { newRule ->
-                state = applyRuleToCollection(state, activeId, newRule)
+                updateState(applyRuleToCollection(state, activeId, newRule))
                 // W4(用户 2026-09-17 指定):规则变更后**自动回顶**。
                 // 因为重排会让"当前位置"失去意义(用户看到的是中段而非新首项)。
                 scrollSignal++
@@ -205,9 +232,9 @@ fun SortAndPreviewPage(
             ViewMode.Grid -> DragReorderGrid(
                 items = order.order,
                 onMoveTo = { id, target ->
-                    state = updatePageOrder(state, activeId, moveItemTo(order, id, target))
+                    updateState(updatePageOrder(state, activeId, moveItemTo(order, id, target)))
                 },
-                onPin = { id -> state = updatePageOrder(state, activeId, togglePin(order, id)) },
+                onPin = { id -> updateState(updatePageOrder(state, activeId, togglePin(order, id))) },
                 isPinned = { id -> order.isPinned(id) },
                 onClick = { index -> onOpenPreview(index) },
                 modifier = Modifier.fillMaxSize(),
@@ -217,9 +244,9 @@ fun SortAndPreviewPage(
             ViewMode.List -> DragReorderList(
                 items = order.order,
                 onMoveTo = { id, target ->
-                    state = updatePageOrder(state, activeId, moveItemTo(order, id, target))
+                    updateState(updatePageOrder(state, activeId, moveItemTo(order, id, target)))
                 },
-                onPin = { id -> state = updatePageOrder(state, activeId, togglePin(order, id)) },
+                onPin = { id -> updateState(updatePageOrder(state, activeId, togglePin(order, id))) },
                 isPinned = { id -> order.isPinned(id) },
                 onClick = { index -> onOpenPreview(index) },
                 modifier = Modifier.fillMaxSize(),

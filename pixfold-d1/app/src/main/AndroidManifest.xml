@@ -1,8 +1,29 @@
 <?xml version="1.0" encoding="utf-8"?>
-<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
+    <!--
+      android:enableOnBackInvokedCallback="true" —— 启用 Android 13+ 的预测性返回
+      (predictive back)。targetSdk 33+ 默认即为 true,这里**显式声明**以表明意图:
+      应用已适配"系统提前拿到返回手势、绘制退场动画"的模型。
+
+      配套要求(缺一不可,否则预测性返回不会真正生效):
+        1. 用 `BackHandler`(androidx.activity)处理返回,而不是重写 onBackPressed ——
+           前者注册到 OnBackInvokedDispatcher,系统才能在**手势进行中**查询
+           "返回会去哪"并播放预览动画;
+        2. 各层级都要有返回去处(见 PixFoldApp / WorkflowASteps),
+           否则系统在根级直接执行"退出应用"。
+      真机实测(2026-09-18):未处理返回时,在"步骤2 命名结构"按返回会**直接退出应用**。
+
+      tools:targetApi="33" —— 该属性 API 33 才存在,而 minSdk=24,
+      lint 的 UnusedAttribute 会把它判为"对低版本无用"(本项目 warningsAsErrors=true
+      时会直接失败)。标注后 lint 知道我们是有意为之:低版本系统忽略它,
+      行为退回传统返回(仍是 `BackHandler` 驱动的层级后退,只是没有预览动画)。
+    -->
     <application
         android:label="@string/app_name"
         android:icon="@drawable/ic_launcher"
+        android:enableOnBackInvokedCallback="true"
+        tools:targetApi="33"
         android:supportsRtl="true"
         android:theme="@style/Theme.PixFold">
         <activity

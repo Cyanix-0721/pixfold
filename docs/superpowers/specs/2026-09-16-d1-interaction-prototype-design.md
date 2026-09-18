@@ -415,6 +415,11 @@ data class WorkflowAState(
   **再次点击已选中的字段**即翻转升/降序,方向用**实心三角**显示在选中字段名之后
   (原独立"升序/降序"切换按钮已移除)。详见 HANGOFF §9.1 走查项 W3。
 - 命名结构与逐项覆盖是**批次级**(不属于某个集合),`overrides: Map<String, String>` 全局一份。
+  **2026-09-18 用户补充**:**根目录名例外** —— 它默认**跟随当前集合**的
+  `ImageCollection.rootDirName`,用户显式改过则记为逐项例外(切集合不被冲掉)。
+  即 HANGOFF §2 约束 4「批次统一 + 逐项例外」:组件/分隔符/补零/扩展名仍是批次级,
+  只有根目录名有逐集合的天然来源。实现见 `NamingState.rootDirNameOverride` 与
+  `effectiveScheme(state, collection)`。
 
 ---
 
