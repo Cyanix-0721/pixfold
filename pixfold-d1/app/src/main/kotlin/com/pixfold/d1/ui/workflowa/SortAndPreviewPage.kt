@@ -132,7 +132,20 @@ fun SortAndPreviewPage(
                 collections.forEach { c ->
                     FilterChip(
                         selected = c.id == activeId,
-                        onClick = { activeId = c.id },
+                        onClick = {
+                            // W1(2026-09-17 实测缺陷):切集合必须**回到顶部**。
+                            // 原因:切换集合的语义是"换一批图看",沿用上一个集合的滚动偏移
+                            // 会让用户看到"中段"而非第一张,需手动滑回顶部才知道切换成功;
+                            // 该残留状态还会**误导测试**(语义树只含可见项,读到的是视口中段)。
+                            //
+                            // 复用 W4 已建立的同一条通道(signal 自增 -> requestScrollToItem(0)):
+                            // 两处需求本质相同 —— 视口位置失去意义时归位。
+                            // 只有真的换了集合才自增,重复点同一个 chip 不该把用户拽回顶部。
+                            if (c.id != activeId) {
+                                activeId = c.id
+                                scrollSignal++
+                            }
+                        },
                         label = { Text("${c.name}（${c.images.size}）") },
                         modifier = Modifier
                             .testTag(collectionTag(c.id))
