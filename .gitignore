@@ -12,6 +12,4 @@ $RECYCLE.BIN/
 *.log
 
 # AI 助手缓存目录 / AI assistant cache directories
-.kilo/
-.workbuddy*/
 .agents/

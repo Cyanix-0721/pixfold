@@ -13,6 +13,10 @@ import com.pixfold.d1.ui.preview.TAG_PREVIEW
 import com.pixfold.d1.ui.workflowa.TAG_STEP_BACK
 import com.pixfold.d1.ui.workflowa.TAG_STEP_NAMING
 import com.pixfold.d1.ui.workflowa.TAG_STEP_SORT
+import com.pixfold.d1.ui.workflowb.TAG_B_STEP_PACK
+import com.pixfold.d1.ui.workflowb.TAG_LIBRARY_PAGE
+import com.pixfold.d1.ui.workflowb.TAG_METADATA_PAGE
+import com.pixfold.d1.ui.workflowb.TAG_PACK_PAGE
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -96,10 +100,28 @@ class BackNavigationTest {
     }
 
     @Test
-    fun `back from workflow B placeholder returns to home`() {
+    fun `back from workflow B first step returns to home`() {
         rule.setContent { PixFoldApp() }
         rule.onNodeWithText("工作流 B · CBZ 制作").performClick()
-        rule.onNodeWithText("工作流 B · 待实现（P5）").assertIsDisplayed()
+        rule.onNodeWithTag(TAG_LIBRARY_PAGE).assertIsDisplayed()
+
+        back()
+        rule.onNodeWithText("工作流 A · 图片整理与命名").assertIsDisplayed()
+    }
+
+    @Test
+    fun `back from workflow B third step walks down to the library step`() {
+        // 层级:步骤3 打包计划 -> 步骤2 元数据 -> 步骤1 漫画库 -> 首页
+        rule.setContent { PixFoldApp() }
+        rule.onNodeWithText("工作流 B · CBZ 制作").performClick()
+        rule.onNodeWithTag(TAG_B_STEP_PACK).performClick()
+        rule.onNodeWithTag(TAG_PACK_PAGE).assertIsDisplayed()
+
+        back()
+        rule.onNodeWithTag(TAG_METADATA_PAGE).assertIsDisplayed()
+
+        back()
+        rule.onNodeWithTag(TAG_LIBRARY_PAGE).assertIsDisplayed()
 
         back()
         rule.onNodeWithText("工作流 A · 图片整理与命名").assertIsDisplayed()

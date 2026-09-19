@@ -1,28 +1,25 @@
 package com.pixfold.d1
 
 import androidx.activity.compose.BackHandler
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.unit.dp
 import com.pixfold.d1.domain.mock.MockData
+import com.pixfold.d1.domain.mock.MockDataB
 import com.pixfold.d1.ui.HomeScreen
 import com.pixfold.d1.ui.preview.ImagePreview
 import com.pixfold.d1.ui.theme.PixFoldTheme
 import com.pixfold.d1.ui.workflowa.WorkflowASteps
+import com.pixfold.d1.ui.workflowb.WorkflowBSteps
 
 /**
  * 应用根。用**状态驱动的轻量导航**(密封类 + `mutableStateOf`),不引入 Navigation 组件
@@ -50,6 +47,9 @@ fun PixFoldApp() {
             // 工作流 A 演示数据:trip(30 张)+ scan(14 张)+ misc(12 张),
             // 多集合用于演示"批次默认 + 本组独立"(验收第 7 项)。
             val collections = remember { MockData.workspaceA.collections }
+            // 工作流 B 演示数据:5 卷覆盖缺卷号 / 无语言线索 / 输出冲突三类异常
+            // (验收第 11–14 项;确定性 mock,不连真实文件系统)。
+            val library = remember { MockDataB.library }
             // 预览跟随**当前集合**:切集合后打开预览应看到该集合的图,
             // 否则页码与图片会对不上(索引来自当前集合)。
             var activeCollectionId by remember { mutableStateOf(collections.first().id) }
@@ -85,24 +85,13 @@ fun PixFoldApp() {
                     )
                 }
 
-                Screen.WorkflowB -> {
-                    BackHandler { screen = Screen.Home }
-                    PlaceholderPage("工作流 B · 待实现（P5）")
-                }
+                Screen.WorkflowB -> WorkflowBSteps(
+                    rootPath = library.rootPath,
+                    volumes = library.volumes,
+                    // 在工作流 B 内按返回 -> 回首页(步骤内的返回由 WorkflowBSteps 自己处理)
+                    onBack = { screen = Screen.Home },
+                )
             }
         }
-    }
-}
-
-@Composable
-private fun PlaceholderPage(label: String) {
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .windowInsetsPadding(WindowInsets.safeDrawing)
-            .padding(16.dp),
-        contentAlignment = Alignment.Center,
-    ) {
-        Text(text = label, color = MaterialTheme.colorScheme.onBackground)
     }
 }

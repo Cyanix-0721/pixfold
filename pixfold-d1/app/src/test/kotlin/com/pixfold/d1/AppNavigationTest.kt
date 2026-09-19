@@ -11,6 +11,9 @@ import com.pixfold.d1.ui.preview.TAG_PREVIEW_CLOSE
 import com.pixfold.d1.ui.preview.TAG_PREVIEW_NEXT
 import com.pixfold.d1.ui.preview.TAG_PREVIEW_PAGE_LABEL
 import com.pixfold.d1.ui.workflowa.TAG_GRID
+import com.pixfold.d1.ui.workflowb.TAG_LIBRARY_PAGE
+import com.pixfold.d1.ui.workflowb.volumeCardTag
+import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.assertTextEquals
 import org.junit.Rule
@@ -64,10 +67,12 @@ class AppNavigationTest {
     }
 
     @Test
-    fun `workflow B entry is reachable but not yet implemented`() {
-        // P5 前工作流 B 只有占位页;此处只保证点了不会崩、且有反馈文案。
+    fun `workflow B entry actually opens the library step`() {
+        // P5 起工作流 B 有真实页面:断言"真的到了漫画库步骤"(出现卷卡片),
+        // 而不是只断言回调被调用 —— 后者会放过"回调触发但界面没换"的缺陷。
         rule.setContent { PixFoldApp() }
         rule.onNodeWithText("工作流 B · CBZ 制作").performClick()
-        rule.onNodeWithText("工作流 B · 待实现（P5）").assertIsDisplayed()
+        rule.onNodeWithTag(TAG_LIBRARY_PAGE).assertIsDisplayed()
+        rule.onAllNodesWithTag(volumeCardTag("aot-1")).assertCountEquals(1)
     }
 }
