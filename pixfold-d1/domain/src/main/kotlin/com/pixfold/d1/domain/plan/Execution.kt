@@ -34,7 +34,27 @@ data class ExecEntry(
     val outcome: ExecOutcome,
     val reason: String? = null,
     val createdPath: String? = null,
-)
+) {
+    init {
+        // ---- 不变式:只有"成功"才产生输出(createdPath 非空 ⟺ Succeeded) ----
+        //
+        // 为什么把不变量**强制**在这里,而不是继续只写在文档与调用点里:
+        // 此前 `undoRecordOf` 同时用了 `outcome == Succeeded` 与 `createdPath != null`
+        // 两道判据 —— 二者**完全等价**,是纯冗余。P6 变异验证实测:
+        // "把跳过也算进撤销记录"这个变异**未能被任何测试捕获**,正是因为
+        // 去掉一道后另一道仍然挡住了它。
+        //
+        // 单纯删掉一道判据只是把冗余换个地方藏起来;根因是**不变量没有被强制**,
+        // 于是"跳过项却带着 createdPath"这种非法组合在类型上依然可构造。
+        // 这里用 require 把它堵死:非法状态根本造不出来,于是使用点只留**一道**判据即可。
+        require(outcome == ExecOutcome.Succeeded || createdPath == null) {
+            "$outcome 项不应携带 createdPath（$createdPath）—— 只有成功执行才产生输出"
+        }
+        require(outcome != ExecOutcome.Succeeded || createdPath != null) {
+            "Succeeded 项必须携带 createdPath —— 否则撤销无从知道要回滚什么"
+        }
+    }
+}
 
 /**
  * 执行报告。
@@ -165,8 +185,10 @@ data class UndoRecord(val ops: List<UndoOp>, val kind: ExecKind) {
 /** 从报告推导撤销记录;没有成功项时返回 null(没有可撤销的东西)。 */
 fun undoRecordOf(report: ExecutionReport): UndoRecord? {
     if (!report.canUndo) return null
+    // 只需一道判据:`ExecEntry` 的 init 已强制"只有成功项才有 createdPath"
+    // (createdPath 非空 ⟺ Succeeded)。此前这里并列了 outcome 与 path 两道等价判据,
+    // 属冗余 —— 冗余的代价是"去掉一道仍有另一道兜着",于是缺陷能被掩盖(见 ExecEntry 注释)。
     val ops = report.entries
-        .filter { it.outcome == ExecOutcome.Succeeded }
         .mapNotNull { e ->
             val path = e.createdPath ?: return@mapNotNull null
             when (report.kind) {

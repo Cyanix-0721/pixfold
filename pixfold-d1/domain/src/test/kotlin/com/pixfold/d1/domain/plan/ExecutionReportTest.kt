@@ -5,6 +5,7 @@ import com.pixfold.d1.domain.model.NameProposal
 import com.pixfold.d1.domain.naming.OpStatus
 import com.pixfold.d1.domain.naming.RenameOp
 import kotlin.test.Test
+import kotlin.test.assertFailsWith
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
@@ -137,6 +138,42 @@ class ExecutionReportTest {
         val report = executeRenamePlan(listOf(op("i1", "   ")))
         assertEquals(ExecOutcome.Failed, report.entries.single().outcome)
         assertEquals("新名称为空", report.entries.single().reason)
+    }
+
+    // ---- 不变式:只有成功项才产生输出 ----
+    //
+    // P6 变异验证实测:"把跳过也算进撤销记录"这个变异**未能被任何测试捕获** ——
+    // 因为 undorecordOf 里并列了 outcome 与 createdPath 两道**等价**判据,去掉一道
+    // 另一道仍挡住了它。根因是不变量没被强制。以下用例钉死该不变量。
+
+    @Test
+    fun `a skipped entry cannot carry a created path`() {
+        val ex = assertFailsWith<IllegalArgumentException> {
+            ExecEntry(id = "x", label = "a.cbz", outcome = ExecOutcome.Skipped, createdPath = "out/a.cbz")
+        }
+        assertTrue("createdPath" in ex.message.orEmpty(), "报错应点明问题所在，实际 ${ex.message}")
+    }
+
+    @Test
+    fun `a failed entry cannot carry a created path`() {
+        assertFailsWith<IllegalArgumentException> {
+            ExecEntry(id = "x", label = "a.cbz", outcome = ExecOutcome.Failed, createdPath = "out/a.cbz")
+        }
+    }
+
+    @Test
+    fun `a successful entry must carry a created path`() {
+        // 反向也堵死:成功项没有 path,撤销就不知道回滚什么 —— 属非法状态
+        assertFailsWith<IllegalArgumentException> {
+            ExecEntry(id = "x", label = "a.cbz", outcome = ExecOutcome.Succeeded)
+        }
+    }
+
+    @Test
+    fun `skipped and failed entries without a path are legal`() {
+        // 正常的跳过/失败项必须能构造(否则前面的用例会把合法用法一起挡掉)
+        ExecEntry(id = "x", label = "a.cbz", outcome = ExecOutcome.Skipped, reason = "冲突")
+        ExecEntry(id = "y", label = "b.cbz", outcome = ExecOutcome.Failed, reason = "无页")
     }
 
     // ---- 撤销 ----
