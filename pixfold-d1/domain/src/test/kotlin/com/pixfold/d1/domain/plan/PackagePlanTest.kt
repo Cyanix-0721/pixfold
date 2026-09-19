@@ -98,6 +98,20 @@ class PackagePlanTest {
     }
 
     @Test
+    fun `rename policy inserts before the LAST dot not the first`() {
+        // 回归:mock 里的 CBZ 名只含一个点,故"首个点"与"最后一个点"结果相同 ——
+        // 变异"改用第一个点"因此**无法被捕获**(实测发现)。这里用**多点文件名**
+        // 真正钉住"最后一个点"这个语义(§9.1 明确写的是 last dot)。
+        val multi = op102.copy(cbzFileName = "海贼王 第102卷.v2.final.cbz")
+        val plan = buildPackagePlans(listOf(multi), conflictPolicy = OutputConflictPolicy.Rename).single()
+        assertEquals(
+            "海贼王 第102卷.v2.final (1).cbz",
+            plan.outputDisplay,
+            "序号必须加在**最后一个**点之前(扩展名前)，而不是第一个点前",
+        )
+    }
+
+    @Test
     fun `rename policy appends the suffix even when there is no extension`() {
         assertEquals(
             "无扩展名 (1)",
