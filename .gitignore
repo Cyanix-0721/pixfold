@@ -13,3 +13,12 @@ $RECYCLE.BIN/
 
 # AI 助手缓存目录 / AI assistant cache directories
 .agents/
+
+# Python 工具缓存 / Python tooling caches
+# WHY:.uvcache 是 `uv run` 在仓库根留下的缓存目录(可达百 MB 级)。
+# uv 会自己在其中写 `.gitignore`(内容为 `*`)以求自保,但那是**工具的实现细节**,
+# 不是本仓库的约定 —— 一旦 uv 改了行为或目录名,缓存就会被误提交。
+# 故在此显式声明,不依赖第三方工具的隐式保护。(2026-09-19 用户提出)
+# 注:缓存本身**保留在本地**(可能被后续 UV 操作复用),只是不参与版本控制。
+.uvcache/
+.venv/
