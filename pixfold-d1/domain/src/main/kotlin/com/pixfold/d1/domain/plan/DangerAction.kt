@@ -134,5 +134,11 @@ fun generalSummaryLines(
                 .joinToString("、") { it.outputPath }
         }")
     }
-    add("本操作只写入输出文件；未勾选「删除源目录」时源文件不会被改动")
+    // 末条必须与"本次实际会做什么"一致:选了删除源目录却说"只写入输出文件"
+    // 会与上一行的「源目录：删除（危险）」直接矛盾(真机核对时发现)。
+    if (DangerAction.DeleteSourceDir in dangerActions) {
+        add("⚠️ 打包完成后源目录将被删除，且不可恢复")
+    } else {
+        add("本操作只写入输出文件；不会删除任何源文件")
+    }
 }

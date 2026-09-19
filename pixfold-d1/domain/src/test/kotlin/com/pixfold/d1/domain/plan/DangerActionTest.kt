@@ -137,6 +137,25 @@ class DangerActionTest {
     }
 
     @Test
+    fun `general summary never claims it only writes files when source deletion is on`() {
+        // 真机核对时发现:选了「删除源目录」,末条仍写"本操作只写入输出文件" ——
+        // 与上一行的「源目录：删除（危险）」直接矛盾。此用例钉死该矛盾不得复现。
+        val plans = buildPackagePlans(library.volumes, sourcePolicy = SourcePolicy.Delete)
+        val dangers = effectiveDangerActions(plans)
+        val lines = generalSummaryLines(plans, dangers)
+
+        assertTrue(lines.any { "源目录：删除（危险）" in it }, "应列出删除影响，实际 $lines")
+        assertTrue(
+            lines.none { "只写入输出文件" in it },
+            "选了删除源目录就不得再说「只写入输出文件」，实际 $lines",
+        )
+        assertTrue(
+            lines.any { "源目录将被删除" in it && "不可恢复" in it },
+            "应明确告知源目录将被删除且不可恢复，实际 $lines",
+        )
+    }
+
+    @Test
     fun `general summary names the concrete files that would be overwritten`() {
         val plans = buildPackagePlans(listOf(op102), conflictPolicy = OutputConflictPolicy.Overwrite)
         val dangers = effectiveDangerActions(plans)
@@ -162,7 +181,7 @@ class DangerActionTest {
         val lines = generalSummaryLines(plans, emptySet())
         assertFalse(lines.isEmpty())
         assertTrue(
-            lines.any { "源文件不会被改动" in it },
+            lines.any { "不会删除任何源文件" in it },
             "安全操作也要说清「不删任何东西」，实际 $lines",
         )
     }
