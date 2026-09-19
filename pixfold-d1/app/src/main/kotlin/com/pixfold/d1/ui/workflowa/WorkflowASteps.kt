@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.windowInsetsPadding
+import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Tab
 import androidx.compose.material3.PrimaryTabRow
@@ -29,17 +30,35 @@ import com.pixfold.d1.domain.model.ImageCollection
 import com.pixfold.d1.domain.model.NamingScheme
 import com.pixfold.d1.domain.model.NamingState
 import com.pixfold.d1.domain.workflowa.WorkflowAState
+import com.pixfold.d1.domain.plan.ConfirmFlowState
+import com.pixfold.d1.domain.plan.ExecutionReport
+import com.pixfold.d1.domain.plan.buildConfirmSequence
+import com.pixfold.d1.domain.plan.buildLibraryRenamePlan
+import com.pixfold.d1.domain.plan.cancel
+import com.pixfold.d1.domain.plan.confirmCurrent
+import com.pixfold.d1.domain.plan.executeRenamePlan
+import com.pixfold.d1.domain.plan.performUndo
+import com.pixfold.d1.domain.plan.renameSummaryLines
+import com.pixfold.d1.domain.plan.startConfirmFlow
+import com.pixfold.d1.domain.plan.undoRecordOf
+import com.pixfold.d1.domain.plan.workflowADangerActions
 import com.pixfold.d1.domain.workflowa.workflowAStateOf
+import com.pixfold.d1.ui.plan.ExecutionReportPage
 
 const val TAG_STEP_TABS = "step-tabs"
 const val TAG_STEP_SORT = "step-sort"
 const val TAG_STEP_NAMING = "step-naming"
 const val TAG_STEP_BACK = "step-back"
+const val TAG_STEP_PLAN = "step-plan"
+
+/** 命名结构 -> 执行计划 的下一步入口(与步骤1的「下一步」区分,便于测试精确定位)。 */
+const val TAG_TO_PLAN = "step-to-plan"
 
 /** 工作流 A 的步骤(规格 §10.1:步骤1 排序与预览 / 步骤2 命名结构 / 步骤3 计划)。 */
 enum class WorkflowAStep(val label: String) {
     Sort("步骤1 排序与预览"),
     Naming("步骤2 命名结构"),
+    Plan("步骤3 执行计划"),
 }
 
 /**
@@ -66,6 +85,12 @@ fun WorkflowASteps(
     var activeId by remember { mutableStateOf(collections.firstOrNull()?.id.orEmpty()) }
     // 命名结构与覆盖是**批次级**(规格 §6.3:overrides 全局一份,不属于某个集合),
     // 故在此持有 —— 切集合、来回切 Tab 都不会丢失用户的覆盖。
+    // 工作流 A 的危险动作(默认关闭)+ 确认流程 + 执行报告
+    var cleanEmptyDirs by remember { mutableStateOf(false) }
+    var confirmFlow by remember { mutableStateOf(ConfirmFlowState()) }
+    var report by remember { mutableStateOf<ExecutionReport?>(null) }
+    var undoMessage by remember { mutableStateOf<String?>(null) }
+
     var namingState by remember {
         mutableStateOf(
             NamingState(
@@ -77,12 +102,12 @@ fun WorkflowASteps(
     // 返回手势/返回键(用户 2026-09-18 反馈:真机上按返回会直接退出应用)。
     //
     // 统一在**一个** handler 内按层级决策,而不是"非首步才启用 + 靠外层兜底":
-    //   - 步骤 2 -> 回步骤 1;
+    //   - 步骤 3 -> 步骤 2 -> 步骤 1(逐级后退);
     //   - 已在步骤 1 -> 回调 [onBack](由上层回首页)。
     // 这样注册始终是 enabled(系统据此知道"返回有去处",预测性返回动画才会
     // 走"应用内后退"而非"退出应用"),且不存在依赖注册顺序的隐式耦合。
     BackHandler {
-        if (stepIndex > 0) stepIndex = 0 else onBack()
+        if (stepIndex > 0) stepIndex -= 1 else onBack()
     }
 
     val activeCollection = collections.firstOrNull { it.id == activeId } ?: collections.firstOrNull()
@@ -104,7 +129,13 @@ fun WorkflowASteps(
                     onClick = { stepIndex = i },
                     text = { Text(step.label) },
                     modifier = Modifier
-                        .testTag(if (step == WorkflowAStep.Sort) TAG_STEP_SORT else TAG_STEP_NAMING)
+                        .testTag(
+                            when (step) {
+                                WorkflowAStep.Sort -> TAG_STEP_SORT
+                                WorkflowAStep.Naming -> TAG_STEP_NAMING
+                                WorkflowAStep.Plan -> TAG_STEP_PLAN
+                            },
+                        )
                         .semantics { contentDescription = step.label },
                 )
             }
@@ -150,6 +181,16 @@ fun WorkflowASteps(
                         onStateChange = { namingState = it },
                         modifier = Modifier.weight(1f),
                     )
+                    // 常驻在底部的下一步:长表滚到底后 Tab 与返回入口都可能不在视口内
+                    Column(modifier = Modifier.fillMaxWidth()) {
+                        Button(
+                            onClick = { stepIndex = 2 },
+                            modifier = Modifier
+                                .padding(horizontal = 12.dp, vertical = 4.dp)
+                                .testTag(TAG_TO_PLAN)
+                                .semantics { contentDescription = "下一步 执行计划" },
+                        ) { Text("下一步：执行计划") }
+                    }
                 } else {
                     Text(
                         text = "无可命名的集合",
@@ -158,6 +199,64 @@ fun WorkflowASteps(
                         modifier = Modifier
                             .padding(16.dp)
                             .align(Alignment.CenterHorizontally),
+                    )
+                }
+            }
+
+            WorkflowAStep.Plan -> {
+                val currentReport = report
+                if (currentReport != null) {
+                    ExecutionReportPage(
+                        report = currentReport,
+                        undoMessage = undoMessage,
+                        onUndo = { undoMessage = performUndo(undoRecordOf(currentReport)).message },
+                        onDone = {
+                            // 执行完回到步骤 1:报告是一次执行的终点,不该留在计划页
+                            // 让用户误以为还能再执行一次。
+                            report = null
+                            undoMessage = null
+                            stepIndex = 0
+                        },
+                        modifier = Modifier.weight(1f),
+                    )
+                } else {
+                    Column(modifier = Modifier.fillMaxWidth()) {
+                        TextButton(
+                            onClick = { stepIndex = 1 },
+                            modifier = Modifier
+                                .padding(start = 4.dp)
+                                .testTag(TAG_STEP_BACK)
+                                .semantics { contentDescription = "返回步骤2" },
+                        ) {
+                            Text("← 返回命名结构")
+                        }
+                    }
+                    RenamePlanPage(
+                        collections = collections,
+                        orders = state.orders,
+                        namingState = namingState,
+                        cleanEmptyDirs = cleanEmptyDirs,
+                        onCleanEmptyDirsChange = { cleanEmptyDirs = it },
+                        flow = confirmFlow,
+                        onStartConfirm = {
+                            val plan = buildLibraryRenamePlan(collections, state.orders, namingState)
+                            val dangers = workflowADangerActions(cleanEmptyDirs)
+                            confirmFlow = startConfirmFlow(
+                                buildConfirmSequence(dangers, renameSummaryLines(plan, dangers)),
+                            )
+                        },
+                        onConfirmStep = {
+                            val (next, done) = confirmFlow.confirmCurrent()
+                            confirmFlow = next
+                            if (done) {
+                                val plan = buildLibraryRenamePlan(collections, state.orders, namingState)
+                                report = executeRenamePlan(plan.ops)
+                            }
+                        },
+                        onCancelConfirm = { confirmFlow = confirmFlow.cancel() },
+                        onExecute = { stepIndex = 2 },
+                        contentInsets = innerInsets,
+                        modifier = Modifier.weight(1f),
                     )
                 }
             }

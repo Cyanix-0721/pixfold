@@ -1,0 +1,132 @@
+package com.pixfold.d1.domain.plan
+
+import com.pixfold.d1.domain.comic.langIso
+import com.pixfold.d1.domain.model.ComicVolume
+
+/**
+ * 工作流 B 的**打包计划**(规格 §9.1,验收第 15 项)。
+ *
+ * 这是"扫描 / 决策 / 执行分离"(HANGOFF §2 约束 1)的**决策**产物:
+ * 只描述"将要做什么",**不产生任何副作用**。执行在 [executePackagePlans],
+ * 且在执行前必须走 [ExecutionGate] 的确认流程(验收第 16 项)。
+ */
+
+/** 输出已存在时的策略(归档语义:默认 [Rename])。 */
+enum class OutputConflictPolicy(val label: String) {
+    Rename("自动重命名（加序号）"),
+    Skip("跳过该卷"),
+    Overwrite("覆盖已有文件"),
+}
+
+/** 源目录处置策略(归档语义:默认 [Keep];[Delete] 是**危险动作**)。 */
+enum class SourcePolicy(val label: String) {
+    Keep("保留源目录（默认）"),
+    Delete("打包后删除源目录（危险）"),
+}
+
+/**
+ * 单卷的打包计划。
+ *
+ * [renumbered] 是**生成计划时的快照**(归档语义:不是惰性求值)——
+ * 否则用户在执行前改了页序,计划上写的张数就会与实际执行的不一致。
+ */
+data class VolumePackPlan(
+    val volume: ComicVolume,
+    val outputDisplay: String,
+    val pageCount: Int,
+    val skipped: Boolean,
+    val skipReason: String?,
+    val conflictPolicy: OutputConflictPolicy,
+    val sourcePolicy: SourcePolicy,
+) {
+    /** 输出全路径(展示与"跳过原因"文案共用)。 */
+    val outputPath: String get() = "${volume.outputDir}/$outputDisplay"
+}
+
+/**
+ * 生成操作清单文案(规格 §9.1 的**文案契约**,按序):
+ *
+ * 1. (若 skipped)`跳过：输出已存在 …` 并 **return**(后续不产出);
+ * 2. `创建 CBZ → <outputDisplay>`;
+ * 3. `写入 ComicInfo.xml（Title=…，Series=…，Number=…，Writer=…，LanguageISO=…）`;
+ * 4. `按页序打包 <N> 张并重命名为页码（0001 起）`;
+ * 5. (若 `sourcePolicy == Delete`)`打包后删除源目录：<dirPath>`。
+ *
+ * **为什么把文案放在领域层**:这是"计划必须可解释"(约束 5)的载体。
+ * 若文案散在 UI 里,测试就只能断言"有个按钮",而无法断言"计划说清了要做什么"。
+ * 归档原型把同一份契约放在 `VolumePackPlan.describe()`,此处沿用其文本。
+ */
+fun VolumePackPlan.describe(): List<String> {
+    if (skipped) {
+        return listOf("跳过：输出已存在 $outputPath")
+    }
+    val v = volume
+    val number = v.volume?.toString() ?: "未设置"
+    val writer = v.writer.ifEmpty { "空" }
+    val lang = langIso(v.language, v.otherLangCode) ?: "不写入"
+    return buildList {
+        add("创建 CBZ → $outputDisplay")
+        add("写入 ComicInfo.xml（Title=${v.title}，Series=${v.series}，Number=$number，Writer=$writer，LanguageISO=$lang）")
+        add("按页序打包 $pageCount 张并重命名为页码（0001 起）")
+        if (sourcePolicy == SourcePolicy.Delete) {
+            add("打包后删除源目录：${v.dirPath}")
+        }
+    }
+}
+
+/**
+ * 输出冲突时的实际文件名(规格 §9.1)。
+ *
+ * - [OutputConflictPolicy.Rename]:在**最后一个** `.` 前插入 ` (1)`
+ *   → `name.substring(0, dot) + " (1)" + name.substring(dot)`;无扩展名则直接追加。
+ * - [OutputConflictPolicy.Skip]:不改名(计划会整个跳过该卷)。
+ * - [OutputConflictPolicy.Overwrite]:不改名(直接覆盖)。
+ *
+ * @param outputExists 输出目录下是否已存在同名文件
+ */
+fun outputDisplayOf(
+    cbzFileName: String,
+    policy: OutputConflictPolicy,
+    outputExists: Boolean,
+): String {
+    if (!outputExists || policy != OutputConflictPolicy.Rename) return cbzFileName
+    val dot = cbzFileName.lastIndexOf('.')
+    return if (dot <= 0) {
+        "$cbzFileName (1)"
+    } else {
+        cbzFileName.substring(0, dot) + " (1)" + cbzFileName.substring(dot)
+    }
+}
+
+/**
+ * 构建整库打包计划。
+ *
+ * **只处理 `included == true` 的卷**(规格 §9.1 末段)——未勾选的卷不进计划,
+ * 因此也不会出现在执行报告里,不会让用户误以为"没打包是失败了"。
+ *
+ * 默认 `conflictPolicy = Rename`、`sourcePolicy = Keep`(归档语义)。
+ */
+fun buildPackagePlans(
+    volumes: List<ComicVolume>,
+    conflictPolicy: OutputConflictPolicy = OutputConflictPolicy.Rename,
+    sourcePolicy: SourcePolicy = SourcePolicy.Keep,
+): List<VolumePackPlan> = volumes.filter { it.included }.map { v ->
+    val skipped = v.outputExists && conflictPolicy == OutputConflictPolicy.Skip
+    VolumePackPlan(
+        volume = v,
+        outputDisplay = outputDisplayOf(v.cbzFileName, conflictPolicy, v.outputExists),
+        pageCount = v.pageCount,
+        skipped = skipped,
+        skipReason = if (skipped) "输出已存在 ${v.outputDir}/${v.cbzFileName}" else null,
+        conflictPolicy = conflictPolicy,
+        sourcePolicy = sourcePolicy,
+    )
+}
+
+/** 计划里的计数(UI 顶部「共 N 卷 · 跳过 M 卷」与测试共用)。 */
+data class PlanCounts(val total: Int, val skipped: Int) {
+    val runnable: Int get() = total - skipped
+}
+
+fun planCountsOf(plans: List<VolumePackPlan>): PlanCounts =
+    PlanCounts(total = plans.size, skipped = plans.count { it.skipped })

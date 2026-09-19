@@ -25,6 +25,21 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import com.pixfold.d1.domain.model.ComicVolume
+import com.pixfold.d1.domain.plan.ConfirmFlowState
+import com.pixfold.d1.domain.plan.ExecutionReport
+import com.pixfold.d1.domain.plan.OutputConflictPolicy
+import com.pixfold.d1.domain.plan.SourcePolicy
+import com.pixfold.d1.domain.plan.buildConfirmSequence
+import com.pixfold.d1.domain.plan.buildPackagePlans
+import com.pixfold.d1.domain.plan.cancel
+import com.pixfold.d1.domain.plan.confirmCurrent
+import com.pixfold.d1.domain.plan.effectiveDangerActions
+import com.pixfold.d1.domain.plan.executePackagePlans
+import com.pixfold.d1.domain.plan.generalSummaryLines
+import com.pixfold.d1.domain.plan.performUndo
+import com.pixfold.d1.domain.plan.startConfirmFlow
+import com.pixfold.d1.domain.plan.undoRecordOf
+import com.pixfold.d1.ui.plan.ExecutionReportPage
 import com.pixfold.d1.domain.workflowb.WorkflowBState
 import com.pixfold.d1.domain.workflowb.workflowBStateOf
 
@@ -63,6 +78,15 @@ fun WorkflowBSteps(
 ) {
     var stepIndex by remember { mutableIntStateOf(0) }
     var state by remember { mutableStateOf(workflowBStateOf(rootPath, volumes)) }
+
+    // P6:策略(默认 Rename / Keep,与归档语义一致)、危险动作、确认流程、执行报告。
+    // 全部提到这一层 —— 在步骤 3 内执行完再看报告,切回来时不该丢掉策略选择。
+    var conflictPolicy by remember { mutableStateOf(OutputConflictPolicy.Rename) }
+    var sourcePolicy by remember { mutableStateOf(SourcePolicy.Keep) }
+    var cleanEmptyDirs by remember { mutableStateOf(false) }
+    var confirmFlow by remember { mutableStateOf(ConfirmFlowState()) }
+    var report by remember { mutableStateOf<ExecutionReport?>(null) }
+    var undoMessage by remember { mutableStateOf<String?>(null) }
 
     BackHandler {
         if (stepIndex > 0) stepIndex -= 1 else onBack()
@@ -128,23 +152,55 @@ fun WorkflowBSteps(
                 modifier = Modifier.weight(1f),
             )
 
-            WorkflowBStep.Pack -> PackPreviewPage(
-                libraryState = state,
-                onLibraryChange = { state = it },
-                contentInsets = innerInsets,
-                modifier = Modifier.weight(1f),
-            )
-        }
-
-        // 打包执行(危险动作二次确认、执行报告、撤销)属 P6;此处仅提示后续步骤,
-        // 避免用户以为"预览完就等于做完了"。
-        if (WorkflowBStep.entries[stepIndex] == WorkflowBStep.Pack) {
-            Text(
-                text = "本阶段只做预览；执行计划、危险动作确认与执行报告在 P6 接入。",
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp),
-            )
+            WorkflowBStep.Pack -> {
+                val currentReport = report
+                if (currentReport != null) {
+                    ExecutionReportPage(
+                        report = currentReport,
+                        undoMessage = undoMessage,
+                        onUndo = { undoMessage = performUndo(undoRecordOf(currentReport)).message },
+                        onDone = {
+                            report = null
+                            undoMessage = null
+                            stepIndex = 0
+                        },
+                        modifier = Modifier.weight(1f),
+                    )
+                } else {
+                    PackPreviewPage(
+                        libraryState = state,
+                        onLibraryChange = { state = it },
+                        contentInsets = innerInsets,
+                        conflictPolicy = conflictPolicy,
+                        sourcePolicy = sourcePolicy,
+                        cleanEmptyDirs = cleanEmptyDirs,
+                        onConflictPolicyChange = { conflictPolicy = it },
+                        onSourcePolicyChange = { sourcePolicy = it },
+                        onCleanEmptyDirsChange = { cleanEmptyDirs = it },
+                        confirmFlow = confirmFlow,
+                        onStartConfirm = {
+                            val plans = buildPackagePlans(state.volumes, conflictPolicy, sourcePolicy)
+                            val dangers = effectiveDangerActions(plans, cleanEmptyDirs)
+                            confirmFlow = startConfirmFlow(
+                                buildConfirmSequence(dangers, generalSummaryLines(plans, dangers)),
+                            )
+                        },
+                        onConfirmStep = {
+                            val (next, done) = confirmFlow.confirmCurrent()
+                            confirmFlow = next
+                            if (done) {
+                                report = executePackagePlans(
+                                    buildPackagePlans(state.volumes, conflictPolicy, sourcePolicy),
+                                )
+                            }
+                        },
+                        onCancelConfirm = { confirmFlow = confirmFlow.cancel() },
+                        onExecute = {},
+                        showPlanSection = true,
+                        modifier = Modifier.weight(1f),
+                    )
+                }
+            }
         }
     }
 }

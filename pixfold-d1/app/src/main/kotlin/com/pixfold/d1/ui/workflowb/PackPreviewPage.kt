@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.material3.Button
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
@@ -26,6 +27,18 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
 import com.pixfold.d1.domain.comic.includedVolumes
+import com.pixfold.d1.domain.plan.ConfirmFlowState
+import com.pixfold.d1.domain.plan.OutputConflictPolicy
+import com.pixfold.d1.domain.plan.SourcePolicy
+import com.pixfold.d1.domain.plan.buildPackagePlans
+import com.pixfold.d1.domain.plan.effectiveDangerActions
+import com.pixfold.d1.domain.plan.generalSummaryLines
+import com.pixfold.d1.domain.plan.buildConfirmSequence
+import com.pixfold.d1.domain.plan.planCountsOf
+import com.pixfold.d1.ui.plan.ConfirmDialog
+import com.pixfold.d1.ui.plan.PlanHeader
+import com.pixfold.d1.ui.plan.PlanRow
+import com.pixfold.d1.ui.plan.TAG_PLAN_CONFIRM
 import com.pixfold.d1.domain.comic.previewOf
 import com.pixfold.d1.domain.model.ComicVolume
 import com.pixfold.d1.domain.model.LangChoice
@@ -56,8 +69,9 @@ fun packVolumeChipTag(id: String) = "pack-volume-chip-$id"
  * 本页是纯展示 + 切卷,不持有自己的状态副本(切卷把新状态上报上层),
  * 因此也不会出现"预览与当前设置不一致"的陈旧副本。
  *
- * 本阶段(验收 11–14)只做**预览**:执行计划、危险动作二次确认、报告与撤销属 P6(15–17),
- * 故这里**不放**"确认打包"按钮 —— 不放一个点了没反应的假按钮。
+ * P6(验收 15–17)起,本页在预览之下承载**执行计划**:
+ * 冲突策略 / 源目录策略 / 危险动作开关 + 操作清单( describe() 契约) + 两次确认 + 执行。
+ * 预览仍由 [previewOf] 驱动,与计划**同源**(同一份页序快照),不会互相矛盾。
  */
 @Composable
 fun PackPreviewPage(
@@ -65,6 +79,18 @@ fun PackPreviewPage(
     onLibraryChange: (WorkflowBState) -> Unit,
     modifier: Modifier = Modifier,
     contentInsets: WindowInsets = WindowInsets.safeDrawing,
+    conflictPolicy: OutputConflictPolicy = OutputConflictPolicy.Rename,
+    sourcePolicy: SourcePolicy = SourcePolicy.Keep,
+    cleanEmptyDirs: Boolean = false,
+    onConflictPolicyChange: (OutputConflictPolicy) -> Unit = {},
+    onSourcePolicyChange: (SourcePolicy) -> Unit = {},
+    onCleanEmptyDirsChange: (Boolean) -> Unit = {},
+    confirmFlow: ConfirmFlowState = ConfirmFlowState(),
+    onStartConfirm: () -> Unit = {},
+    onConfirmStep: () -> Unit = {},
+    onCancelConfirm: () -> Unit = {},
+    onExecute: () -> Unit = {},
+    showPlanSection: Boolean = false,
 ) {
     val volume = libraryState.activeVolume
     val preview = previewOf(volume)
@@ -213,9 +239,122 @@ fun PackPreviewPage(
                     }
                 }
             }
+
+            // ---- P6:执行计划(仅当前卷? 不 —— 计划覆盖全部 included 卷) ----
+            if (showPlanSection) {
+                item(key = "plan") {
+                    val plans = buildPackagePlans(
+                        libraryState.volumes,
+                        conflictPolicy = conflictPolicy,
+                        sourcePolicy = sourcePolicy,
+                    )
+                    val dangers = effectiveDangerActions(plans, cleanEmptyDirs)
+
+                    Column(modifier = Modifier.fillMaxWidth()) {
+                        HorizontalDivider(modifier = Modifier.padding(top = 8.dp))
+                        Text(
+                            text = "执行计划",
+                            style = MaterialTheme.typography.titleSmall,
+                            color = MaterialTheme.colorScheme.onBackground,
+                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+                        )
+
+                        // ---- 策略选择(默认 Rename / Keep) ----
+                        Column(modifier = Modifier.padding(horizontal = 12.dp)) {
+                            Text(
+                                text = "输出冲突策略",
+                                style = MaterialTheme.typography.labelMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .horizontalScroll(rememberScrollState()),
+                                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                            ) {
+                                OutputConflictPolicy.entries.forEach { p ->
+                                    FilterChip(
+                                        selected = conflictPolicy == p,
+                                        onClick = { onConflictPolicyChange(p) },
+                                        label = { Text(p.label) },
+                                        modifier = Modifier.testTag("policy-conflict-" + p.name),
+                                    )
+                                }
+                            }
+                            Text(
+                                text = "源目录处置",
+                                style = MaterialTheme.typography.labelMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.padding(top = 4.dp),
+                            )
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .horizontalScroll(rememberScrollState()),
+                                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                            ) {
+                                SourcePolicy.entries.forEach { p ->
+                                    FilterChip(
+                                        selected = sourcePolicy == p,
+                                        onClick = { onSourcePolicyChange(p) },
+                                        label = { Text(p.label) },
+                                        modifier = Modifier.testTag("policy-source-" + p.name),
+                                    )
+                                }
+                            }
+                            FilterChip(
+                                selected = cleanEmptyDirs,
+                                onClick = { onCleanEmptyDirsChange(!cleanEmptyDirs) },
+                                label = { Text(if (cleanEmptyDirs) "清理空目录：开（危险）" else "清理空目录：关（默认）") },
+                                modifier = Modifier.testTag(TAG_CLEAN_EMPTY_TOGGLE),
+                            )
+                            if (sourcePolicy == SourcePolicy.Delete) {
+                                Text(
+                                    text = "⚠️ 已选择删除源目录：执行前需独立二次确认",
+                                    style = MaterialTheme.typography.labelMedium,
+                                    color = MaterialTheme.colorScheme.error,
+                                    modifier = Modifier.testTag(TAG_DELETE_WARNING),
+                                )
+                            }
+                        }
+
+                        PlanHeader(counts = planCountsOf(plans), dangers = dangers.toList())
+                        for (i in plans.indices) {
+                            PlanRow(plans[i], i)
+                        }
+
+                        Button(
+                            onClick = onStartConfirm,
+                            modifier = Modifier
+                                .padding(horizontal = 12.dp, vertical = 8.dp)
+                                .testTag(TAG_PLAN_CONFIRM)
+                                .semantics { contentDescription = "确认打包" },
+                        ) { Text("确认打包") }
+                    }
+                }
+            }
         }
     }
+
+    // 确认对话框:严格按领域层给出的序列推进(通用 → 危险)。
+    // 必须在 Column **之外**:弹窗是独立窗口层,放进滚动容器会被裁切。
+    val step = confirmFlow.currentStep
+    if (step != null) {
+        ConfirmDialog(
+            step = step,
+            stepIndex = confirmFlow.stepIndex,
+            totalSteps = confirmFlow.totalSteps,
+            onConfirm = onConfirmStep,
+            onCancel = onCancelConfirm,
+        )
+    }
 }
+
+/** 「清理空目录」开关(默认关闭;勾选后仍需在确认对话框中再次确认)。 */
+const val TAG_CLEAN_EMPTY_TOGGLE = "pack-clean-empty-toggle"
+
+/** 选择删除源目录时的红色警告。 */
+const val TAG_DELETE_WARNING = "pack-delete-warning"
 
 @Composable
 private fun PackHeader(volume: ComicVolume, includedCount: Int, totalCount: Int) {
