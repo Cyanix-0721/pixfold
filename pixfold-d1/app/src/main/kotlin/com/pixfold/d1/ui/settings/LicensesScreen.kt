@@ -45,6 +45,9 @@ const val TAG_LICENSES_CORRECTION = "licenses-correction"
 private const val OWN_LICENSE_NAME = "MIT License"
 private const val OWN_COPYRIGHT = "Copyright (c) 2026 Cyanix-0721"
 
+/** 图标几何数据的手写说明(它们不在依赖图中,AboutLibraries 收集不到)。 */
+private const val ICONS_NOTE = "Material Symbols (Apache-2.0) · https://github.com/google/material-design-icons"
+
 /**
  * 开源许可页。
  *
@@ -70,6 +73,13 @@ fun LicensesScreen(
     // 前者是**配置感知**的,lint(LocalContextResourcesRead)要求如此 ——
     // 配置变化(如切换语言/深色)后能拿到新的 Resources,不会读到陈旧值。
     val resources = LocalResources.current
+    val thanksText = stringResource(R.string.licenses_thanks)
+    val ownTitle = stringResource(R.string.licenses_own)
+    val thirdPartyTitle = stringResource(R.string.licenses_third_party)
+    val correctionTitle = stringResource(R.string.licenses_correction_title)
+    val correctionBody = stringResource(R.string.licenses_correction_body)
+    val ownLicenseLine = "$OWN_LICENSE_NAME · $OWN_COPYRIGHT"
+    val iconsNote = ICONS_NOTE
     // stringResource 先在 @Composable 作用域求值(semantics{} 的 lambda 不是 @Composable)。
     val backLabel = stringResource(R.string.settings_back)
 
@@ -116,92 +126,115 @@ fun LicensesScreen(
             )
         }
 
-        Column(
+        // ⚠️ **不能**把 LibrariesContainer 放进 Column(verticalScroll):
+        // 它自身是 LazyColumn,嵌套会给它**无界高度** -> 运行时抛
+        // "Vertically scrollable component was measured with an infinity maximum
+        //  height constraints"(真机实测崩溃,2026-09-21)。
+        // 这正是项目 §12.5 记的禁忌:"一页只有一个页面级 LazyColumn,
+        // 不在无界 verticalScroll 里嵌 LazyColumn"。
+        //
+        // 正确做法:让 LibrariesContainer **自己**当唯一滚动容器,
+        // 页头/页脚用它提供的 header/footer 槽传入(而不是外层再套一个滚动)。
+        LibrariesContainer(
+            libraries = libraries,
             modifier = Modifier
                 .fillMaxWidth()
                 .weight(1f)
-                .verticalScroll(rememberScrollState())
-                .padding(horizontal = 12.dp),
-        ) {
-            Text(
-                text = stringResource(R.string.licenses_thanks),
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(vertical = 8.dp),
-            )
-
-            // ---- ① 本项目 ----
-            Text(
-                text = stringResource(R.string.licenses_own),
-                style = MaterialTheme.typography.titleSmall,
-                color = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.padding(top = 8.dp, bottom = 4.dp),
-            )
-            Card(modifier = Modifier.fillMaxWidth()) {
-                Column(modifier = Modifier.padding(12.dp)) {
-                    Text(
-                        text = "PixFold",
-                        style = MaterialTheme.typography.bodyLarge,
-                        color = MaterialTheme.colorScheme.onSurface,
-                    )
-                    Text(
-                        text = "$OWN_LICENSE_NAME · $OWN_COPYRIGHT",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.testTag(TAG_LICENSES_OWN),
+                .testTag(TAG_LICENSES_LIST),
+            header = {
+                item {
+                    LicensesHeader(
+                        thanks = thanksText,
+                        ownTitle = ownTitle,
+                        ownLicense = ownLicenseLine,
+                        thirdPartyTitle = thirdPartyTitle,
+                        correctionTitle = correctionTitle,
+                        correctionBody = correctionBody,
+                        iconsNote = iconsNote,
                     )
                 }
+            },
+        )
+    }
+}
+
+/**
+ * 许可页的**静态页头**(本项目 + 第三方标题 + 许可更正)。
+ *
+ * 抽成独立组件是因为它现在渲染在 `LibrariesContainer` 的 `header` 槽里 ——
+ * 槽内是 `LazyListScope`,不是 `@Composable` 上下文,故文案需在外面先求值再传入
+ * (字符串资源不能在其中调用)。
+ */
+@Composable
+private fun LicensesHeader(
+    thanks: String,
+    ownTitle: String,
+    ownLicense: String,
+    thirdPartyTitle: String,
+    correctionTitle: String,
+    correctionBody: String,
+    iconsNote: String,
+) {
+    // 水平内边距不可省:改用 header 槽后,原先外层 Column 的 padding(horizontal=12.dp)
+    // 一并丢失,导致页头文字贴到屏幕左缘(真机实测发现)。
+    // **整块**内容(含"许可更正")都放进这同一个带内边距的 Column。
+    // 真机踩坑:把"许可更正"放在 Column 之外当兄弟节点,它会失去水平内边距、文字贴左缘。
+    Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp)) {
+        Text(
+            text = thanks,
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(vertical = 8.dp),
+        )
+        Text(
+            text = ownTitle,
+            style = MaterialTheme.typography.titleSmall,
+            color = MaterialTheme.colorScheme.primary,
+            modifier = Modifier.padding(top = 8.dp, bottom = 4.dp),
+        )
+        Card(modifier = Modifier.fillMaxWidth()) {
+            Column(modifier = Modifier.padding(12.dp)) {
+                Text(
+                    text = "PixFold",
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = MaterialTheme.colorScheme.onSurface,
+                )
+                Text(
+                    text = ownLicense,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.testTag(TAG_LICENSES_OWN),
+                )
             }
-
-            HorizontalDivider(modifier = Modifier.padding(vertical = 12.dp))
-
-            // ---- ② 第三方组件(自动生成) ----
-            Text(
-                text = stringResource(R.string.licenses_third_party),
-                style = MaterialTheme.typography.titleSmall,
-                color = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.padding(bottom = 4.dp),
-            )
-            LibrariesContainer(
-                libraries = libraries,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .testTag(TAG_LICENSES_LIST),
-            )
-
-            // ---- 许可更正 ----
-            //
-            // 为什么需要它:AboutLibraries **从构件 POM 自动收集**许可,
-            // 但 POM 声明的是"项目级"许可,未必等于**该模块**实际使用的许可。
-            // `material-color-utilities` 正是这种情况:POM 写 MIT,
-            // 而其模块内 LICENSE 沿用 Google 原库的 Apache-2.0。
-            //
-            // 这条**如实更正**而非静默采信自动结果 —— 许可声明的准确性是合规问题,
-            // 不能因为"工具自动生成的"就默认正确。
-            HorizontalDivider(modifier = Modifier.padding(vertical = 12.dp))
-            Text(
-                text = stringResource(R.string.licenses_correction_title),
-                style = MaterialTheme.typography.titleSmall,
-                color = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.padding(bottom = 4.dp),
-            )
-            Text(
-                text = stringResource(R.string.licenses_correction_body),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier
-                    .testTag(TAG_LICENSES_CORRECTION)
-                    .padding(bottom = 12.dp),
-            )
-
-            // 图标几何数据:手工引入的矢量资源,不在依赖图中,故单列说明。
-            Text(
-                text = "Material Symbols (Apache-2.0) · " +
-                    "https://github.com/google/material-design-icons",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(vertical = 12.dp),
-            )
         }
+
+        HorizontalDivider(modifier = Modifier.padding(vertical = 12.dp))
+        Text(
+            text = thirdPartyTitle,
+            style = MaterialTheme.typography.titleSmall,
+            color = MaterialTheme.colorScheme.primary,
+            modifier = Modifier.padding(bottom = 4.dp),
+        )
+
+        // ---- 许可更正(见文件头注释:为什么需要它)----
+        HorizontalDivider(modifier = Modifier.padding(bottom = 12.dp))
+        Text(
+            text = correctionTitle,
+            style = MaterialTheme.typography.titleSmall,
+            color = MaterialTheme.colorScheme.primary,
+            modifier = Modifier.padding(bottom = 4.dp),
+        )
+        Text(
+            text = correctionBody,
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.testTag(TAG_LICENSES_CORRECTION).padding(bottom = 12.dp),
+        )
+        Text(
+            text = iconsNote,
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(bottom = 12.dp),
+        )
     }
 }
