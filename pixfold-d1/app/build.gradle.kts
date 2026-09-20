@@ -18,6 +18,8 @@ android {
 
     buildFeatures {
         compose = true
+        // 设置页「关于」需要读取 VERSION_NAME / VERSION_CODE 显示当前版本。
+        buildConfig = true
     }
 
     compileOptions {
@@ -73,6 +75,7 @@ dependencies {
     implementation(libs.activity.compose)
     implementation(libs.aboutlibraries.core)
     implementation(libs.aboutlibraries.compose.m3)
+    implementation(libs.material.color.utilities)
 
     testImplementation(composeBom)
     testImplementation(kotlin("test"))

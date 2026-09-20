@@ -13,9 +13,15 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import com.pixfold.d1.domain.mock.MockData
 import com.pixfold.d1.domain.mock.MockDataB
+import com.pixfold.d1.data.SharedPrefsSettingsStore
+import com.pixfold.d1.domain.settings.PixFoldSettings
+import com.pixfold.d1.domain.settings.SettingsStore
 import com.pixfold.d1.ui.HomeScreen
+import com.pixfold.d1.ui.settings.LicensesScreen
+import com.pixfold.d1.ui.settings.SettingsScreen
 import com.pixfold.d1.ui.preview.ImagePreview
 import com.pixfold.d1.ui.theme.PixFoldTheme
 import com.pixfold.d1.ui.workflowa.WorkflowASteps
@@ -29,14 +35,31 @@ import com.pixfold.d1.ui.workflowb.WorkflowBSteps
  */
 sealed interface Screen {
     data object Home : Screen
+    data object Settings : Screen
+    data object Licenses : Screen
     data object WorkflowA : Screen
     data object WorkflowB : Screen
     data class Preview(val index: Int) : Screen
 }
 
+/**
+ * 应用根。
+ *
+ * @param store 设置存储。默认用 [SharedPrefsSettingsStore];测试可注入内存实现,
+ *   从而无需 Android 持久化环境即可断言"设置真的驱动了主题"。
+ */
 @Composable
-fun PixFoldApp() {
-    PixFoldTheme {
+fun PixFoldApp(store: SettingsStore? = null) {
+    val context = LocalContext.current
+    val settingsStore = store ?: remember { SharedPrefsSettingsStore(context) }
+    // 设置在**应用根**持有:主题、语言、各页面都要读它,提上层是唯一合理位置。
+    var settings by remember { mutableStateOf(settingsStore.load()) }
+    val updateSettings: (PixFoldSettings) -> Unit = { next ->
+        settings = next
+        settingsStore.save(next)
+    }
+
+    PixFoldTheme(settings = settings) {
         // Surface 提供 M3 语义背景色 —— 深色模式下不会透出窗口白底(真机实证修复)。
         Surface(
             modifier = Modifier.fillMaxSize(),
@@ -64,7 +87,23 @@ fun PixFoldApp() {
                 Screen.Home -> HomeScreen(
                     onOpenWorkflowA = { screen = Screen.WorkflowA },
                     onOpenWorkflowB = { screen = Screen.WorkflowB },
+                    onOpenSettings = { screen = Screen.Settings },
                 )
+
+                Screen.Settings -> {
+                    BackHandler { screen = Screen.Home }
+                    SettingsScreen(
+                        settings = settings,
+                        onChange = updateSettings,
+                        onBack = { screen = Screen.Home },
+                        onOpenLicenses = { screen = Screen.Licenses },
+                    )
+                }
+
+                Screen.Licenses -> {
+                    BackHandler { screen = Screen.Settings }
+                    LicensesScreen(onBack = { screen = Screen.Settings })
+                }
 
                 Screen.WorkflowA -> WorkflowASteps(
                     collections = collections,

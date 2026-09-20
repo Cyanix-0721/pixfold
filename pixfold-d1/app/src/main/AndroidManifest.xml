@@ -25,6 +25,7 @@
         android:enableOnBackInvokedCallback="true"
         tools:targetApi="33"
         android:supportsRtl="true"
+        android:localeConfig="@xml/locales_config"
         android:theme="@style/Theme.PixFold">
         <activity
             android:name=".MainActivity"

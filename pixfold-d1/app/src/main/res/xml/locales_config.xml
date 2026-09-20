@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  声明本应用支持的界面语言,使系统"设置 → 应用 → 语言"能正确列出可选语言。
+  阶段 1 仅设置页自身做了本地化(见 docs/superpowers/specs/2026-09-20-d1-settings-theme-design.md §9)。
+-->
+<locale-config xmlns:android="http://schemas.android.com/apk/res/android">
+    <locale android:name="zh" />
+    <locale android:name="en" />
+</locale-config>
