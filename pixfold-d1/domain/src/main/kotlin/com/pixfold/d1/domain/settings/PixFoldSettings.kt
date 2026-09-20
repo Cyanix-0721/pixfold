@@ -109,6 +109,19 @@ data class PixFoldSettings(
     val colorSpec: ColorSpecVersion = ColorSpecVersion.V2021,
     /** 深色模式下是否使用纯黑(`#000000`)背景。默认关。 */
     val pureBlack: Boolean = false,
+    /**
+     * 预测性返回动画。
+     *
+     * 开启时,返回手势进行中会**跟随手势进度**做缩放/淡出预览(Android 13+);
+     * 关闭时退化为普通返回(立刻切走,无手势跟随动画)。
+     *
+     * 默认开 —— 这是系统本来的行为,关掉只是"去掉动画",不应作为默认。
+     *
+     * > **实现说明**:`android:enableOnBackInvokedCallback` 是 manifest 静态属性、
+     * > 无法运行时改;但 androidx 的 `PredictiveBackHandler` 让应用能**消费手势进度**,
+     * > 于是"是否做手势跟随动画"是可以运行时切换的。本开关控制的就是后者。
+     */
+    val predictiveBackAnimation: Boolean = true,
     val language: AppLanguage = AppLanguage.System,
     val storageAccess: StorageAccess = StorageAccess.Saf,
 ) {

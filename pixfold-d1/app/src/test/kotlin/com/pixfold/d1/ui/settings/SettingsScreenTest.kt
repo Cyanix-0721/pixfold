@@ -100,6 +100,7 @@ class SettingsScreenTest {
             TAG_SETTINGS_PURE_BLACK,
             TAG_SETTINGS_LANGUAGE,
             TAG_SETTINGS_STORAGE,
+            TAG_SETTINGS_PREDICTIVE_BACK,
             TAG_SETTINGS_VERSION,
             TAG_SETTINGS_REPO,
             TAG_SETTINGS_RELEASE,
@@ -215,5 +216,16 @@ class SettingsScreenTest {
         show()
         rule.onNodeWithTag(TAG_SETTINGS_AUTHOR).assertExists()
         rule.onNodeWithTag(TAG_SETTINGS_VERSION).assertExists()
+    }
+
+    @Test
+    fun `predictive back animation defaults on and can be turned off`() {
+        // 默认**开**:预测性返回是系统本来的行为,关掉只是去掉动画。
+        show()
+        assertTrue(PixFoldSettings().predictiveBackAnimation, "默认应开启")
+        tap(TAG_SETTINGS_PREDICTIVE_BACK)
+        assertFalse(latest.predictiveBackAnimation, "关掉后应上报 false")
+        tap(TAG_SETTINGS_PREDICTIVE_BACK)
+        assertTrue(latest.predictiveBackAnimation, "再次点击应能开回来")
     }
 }

@@ -62,6 +62,7 @@ const val TAG_SETTINGS_COLOR_SPEC = "settings-color-spec"
 const val TAG_SETTINGS_PURE_BLACK = "settings-pure-black"
 const val TAG_SETTINGS_LANGUAGE = "settings-language"
 const val TAG_SETTINGS_STORAGE = "settings-storage"
+const val TAG_SETTINGS_PREDICTIVE_BACK = "settings-predictive-back"
 const val TAG_SETTINGS_VERSION = "settings-version"
 const val TAG_SETTINGS_REPO = "settings-repo"
 const val TAG_SETTINGS_RELEASE = "settings-release"
@@ -239,6 +240,14 @@ fun SettingsScreen(
             )
             // D1 不连真实文件系统,此项只记偏好 —— 如实标注,不假装已生效。
             Note(stringResource(R.string.settings_storage_note))
+
+            SwitchRow(
+                label = stringResource(R.string.settings_predictive_back),
+                description = stringResource(R.string.settings_predictive_back_desc),
+                checked = settings.predictiveBackAnimation,
+                tag = TAG_SETTINGS_PREDICTIVE_BACK,
+                onCheckedChange = { onChange(settings.copy(predictiveBackAnimation = it)) },
+            )
 
             Divider()
 

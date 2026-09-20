@@ -64,4 +64,6 @@
     <string name="language_english">English</string>
     <string name="storage_saf">SAF (recommended)</string>
     <string name="storage_all">All files access</string>
+    <string name="settings_predictive_back">Predictive back animation</string>
+    <string name="settings_predictive_back_desc">Preview the exit while swiping back; off switches immediately</string>
 </resources>

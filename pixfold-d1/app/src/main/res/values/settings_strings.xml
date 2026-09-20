@@ -64,4 +64,6 @@
     <string name="language_english">English</string>
     <string name="storage_saf">SAF（推荐）</string>
     <string name="storage_all">全部文件访问</string>
+    <string name="settings_predictive_back">返回手势跟随动画</string>
+    <string name="settings_predictive_back_desc">返回手势进行中实时预览退场；关闭则立即切走</string>
 </resources>

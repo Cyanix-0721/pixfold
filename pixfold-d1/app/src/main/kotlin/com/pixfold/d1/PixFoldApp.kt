@@ -1,6 +1,8 @@
 package com.pixfold.d1
 
 import androidx.activity.compose.BackHandler
+import androidx.activity.compose.PredictiveBackHandler
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.safeDrawing
@@ -9,10 +11,12 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalContext
 import com.pixfold.d1.domain.mock.MockData
 import com.pixfold.d1.domain.mock.MockDataB
@@ -83,6 +87,22 @@ fun PixFoldApp(store: SettingsStore? = null) {
             // 真机实测(2026-09-18):未处理时在"命名结构"步骤按返回会**直接退出到桌面**,
             // 用户丢失当前浏览位置,与 Android 的层级返回预期不符。
             // 注意:BackHandler 注册在**最内层**,故各级返回由内向外依次生效。
+            // 根级返回去处(按当前页面决定)。
+            // 工作流内部**步骤级**的返回由各自的步骤容器处理 —— 它们注册得更深、
+            // 优先级更高,故不会与本处冲突(详见 PredictiveBackContainer 注释)。
+            val rootBack: (() -> Unit)? = when (screen) {
+                Screen.Home -> null // 首页:交回系统(退出应用)
+                Screen.Settings -> ({ screen = Screen.Home })
+                Screen.Licenses -> ({ screen = Screen.Settings })
+                Screen.WorkflowA -> ({ screen = Screen.Home })
+                Screen.WorkflowB -> ({ screen = Screen.Home })
+                is Screen.Preview -> ({ screen = Screen.WorkflowA })
+            }
+
+            PredictiveBackContainer(
+                enabled = settings.predictiveBackAnimation,
+                onBack = rootBack,
+            ) {
             when (val current = screen) {
                 Screen.Home -> HomeScreen(
                     onOpenWorkflowA = { screen = Screen.WorkflowA },
@@ -91,7 +111,6 @@ fun PixFoldApp(store: SettingsStore? = null) {
                 )
 
                 Screen.Settings -> {
-                    BackHandler { screen = Screen.Home }
                     SettingsScreen(
                         settings = settings,
                         onChange = updateSettings,
@@ -101,7 +120,6 @@ fun PixFoldApp(store: SettingsStore? = null) {
                 }
 
                 Screen.Licenses -> {
-                    BackHandler { screen = Screen.Settings }
                     LicensesScreen(onBack = { screen = Screen.Settings })
                 }
 
@@ -116,7 +134,6 @@ fun PixFoldApp(store: SettingsStore? = null) {
                 is Screen.Preview -> {
                     // 预览是最内层:返回即关闭预览,回到工作流 A。
                     // (ImagePreview 内部也有自己的关闭按钮;二者语义一致。)
-                    BackHandler { screen = Screen.WorkflowA }
                     ImagePreview(
                         items = previewItems,
                         initialIndex = current.index,
@@ -131,6 +148,69 @@ fun PixFoldApp(store: SettingsStore? = null) {
                     onBack = { screen = Screen.Home },
                 )
             }
+            }
         }
     }
+}
+
+/**
+ * 预测性返回容器(用户 2026-09-20 要求做成可切换开关)。
+ *
+ * ## 为什么"开关"是可以做的(修正我此前的判断)
+ *
+ * `android:enableOnBackInvokedCallback` 是 **manifest 静态属性**,确实**不能**运行时改
+ * (已反编译 `android-36/android.jar` 确认 `OnBackInvokedDispatcher` 无 enable/disable API)。
+ *
+ * 但 androidx 提供了 [PredictiveBackHandler]:它让应用**订阅返回手势的进度流**,
+ * 于是"是否跟随手势做退场动画"成为**应用层的运行时选择**。本容器控制的正是后者。
+ *
+ * - [enabled] = true:`PredictiveBackHandler` 收进度 -> 内容随进度缩放/淡出;
+ *   手势完成时执行 [onBack];手势取消时复位(不导航)。
+ * - [enabled] = false:退回普通 `BackHandler` —— 立刻执行 [onBack],无跟随动画。
+ *
+ * ## 优先级
+ *
+ * 本容器注册在**较外层**,步骤容器(WorkflowASteps/BSteps)注册在**更内层**。
+ * `OnBackInvokedDispatcher` 取**最后注册者**,故工作流内部的步骤级返回优先;
+ * 只有步骤容器不处理时(如已在第 1 步)才落到本容器。
+ */
+@Composable
+private fun PredictiveBackContainer(
+    enabled: Boolean,
+    onBack: (() -> Unit)?,
+    content: @Composable () -> Unit,
+) {
+    if (onBack == null) {
+        // 首页:没有应用内返回去处,交回系统(系统据此执行"退出应用")。
+        content()
+        return
+    }
+    if (!enabled) {
+        BackHandler(onBack = onBack)
+        content()
+        return
+    }
+
+    var progress by remember { mutableFloatStateOf(0f) }
+    PredictiveBackHandler { events ->
+        try {
+            events.collect { event -> progress = event.progress }
+            // 手势完成(未被取消)才真正导航。
+            onBack()
+        } finally {
+            // 取消或完成后都复位,避免残留缩放。
+            progress = 0f
+        }
+    }
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .graphicsLayer {
+                val p = progress
+                val scale = 1f - 0.10f * p
+                scaleX = scale
+                scaleY = scale
+                alpha = 1f - 0.35f * p
+            },
+    ) { content() }
 }

@@ -36,6 +36,7 @@ class SharedPrefsSettingsStore(context: Context) : SettingsStore {
         colorStyle = readEnum(KEY_COLOR_STYLE, ColorStyle.entries, ColorStyle.TonalSpot),
         colorSpec = readEnum(KEY_COLOR_SPEC, ColorSpecVersion.entries, ColorSpecVersion.V2021),
         pureBlack = prefs.getBoolean(KEY_PURE_BLACK, false),
+        predictiveBackAnimation = prefs.getBoolean(KEY_PREDICTIVE_BACK, true),
         language = readEnum(KEY_LANGUAGE, AppLanguage.entries, AppLanguage.System),
         storageAccess = readEnum(KEY_STORAGE, StorageAccess.entries, StorageAccess.Saf),
     )
@@ -48,6 +49,7 @@ class SharedPrefsSettingsStore(context: Context) : SettingsStore {
             putString(KEY_COLOR_STYLE, settings.colorStyle.name)
             putString(KEY_COLOR_SPEC, settings.colorSpec.name)
             putBoolean(KEY_PURE_BLACK, settings.pureBlack)
+            putBoolean(KEY_PREDICTIVE_BACK, settings.predictiveBackAnimation)
             putString(KEY_LANGUAGE, settings.language.name)
             putString(KEY_STORAGE, settings.storageAccess.name)
         }
@@ -66,6 +68,7 @@ class SharedPrefsSettingsStore(context: Context) : SettingsStore {
         const val KEY_COLOR_STYLE = "color_style"
         const val KEY_COLOR_SPEC = "color_spec"
         const val KEY_PURE_BLACK = "pure_black"
+        const val KEY_PREDICTIVE_BACK = "predictive_back_animation"
         const val KEY_LANGUAGE = "language"
         const val KEY_STORAGE = "storage_access"
     }
