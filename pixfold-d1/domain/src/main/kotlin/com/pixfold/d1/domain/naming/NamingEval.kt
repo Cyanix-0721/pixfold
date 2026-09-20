@@ -108,7 +108,7 @@ fun containsIllegalChar(name: String): Boolean =
     name.any { it in ILLEGAL_NAME_CHARS || it.code < 0x20 }
 
 /** 把非法字符全部替换为 [replacement](规格 §7)。 */
-fun sanitizeName(name: String, replacement: String = "_"): String {
+fun sanitizeName(name: String, replacement: String = NamingScheme.DEFAULT_REPLACEMENT): String {
     if (!containsIllegalChar(name)) return name
     return buildString {
         for (ch in name) {

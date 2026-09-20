@@ -400,4 +400,23 @@ class NamingEvalTest {
         assertTrue(buildRenamePlan(emptyList()).isEmpty())
         assertNull(buildRenamePlan(emptyList()).firstOrNull())
     }
+
+    @Test
+    fun `default replacement is a single underscore and is used by default`() {
+        // UI 上的「默认」按钮与领域默认值**同源**(NamingScheme.DEFAULT_REPLACEMENT)。
+        // 若两处字面量不同步,就会出现"点了默认却没变"的假按钮。
+        assertEquals("_", NamingScheme.DEFAULT_REPLACEMENT)
+        assertEquals(
+            "a_b.jpg",
+            sanitizeName("a:b.jpg"),
+            "不显式传 replacement 时应使用领域默认值",
+        )
+    }
+
+    @Test
+    fun `empty replacement deletes illegal characters`() {
+        // 留空是一种真实语义(不是"没填"):非法字符被**删除**而非替换。
+        // UI 必须据此给出说明文案,否则用户会以为是自己弄坏了。
+        assertEquals("ab.jpg", sanitizeName("a:b?.jpg", replacement = ""))
+    }
 }
