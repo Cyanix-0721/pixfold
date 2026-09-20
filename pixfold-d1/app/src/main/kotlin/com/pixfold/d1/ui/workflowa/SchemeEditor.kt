@@ -47,6 +47,7 @@ import com.pixfold.d1.domain.naming.addComponent
 import com.pixfold.d1.domain.naming.moveComponent
 import com.pixfold.d1.domain.naming.clearRootDirNameOverride
 import com.pixfold.d1.domain.naming.removeComponent
+import com.pixfold.d1.domain.naming.sanitizeName
 import com.pixfold.d1.domain.naming.setRootDirNameOnScheme
 import com.pixfold.d1.domain.naming.toggleComponent
 import com.pixfold.d1.domain.naming.updateComponent
@@ -60,6 +61,9 @@ const val TAG_SCHEME_INDEX_START = "scheme-index-start"
 const val TAG_SCHEME_INDEX_PADDING = "scheme-index-padding"
 const val TAG_SCHEME_REPLACEMENT = "scheme-replacement"
 const val TAG_SCHEME_REPLACEMENT_RESET = "scheme-replacement-reset"
+
+/** 「清洗」说明对话框里的**实时示例**文案(用真实 sanitizeName 算出,不写死)。 */
+const val TAG_SCHEME_SANITIZE_EXAMPLE = "scheme-sanitize-example"
 
 /** "自动清洗"说明入口(圆形感叹号图标)。 */
 const val TAG_SCHEME_SANITIZE_INFO = "scheme-sanitize-info"
@@ -258,6 +262,13 @@ fun SchemeEditor(
  * 且**不含跨行拼接** —— 后者会被 lint 的 `TextConcatSpace` 判为"可能漏空格"
  * (中文其实不需要空格,但项目要求 lint 零告警,故从结构上避免)。
  */
+/**
+ * 清洗示例的**输入**名(含 `:` 与 `?` 两个非法字符 + 扩展名)。
+ *
+ * 选它是因为它同时演示两件事:非法字符被替换、**扩展名也参与清洗**(§6.1 第 7 步)。
+ */
+private const val SANITIZE_EXAMPLE_INPUT = "封:面?.jpg"
+
 private val SANITIZE_EXPLANATION = """
     开启后，文件名中的非法字符（\ / : * ? " < > | 以及控制字符）会被替换为「_」。
 
@@ -346,6 +357,26 @@ private fun SanitizeInfoButton(
                             },
                             style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                        Spacer(Modifier.size(8.dp))
+                        Text(
+                            // ---- 实时示例(用户 2026-09-19 裁决「方案 A」) ----
+                            //
+                            // 用户困惑的根源是"不知道这个字符做什么"。一句具体示例即可消除;
+                            // 比"条件提示"更值:后者在真实数据下(根目录名/原文件名常含非法字符)
+                            // 很少触发,等真看到提示时用户多半已经困惑过了。
+                            //
+                            // **示例值由真实的 `sanitizeName` 算出,不是写死的字符串** ——
+                            // 写死的话,一旦清洗规则变了(改非法字符集/改替换逻辑),
+                            // 说明文字会与真实行为不符,而那种"文档说谎"极难被发现。
+                            // 这里让示例**结构上不可能说谎**(规则一改,示例自动跟着改)。
+                            text = "示例：" + SANITIZE_EXAMPLE_INPUT + " → " +
+                                sanitizeName(SANITIZE_EXAMPLE_INPUT, scheme.replacement),
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier
+                                .testTag(TAG_SCHEME_SANITIZE_EXAMPLE)
+                                .semantics { contentDescription = "清洗示例" },
                         )
                     }
                 }

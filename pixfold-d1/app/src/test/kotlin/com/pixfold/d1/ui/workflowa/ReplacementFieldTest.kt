@@ -19,6 +19,7 @@ import com.pixfold.d1.domain.model.NameComponent
 import com.pixfold.d1.domain.model.NameComponentKind
 import com.pixfold.d1.domain.model.NamingScheme
 import com.pixfold.d1.domain.model.NamingState
+import com.pixfold.d1.domain.naming.sanitizeName
 import com.pixfold.d1.domain.sort.pageOrderOf
 import org.junit.Rule
 import org.junit.Test
@@ -190,5 +191,52 @@ class ReplacementFieldTest {
         val node = rule.onNodeWithTag(tag).fetchSemanticsNode()
         val key = SemanticsProperties.EditableText
         return if (node.config.contains(key)) node.config[key].text else ""
+    }
+
+    // ---- 实时示例(方案 A,用户 2026-09-19 裁决) ----
+
+    @Test
+    fun `dialog shows a concrete cleaning example`() {
+        setPage(NamingScheme(
+            rootDirName = "旅行照片",
+            sanitize = true,
+            replacement = "_",
+            components = illegalComponents,
+        ))
+        openSanitizeDialog()
+        rule.onNodeWithText("示例：封:面?.jpg → 封_面_.jpg").assertExists()
+    }
+
+    @Test
+    fun `example follows the replacement character`() {
+        // 示例必须是**实时**的:换了替换字符,示例立刻跟着变。
+        setPage(NamingScheme(
+            rootDirName = "旅行照片",
+            sanitize = true,
+            replacement = "_",
+            components = illegalComponents,
+        ))
+        openSanitizeDialog()
+        rule.onNodeWithTag(TAG_SCHEME_REPLACEMENT).performTextClearance()
+        rule.onNodeWithTag(TAG_SCHEME_REPLACEMENT).performTextInput("#")
+        rule.waitForIdle()
+        rule.onNodeWithText("示例：封:面?.jpg → 封#面#.jpg").assertExists()
+    }
+
+    @Test
+    fun `example is computed by the real sanitize function`() {
+        // 防"文档说谎":示例若被写成硬编码字符串,清洗规则一改就会与真实行为不符,
+        // 而那种偏差极难被发现。这里直接拿**领域函数**的结果与界面文案对照,
+        // 钉死"示例 = 真实清洗结果"。
+        setPage(NamingScheme(
+            rootDirName = "旅行照片",
+            sanitize = true,
+            replacement = "@",
+            components = illegalComponents,
+        ))
+        openSanitizeDialog()
+        val expected = sanitizeName("封:面?.jpg", "@")
+        rule.onNodeWithText("示例：封:面?.jpg → $expected").assertExists()
+        assertEquals("封@面@.jpg", expected, "前置:领域函数应把 : 与 ? 都替换为 @")
     }
 }
