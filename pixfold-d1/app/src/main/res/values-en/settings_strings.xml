@@ -43,7 +43,7 @@
     <string name="licenses_own">This project</string>
     <string name="licenses_third_party">Third-party components</string>
     <!-- Enum value labels (English) -->
-    <string name="accent_default">Default</string>
+    <string name="accent_default">Indigo</string>
     <string name="accent_blue">Blue</string>
     <string name="accent_green">Green</string>
     <string name="accent_purple">Purple</string>

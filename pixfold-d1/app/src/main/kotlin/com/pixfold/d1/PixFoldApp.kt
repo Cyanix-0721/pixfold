@@ -1,5 +1,8 @@
 package com.pixfold.d1
 
+import android.app.LocaleManager
+import android.os.Build
+import android.os.LocaleList
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.PredictiveBackHandler
 import androidx.compose.foundation.layout.Box
@@ -11,6 +14,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -21,6 +25,7 @@ import androidx.compose.ui.platform.LocalContext
 import com.pixfold.d1.domain.mock.MockData
 import com.pixfold.d1.domain.mock.MockDataB
 import com.pixfold.d1.data.SharedPrefsSettingsStore
+import com.pixfold.d1.domain.settings.AppLanguage
 import com.pixfold.d1.domain.settings.PixFoldSettings
 import com.pixfold.d1.domain.settings.SettingsStore
 import com.pixfold.d1.ui.HomeScreen
@@ -62,6 +67,10 @@ fun PixFoldApp(store: SettingsStore? = null) {
         settings = next
         settingsStore.save(next)
     }
+
+    // 语言必须**真正应用**到系统 per-app locale,否则只是存了个值、界面不变
+    // (真机实测发现:选了 English 界面仍是中文 —— 此前完全漏了这一步)。
+    ApplyAppLanguage(settings.language)
 
     PixFoldTheme(settings = settings) {
         // Surface 提供 M3 语义背景色 —— 深色模式下不会透出窗口白底(真机实证修复)。
@@ -149,6 +158,39 @@ fun PixFoldApp(store: SettingsStore? = null) {
                 )
             }
             }
+        }
+    }
+}
+
+/**
+ * 把设置里的语言应用到系统的 **per-app locale**。
+ *
+ * **为什么需要它**:设置页只把 `language` 存进 SharedPreferences,
+ * 那只是"记录用户的选择";要让界面真的切换语言,必须调用
+ * [LocaleManager.setApplicationLocales] —— 系统据此重建 Activity 并
+ * 按新 locale 解析字符串资源。
+ *
+ * **此前漏了这一步**(真机实测:选 English 后界面仍是中文),属真实缺陷。
+ *
+ * **版本说明**:`LocaleManager` 是 API 33+,故仅在其上生效;
+ * 更低版本此处不处理(项目真机为 Android 16,不受影响)。
+ * 要让低版本也支持,需 `attachBaseContext` 手动包装 —— 属后续工作。
+ */
+@Composable
+private fun ApplyAppLanguage(language: AppLanguage) {
+    val context = LocalContext.current
+    LaunchedEffect(language) {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) return@LaunchedEffect
+        val manager = context.getSystemService(LocaleManager::class.java) ?: return@LaunchedEffect
+        val tag = when (language) {
+            AppLanguage.System -> null          // 空 LocaleList = 跟随系统
+            AppLanguage.Chinese -> "zh"
+            AppLanguage.English -> "en"
+        }
+        val want = if (tag == null) LocaleList.getEmptyLocaleList() else LocaleList.forLanguageTags(tag)
+        // 已是目标值就不要重复设置 —— 否则每次重组都可能触发一次 Activity 重建。
+        if (manager.applicationLocales != want) {
+            manager.setApplicationLocales(want)
         }
     }
 }
