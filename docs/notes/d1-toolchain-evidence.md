@@ -17,6 +17,9 @@
 
 ## 2. 锁定的版本组合(实测可用)
 
+> **⚠️ 本节记录的是 2026-09-16 的组合,已于 2026-09-20 被 §8 取代**(工具链升级到当时最新 stable)。
+> **保留原文作为当时的历史证据**,不作为当前版本依据 —— 当前以 §8 与 `HANGOFF.md` §12.6 为准。
+
 | 组件 | 版本 | 备注 |
 | --- | --- | --- |
 | Gradle | **9.6.0** | 发行版**已在 Windows 侧缓存**(`C:\Users\Administrator\.gradle\wrapper\dists\gradle-9.6.0-bin`),无需下载 |
@@ -166,3 +169,97 @@ MotionScheme$Companion:
   那将是"零三方依赖"(规格 §2 约束 3)的**显式例外**,须记录并锁版本。
 - **反面教训**:M3E 类文件**存在于** stable 构件里,单看 `unzip -l` 会误判"stable 已支持";
   必须**编译**才能确认可见性。这与本项目"断言必须实证"的一贯要求一致。
+
+## 8. 工具链升级到最新 stable(2026-09-20)
+
+> **动因**:用户要求"尽量都用新的稳定版本"(考虑后期维护),并引入 AboutLibraries 做开源许可页。
+> AboutLibraries `15.2.0` 声明 `kotlin-stdlib 2.4.10`,而当时项目 Kotlin 为 2.2.10
+> (编译器最多读 metadata 2.3),**直接编译失败**:
+>
+> ```
+> e: Module was compiled with an incompatible version of Kotlin.
+>    The binary version of its metadata is 2.4.0, expected version is 2.2.0.
+>    The actual metadata version is 2.4.0, but the compiler version 2.2.0 can read versions up to 2.3.0.
+> ```
+>
+> 即**不是"要不要用三方库"的问题,而是"它的最低 Kotlin 要求超过了我们的工具链"**。
+
+### 8.1 升级前后对照
+
+| 组件 | 升级前(2026-09-16) | **升级后** | 说明 |
+| --- | --- | --- | --- |
+| Gradle | 9.6.0 | **9.7.1** | lint 报出过期后一并升 |
+| AGP | 9.4.0 | **9.4.1** | 补丁级 |
+| Kotlin | 2.2.10 | **2.4.20** | 由 AGP 9.4.1 内置(见 §3.1) |
+| Compose BOM | 2026.02.01 | **2026.09.00** | — |
+| activity-compose | 1.12.4 | **1.13.0** | lint 报出过期后一并升 |
+| compileSdk | 36 | **37** | 新依赖链要求(见 8.3) |
+| targetSdk | 36 | **36(不变)** | 刻意锁定,与真机 Android 16 对齐 |
+| minSdk | 24 | 24(不变) | — |
+| Robolectric | 4.17 | 4.17(已最新) | — |
+| AboutLibraries | — | **15.2.0** | 新增(core + compose-m3 + 插件) |
+
+### 8.2 验证证据(探针分支 → 正式升级,均实测)
+
+**先在临时分支 `probe/toolchain-upgrade` 验证**(验证后**已删除**,`dev` 未受影响),
+确认组合成立再正式改 —— 避免"改坏主分支再回滚"。
+
+| 验证项 | 结果 |
+| --- | --- |
+| 主代码 + 测试代码编译 | ✅ |
+| **既有 461 项测试**(domain 219 + app UI 241) | ✅ **0 失败** |
+| `assembleDebug` | ✅ |
+| `lintDebug` | ✅ **No issues found** |
+
+**关键**:先证明"**升级本身没有破坏任何既有行为**"(461 项全绿),
+后续功能测试若失败才能确定是新代码的问题 —— 否则归因会变难。
+
+### 8.3 撞到并解决的坑:compileSdk 必须升到 37
+
+引入 AboutLibraries 后构建报错:
+
+```
+Dependency 'com.mikepenz:aboutlibraries-compose-m3-android:15.2.0' requires
+libraries and applications that depend on it to compile against version 37
+or later of the Android APIs. :app is currently compiled against android-36.
+```
+
+传导链:AboutLibraries 15.2.0 → Compose 1.12.1 → 要求 `compileSdk ≥ 37`。
+
+**`compileSdk` 与 `targetSdk` 必须分开看**(此处容易搞混):
+
+| 项 | 是否改 | 理由 |
+| --- | --- | --- |
+| `compileSdk` | **36 → 37** | 只决定"用哪个 SDK 编译",不改变运行时行为 |
+| `targetSdk` | **保持 36** | 决定运行时行为契约(如 targetSdk 36 起强制 edge-to-edge),§12.6 明确与真机 Android 16 对齐 |
+
+`platforms;android-37.0` 本机**已装**,无需额外下载。
+
+### 8.4 伴随的 lint 收紧(从"关 4 项"到"只关 1 项")
+
+升级前 `lint` 因"刻意锁定旧版本"关闭了 4 项版本检查
+(`NewerVersionAvailable` / `GradleDependency` / `AndroidGradlePluginVersion` / `OldTargetApi`)。
+升级后**重新启用前 3 项**并真实通过:
+
+> **这 3 项检测确实在工作**(不是被忽略):启用后它立刻报出
+> `Gradle 9.6.0 → 9.7.1` 与 `activity-compose 1.12.4 → 1.13.0` 两项过期,
+> 升级后归零。**若无这次重新启用,这两个过期项不会被发现。**
+
+仅保留 `OldTargetApi` 关闭(targetSdk 36 是刻意策略)。
+约束 `warningsAsErrors = true` 要求豁免清单尽可能小,每次升级工具链后应重新评估。
+
+### 8.5 附带确认:material3 仍是 1.4.0
+
+最新 Compose BOM `2026.09.00` 锁定的 material3 **仍是 1.4.0**
+(实测其 BOM pom)。故 **§7 关于 M3E 不可用的结论不变** ——
+升级 BOM 不会带来 M3E,stable 仍是唯一可用规范。
+
+### 8.6 一条操作教训
+
+升级 Gradle wrapper 时,我在 WSL 侧用 `curl` 下载分发包**连续 TLS 中断**,
+一度误判"网络不通"。实际上 **Gradle 跑在 Windows 侧,其网络路径与 WSL 不同** ——
+Windows 侧的 wrapper **一直在正常下载**(缓存目录里已有 108MB 的 `.part`)。
+
+> **教训**:排查 Gradle/Android 的网络问题,要在**实际执行构建的那一侧**验证,
+> 不要用 WSL 侧的连通性推断 Windows 侧。本次还因此在缓存里留下 `.lck` 残留,
+> 导致后续报 `Timeout ... waiting for exclusive access to file`,清理后才恢复。

@@ -1566,8 +1566,8 @@ mise ls                  # 看 mise 管的工具版本
 | --- | --- |
 | Git / VS Code / Android Studio | 2.55.0.windows.5 / 1.138.0 / 2026.1.4.7 |
 | JDK | temurin-17.0.20+101(mise;Android/Gradle 构建所需);另有 Studio 内置 **JBR 25.0.3** 可用(完整 JDK) |
-| Gradle / AGP / Kotlin / Compose BOM | 9.6.0 / 9.4.0 / 2.2.10 / 2026.02.01 —— **来自 Studio 2026.1.4 新建工程模板**;2026-09-12 有成功构建实证(跑在 JBR 25 上),**2026-09-16 已在 temurin-17 下完整复验通过**(探针工程,证据见 `docs/notes/d1-toolchain-evidence.md`) |
-| compileSdk / minSdk / targetSdk | 36 / 24 / 36(目标值;Studio 模板默认给的是 37 / 36 / 37,新工程须显式改回) |
+| Gradle / AGP / Kotlin / Compose BOM | **9.7.1 / 9.4.1 / 2.4.20 / 2026.09.00** —— **2026-09-20 主动升级到当时最新 stable**(用户决策:"尽量都用新的稳定版本",考虑后期维护)。原值 9.6.0 / 9.4.0 / 2.2.10 / 2026.02.01 来自 Studio 2026.1.4 模板。**升级动因**:引入 AboutLibraries 15.2.0 需 Kotlin ≥ 2.4.10。**升级经探针实测**(临时分支验证后弃用):编译通过 + **既有 461 项测试全绿** + assembleDebug + lint 零告警。证据见 `docs/notes/d1-toolchain-evidence.md` §8 |
+| compileSdk / minSdk / targetSdk | **37** / 24 / **36** —— `compileSdk` 于 2026-09-20 由 36 升到 37 (新依赖链 AboutLibraries → Compose 1.12.1 要求;`platforms;android-37.0` 本机已装)。**`targetSdk` 仍锁 36**(与真机 Android 16 对齐,§12.6 策略不变)—— 二者分离:`compileSdk` 只决定"用哪个 SDK 编译",`targetSdk` 决定运行时行为契约。故 `OldTargetApi` 的 lint 豁免理由继续成立 |
 | Android platform | `platforms;android-36`(**已装**,与真机 Android 16 对齐);`android-37.0` 也在(模板默认带的) |
 | Android SDK 根 | `C:\Users\Administrator\AppData\Local\Android\Sdk` |
 

@@ -512,25 +512,47 @@ MIT License · Copyright (c) 2026 Cyanix-0721
 [查看完整许可证]        ← 展开 LICENSE 全文
 ```
 
-**② 第三方组件**（每行：名称 / 许可 / 来源链接）
+**② 第三方组件** —— **由 AboutLibraries 自动生成**（见下）
+
+组件列表由 `com.mikepenz:aboutlibraries` 从各依赖的 POM/元数据**自动提取**，
+不需要手工维护。预期覆盖（升级后实测为准）：
 
 | 组件 | 许可 |
 | --- | --- |
-| Jetpack Compose (UI / Runtime) | Apache-2.0 |
+| Jetpack Compose (UI / Runtime / Foundation) | Apache-2.0 |
 | Material 3 (`androidx.compose.material3`) | Apache-2.0 |
-| AndroidX Activity Compose | Apache-2.0 |
+| AndroidX Activity Compose / Core | Apache-2.0 |
 | Kotlin Standard Library | Apache-2.0 |
+| **AboutLibraries 自身** | Apache-2.0 |
 | Material Symbols 图标几何数据 | Apache-2.0 |
-| Robolectric（仅测试，不随应用分发） | MIT |
-| JUnit 4（仅测试，不随应用分发） | EPL-1.0 |
 
-- **出处依据**：图标许可已在各 `drawable/*.xml` 注释中记录来源；
-  依赖许可见各自 POM。
-- **不引入任何许可证展示三方库**（如 `aboutlibraries`）—— 手写静态清单，保持零依赖。
-- 页面顶部标注：`本应用使用了以下开源组件，特此致谢。`
+- **页面顶部**：`本应用使用了以下开源组件，特此致谢。`
+- **Material Symbols 图标**（`ic_*` 矢量资源）：许可与来源已逐条记录在
+  各 `drawable/*.xml` 注释中；AboutLibraries **不会**自动收录这类"手工引入的几何数据"，
+  故在许可页**以一条静态条目**列出（这是本页唯一手写的部分）。
+
+### 8.2 为什么改用 AboutLibraries（决策变更记录）
+
+**初稿决定**：手写静态清单、不引入三方库（当时理由是"保持零依赖"）。
+
+**2026-09-20 用户裁决后变更**：用户明确"**并不强求无第三方依赖，热门且有在维护的库可以考虑**"，
+并选择升级工具链以接入 AboutLibraries。变更依据：
+
+| 维度 | 事实（2026-09-20 实测） |
+| --- | --- |
+| 热度 | GitHub **4.4k star**、591 fork、3,224 commits |
+| 维护活跃度 | 最新 release **15.2.0（2026-08-28）**，依赖由 Renovate 自动跟进 |
+| 构件正确坐标 | **`com.mikepenz:aboutlibraries-core`** 与 **`-compose-m3`**（均为 15.2.0） |
+| ⚠️ 坑 | 父构件 `com.mikepenz:aboutlibraries` **只到 14.2.1** —— 查"最新版本"时看父构件会得出**错误结论** |
+| 使用方式 | 官方推荐 `libs.versions.toml`（Version Catalog）—— **本项目早已在用** |
+
+**代价（已接受）**：需把工具链升到 Kotlin ≥ 2.4.10，连带升级
+Gradle / AGP / Compose BOM / compileSdk。**升级已完成并验证**（见 §10.6 与
+`docs/notes/d1-toolchain-evidence.md` §8）。
 
 > **合规性说明**：Apache-2.0 要求保留版权与许可声明，
-> 故该清单**不只是礼貌，属合规刚需**。
+> 故该清单**不只是礼貌，属合规刚需** —— 自动生成可避免"漏列某个依赖的许可"这类合规风险，
+> 这也是引入它的主要收益（而非单纯省事）。
 
 ## 9. 本地化机制（阶段 1 部分）
 
@@ -598,6 +620,25 @@ res/xml/locales_config.xml    —— 声明 zh / en
 关键断言需做变异验证（去掉实现后测试必须失败），至少覆盖：
 主题三态解析、`accent` 派生 `monetEnabled`、纯黑生效、恢复默认真的重置、
 语言切换真的换文案。
+
+### 10.6 工具链升级验证（2026-09-20，已完成）
+
+工具链升级到最新 stable（Gradle 9.7.1 / AGP 9.4.1 / Kotlin 2.4.20 / Compose BOM 2026.09.00 /
+compileSdk 37），**在临时探针分支验证通过后**才正式改：
+
+| 验证项 | 结果 |
+| --- | --- |
+| 主 + 测试代码编译 | ✅ |
+| **既有 461 项测试**（domain 219 + app UI 241） | ✅ **0 失败** |
+| `assembleDebug` | ✅ |
+| `lintDebug` | ✅ No issues found |
+
+**为什么升级本身就要立刻跑全量测试**：这是"升级未破坏既有行为"的**唯一证据**。
+若跳过它、等新功能写完再测，一旦失败将**无法区分**是工具链升级引起还是新代码写坏 —— 归因会变难。
+实测耗时仅约 2 分钟，成本远低于归因困难。
+
+详细依据（含 `compileSdk 37` 的传导链、lint 收紧、教训）见
+`docs/notes/d1-toolchain-evidence.md` §8。
 
 ## 11. 决策记录（原待确认项，2026-09-20 已全部裁决）
 
