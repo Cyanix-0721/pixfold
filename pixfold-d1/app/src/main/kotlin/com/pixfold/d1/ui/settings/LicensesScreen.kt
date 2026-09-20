@@ -38,6 +38,9 @@ const val TAG_LICENSES_BACK = "licenses-back"
 const val TAG_LICENSES_OWN = "licenses-own"
 const val TAG_LICENSES_LIST = "licenses-list"
 
+/** 许可更正说明(见下方"为什么需要它")。 */
+const val TAG_LICENSES_CORRECTION = "licenses-correction"
+
 /** 本项目自身的许可(MIT)—— 与仓库根 `LICENSE` 一致。 */
 private const val OWN_LICENSE_NAME = "MIT License"
 private const val OWN_COPYRIGHT = "Copyright (c) 2026 Cyanix-0721"
@@ -164,6 +167,31 @@ fun LicensesScreen(
                 modifier = Modifier
                     .fillMaxWidth()
                     .testTag(TAG_LICENSES_LIST),
+            )
+
+            // ---- 许可更正 ----
+            //
+            // 为什么需要它:AboutLibraries **从构件 POM 自动收集**许可,
+            // 但 POM 声明的是"项目级"许可,未必等于**该模块**实际使用的许可。
+            // `material-color-utilities` 正是这种情况:POM 写 MIT,
+            // 而其模块内 LICENSE 沿用 Google 原库的 Apache-2.0。
+            //
+            // 这条**如实更正**而非静默采信自动结果 —— 许可声明的准确性是合规问题,
+            // 不能因为"工具自动生成的"就默认正确。
+            HorizontalDivider(modifier = Modifier.padding(vertical = 12.dp))
+            Text(
+                text = stringResource(R.string.licenses_correction_title),
+                style = MaterialTheme.typography.titleSmall,
+                color = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.padding(bottom = 4.dp),
+            )
+            Text(
+                text = stringResource(R.string.licenses_correction_body),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier
+                    .testTag(TAG_LICENSES_CORRECTION)
+                    .padding(bottom = 12.dp),
             )
 
             // 图标几何数据:手工引入的矢量资源,不在依赖图中,故单列说明。

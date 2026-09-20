@@ -66,4 +66,6 @@
     <string name="storage_all">全部文件访问</string>
     <string name="settings_predictive_back">返回手势跟随动画</string>
     <string name="settings_predictive_back_desc">返回手势进行中实时预览退场；关闭则立即切走</string>
+    <string name="licenses_correction_title">许可更正</string>
+    <string name="licenses_correction_body">com.materialkolor:material-color-utilities 的构件 POM 声明为 MIT，但其模块内 LICENSE 为 Apache-2.0（源码移植自 Google 的 material-foundation/material-color-utilities）。本应用按 Apache-2.0 履行声明义务。</string>
 </resources>
