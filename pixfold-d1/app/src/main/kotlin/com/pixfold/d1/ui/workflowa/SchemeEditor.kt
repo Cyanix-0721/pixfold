@@ -41,6 +41,7 @@ import com.pixfold.d1.domain.model.ExtPolicy
 import com.pixfold.d1.domain.model.NameComponent
 import com.pixfold.d1.domain.model.NameComponentKind
 import com.pixfold.d1.domain.model.NamingScheme
+import com.pixfold.d1.domain.model.NamingScheme.Companion.DEFAULT_REPLACEMENT
 import com.pixfold.d1.domain.model.NamingState
 import com.pixfold.d1.domain.naming.addComponent
 import com.pixfold.d1.domain.naming.moveComponent
@@ -57,6 +58,8 @@ const val TAG_SCHEME_SANITIZE = "scheme-sanitize"
 const val TAG_SCHEME_ROOT_DIR = "scheme-root-dir"
 const val TAG_SCHEME_INDEX_START = "scheme-index-start"
 const val TAG_SCHEME_INDEX_PADDING = "scheme-index-padding"
+const val TAG_SCHEME_REPLACEMENT = "scheme-replacement"
+const val TAG_SCHEME_REPLACEMENT_RESET = "scheme-replacement-reset"
 
 /** "自动清洗"说明入口(圆形感叹号图标)。 */
 const val TAG_SCHEME_SANITIZE_INFO = "scheme-sanitize-info"
@@ -228,7 +231,15 @@ fun SchemeEditor(
                 style = MaterialTheme.typography.labelMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
-            SanitizeInfoButton()
+            // 替换字符放在**说明对话框内**(而非再加一行):
+            // 命名页整页只有一个 LazyColumn,头部(编辑器)在真机上已高达 ~862dp,
+            // 视口仅剩约 130dp 给建议表 —— 再加一行会把**主工作区**挤出屏幕
+            // (实测:加行后建议行完全不组合,14 项既有测试失败)。
+            // 放进对话框既零高度成本,也与「清洗规则」的说明同处一室,语义更顺。
+            SanitizeInfoButton(
+                scheme = scheme,
+                onScheme = { onChange(updateScheme(state, it)) },
+            )
             Switch(
                 checked = scheme.sanitize,
                 onCheckedChange = { onChange(updateScheme(state, scheme.copy(sanitize = it))) },
@@ -262,7 +273,10 @@ private val SANITIZE_EXPLANATION = """
  *  - 说明内容由对话框承载,反而可以写得更完整(非法字符集 + "不会去重"的提醒)。
  */
 @Composable
-private fun SanitizeInfoButton() {
+private fun SanitizeInfoButton(
+    scheme: NamingScheme,
+    onScheme: (NamingScheme) -> Unit,
+) {
     var showInfo by remember { mutableStateOf(false) }
 
     IconButton(
@@ -283,7 +297,59 @@ private fun SanitizeInfoButton() {
         AlertDialog(
             onDismissRequest = { showInfo = false },
             title = { Text("自动清洗") },
-            text = { Text(SANITIZE_EXPLANATION) },
+            text = {
+                Column {
+                    Text(SANITIZE_EXPLANATION)
+                    // 替换字符:**仅在开启清洗时可改**。
+                    // 关闭时它完全不起作用(领域层 `if (scheme.sanitize)`),
+                    // 留个改了没反应的框就是假控件 —— 故此处直接不显示。
+                    if (scheme.sanitize) {
+                        Spacer(Modifier.size(12.dp))
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            modifier = Modifier.fillMaxWidth(),
+                        ) {
+                            Text(
+                                text = "替换为",
+                                style = MaterialTheme.typography.labelMedium,
+                            )
+                            OutlinedTextField(
+                                value = scheme.replacement,
+                                onValueChange = {
+                                    // 只取**单个**字符:多于一个会让"一个非法字符"变成多个字符,
+                                    // 破坏逐字符替换的可预期性(粘贴多字符时取首个,避免怪结果)。
+                                    onScheme(scheme.copy(replacement = it.take(1)))
+                                },
+                                singleLine = true,
+                                modifier = Modifier
+                                    .widthInChars(6)
+                                    .testTag(TAG_SCHEME_REPLACEMENT)
+                                    .semantics { contentDescription = "非法字符替换为" },
+                            )
+                            TextButton(
+                                onClick = { onScheme(scheme.copy(replacement = DEFAULT_REPLACEMENT)) },
+                                enabled = scheme.replacement != DEFAULT_REPLACEMENT,
+                                modifier = Modifier
+                                    .testTag(TAG_SCHEME_REPLACEMENT_RESET)
+                                    .semantics { contentDescription = "恢复默认替换字符" },
+                            ) { Text("默认") }
+                        }
+                        Text(
+                            // 留空不是"没填",而是一种真实语义:领域层 `append(replacement)`,
+                            // 替换字符为空 = 把非法字符**删掉**。必须说清,否则用户清空后
+                            // 看到非法字符凭空消失、却不知道是自己造成的。
+                            text = if (scheme.replacement.isEmpty()) {
+                                "留空 = 直接删除非法字符"
+                            } else {
+                                "非法字符将被替换为该字符"
+                            },
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                }
+            },
             confirmButton = {
                 TextButton(
                     onClick = { showInfo = false },

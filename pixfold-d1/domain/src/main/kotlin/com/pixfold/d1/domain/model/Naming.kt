@@ -59,9 +59,17 @@ data class NamingScheme(
     val indexPadding: Int = 3,
     val extPolicy: ExtPolicy = ExtPolicy.Lower,
     val sanitize: Boolean = true,
-    val replacement: String = "_",
+    val replacement: String = DEFAULT_REPLACEMENT,
 ) {
     companion object {
+        /**
+         * 非法字符的默认替换字符(规格 §7:非法字符全部替换为 `replacement`,默认 `"_"`)。
+         *
+         * 提为常量而非各处写 `"_"`:UI 上的「默认」按钮要与领域默认值比较,
+         * 两处字面量一旦不同步就会出现"点了默认却没变"的假按钮。
+         */
+        const val DEFAULT_REPLACEMENT = "_"
+
         /** 默认输出 `<根目录名>_<三位序号>.<小写扩展名>`(规格 §4.4)。 */
         val DEFAULT_COMPONENTS = listOf(
             NameComponent(NameComponentKind.RootDir),
