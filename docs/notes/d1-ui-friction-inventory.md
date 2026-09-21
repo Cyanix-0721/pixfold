@@ -222,6 +222,7 @@
 | **P1** | 3 | 计划页/报告页缺筛选 | 一致性与可用性 |
 | **P2** | 4 | B 侧策略与计划的因果距离 | 可用性 |
 | **P2** | 5 | 危险动作触发路径长 | 第 2 项的派生 |
+| **P2** | 10 | 深色下卡片是 material3 基线紫灰，与种子派生背景**色相错配** | **违反约束 7（配色未走语义派生）** |
 | **P3** | 6/7 | 容器重复；MetadataPage 637 行 | 结构性 |
 
 **建议顺序**：**P0 先做**（唯一违反产品约束的项，且已两次逼出绕过方案），
@@ -229,6 +230,56 @@
 
 > **流程约定**：以上均为**设计变更**（动页面结构），需先出设计方案交用户确认，
 > 再进入实现；实现后按「修复自证三层」（领域单测 → UI 断言 → 真机实证）交付。
+> 第 10 节属**行为变更（改变现有观感）**，同样须先经用户裁决。
+
+---
+
+## 10. P2：配色只映射 24 个角色，扩展角色不随种子色变化（深色下卡片色相错配）
+
+**来源：代码核实 + 探针实测（2026-09-21）**
+
+**机制**：`ColorSchemes.toColorScheme()` 用 `base.copy(...)` 只覆盖约 **24** 个角色；
+`surfaceBright` / `surfaceDim` / `surfaceContainerLowest` / `surfaceContainerLow` /
+`surfaceContainer` / `surfaceContainerHigh` / `surfaceContainerHighest` /
+`primaryFixed` / `primaryFixedDim` / `secondaryFixed` / `tertiaryFixed` /
+`onPrimaryFixed` / `onPrimaryFixedVariant` **不在其中** —— 它们是 `lightColorScheme()` /
+`darkColorScheme()` 的**基线常量**，因此**不随强调色 / 色彩风格 / 色彩标准变化**。
+
+**实测证据**（种子 `#3F51B5` 靛蓝 vs `#2E7D32` 绿；探针逐项比较 38 个角色）：
+两组种子下这些角色取值**逐字节相同**，故"不受种子影响"成立：
+
+| 角色 | 浅色 | 深色 |
+| --- | --- | --- |
+| `surfaceContainer` | `#F3EDF7` | `#211F26` |
+| `surfaceContainerHigh` | `#ECE6F0` | `#2B2930` |
+| `surfaceContainerHighest` | `#E6E0E9` | `#36343B` |
+| `surfaceBright` | `#FEF7FF` | `#3B383E` |
+| `primaryFixed` | `#EADDFF` | `#EADDFF`（深色下仍是淡紫） |
+
+对照组（**确实**随种子变化）：`primary` / `primaryContainer` / `secondary` / `tertiary` /
+`background` / `surface` / `onSurface` / `surfaceVariant` / `outline` / `inverseSurface` 等 19 个。
+深色实测：`surface = #121318`（靛蓝中性）而 `surfaceContainer = #211F26`（基线紫灰）。
+
+**后果**：
+
+1. 非靛蓝强调色下，`surface`（种子派生）与 `surfaceContainer*`（基线紫灰）**色相不一致**
+   —— "背景对了、卡片还是 M3 基线紫"。
+2. 深色下最明显。**这正是「纯黑背景」开关能救场的原因** —— `withPureBlack()` 把这些
+   容器角色一并压到 `#000000`，错配被掩盖；不开纯黑时就是"深底 + 基线紫灰卡"。
+   反过来说：用户偏好"莫奈 + 纯黑"很可能部分是**被这个错配逼出来的**。
+3. `*Fixed*` 系列在深色下保持浅紫；若将来用到固定色角色（M3 的 fixed 色板本就用于
+   跨深浅保持一致的强调块），会明显偏色。
+4. **error 族不受种子影响是刻意的**（产品约束 5「破坏性动作必须醒目」，见
+   `ColorSchemes.kt` 注释与单测）—— **不属本条问题，勿一并"修掉"**。
+
+**候选修法**：
+
+| 方向 | 说明 | 代价 |
+| --- | --- | --- |
+| A1 补全映射 | 按规范为扩展角色算对应调色板与 tone（`DynamicScheme` 已提供 `surfaceContainer*` / `surfaceBright` / `*Fixed*`），纳入 `copy(...)` | 改动中等；**会改变现有观感**，须过四层自证 + 真机核对 |
+| A2 仅记录 | 不动，等用户明说卡片颜色不对再修 | 零风险；错配留存 |
+
+**⚠️ 状态：待用户裁决。** 这是**行为变更**（改变现有观感），按项目约定不得自行实施。
 
 ---
 
@@ -242,6 +293,9 @@
 | 按钮固定 vs 列表内 | 读源码：按钮是否在 `LazyColumn` 之外 |
 | 页面行数 | `wc -l` |
 | 筛选器有无 | 检索 `TAG_FILTER_*` 的实际使用点 |
+| 第 10 节"角色不受种子影响" | 临时 JVM 探针：两组种子各生成 `ColorScheme`，用 **`toArgb()`** 逐角色比较；取值相同的即未从种子派生 |
+| 第 10 节色彩标准覆盖面 | 同一探针比较 `SPEC_2021` / `SPEC_2025` 的 48 个角色，计数变值角色 |
+
 
 **⚠️ 一条取证教训**：本清单初稿曾据 Robolectric 探针（`w400dp-h1000dp`）
 称"头部约 862dp、仅剩约 130dp"，而**真机是 794dp 视口** —— 探针视口比真机更宽松，

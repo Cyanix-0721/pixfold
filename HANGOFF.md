@@ -1012,11 +1012,13 @@ Manifest 显式 `enableOnBackInvokedCallback="true"`(targetSdk 33+ 默认,写明
 > **流程约定**:此项属**页面结构变更(设计变更)**,须先出设计方案交用户确认再实现;
 > 实现后按「修复自证三层」交付。**在用户确认设计方案前不得直接改动。**
 
-### ⏭️ 设置与主题体系 —— 现状与后续三步(2026-09-21 记录,供换机续接)
+### ⏭️ 设置与主题体系 —— 现状与后续(2026-09-21 记录,供换机续接)
 
-> **分支**:`d1/settings-impl`(**未合回 `dev`**),8 个提交(自 `dev` 起算)。
+> **分支**:`d1/settings-impl`(**未合回 `dev`**),13 个提交(自 `dev` 起算;
+> `dev` 自身另有 14 个未推送提交,均未 push —— push 由用户处理)。
 > **工作区干净**。规格:`docs/superpowers/specs/2026-09-20-d1-settings-theme-design.md`。
-> **验证**:`domain:test` **224** + `app:testDebugUnitTest` **259** 全绿;`assembleDebug` 成功;`lintDebug` 零告警。
+> **验证**(2026-09-21 复跑):`domain:test` **224** + `app:testDebugUnitTest` **261** 全绿;
+> `assembleDebug` 成功;`lintDebug` 零告警。
 
 **已交付并真机核对通过**:
 
@@ -1048,21 +1050,78 @@ Manifest 显式 `enableOnBackInvokedCallback="true"`(targetSdk 33+ 默认,写明
 
 ---
 
-#### ⏭️ 后续三步(按性价比排序,用户 2026-09-21 指定记录)
+#### ⏭️ 后续三步(按性价比排序,用户 2026-09-21 指定记录) —— **第 1 步已完成,剩第 2/3 步**
 
-**第 1 步(小,先做):补 `2021 ≠ 2025` 断言 —— 先分清"正常"还是"没接上"**
+**第 1 步(小,先做):补 `2021 ≠ 2025` 断言 —— ✅ 已完成(2026-09-21)**
 
-- **背景**:用户真机反馈「2021/2025 变化微小」。而 `ColorSchemesTest` 目前
+- **背景**:用户真机反馈「2021/2025 变化微小」。而 `ColorSchemesTest` 当时
   **只断言了"不同色彩风格产出不同主色",没有断言 "2021 ≠ 2025"** ——
   故**无法排除"spec 参数根本没接上"**。这是真实覆盖缺口。
-- **做法**:在 `app/src/test/kotlin/com/pixfold/d1/ui/theme/ColorSchemesTest.kt` 增加断言:
-  同一 seed + 同一风格下,`SPEC_2021` 与 `SPEC_2025` 产出的 `primary`(或整组关键角色)不同;
-  并**做变异验证**(把 spec 参数写死为 2021,断言必须失败)。
-- **预期**:materialkolor 文档指出 `SPEC_2025` 是为 Material 3 Expressive 设计、
-  **推荐与 `PaletteStyle.Expressive` 搭配**;单换 spec 而风格仍 TonalSpot 时差异本就细微。
-  故"差异小"很可能是**正常**的 —— 但必须由断言证明,不能靠推测。
-- **若确认正常**:考虑在设置页给「色彩标准」加一句说明(如"与「活泼」风格搭配更明显"),
-  避免用户以为开关无效。
+- **做法**:先写**临时探针**量化(不凭猜写断言),再落成断言:
+  `app/src/test/kotlin/com/pixfold/d1/ui/theme/ColorSchemesTest.kt` 新增两条用例
+  —— `color spec version really re-tones the scheme`(**接线验证** + 方向钉死)
+  与 `color spec version is a no-op for the five styles it does not re-tone`(**覆盖面记录**)。
+
+**实测数据**(探针:6 个种子 × 深浅 × 9 风格,逐项比较 **48 个** `ColorScheme` 角色):
+
+| 色彩风格 | 2021↔2025 变值角色数(最小 / 最大) |
+| --- | --- |
+| **TonalSpot / Vibrant / Expressive / Neutral** | **21 / 24**(4 个变体确实被重写) |
+| Monochrome / Fidelity / Content / Rainbow / FruitSalad | **0 / 0**(逐字节相同) |
+
+> **根因(库源码,一手)**:`ColorSpec2025 : ColorSpec2021()`,其
+> `getPrimaryPalette` / `getSecondaryPalette` / `getTertiaryPalette` / `getNeutralPalette` /
+> `getNeutralVariantPalette` / `getErrorPalette` **只对 NEUTRAL / TONAL_SPOT / EXPRESSIVE /
+> VIBRANT 四个变体重写,其余分支一律 `else -> super`**。故 5 个风格下两套规范必然等价。
+
+**结论**:用户感觉"变化微小"**是正常的**,不是没接上 —— 但"没接上"这一可能性此前
+**确实未被任何断言排除**,补齐是必要的。**断言下界取 10**(实测最小 21,留算法微调余量;
+"没接上"恒为 0 必被抓住)。
+
+**变异验证(3 组,均捕获)**:
+
+| 变异 | 预期 | 实测 |
+| --- | --- | --- |
+| ① `toAlgorithm()` 恒返回 `SPEC_2021`(即"没接上") | 接线断言失败 | ✅ **1 项失败**:`实测仅 0/48 个角色不同` |
+| ② V2021/V2025 **映射对调**(即"接反了") | 计数断言通过、**方向断言**失败 | ✅ **1 项失败**:`2021 的主色实测值变了`(计数断言确实未能捕获该变异 —— 这正是钉死方向色值的理由) |
+| ③ 把 `TonalSpot` 塞进"应无差异"名单 | 覆盖面断言失败 | ✅ **1 项失败**:`Expected <0>, actual <23>` |
+
+**⚠️ 第 1 步顺带实测出的两个新问题(待用户裁决)**:
+
+**问题 A:「色彩标准」对 5 / 9 个风格是无操作开关。**
+设置页把它做成全局开关,但上表已证明选中 Monochrome / Fidelity / Content / Rainbow /
+FruitSalad 时,切换 2021↔2025 **不改变任何颜色、界面无任何反馈**。
+当前页面文案未作说明。**候选**:(a) 保持现状(算法固有性质,自用可接受);
+(b) 在对话框加一句如实说明(如"该标准对部分色彩风格无影响");
+(c) 把 5 个风格下的该行置灰。
+
+**问题 B(更值得修):配色映射只覆盖约 24 个角色,扩展角色不随种子色变化。**
+`ColorSchemes.toColorScheme()` 用 `base.copy(...)` 只覆盖了 24 个角色,
+`surfaceBright` / `surfaceDim` / `surfaceContainerLowest/Low/High/Highest` /
+`*Fixed*` **不在其中**,故恒为 **material3 基线常量**。
+
+实测(种子 `#3F51B5` 靛蓝 vs `#2E7D32` 绿,两套规范、深浅四组,**这些角色取值完全相同**):
+
+| 角色 | 浅色 | 深色 |
+| --- | --- | --- |
+| `surfaceContainer` | `#F3EDF7`(基线紫灰) | `#211F26`(基线紫灰) |
+| `surfaceContainerHighest` | `#E6E0E9` | `#36343B` |
+| `primaryFixed` | `#EADDFF`(基线淡紫) | `#EADDFF`(**深色下仍是淡紫**) |
+
+**后果**:非靛蓝强调色下,`surface`(经种子派生,如绿色中性)**与** `surfaceContainer*`
+(基线紫灰)**色相不一致** —— 即"背景对了、卡片还是 M3 基线紫"。深色下更明显,
+这正是**「纯黑背景」开关之所以能救场的原因**:`withPureBlack()` 把这些角色一并压黑,
+错配被掩盖;但只要用户不开纯黑(用户本人偏好开),深色下就是"深底 + 基线紫灰卡"。
+`*Fixed*` 系列在深色下保持浅紫,若将来用到固定色角色会明显偏色。
+
+**候选修法**:(a) 把扩展角色也纳入映射(需按规范算对应调色板与 tone,改动中等,
+须过四层自证 + 真机核对);(b) 暂不修,仅记录。**需用户裁决 —— 这是行为变更,
+且会改变现有观感,按项目约定不得自行实施。**
+
+> **一个取证教训(值得记)**:本次第一版探针给出的是**相反结论**("2021 与 2025 逐字节相同")。
+> 原因是我用 `Color.value.toInt()` 取色值 —— `Color.value` 是 `ULong`,**低 32 位是色彩空间 id
+> 而不是 ARGB**,任何两个 sRGB 颜色都会被算成相等。**按颜色值断言必须用 `toArgb()`**;
+> 该陷阱已写进 `ColorSchemesTest.argbRoles` 的文档注释。**先验证度量本身,再信度量结论。**
 
 **第 2 步(中):让预测性返回在**工作流内部**也生效**
 
@@ -1118,11 +1177,18 @@ Manifest 显式 `enableOnBackInvokedCallback="true"`(targetSdk 33+ 默认,写明
 > **阶段 2 = 全量 i18n**(领域层 99 处文案 + 测试 826 处中文断言,涉及 461 个 `@Test`)。
 > 阶段 1 的语言切换**只覆盖设置页自身**(用户裁决 c)。
 >
-> **三项实测确认的边界**:
+> **三项实测确认的边界**(⚠️ **2026-09-21 复核:其中 ①② 均已被后续实现推翻,保留原文以存证 —— 见下**):
 > ① **预测性返回开关不做** —— 无运行时 API(反编译 `OnBackInvokedDispatcher` 确认),
 >    官方退出方式仅为 manifest 静态属性;用户裁决默认保持开启。
+>    → **❌ 该结论是错的**(2026-09-21 修正):`activity-compose 1.13.0` 提供
+>    `PredictiveBackHandler` + `BackEventCompat.progress`,应用**可以**运行时决定是否消费
+>    手势进度 —— manifest 的 `enableOnBackInvokedCallback` 是静态的,但"开关是否生效"不是。
+>    开关已实现(`cc34a98`)。教训:反编译"未见到某 API"≠"该能力不存在",还须查库的公开入口。
 > ② **2021/2025 色彩标准暂不做** —— 零依赖下不可行,见 §11 第 17 项待裁决。
+>    → **❌ 已推翻**(2026-09-20):用户选择引入 `materialkolor` 算法子库,该开关**已实现并交付**;
+>    §11 第 17 项已裁决。
 > ③ **强调色预设可做** —— 手写静态 `ColorScheme` 即可,无需种子色算法。
+>    → ✅ 成立,且已实现(实际用算法库的种子色生成,见规格 §6.2)。
 >
 > **用户裁决(2026-09-20)**:默认配色 = 系统取色(与既有行为一致);
 > 纯黑 = OLED 真纯黑 `#000000`;**移除"检查更新"**改为直接跳转发布页
@@ -1515,6 +1581,27 @@ Manifest 显式 `enableOnBackInvokedCallback="true"`(targetSdk 33+ 默认,写明
     "零三方依赖 + 只用官方 stable"是**已多次受益的约束**;
     且用户已明确"不上架、自用为主",色彩规范的世代差异对自用体验影响很小。
     **需用户裁决。**
+
+    ---
+
+    **✅ 已裁决(2026-09-20):选 B —— 引入 `materialkolor` 的算法子库。**
+
+    用户 2026-09-20 指示"我并不强求无第三方依赖的,热门且有在维护的库是可以考虑的",
+    并明确要求设置页要有色彩标准开关,故 A 不再成立。实际引入的是
+    **`com.materialkolor:material-color-utilities`(算法子库,纯 Kotlin,仅依赖 kotlin-stdlib)**,
+    **不是** `material-kolor`(Compose 包装 —— 它会把 material3 强拉到 `1.5.0-alpha22`,
+    违背"只用 stable")。详见 `docs/superpowers/specs/2026-09-20-d1-settings-theme-design.md` §6。
+
+    **⚠️ 2026-09-21 补:开关"接上了"已由断言证明,但同时实测出两个新问题。**
+
+    ① 该开关此前**没有任何测试能证明它接上了算法**("界面能点、存储能写、结果不变"
+       的假开关也能全绿)—— 已补断言 + 变异验证,见 §9.1「第 1 步」。
+    ② 实测:`SPEC_2025` 只重写 4 个色彩风格变体,**Monochrome / Fidelity / Content /
+       Rainbow / FruitSalad 五个风格下该开关完全不改变任何颜色**;
+    ③ 实测:配色映射**只覆盖约 24 个角色**,`surfaceContainer*` / `surfaceBright` /
+       `surfaceDim` / `*Fixed*` **不受种子色影响**(恒为 material3 基线值)——
+       非靛蓝强调色下会出现"表面是强调色中性色、卡片却是基线紫灰"的色相错配。
+       详见 §9.1「第 1 步」与 `docs/notes/d1-ui-friction-inventory.md` 第 10 节。
 
 ## 12. 开发环境实况与 Android 验证准备(2026-09-07 由 s_handoff.md 并入)
 
