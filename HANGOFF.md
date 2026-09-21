@@ -567,6 +567,10 @@ Android 第一版应优先保证“选目录 → 预览 → 手工确认 → 生
 | **预测性返回**:根级有效、**工作流内部无效** | ✅ 全绿 | ❌ 用户感知"时灵时不灵" |
 | 强调色「**默认**」与「跟随色=跟随系统」撞语义 | ✅ 全绿 | ❌ 用户直接提问"为什么有个默认" |
 
+> **上表三项现状(2026-09-21 复核)**:第 2 行「预测性返回工作流内部无效」**已修**
+> (§9.1 第 2 步;离线证据齐备,观感待真机走查);第 3 行强调色「默认」**已改名「靛蓝」**;
+> 第 1 行命名页头部占约 88% 可视高度**仍未处理**(P0,见 `docs/notes/d1-ui-friction-inventory.md`)。
+
 > **判据关系**:前三层是**必要条件**(不绿则一定不合格),
 > 第 4 层决定**是否真的好用**。D1 验收清单 20 项已全绿,
 > 但上表三项均**不在清单覆盖范围**内 —— 这正是需要本层的原因。
@@ -1017,9 +1021,9 @@ Manifest 显式 `enableOnBackInvokedCallback="true"`(targetSdk 33+ 默认,写明
 > **分支**:`d1/settings-impl`(**未合回 `dev`**),15 个提交(自 `dev` 起算;
 > `dev` 自身另有 14 个未推送提交,均未 push —— push 由用户处理)。
 > **工作区干净**。规格:`docs/superpowers/specs/2026-09-20-d1-settings-theme-design.md`。
-> **验证**(2026-09-21 复跑):`domain:test` **224** + `app:testDebugUnitTest` **264** 全绿;
-> `assembleDebug` 成功;`lintDebug` 零告警。(264 = 原 261 + 本轮新增 3 条:
-> 扩展角色回归 1 条 + 「色彩标准」置灰 2 条。)
+> **验证**(2026-09-21 复跑):`domain:test` **224** + `app:testDebugUnitTest` **273** 全绿;
+> `assembleDebug` 成功;`lintDebug` 零告警。(273 = 原 264 + §9.1 第 2 步新增 9 条
+> `PredictiveBackTest`;此前 264 = 261 + 扩展角色回归 1 条 + 「色彩标准」置灰 2 条。)
 
 **已交付并真机核对通过**:
 
@@ -1051,7 +1055,7 @@ Manifest 显式 `enableOnBackInvokedCallback="true"`(targetSdk 33+ 默认,写明
 
 ---
 
-#### ⏭️ 后续三步(按性价比排序,用户 2026-09-21 指定记录) —— **第 1 步已完成(含其顺带发现的两个问题的修复),剩第 2/3 步**
+#### ⏭️ 后续三步(按性价比排序,用户 2026-09-21 指定记录) —— **第 1、2 步已完成,剩第 3 步**
 
 **第 1 步(小,先做):补 `2021 ≠ 2025` 断言 —— ✅ 已完成(2026-09-21)**
 
@@ -1187,18 +1191,36 @@ FruitSalad 时,切换 2021↔2025 **不改变任何颜色、界面无任何反�
 > 而不是 ARGB**,任何两个 sRGB 颜色都会被算成相等。**按颜色值断言必须用 `toArgb()`**;
 > 该陷阱已写进 `ColorSchemesTest.argbRoles` 的文档注释。**先验证度量本身,再信度量结论。**
 
-**第 2 步(中):让预测性返回在**工作流内部**也生效**
+**第 2 步(中):让预测性返回在**工作流内部**也生效 —— ✅ 已完成(2026-09-21)**
 
-- **现状**:根级 `PredictiveBackContainer`(`PixFoldApp.kt`)在**设置/许可/预览**等页有效;
+- **现状(改前)**:根级 `PredictiveBackContainer`(`PixFoldApp.kt`)在**设置/许可/预览**等页有效;
   但**工作流内部(步骤切换)无效**。
-- **根因**:`WorkflowASteps` / `WorkflowBSteps` 自己注册了 `BackHandler`,
+- **根因(已实证)**:`WorkflowASteps` / `WorkflowBSteps` 自己注册了 `BackHandler`,
   `OnBackInvokedDispatcher` **取最后注册者**,故步骤容器的 `BackHandler` 优先级高于
   根级 `PredictiveBackHandler` —— 步骤级返回走的是普通返回,无手势跟随动画。
-- **做法**:把「是否使用预测性返回」作为参数传入两个步骤容器
-  (或在容器内改用 `PredictiveBackHandler`),使步骤级返回同样跟随手势进度;
-  保持 `settings.predictiveBackAnimation == false` 时退回 `BackHandler`。
-- **注意**:两处都要改(`workflowa/WorkflowASteps.kt`、`workflowb/WorkflowBSteps.kt`),
-  并补 UI 断言。
+- **做法(已落地)**:把根级那个 private 容器提升为**公共共享组件**
+  `app/src/main/kotlin/com/pixfold/d1/ui/components/PredictiveBackContainer.kt`
+  (三处共用同一实现,避免动画参数各写一份而漂移),并给两个步骤容器加参数
+  `predictiveBackAnimation: Boolean = true` —— 由 `PixFoldApp` 传
+  `settings.predictiveBackAnimation`;容器内 `false` 时自动退回 `BackHandler`。
+- **改动文件**:`ui/components/PredictiveBackContainer.kt`(新建)、`PixFoldApp.kt`
+  (删 private 副本、两处透传)、`ui/workflowa/WorkflowASteps.kt`、`ui/workflowb/WorkflowBSteps.kt`。
+- **UI 断言**:新增 `app/src/test/kotlin/com/pixfold/d1/PredictiveBackTest.kt`(9 条)。
+  用 `activity.onBackPressedDispatcher.dispatchOnBackStarted/Progressed/Cancelled` +
+  `onBackPressed()` 驱动**与系统手势同一条链路**的预测事件(activity 1.13.0 已反编译确认这些方法是 public)。
+  **关键取证**:`SemanticsNode.boundsInRoot` **会反映 `graphicsLayer` 缩放** ——
+  满屏 400×1000 在 progress=1 时变 `Rect.fromLTRB(20,50,380,950)`(正好 ×0.9),
+  故"动画有没有接上"这次**在离线测试里可断言**(此前只能靠真机走查)。
+  其中 3 条是**接线变异敏感**断言(直接观察步骤内容 bounds 是否缩放),专抓
+  "把开关写死/参数没透传"这类会**静默丢掉动画**的回归。
+- **变异验证(5 组全捕获)**:① 工作流 A `enabled` 写死 true → 1 项失败;
+  ② 写死 false → 1 项失败;③ 工作流 B 写死 false → 1 项失败;
+  ④ 丢掉 `stepIndex -= 1`(不再逐级后退)→ 4 项失败;⑤ 去掉容器 `graphicsLayer` 进度变换 → 3 项失败。
+- **全量验证**:`domain:test` **224** + `app:testDebugUnitTest` **273** 全绿、`assembleDebug` 成功、
+  `lintDebug` 零告警。
+- **⚠️ 离线断言不到的边界**:断言的是**变换确实随进度发生**(bounds 变了),
+  **不是"动画看起来舒服"**——缩放系数 0.9 / 透明度 0.65 的观感仍须**真机走查**(用户授权后执行)。
+  另:被断言的是根坐标矩形,若日后改了缩放实现(如改用平移),断言需同步调整。
 
 **第 3 步(大):让**目标页**显示在背后(真正的预测性返回观感)**
 

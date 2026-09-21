@@ -1,6 +1,5 @@
 package com.pixfold.d1.ui.workflowb
 
-import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
@@ -42,6 +41,7 @@ import com.pixfold.d1.domain.plan.undoRecordOf
 import com.pixfold.d1.ui.plan.ExecutionReportPage
 import com.pixfold.d1.domain.workflowb.WorkflowBState
 import com.pixfold.d1.domain.workflowb.workflowBStateOf
+import com.pixfold.d1.ui.components.PredictiveBackContainer
 
 const val TAG_B_STEP_TABS = "b-step-tabs"
 const val TAG_B_STEP_LIBRARY = "b-step-library"
@@ -75,6 +75,11 @@ fun WorkflowBSteps(
     modifier: Modifier = Modifier,
     contentInsets: WindowInsets = WindowInsets.safeDrawing,
     onBack: () -> Unit = {},
+    /**
+     * 步骤级返回是否使用**预测性返回动画**(来自 `settings.predictiveBackAnimation`)。
+     * 默认 true(与设置默认值一致);false 时内部退回普通 `BackHandler`。
+     */
+    predictiveBackAnimation: Boolean = true,
 ) {
     var stepIndex by remember { mutableIntStateOf(0) }
     var state by remember { mutableStateOf(workflowBStateOf(rootPath, volumes)) }
@@ -88,117 +93,121 @@ fun WorkflowBSteps(
     var report by remember { mutableStateOf<ExecutionReport?>(null) }
     var undoMessage by remember { mutableStateOf<String?>(null) }
 
-    BackHandler {
-        if (stepIndex > 0) stepIndex -= 1 else onBack()
-    }
-
-    Column(
-        modifier = modifier
-            .fillMaxSize()
-            .windowInsetsPadding(contentInsets),
+    // **2026-09-21 修复**:原先直接用 `BackHandler`,其注册优先级高于根级
+    // `PredictiveBackHandler`,导致**工作流内部没有手势跟随动画**(在步骤 3 拖到一半
+    // 内容纹丝不动,松手才突然跳回)。改用与根级同一实现的 [PredictiveBackContainer]。
+    PredictiveBackContainer(
+        enabled = predictiveBackAnimation,
+        onBack = { if (stepIndex > 0) stepIndex -= 1 else onBack() },
     ) {
-        PrimaryTabRow(
-            selectedTabIndex = stepIndex,
-            modifier = Modifier
-                .fillMaxWidth()
-                .testTag(TAG_B_STEP_TABS),
+        Column(
+            modifier = modifier
+                .fillMaxSize()
+                .windowInsetsPadding(contentInsets),
         ) {
-            WorkflowBStep.entries.forEachIndexed { i, step ->
-                Tab(
-                    selected = stepIndex == i,
-                    onClick = { stepIndex = i },
-                    text = { Text(step.label) },
-                    modifier = Modifier
-                        .testTag(
-                            when (step) {
-                                WorkflowBStep.Library -> TAG_B_STEP_LIBRARY
-                                WorkflowBStep.Metadata -> TAG_B_STEP_METADATA
-                                WorkflowBStep.Pack -> TAG_B_STEP_PACK
-                            },
-                        )
-                        .semantics { contentDescription = step.label },
-                )
-            }
-        }
-
-        // 步骤内容不重复叠加 inset(外层已处理)
-        val innerInsets = WindowInsets(0, 0, 0, 0)
-
-        // 非首步给一个显式返回入口(Tab 也能切,但长列表滚到底后 Tab 不在视口内)
-        if (stepIndex > 0) {
-            TextButton(
-                onClick = { stepIndex -= 1 },
+            PrimaryTabRow(
+                selectedTabIndex = stepIndex,
                 modifier = Modifier
-                    .padding(start = 4.dp)
-                    .testTag(TAG_B_STEP_BACK)
-                    .semantics { contentDescription = "返回上一步" },
-            ) { Text("← 返回上一步") }
-        }
-
-        when (WorkflowBStep.entries[stepIndex]) {
-            WorkflowBStep.Library -> LibraryPage(
-                state = state,
-                onStateChange = { state = it },
-                contentInsets = innerInsets,
-                onNext = { stepIndex = 1 },
-                modifier = Modifier.weight(1f),
-            )
-
-            WorkflowBStep.Metadata -> MetadataPage(
-                libraryState = state,
-                onLibraryChange = { state = it },
-                contentInsets = innerInsets,
-                onNext = { stepIndex = 2 },
-                modifier = Modifier.weight(1f),
-            )
-
-            WorkflowBStep.Pack -> {
-                val currentReport = report
-                if (currentReport != null) {
-                    ExecutionReportPage(
-                        report = currentReport,
-                        undoMessage = undoMessage,
-                        onUndo = { undoMessage = performUndo(undoRecordOf(currentReport)).message },
-                        onDone = {
-                            report = null
-                            undoMessage = null
-                            stepIndex = 0
-                        },
-                        modifier = Modifier.weight(1f),
-                    )
-                } else {
-                    PackPreviewPage(
-                        libraryState = state,
-                        onLibraryChange = { state = it },
-                        contentInsets = innerInsets,
-                        conflictPolicy = conflictPolicy,
-                        sourcePolicy = sourcePolicy,
-                        cleanEmptyDirs = cleanEmptyDirs,
-                        onConflictPolicyChange = { conflictPolicy = it },
-                        onSourcePolicyChange = { sourcePolicy = it },
-                        onCleanEmptyDirsChange = { cleanEmptyDirs = it },
-                        confirmFlow = confirmFlow,
-                        onStartConfirm = {
-                            val plans = buildPackagePlans(state.volumes, conflictPolicy, sourcePolicy)
-                            val dangers = effectiveDangerActions(plans, cleanEmptyDirs)
-                            confirmFlow = startConfirmFlow(
-                                buildConfirmSequence(dangers, generalSummaryLines(plans, dangers)),
+                    .fillMaxWidth()
+                    .testTag(TAG_B_STEP_TABS),
+            ) {
+                WorkflowBStep.entries.forEachIndexed { i, step ->
+                    Tab(
+                        selected = stepIndex == i,
+                        onClick = { stepIndex = i },
+                        text = { Text(step.label) },
+                        modifier = Modifier
+                            .testTag(
+                                when (step) {
+                                    WorkflowBStep.Library -> TAG_B_STEP_LIBRARY
+                                    WorkflowBStep.Metadata -> TAG_B_STEP_METADATA
+                                    WorkflowBStep.Pack -> TAG_B_STEP_PACK
+                                },
                             )
-                        },
-                        onConfirmStep = {
-                            val (next, done) = confirmFlow.confirmCurrent()
-                            confirmFlow = next
-                            if (done) {
-                                report = executePackagePlans(
-                                    buildPackagePlans(state.volumes, conflictPolicy, sourcePolicy),
-                                )
-                            }
-                        },
-                        onCancelConfirm = { confirmFlow = confirmFlow.cancel() },
-                        onExecute = {},
-                        showPlanSection = true,
-                        modifier = Modifier.weight(1f),
+                            .semantics { contentDescription = step.label },
                     )
+                }
+            }
+
+            // 步骤内容不重复叠加 inset(外层已处理)
+            val innerInsets = WindowInsets(0, 0, 0, 0)
+
+            // 非首步给一个显式返回入口(Tab 也能切,但长列表滚到底后 Tab 不在视口内)
+            if (stepIndex > 0) {
+                TextButton(
+                    onClick = { stepIndex -= 1 },
+                    modifier = Modifier
+                        .padding(start = 4.dp)
+                        .testTag(TAG_B_STEP_BACK)
+                        .semantics { contentDescription = "返回上一步" },
+                ) { Text("← 返回上一步") }
+            }
+
+            when (WorkflowBStep.entries[stepIndex]) {
+                WorkflowBStep.Library -> LibraryPage(
+                    state = state,
+                    onStateChange = { state = it },
+                    contentInsets = innerInsets,
+                    onNext = { stepIndex = 1 },
+                    modifier = Modifier.weight(1f),
+                )
+
+                WorkflowBStep.Metadata -> MetadataPage(
+                    libraryState = state,
+                    onLibraryChange = { state = it },
+                    contentInsets = innerInsets,
+                    onNext = { stepIndex = 2 },
+                    modifier = Modifier.weight(1f),
+                )
+
+                WorkflowBStep.Pack -> {
+                    val currentReport = report
+                    if (currentReport != null) {
+                        ExecutionReportPage(
+                            report = currentReport,
+                            undoMessage = undoMessage,
+                            onUndo = { undoMessage = performUndo(undoRecordOf(currentReport)).message },
+                            onDone = {
+                                report = null
+                                undoMessage = null
+                                stepIndex = 0
+                            },
+                            modifier = Modifier.weight(1f),
+                        )
+                    } else {
+                        PackPreviewPage(
+                            libraryState = state,
+                            onLibraryChange = { state = it },
+                            contentInsets = innerInsets,
+                            conflictPolicy = conflictPolicy,
+                            sourcePolicy = sourcePolicy,
+                            cleanEmptyDirs = cleanEmptyDirs,
+                            onConflictPolicyChange = { conflictPolicy = it },
+                            onSourcePolicyChange = { sourcePolicy = it },
+                            onCleanEmptyDirsChange = { cleanEmptyDirs = it },
+                            confirmFlow = confirmFlow,
+                            onStartConfirm = {
+                                val plans = buildPackagePlans(state.volumes, conflictPolicy, sourcePolicy)
+                                val dangers = effectiveDangerActions(plans, cleanEmptyDirs)
+                                confirmFlow = startConfirmFlow(
+                                    buildConfirmSequence(dangers, generalSummaryLines(plans, dangers)),
+                                )
+                            },
+                            onConfirmStep = {
+                                val (next, done) = confirmFlow.confirmCurrent()
+                                confirmFlow = next
+                                if (done) {
+                                    report = executePackagePlans(
+                                        buildPackagePlans(state.volumes, conflictPolicy, sourcePolicy),
+                                    )
+                                }
+                            },
+                            onCancelConfirm = { confirmFlow = confirmFlow.cancel() },
+                            onExecute = {},
+                            showPlanSection = true,
+                            modifier = Modifier.weight(1f),
+                        )
+                    }
                 }
             }
         }

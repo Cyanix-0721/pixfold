@@ -3,24 +3,16 @@ package com.pixfold.d1
 import android.app.LocaleManager
 import android.os.Build
 import android.os.LocaleList
-import androidx.activity.compose.BackHandler
-import androidx.activity.compose.PredictiveBackHandler
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.safeDrawing
-import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalContext
 import com.pixfold.d1.domain.mock.MockData
 import com.pixfold.d1.domain.mock.MockDataB
@@ -29,6 +21,7 @@ import com.pixfold.d1.domain.settings.AppLanguage
 import com.pixfold.d1.domain.settings.PixFoldSettings
 import com.pixfold.d1.domain.settings.SettingsStore
 import com.pixfold.d1.ui.HomeScreen
+import com.pixfold.d1.ui.components.PredictiveBackContainer
 import com.pixfold.d1.ui.settings.LicensesScreen
 import com.pixfold.d1.ui.settings.SettingsScreen
 import com.pixfold.d1.ui.preview.ImagePreview
@@ -134,6 +127,10 @@ fun PixFoldApp(store: SettingsStore? = null) {
 
                 Screen.WorkflowA -> WorkflowASteps(
                     collections = collections,
+                    // 步骤级返回同样跟随手势进度(2026-09-21):把开关透传进容器。
+                    // 此前步骤容器用普通 BackHandler,优先级高于根级 PredictiveBackHandler,
+                    // 导致工作流内部完全没有手势跟随动画 —— 详见 HANGOFF §9.1 第 2 步。
+                    predictiveBackAnimation = settings.predictiveBackAnimation,
                     onOpenPreview = { index -> screen = Screen.Preview(index) },
                     onActiveCollectionChange = { activeCollectionId = it },
                     // 在工作流 A 内按返回 -> 回首页(步骤内的返回由 WorkflowASteps 自己处理)
@@ -153,6 +150,8 @@ fun PixFoldApp(store: SettingsStore? = null) {
                 Screen.WorkflowB -> WorkflowBSteps(
                     rootPath = library.rootPath,
                     volumes = library.volumes,
+                    // 同上:步骤级返回跟随手势进度。
+                    predictiveBackAnimation = settings.predictiveBackAnimation,
                     // 在工作流 B 内按返回 -> 回首页(步骤内的返回由 WorkflowBSteps 自己处理)
                     onBack = { screen = Screen.Home },
                 )
@@ -193,66 +192,4 @@ private fun ApplyAppLanguage(language: AppLanguage) {
             manager.setApplicationLocales(want)
         }
     }
-}
-
-/**
- * 预测性返回容器(用户 2026-09-20 要求做成可切换开关)。
- *
- * ## 为什么"开关"是可以做的(修正我此前的判断)
- *
- * `android:enableOnBackInvokedCallback` 是 **manifest 静态属性**,确实**不能**运行时改
- * (已反编译 `android-36/android.jar` 确认 `OnBackInvokedDispatcher` 无 enable/disable API)。
- *
- * 但 androidx 提供了 [PredictiveBackHandler]:它让应用**订阅返回手势的进度流**,
- * 于是"是否跟随手势做退场动画"成为**应用层的运行时选择**。本容器控制的正是后者。
- *
- * - [enabled] = true:`PredictiveBackHandler` 收进度 -> 内容随进度缩放/淡出;
- *   手势完成时执行 [onBack];手势取消时复位(不导航)。
- * - [enabled] = false:退回普通 `BackHandler` —— 立刻执行 [onBack],无跟随动画。
- *
- * ## 优先级
- *
- * 本容器注册在**较外层**,步骤容器(WorkflowASteps/BSteps)注册在**更内层**。
- * `OnBackInvokedDispatcher` 取**最后注册者**,故工作流内部的步骤级返回优先;
- * 只有步骤容器不处理时(如已在第 1 步)才落到本容器。
- */
-@Composable
-private fun PredictiveBackContainer(
-    enabled: Boolean,
-    onBack: (() -> Unit)?,
-    content: @Composable () -> Unit,
-) {
-    if (onBack == null) {
-        // 首页:没有应用内返回去处,交回系统(系统据此执行"退出应用")。
-        content()
-        return
-    }
-    if (!enabled) {
-        BackHandler(onBack = onBack)
-        content()
-        return
-    }
-
-    var progress by remember { mutableFloatStateOf(0f) }
-    PredictiveBackHandler { events ->
-        try {
-            events.collect { event -> progress = event.progress }
-            // 手势完成(未被取消)才真正导航。
-            onBack()
-        } finally {
-            // 取消或完成后都复位,避免残留缩放。
-            progress = 0f
-        }
-    }
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .graphicsLayer {
-                val p = progress
-                val scale = 1f - 0.10f * p
-                scaleX = scale
-                scaleY = scale
-                alpha = 1f - 0.35f * p
-            },
-    ) { content() }
 }

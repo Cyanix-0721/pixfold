@@ -708,7 +708,7 @@ compileSdk 37），**在临时探针分支验证通过后**才正式改：
 ## 14. 实施现状与后续(2026-09-21 补,供换机续接)
 
 **分支**:`d1/settings-impl`(未合回 `dev`)。**验证**(2026-09-21 复跑):
-domain **224** + app **264** 全绿、`lintDebug` 零告警。
+domain **224** + app **273** 全绿、`lintDebug` 零告警。
 **真机**:设置页四组、纯黑(`#000000` 实测)、色彩风格差异、关于页、许可页、语言切英文 —— 均已核对通过。
 
 **真机核对中修掉的真实缺陷**:许可页嵌套滚动崩溃(§12.5 铁律被违反,离线测试抓不到)、
@@ -733,8 +733,14 @@ domain **224** + app **264** 全绿、`lintDebug` 零告警。
    纯黑关下,卡片实测 `#28281D`（绿调,R=G>B）、背景 `#0F0F0A` —— 与修复前恒为基线
    `#211F26`（紫调）相比,色相错配在真机上已消失;置灰行实测 `enabled="false"`
    且点击无对话框,切回敏感风格即恢复可点。核对后设备已恢复原设置。
-2. ⬜ **工作流内部预测性返回(中)** —— 步骤容器的 `BackHandler` 优先级高于根级
-   `PredictiveBackHandler`,需把开关传入两个步骤容器。
+2. ✅ **工作流内部预测性返回(中,2026-09-21 已完成)** —— 根级 private 容器提升为公共
+   `app/src/main/kotlin/com/pixfold/d1/ui/components/PredictiveBackContainer.kt`,
+   两个步骤容器各加 `predictiveBackAnimation: Boolean = true` 并由 `PixFoldApp` 透传
+   `settings.predictiveBackAnimation`(false 时容器内退回 `BackHandler`)。
+   新增 `app/src/test/kotlin/com/pixfold/d1/PredictiveBackTest.kt` 9 条,
+   用 `dispatchOnBackStarted/Progressed/Cancelled` 驱动真实预测事件;
+   `SemanticsNode.boundsInRoot` 实测能反映 `graphicsLayer` 缩放,故动画是否接上**离线可断言**。
+   5 组变异全捕获,验证 **224+273** 全绿。**观感(0.9 缩放/0.65 透明)仍待真机走查。**
 3. ⬜ **目标页显示在背后(大)** —— 现只缩放当前页、背后是空背景;真预测性返回需两层渲染。
 
 **未决策**:D1 范围 vs MVP(设置阶段超出 D1 的六项交付,归属待用户定调)。
