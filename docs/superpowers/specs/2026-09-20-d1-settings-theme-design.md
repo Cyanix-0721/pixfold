@@ -634,6 +634,20 @@ res/xml/locales_config.xml    —— 声明 zh / en
 | V2021 / V2025 **映射对调**（"接反了"） | ✅ 计数断言**未**捕获、**方向色值断言**捕获（`2021 的主色实测值变了`） |
 | 把 `TonalSpot` 塞进"应无差异"名单 | ✅ 覆盖面断言失败：`Expected <0>, actual <23>` |
 
+**两项配套修复的变异验证（2026-09-21 补,4 组全部捕获,已还原）**：
+
+| 变异 | 结果 |
+| --- | --- |
+| 删掉 19 个扩展角色映射（回到"只映射 24 个"） | ✅ 扩展角色回归用例失败 |
+| 「色彩标准」行 `enabled = false`（恒置灰） | ✅ 2 项失败（受影响风格仍应可点） |
+| 「色彩标准」行 `enabled = true`（从不置灰） | ✅ 1 项失败（`greyed out` 用例） |
+| 把 `ColorStyle.Monochrome` 错列进 `COLOR_SPEC_SENSITIVE_STYLES` | ✅ 1 项失败（`really re-tones` 用例） |
+
+> **判据要点**：扩展角色回归用例的判据是「**是否还等于 material3 基线色**」
+> （`lightColorScheme()` / `darkColorScheme()` 的对应值），**不是**「是否随种子变化」。
+> 第一版用后者时被 `surfaceContainerLowest` 浅色判失败 —— 它恒为 `#FFFFFFFF`，
+> 但那是算法**正确**行为。**「与种子无关」≠「没接上」。**
+
 ### 10.6 工具链升级验证（2026-09-20，已完成）
 
 工具链升级到最新 stable（Gradle 9.7.1 / AGP 9.4.1 / Kotlin 2.4.20 / Compose BOM 2026.09.00 /
@@ -694,7 +708,7 @@ compileSdk 37），**在临时探针分支验证通过后**才正式改：
 ## 14. 实施现状与后续(2026-09-21 补,供换机续接)
 
 **分支**:`d1/settings-impl`(未合回 `dev`)。**验证**(2026-09-21 复跑):
-domain **224** + app **261** 全绿、`lintDebug` 零告警。
+domain **224** + app **264** 全绿、`lintDebug` 零告警。
 **真机**:设置页四组、纯黑(`#000000` 实测)、色彩风格差异、关于页、许可页、语言切英文 —— 均已核对通过。
 
 **真机核对中修掉的真实缺陷**:许可页嵌套滚动崩溃(§12.5 铁律被违反,离线测试抓不到)、
@@ -703,14 +717,20 @@ domain **224** + app **261** 全绿、`lintDebug` 零告警。
 **后续(详见 HANGOFF §9.1 同名列)**:
 
 1. ✅ **补 `2021 ≠ 2025` 断言(已完成 2026-09-21)** —— 见 §10.5 与 HANGOFF §9.1「第 1 步」。
-   实测:两套规范在 **TonalSpot / Vibrant / Expressive / Neutral** 下改变 **21–24 / 48**
-   个角色;在 **Monochrome / Fidelity / Content / Rainbow / FruitSalad** 下**恒为 0**
-   (根因:`ColorSpec2025 : ColorSpec2021()`,六个 palette 方法只重写四个变体)。
+   实测(**修复映射缺口之前**):两套规范在 **TonalSpot / Vibrant / Expressive / Neutral** 下
+   改变 **21–24 / 48** 个角色;在 **Monochrome / Fidelity / Content / Rainbow / FruitSalad** 下
+   **恒为 0**(根因:`ColorSpec2025 : ColorSpec2021()`,六个 palette 方法只重写四个变体);
+   **修复后**敏感风格涨到 **36–43 / 48**。
    **断言已落** `ColorSchemesTest` 两条用例,3 组变异全部捕获。
-   顺带实测出**两个待裁决新问题**:① 该开关对 5/9 个风格是无操作;
+   顺带实测出**两个新问题** —— **均已经用户裁决并修复(2026-09-21)**:
+   ① 该开关对 5/9 个风格是无操作 → **设置页对该 5 个风格置灰该行**
+   (`COLOR_SPEC_SENSITIVE_STYLES` 单一事实源,`ChoiceRow` 新增 `enabled` 参数);
    ② 配色只映射 24 个角色,`surfaceContainer*` / `*Fixed*` 等不随种子变化 →
-   深色下卡片是 material3 基线紫灰,**色相与种子派生背景错配**
-   (详见 `docs/notes/d1-ui-friction-inventory.md` 第 10 节)。
+   深色下卡片是 material3 基线紫灰,**色相与种子派生背景错配** → **补全 19 个扩展角色映射**,
+   并给 `withPureBlack()` 补压 `surfaceBright` / `surfaceDim`
+   (详见 `docs/notes/d1-ui-friction-inventory.md` 第 10、11 节)。
+   **⚠️ ② 是行为变更(改变现有观感),离线断言只能证明"已由算法派生、且不同于基线",
+   不能证明"好看/可读" —— 真机核对待用户授权后进行。**
 2. ⬜ **工作流内部预测性返回(中)** —— 步骤容器的 `BackHandler` 优先级高于根级
    `PredictiveBackHandler`,需把开关传入两个步骤容器。
 3. ⬜ **目标页显示在背后(大)** —— 现只缩放当前页、背后是空背景;真预测性返回需两层渲染。

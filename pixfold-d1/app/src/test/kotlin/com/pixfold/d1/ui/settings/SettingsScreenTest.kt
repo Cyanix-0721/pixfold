@@ -7,6 +7,8 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertIsEnabled
+import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
@@ -19,6 +21,7 @@ import com.pixfold.d1.domain.settings.PixFoldSettings
 import com.pixfold.d1.domain.settings.StorageAccess
 import com.pixfold.d1.domain.settings.ThemeMode
 import com.pixfold.d1.ui.theme.PixFoldTheme
+import com.pixfold.d1.ui.theme.isAffectedByColorSpec
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -159,6 +162,37 @@ class SettingsScreenTest {
         tap(TAG_SETTINGS_COLOR_SPEC)
         chooseOption(TAG_SETTINGS_COLOR_SPEC, ColorSpecVersion.entries.indexOf(ColorSpecVersion.V2025))
         assertEquals(ColorSpecVersion.V2025, latest.colorSpec, "应能切到 2025 色彩标准")
+    }
+
+    /**
+     * 「色彩标准」在不受其影响的色彩风格下**置灰**(2026-09-21 用户裁决)。
+     *
+     * 依据(实测,见 `ColorSchemes.COLOR_SPEC_SENSITIVE_STYLES`):算法库的
+     * `ColorSpec2025` 只重写 4 个变体,选中 Monochrome 等 5 个风格时两套规范产出
+     * **逐字节相同**的配色 —— 该行给了选择却毫无反馈,是"假开关"。
+     */
+    @Test
+    fun `color spec row is greyed out for styles the spec does not affect`() {
+        val unaffectedStyle = ColorStyle.entries.first { !it.isAffectedByColorSpec() }
+        show(PixFoldSettings(colorStyle = unaffectedStyle))
+
+        val row = rule.onNodeWithTag(TAG_SETTINGS_COLOR_SPEC)
+        row.assertIsNotEnabled()
+        // 行为断言(不只依赖 semantics):点它不该弹出可选的对话框。
+        runCatching { row.performClick() }
+        rule.waitForIdle()
+        rule.onNodeWithTag(TAG_CHOICE_DIALOG).assertDoesNotExist()
+    }
+
+    /** 反向:受影响的风格下必须可点(否则就是"修反了",把正常功能也关掉)。 */
+    @Test
+    fun `color spec row stays enabled for styles the spec affects`() {
+        val affectedStyle = ColorStyle.entries.first { it.isAffectedByColorSpec() }
+        show(PixFoldSettings(colorStyle = affectedStyle))
+
+        rule.onNodeWithTag(TAG_SETTINGS_COLOR_SPEC).assertIsEnabled()
+        tap(TAG_SETTINGS_COLOR_SPEC)
+        rule.onNodeWithTag(TAG_CHOICE_DIALOG).assertExists()
     }
 
     @Test

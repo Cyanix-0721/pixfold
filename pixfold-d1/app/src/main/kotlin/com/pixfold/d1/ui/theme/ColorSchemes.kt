@@ -112,6 +112,36 @@ object ColorSchemes {
             inverseOnSurface = role(inverseOnSurface),
             inversePrimary = role(inversePrimary),
             surfaceTint = role(primary),
+            // ---- 扩展角色(2026-09-21 补) ----
+            // 此前这里**只映射 24 个角色**,下列角色不在其中,于是恒为 `light/darkColorScheme()`
+            // 的**基线常量**:无论用户选什么强调色 / 色彩风格 / 色彩标准都不变。
+            //
+            // 后果(实测,见 docs/notes/d1-ui-friction-inventory.md 第 10 节):
+            // 非靛蓝强调色下 `surface`(经种子派生)与 `surfaceContainer*`(基线紫灰)
+            // **色相错配** —— "背景对了、卡片还是 M3 基线紫",深色下尤其明显;
+            // `*Fixed*` 族则任何强调色都拿到基线淡紫 `#EADDFF`。
+            surfaceBright = role(surfaceBright),
+            surfaceDim = role(surfaceDim),
+            surfaceContainerLowest = role(surfaceContainerLowest),
+            surfaceContainerLow = role(surfaceContainerLow),
+            surfaceContainer = role(surfaceContainer),
+            surfaceContainerHigh = role(surfaceContainerHigh),
+            surfaceContainerHighest = role(surfaceContainerHighest),
+            // Fixed 族:按 M3 规范跨深浅保持同一值的强调色板。
+            // 注意"跨深浅不变"指**同一套配色内**不随 light/dark 切换,
+            // **不等于**"不随种子色变" —— 它仍须由种子色派生。
+            primaryFixed = role(primaryFixed),
+            primaryFixedDim = role(primaryFixedDim),
+            onPrimaryFixed = role(onPrimaryFixed),
+            onPrimaryFixedVariant = role(onPrimaryFixedVariant),
+            secondaryFixed = role(secondaryFixed),
+            secondaryFixedDim = role(secondaryFixedDim),
+            onSecondaryFixed = role(onSecondaryFixed),
+            onSecondaryFixedVariant = role(onSecondaryFixedVariant),
+            tertiaryFixed = role(tertiaryFixed),
+            tertiaryFixedDim = role(tertiaryFixedDim),
+            onTertiaryFixed = role(onTertiaryFixed),
+            onTertiaryFixedVariant = role(onTertiaryFixedVariant),
             // error 族**刻意保持 material3 默认**:
             // 错误色若随主题漂移,危险提示的"红色"强度会被削弱甚至变得不像警示,
             // 而"破坏性动作必须醒目"是本项目的产品约束(§2 约束 5)。
@@ -132,8 +162,13 @@ object ColorSchemes {
 /**
  * 纯黑背景:OLED 场景下的"真黑"。
  *
- * **不只是把 background 置黑** —— `surfaceContainer*` 系列也要压到纯黑,
+ * **不只是一层**:`surfaceContainer*` 系列也要压到纯黑,
  * 否则深色下会出现"黑底灰卡"的割裂感,与"要纯黑"的诉求相矛盾。
+ *
+ * **2026-09-21 补**:`surfaceBright` / `surfaceDim` 也一并压黑 ——
+ * 二者本是"最亮 / 最暗的表面"两档,扩展角色补全映射后它们会随种子色变化,
+ * 若不在纯黑时一并压掉,深色纯黑模式下这两档又会冒出**非黑**的浅色表面,
+ * 把刚修好的观感重新打回"黑底灰卡"。
  *
  * **代价与配套**:容器与背景同色后,层级只能靠**边框/分隔线**表达
  * (调用方需保证可交互卡片有可见边界);`surfaceVariant` 保留一档浅灰,
@@ -147,6 +182,8 @@ object ColorSchemes {
 fun ColorScheme.withPureBlack(): ColorScheme = copy(
     background = Color.Black,
     surface = Color.Black,
+    surfaceBright = Color.Black,
+    surfaceDim = Color.Black,
     surfaceContainerLowest = Color.Black,
     surfaceContainerLow = Color.Black,
     surfaceContainer = Color.Black,
@@ -155,3 +192,39 @@ fun ColorScheme.withPureBlack(): ColorScheme = copy(
     surfaceVariant = Color(0xFF1A1A1A),
     // on* 角色不动:保持对比度不退化。
 )
+
+/**
+ * 会被「色彩标准」(2021 / 2025)真正改变输出的色彩风格。
+ *
+ * ## 为什么需要这个常量
+ *
+ * 算法库的 `ColorSpec2025 : ColorSpec2021()`,其六个调色板方法
+ * (`getPrimaryPalette` / `getSecondaryPalette` / `getTertiaryPalette` /
+ * `getNeutralPalette` / `getNeutralVariantPalette` / `getErrorPalette`)
+ * **只重写 `NEUTRAL` / `TONAL_SPOT` / `EXPRESSIVE` / `VIBRANT` 四个变体**,
+ * 其余分支一律 `else -> super`。
+ *
+ * 实测(6 个种子 × 深浅,逐项比较 48 个角色):上列 4 个风格下两套规范改变
+ * **21–24 个角色**;其余 5 个风格下**恒为 0 —— 逐个角色逐字节相同**。
+ *
+ * 即:选中 Monochrome / Fidelity / Content / Rainbow / FruitSalad 时,
+ * 设置页的「色彩标准」是**无操作开关**(能点、能存,颜色一点不变)。
+ * 故设置页据此**置灰该行**(用户 2026-09-21 裁决),如实反映能力边界。
+ *
+ * ## 单一事实源
+ *
+ * 置灰(UI)与"应无差异"断言(测试)共用此常量,避免两处各自维护一份知识而漂移;
+ * 测试会验证该常量与算法实际行为一致,若算法库升级改变覆盖面,测试先失败。
+ *
+ * > 放在 `ui/theme` 而非 `domain`:这是**算法库的行为事实**,不是产品领域概念;
+ * > `domain` 的 [ColorStyle] 是对算法变体的纯枚举镜像,不应承载算法实现细节。
+ */
+val COLOR_SPEC_SENSITIVE_STYLES: Set<ColorStyle> = setOf(
+    ColorStyle.TonalSpot,
+    ColorStyle.Vibrant,
+    ColorStyle.Expressive,
+    ColorStyle.Neutral,
+)
+
+/** 「色彩标准」对该风格是否真的有效果。见 [COLOR_SPEC_SENSITIVE_STYLES]。 */
+fun ColorStyle.isAffectedByColorSpec(): Boolean = this in COLOR_SPEC_SENSITIVE_STYLES

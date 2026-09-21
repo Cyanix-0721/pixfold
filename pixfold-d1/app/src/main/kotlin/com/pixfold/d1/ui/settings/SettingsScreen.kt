@@ -49,6 +49,13 @@ import com.pixfold.d1.domain.settings.ColorStyle
 import com.pixfold.d1.domain.settings.PixFoldSettings
 import com.pixfold.d1.domain.settings.StorageAccess
 import com.pixfold.d1.domain.settings.ThemeMode
+import com.pixfold.d1.ui.theme.isAffectedByColorSpec
+
+/**
+ * M3 禁用态内容的不透明度(Material Design 规范值 38%)。
+ * 用于「色彩标准」在该风格下无效时的置灰。
+ */
+private const val DISABLED_CONTENT_ALPHA = 0.38f
 
 // ---- 测试 tag(集中定义,便于测试与实现同步) ----
 const val TAG_SETTINGS_PAGE = "settings-page"
@@ -197,6 +204,12 @@ fun SettingsScreen(
                 tag = TAG_SETTINGS_COLOR_SPEC,
                 options = ColorSpecVersion.entries.map { it to stringResource(colorSpecLabel(it)) },
                 onSelect = { onChange(settings.copy(colorSpec = it)) },
+                // 如实反映能力边界(2026-09-21 用户裁决「置灰」):
+                // 算法库里 2025 规范只重写 4 个变体,其余 5 个风格下两套规范产出
+                // 逐字节相同的结果 —— 此时该行给了选择却毫无反馈,属"假开关"。
+                // 置灰而非隐藏:值仍可见,用户能看出"设过,只是现在不生效"。
+                // 依据见 ColorSchemes.COLOR_SPEC_SENSITIVE_STYLES 的实测注释。
+                enabled = settings.colorStyle.isAffectedByColorSpec(),
             )
 
             SwitchRow(
@@ -428,6 +441,11 @@ private fun RadioRow(
  *
  * 用对话框而非下拉菜单:选项较多(如 9 种色彩风格)、且对话框在窄屏上不会
  * 被挤压;也让"选择真的生效"更容易被测试断言。
+ *
+ * `enabled = false` 时**整行置灰且不可点开** —— 用于如实反映"该设置在当前
+ * 组合下无效"(如「色彩标准」遇到不受其影响的色彩风格,见 [COLOR_SPEC_SENSITIVE_STYLES])。
+ * 置灰而**不隐藏**:值仍可见,用户能看出"我设过 2025,只是现在不生效",
+ * 而不是以为设置丢了。
  */
 @Composable
 private fun <T> ChoiceRow(
@@ -436,13 +454,27 @@ private fun <T> ChoiceRow(
     tag: String,
     options: List<Pair<T, String>>,
     onSelect: (T) -> Unit,
+    enabled: Boolean = true,
 ) {
     var open by remember { mutableStateOf(false) }
+
+    // M3 的禁用态:内容用 on 色 38% 不透明度(Material Design 规范值)。
+    // 用语义角色 + 固定 alpha,不硬编码具体色值。
+    val labelColor = if (enabled) {
+        MaterialTheme.colorScheme.onSurface
+    } else {
+        MaterialTheme.colorScheme.onSurface.copy(alpha = DISABLED_CONTENT_ALPHA)
+    }
+    val valueColor = if (enabled) {
+        MaterialTheme.colorScheme.onSurfaceVariant
+    } else {
+        MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = DISABLED_CONTENT_ALPHA)
+    }
 
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .clickable { open = true }
+            .clickable(enabled = enabled) { open = true }
             .testTag(tag)
             .semantics { contentDescription = label }
             .padding(vertical = 12.dp),
@@ -452,16 +484,16 @@ private fun <T> ChoiceRow(
         Text(
             text = label,
             style = MaterialTheme.typography.bodyLarge,
-            color = MaterialTheme.colorScheme.onSurface,
+            color = labelColor,
         )
         Text(
             text = current,
             style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            color = valueColor,
         )
     }
 
-    if (open) {
+    if (open && enabled) {
         AlertDialog(
             onDismissRequest = { open = false },
             title = { Text(label) },
