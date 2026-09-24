@@ -54,8 +54,9 @@ D1 六项交付(HANGOFF §9 D1):图片列表/缩略图预览、拖拽排序、�
 6. **compileSdk / minSdk / targetSdk = 36 / 24 / 36**;`namespace`/`applicationId` = `com.pixfold.d1`。
    > **⚠️ 2026-09-22 更新**:本行记录的是 09-16 的取值。`compileSdk` 于 09-20 升到 **37**,
    > **`minSdk` 于 09-22 由 24 提到 30**(用户裁决,理由与实测见
-   > `docs/notes/d1-toolchain-evidence.md` §9 与 `HANGOFF.md` §12.6)。当前版本锚点以二者为准;
-   > 保留原文作为当时的设计记录。
+   > `docs/notes/d1-toolchain-evidence.md` §9 与 `HANGOFF.md` §12.6);**2026-09-26 又由 30 提到
+   > `34`**(见 §9.8)。当前版本锚点 = **37 / 34 / 36**,以 `docs/notes/d1-toolchain-evidence.md`
+   > 与 `HANGOFF.md` §12.6 为准;保留原文作为当时的设计记录。
 7. **`local.properties` 不入库**(含机器相关 `sdk.dir`);`build/`、`.gradle/`、`.kotlin/` 不入库。
 8. **领域层不依赖 Android**:`domain/` 不得 import 任何 `android.*` / `androidx.*`;违反即架构缺陷。
 9. **不可变状态 + 纯函数**:领域状态一律用 `data class` 表达,变更经纯函数返回新实例;

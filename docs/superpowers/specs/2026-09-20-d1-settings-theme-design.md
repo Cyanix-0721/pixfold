@@ -36,7 +36,7 @@
 | **预测性返回开关** | 无运行时 API（见 §2.1） | **用户裁决：不做**，默认开启；不加只读说明 |
 | **2021/2025 色彩标准切换** | 需 `material-color-utilities` 的色调板算法（见 §2.2） | HANGOFF §11 待确认 |
 | **全量 i18n**（两条工作流页面英文化） | 领域层 99 处文案 + 测试 826 处中文断言需重构（见 §2.3） | **阶段 2** 独立推进 |
-| `minSdk` 调整 | 版本锚点变更，牵动 lint 配置与既有注释 | 不碰；本阶段用 `Build.VERSION` 分支。**⚠️ 2026-09-22 更新**：本阶段之后用户单独裁决把 `minSdk` 由 24 提到 **30**（见 `docs/notes/d1-toolchain-evidence.md` §9）；两处 `Build.VERSION` 分支（`Theme.kt:48`、`PixFoldApp.kt:192`）**保持不变**，因为 30 仍低于它们所需的 31 / 33 |
+| `minSdk` 调整 | 版本锚点变更，牵动 lint 配置与既有注释 | 不碰；本阶段用 `Build.VERSION` 分支。**⚠️ 2026-09-22 更新**：本阶段之后用户单独裁决把 `minSdk` 由 24 提到 **30**（见 `docs/notes/d1-toolchain-evidence.md` §9）；两处 `Build.VERSION` 分支（`Theme.kt:48`、`PixFoldApp.kt:192`）**保持不变**，因为 30 仍低于它们所需的 31 / 33。**⚠️ 2026-09-26 再更新**：`minSdk` 又提到 **34**（提交 `f3cfb08`，见 §9.8），34 ≥ 31 / 33 ⇒ **两处版本分支已删除**（`Theme.kt` 的 `Build.VERSION.SDK_INT >= S`、`PixFoldApp.kt` 的 `SDK_INT < TIRAMISU`），`ObsoleteSdkInt` 随之消失 |
 | SAF / 权限的**实际生效** | D1 不连真实文件系统 | 本阶段只持久化偏好值 |
 
 ## 2. 已核实的硬约束（均经实测，非推测）

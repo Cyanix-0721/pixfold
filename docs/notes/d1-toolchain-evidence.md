@@ -267,6 +267,11 @@ Windows 侧的 wrapper **一直在正常下载**(缓存目录里已有 108MB 的
 
 ## 9. minSdk 由 24 提到 30(2026-09-22)
 
+> **⚠️ 本节 9.1–9.7 记录的是 2026-09-22 的裁决与当时的实测。**
+> **2026-09-26 用户再次裁决把 `minSdk` 由 30 提到 `34`**(提交 `f3cfb08`),
+> 本节内所有「当前 minSdk = 30」的结论**均已过期**,以 **§9.8** 为准。
+> 保留原文作为当时的取证记录。
+
 ### 9.1 起因与裁决
 
 用户提问(逐字):**「为什么要做API24/25回退，我的安卓手机最低安卓16，没必要低版本适配」**,
@@ -295,6 +300,7 @@ Windows 侧的 wrapper **一直在正常下载**(缓存目录里已有 108MB 的
 | `java/util/zip/ZipOutputStream` / `ZipFile` / `ZipEntry` | **1** | CBZ 打包 | ✅(任意版本) |
 
 ⇒ **minSdk=30 已覆盖 roadmap 所需全部 API**;CBZ 打包与 SAF 在任意 minSdk 都可行。
+(**2026-09-26 更新**:minSdk 已提到 **34**,本表 `LocaleManager` 一行的 ❌ 随之变为 ✅ 且版本分支已删 —— 见 §9.8。)
 主源码只有 2 处 `Build.VERSION` 分支(上表 `Theme.kt:48` / `PixFoldApp.kt:192`),
 无 `@RequiresApi` / `@TargetApi`,Manifest 不申请任何权限。
 
@@ -339,6 +345,8 @@ material-color-utilities → 21;aboutlibraries-compose / -compose-m3 → 21。
    (删掉 API 24/25 回退档)**已经到手**。
 
 ⇒ 维持 Java 17 + minSdk 30。若日后工具链整体迁到 Java 21,可再评估 36。
+(**2026-09-26 更新**:minSdk 实际定为 **34** —— 上面第 3 条「29 个测试文件 `@Config(sdk=[34])` 须全改 `[36]`」
+是 **minSdk=36 的代价**,与 34 无关;34 与既有 `@Config(sdk=[34])` 完全一致,**零测试改动**。见 §9.8。)
 
 ### 9.6 一条测试教训(顺带发现)
 

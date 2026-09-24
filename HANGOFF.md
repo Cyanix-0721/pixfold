@@ -1263,14 +1263,17 @@ Manifest 显式 `enableOnBackInvokedCallback="true"`(targetSdk 33+ 默认,写明
 
 ### ⏭️ 设置与主题体系 —— 现状与后续(2026-09-21 记录,供换机续接)
 
-> **分支**:`d1/settings-impl`(**未合回 `dev`**),26 个提交(自 `dev` 起算;
+> **分支**:`d1/settings-impl`(**未合回 `dev`**),27 个提交(自 `dev` 起算;
 > `dev` 自身另有 14 个未推送提交,均未 push —— push 由用户处理)。
 > **工作区干净**。启动图标主题化 + minSdk 24→30 **已提交**(`2ba10f8`,见本章
 > 「✅ 启动图标 MD 主题化 + minSdk 提到 30」)。规格:`docs/superpowers/specs/2026-09-20-d1-settings-theme-design.md`。
-> **验证**(2026-09-22 复跑):`domain:test` **224** + `app:testDebugUnitTest` **278** 全绿;
-> `assembleDebug` 成功;`lintDebug` 零告警。(278 = 上一轮 273 + `LauncherIconTest` 6 条
-> − 随 minSdk 删除的 API 24/25 回退档用例 1 条;273 = 原 264 + §9.1 第 2 步新增 9 条
-> `PredictiveBackTest`;此前 264 = 261 + 扩展角色回归 1 条 + 「色彩标准」置灰 2 条。)
+> **最新验证(2026-09-26 复跑,`minSdk=34` 终态)**:`domain:test` **229** +
+> `app:testDebugUnitTest` **292** 全绿、`app:lintDebug` **`No issues found.`**、
+> `assembleDebug` 成功(APK **33,046,763 B**)。(数字演进:224/278 @09-22 →
+> 229/280 @09-24 P0 → 229/282 @09-25 底栏化 → 229/287 @09-25 底栏分槽 →
+> 229/291 @09-25 像素守卫 → 229/292 @09-26 深色撤销守卫。)
+> **本轮相关提交**:`1c95db9`(底栏视觉规格 + 撤销危险红,19 files +1592/−201)、
+> `f3cfb08`(minSdk 30→34,5 files +56/−21)、`2a96acc`(文档同步)。
 
 **已交付并真机核对通过**:
 
