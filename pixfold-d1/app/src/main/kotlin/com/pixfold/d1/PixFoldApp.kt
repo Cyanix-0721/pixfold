@@ -1,7 +1,6 @@
 package com.pixfold.d1
 
 import android.app.LocaleManager
-import android.os.Build
 import android.os.LocaleList
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.MaterialTheme
@@ -181,15 +180,15 @@ fun PixFoldApp(store: SettingsStore? = null) {
  *
  * **此前漏了这一步**(真机实测:选 English 后界面仍是中文),属真实缺陷。
  *
- * **版本说明**:`LocaleManager` 是 API 33+,故仅在其上生效;
- * 更低版本此处不处理(项目真机为 Android 16,不受影响)。
- * 要让低版本也支持,需 `attachBaseContext` 手动包装 —— 属后续工作。
+ * **版本说明**:`LocaleManager` / `LocaleConfig` 均为 API 33+。本项目 minSdk
+ * 已于 2026-09-26 提到 **34**,故此处**不再需要版本分支** —— 早先那句
+ * `if (Build.VERSION.SDK_INT < TIRAMISU) return@LaunchedEffect` 已删除
+ * (留着会被 lint 判 `ObsoleteSdkInt` 而本项目 `warningsAsErrors=true`)。
  */
 @Composable
 private fun ApplyAppLanguage(language: AppLanguage) {
     val context = LocalContext.current
     LaunchedEffect(language) {
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) return@LaunchedEffect
         val manager = context.getSystemService(LocaleManager::class.java) ?: return@LaunchedEffect
         val tag = when (language) {
             AppLanguage.System -> null          // 空 LocaleList = 跟随系统

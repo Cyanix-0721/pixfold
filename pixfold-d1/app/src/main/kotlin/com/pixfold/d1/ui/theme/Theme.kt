@@ -1,6 +1,5 @@
 package com.pixfold.d1.ui.theme
 
-import android.os.Build
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material3.ButtonColors
 import androidx.compose.material3.ButtonDefaults
@@ -19,7 +18,8 @@ import com.pixfold.d1.domain.settings.ThemeMode
  * PixFold 主题(HANGOFF §6.5「UI 须符合最新 Material Design」)。
  *
  * 配色来源按优先级:
- *  1. **动态取色**(强调色 = 跟随系统,且 API ≥ 31)→ 种子色取自系统壁纸;
+ *  1. **动态取色**(强调色 = 跟随系统)→ 种子色取自系统壁纸(`dynamic*ColorScheme` 是
+ *     API 31+,而本项目 minSdk 已于 2026-09-26 提到 **34**,故不再需要版本分支);
  *  2. 否则 → 取所选**预设种子色**。
  *
  * 种子色再经**色彩风格**(TonalSpot / Vibrant / …)与**色彩标准**(2021 / 2025)
@@ -48,7 +48,7 @@ fun PixFoldTheme(
     }
 
     val context = LocalContext.current
-    val seedArgb = if (settings.monetEnabled && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+    val seedArgb = if (settings.monetEnabled) {
         // 取系统动态配色的 primary 作种子:深浅两种模式下它都来自同一套壁纸色调。
         val systemScheme = if (dark) {
             dynamicDarkColorScheme(context)

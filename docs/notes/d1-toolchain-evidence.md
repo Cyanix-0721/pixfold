@@ -28,7 +28,7 @@
 | Compose 编译器插件 | **2.2.10** | **必须与 AGP 内置 KGP 版本一致**,见 §3.2 |
 | Compose BOM | **2026.02.01** | 与 §12.6 一致 |
 | JDK | **temurin-17.0.20+101** | mise 管理的 Windows 侧 JDK;`JAVA_HOME` 指向它 |
-| compileSdk / minSdk / targetSdk | **36 / 24 / 36** | 与 §12.6 目标值一致 |
+| compileSdk / minSdk / targetSdk | **36 / 34 / 36** | 与 §12.6 目标值一致。**注**:本行是 §2 探针期的快照,`minSdk` 已于 2026-09-26 由 24→30→**34**,以 §9 与 §12.6 为准;`compileSdk` 亦已升到 **37** |
 | Robolectric | **4.17** | 离线 UI 断言用 |
 | AndroidX test ext junit | **1.3.0** | |
 
@@ -196,6 +196,7 @@ MotionScheme$Companion:
 | compileSdk | 36 | **37** | 新依赖链要求(见 8.3) |
 | targetSdk | 36 | **36(不变)** | 刻意锁定,与真机 Android 16 对齐 |
 | minSdk | 24 | **30** | **2026-09-22 用户裁决**(见 §9);此前 24 是脚手架期的随手取值,新栈未用 `java.time` 故 desugaring 理由从未真正成立 |
+| minSdk(再升) | 30 | **34** | **2026-09-26 用户裁决**(见 §9.8);33 与 34 的清理成本相同(都删同 3 处版本守卫),取 34 额外拿到 HDR gainmap |
 | Robolectric | 4.17 | 4.17(已最新) | — |
 | AboutLibraries | — | **15.2.0** | 新增(core + compose-m3 + 插件) |
 
@@ -289,7 +290,7 @@ Windows 侧的 wrapper **一直在正常下载**(缓存目录里已有 108MB 的
 | `java/nio/file/Files` | **26** | D2a 归档 | ✅ |
 | `android/graphics/ImageDecoder` | **28** | D3/D4 图片解码 | ✅ |
 | `android/app/NotificationChannel` | **26** | D4 进度通知 | ✅ |
-| `android/app/LocaleManager` | **33** | 应用内语言 | ❌ —— 但**已有 `Build.VERSION` 分支**(`PixFoldApp.kt:192`) |
+| `android/app/LocaleManager` | **33** | 应用内语言 | ❌ —— 但**已有 `Build.VERSION` 分支**(`PixFoldApp.kt:192`);**2026-09-26 后 minSdk=34 ⇒ ✅ 且分支已删**(见 §9.8) |
 | `android/provider/DocumentsContract` | 19 | SAF | ✅(任意版本) |
 | `java/util/zip/ZipOutputStream` / `ZipFile` / `ZipEntry` | **1** | CBZ 打包 | ✅(任意版本) |
 
@@ -398,6 +399,41 @@ packaging {
 实测 `assembleDebug` 回到 **13,007,710 B**(`STORED=0 DEFLATED=19`),代价是回到 Android P
 之前的加载路径(首次启动略慢)。**本项目不采用** —— 自用侧载、不经 Play 分发,多出的传输量
 无实际代价;且该开关**只影响 APK,AAB 不受影响**。
+
+### 9.8 minSdk 由 30 再提到 34(2026-09-26)
+
+**起因**:用户看到本节 `:292` 表格里 `LocaleManager`=33 那一行仍带 ❌,问
+「这个应用内语言，再把minSDK升到33吧,minSDK34有什么新的功能可以用吗要不直接切34」。
+**用户裁决:`minSdk = 34`**。
+
+**为什么 33 与 34 的成本完全相同(这是选 34 的关键)**:两者都要求删掉同一批 3 处
+`ObsoleteSdkInt` 守卫 —— `AndroidManifest.xml` 的 `tools:targetApi="33"`、
+`PixFoldApp.kt` 的 `SDK_INT < TIRAMISU`、`Theme.kt` 的 `SDK_INT >= S`。
+**33 不会少删一处,34 也不会多删一处** ⇒ 成本一样时取更高的那个。
+
+**34 相对 33 的增量收益**:HDR gainmap —— `android/graphics/Gainmap` 类、
+`Bitmap.getGainmap()/hasGainmap()/setGainmap()`(类级 `since=34`,据
+`platforms/android-36/data/api-versions.xml`),与 D3/D4 的图片解码管线相关。
+
+**连带删除(3 处)**:
+
+| 文件 | 删除内容 |
+| --- | --- |
+| `AndroidManifest.xml` | `xmlns:tools="http://schemas.android.com/tools"` 声明与 `tools:targetApi="33"` 属性(34 ≥ 33,不再需要豁免) |
+| `PixFoldApp.kt` | `import android.os.Build` + `if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) return@LaunchedEffect` |
+| `Theme.kt` | `import android.os.Build`;`settings.monetEnabled && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S` → **`if (settings.monetEnabled)`** |
+
+**⚠️ 纠正本节 9.5 的一处错判**:"29 个测试文件的 `@Config(sdk = [34])` 必须全部改 `[36]`"
+是 **minSdk=36 的代价**,不能套到 34 上。minSdk=34 与测试既有的 `@Config(sdk = [34])`
+**完全一致 ⇒ 零测试改动**(实测复跑 `app` **292** / `domain` **229** 全绿,无一条用例需改)。
+另:9.5 提到"SDK 36 需 Java 21"的硬墙也与 34 无关 —— Robolectric 只有 34/35/36 的
+`android-all-instrumented` 缓存在本机,34 在列。
+
+**未受影响**:`compileSdk = 37`、`targetSdk = 36`、Java 目标 17 全部不动;
+`docs/notes/d1-toolchain-evidence.md` §9.7 记的"minSdk≥28 时 dex 不压缩"现象**依旧成立**
+(minSdk 仍在 ≥28 档)。
+
+**APK 体积**:33,549,783 B → **33,046,763 B**(−503,020 B)。dex 压缩策略随 minSdk 档位变化所致。
 
 ---
 
