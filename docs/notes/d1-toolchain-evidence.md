@@ -435,6 +435,13 @@ packaging {
 
 **APK 体积**:33,549,783 B → **33,046,763 B**(−503,020 B)。dex 压缩策略随 minSdk 档位变化所致。
 
+**落地**:`f3cfb08`「feat(d1): minSdk 30 → 34（应用内语言 LocaleManager + HDR gainmap）」,
+5 files changed, 56 insertions(+), 21 deletions(-)(含本节 §9.8 的新增)。
+与之相邻的 `1c95db9`(底栏视觉规格 + 撤销危险红)刻意携带**中间态 `Theme.kt`** ——
+保留 `Build.VERSION` 守卫但已含 `dangerActionButtonColors()`,使该提交**独立可过 lint**
+(否则 `ObsoleteSdkInt` 在 `warningsAsErrors = true` 下硬失败,而删守卫只在 minSdk ≥ 31 时合法);
+守卫的删除落在本提交。⇒ 两个提交各自独立绿(方案 C)。
+
 ---
 
 ## 10. 16 KB 页大小支持(2026-09-24 核查,结论:**已达标,无需任何配置**)

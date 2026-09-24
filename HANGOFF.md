@@ -1079,7 +1079,8 @@ Manifest 显式 `enableOnBackInvokedCallback="true"`(targetSdk 33+ 默认,写明
 > **6 组变异全部捕获**:删 A 侧底栏(5 失败)/ 删 B 侧库底栏(1)/ 删 B 侧元数据底栏(1)/
 > 报告动作移回列表内(3)/ A 侧确认移回列表内(5)/ B 侧确认移回列表内(6)。
 > **✅ 离线自证完成;真机核对已通过**(2026-09-25,与紧随其后的「底栏分槽 + 步骤1 头部伸缩轮」同一轮真机核对完成;
-> 5 个动作全部在底栏,长列表无需再滚到底)。详见 `docs/notes/d1-ui-friction-inventory.md` §2。
+> 5 个动作全部在底栏,长列表无需再滚到底)。**已提交 `1c95db9`**。
+> 详见 `docs/notes/d1-ui-friction-inventory.md` §2。
 > 逐项读数见 `docs/notes/d1-ui-friction-inventory.md` §1「真机核对」表。
 
 **底栏分槽 + 步骤1 头部伸缩轮(P1 续,2026-09-25)**:
@@ -1128,7 +1129,7 @@ Manifest 显式 `enableOnBackInvokedCallback="true"`(targetSdk 33+ 默认,写明
 > **教训**:①`assertDoesNotExist()` 是 `SemanticsNodeInteraction` 的**成员方法不是顶层扩展**,
 > 不能 import;②变异若整体互换两个槽,必须**整段替换**,只改关键字会得到「重复具名参数」的
 > 编译错误(`tests=0` 的 NO-XML),那不是有效变异证据。
-> **✅ 离线自证完成**(纯布局位移)。详见 `docs/notes/d1-ui-friction-inventory.md` §2b。
+> **✅ 离线自证完成**(纯布局位移),**已提交 `1c95db9`**。详见 `docs/notes/d1-ui-friction-inventory.md` §2b。
 >
 > **✅ 真机核对已通过(2026-09-25,PJX110 / Android 16 / 361dp×794dp,用户授权)**:
 > 七个位置逐一读数 —— A 步骤1「下一步」**x989-1138 y2633-2703**(改造前在模式行内 **y791-861**);
@@ -1203,7 +1204,8 @@ Manifest 显式 `enableOnBackInvokedCallback="true"`(targetSdk 33+ 默认,写明
 > 返回类按钮已确认**有 tonal 底色**(A 步骤2 左键 x=46 `(80,52,55)` 胶囊外沿、x=146 `(222,181,184)` 填充;
 > B 步骤2 同款);右键为 primary 填充 `(247,182,187)`。B 步骤2 最宽配对实测 `[42,520]` + `[695,1222]`
 > ⇒ 中间 175px 空档、1264 宽屏内**未溢出**。撤销底色见下条「撤销按钮深色不像危险动作」。
-> 详见 `docs/notes/d1-ui-friction-inventory.md` §2c。
+> 详见 `docs/notes/d1-ui-friction-inventory.md` §2c。**本轮的 ①②③ 与 4 条像素守卫已提交 `1c95db9`**
+> (同提交还含下述「撤销按钮深色不像危险动作」的修正)。
 
 **撤销按钮深色不像危险动作(P1 续,2026-09-26 已修)**:
 
@@ -1251,7 +1253,9 @@ Manifest 显式 `enableOnBackInvokedCallback="true"`(targetSdk 33+ 默认,写明
 > **2 组变异各自命中自己那条**:永远用 `error`(即修复前行为)→ 深色用例,报错逐字
 > `实测亮度=0.5649442091904655 (#FFF2B8B5)`(**精确复现用户抱怨的颜色,且旧断言会放行**);
 > 浅色分支改用 `errorContainer` → 浅色用例,报错逐字 `r=249 g=222 b=220 (#FFF9DEDC)`。
-> 变异脚本 `app/build/mut_danger.py`(不跟踪)。
+> 变异脚本 `app/build/mut_danger.py`(不跟踪)。**已提交 `1c95db9`**(与底栏视觉规格同一提交;
+> 该提交刻意携带**中间态 `Theme.kt`** —— 保留 `Build.VERSION` 守卫以免 lint `ObsoleteSdkInt`
+> 在 `warningsAsErrors = true` 下硬失败,使本提交独立可过 lint;守卫的删除落在 `f3cfb08`)。
 > **教训**⚠️:**`git checkout -- <file>` 会连未提交的改动一起丢掉** —— 用它"还原变异"时把新写的
 > `dangerActionButtonColors` 与早先的 minSdk 34 清理一起抹掉,靠 `edit` 逐条重放才恢复;
 > **变异还原必须用 `cp` 备份文件**(备份放工作区,沙箱 `/tmp` 不跨 bash 调用保留)。
@@ -1259,7 +1263,7 @@ Manifest 显式 `enableOnBackInvokedCallback="true"`(targetSdk 33+ 默认,写明
 
 ### ⏭️ 设置与主题体系 —— 现状与后续(2026-09-21 记录,供换机续接)
 
-> **分支**:`d1/settings-impl`(**未合回 `dev`**),21 个提交(自 `dev` 起算;
+> **分支**:`d1/settings-impl`(**未合回 `dev`**),26 个提交(自 `dev` 起算;
 > `dev` 自身另有 14 个未推送提交,均未 push —— push 由用户处理)。
 > **工作区干净**。启动图标主题化 + minSdk 24→30 **已提交**(`2ba10f8`,见本章
 > 「✅ 启动图标 MD 主题化 + minSdk 提到 30」)。规格:`docs/superpowers/specs/2026-09-20-d1-settings-theme-design.md`。
