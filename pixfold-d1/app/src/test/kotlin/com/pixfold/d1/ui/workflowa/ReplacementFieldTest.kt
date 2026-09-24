@@ -91,14 +91,26 @@ class ReplacementFieldTest {
         editableTextOf(proposalFieldTag(collection.images.first().id))
 
     /**
+     * 展开命名结构编辑器 —— P0(2026-09-24)后编辑器**默认折叠**成一行摘要。
+     *
+     * 真机(361dp × 794dp)实测展开态的编辑器高达 692dp(视口的 87%),首屏连一条建议行
+     * 都放不下;折叠栏常驻在页面固定区(不在 LazyColumn 内),点一下即可展开。
+     */
+    private fun expandEditor() {
+        rule.onNodeWithTag(TAG_SCHEME_TOGGLE).performClick()
+        rule.waitForIdle()
+    }
+
+    /**
      * 打开「自动清洗」说明对话框 —— 替换字符输入框就在其中。
      *
-     * **为什么不放在编辑器行内**:命名页整页只有一个 LazyColumn,头部(编辑器)在真机上
-     * 已高达 ~862dp,视口仅剩约 130dp 给建议表;再插一行会把**主工作区**挤出屏幕
-     * (实测:加行后建议行完全不组合,14 项既有测试失败)。
-     * 放进对话框零高度成本,且与"清洗规则"的说明同处一室。
+     * **为什么不放在编辑器行内**:命名页整页只有一个 LazyColumn,编辑器展开时在真机
+     * 上高达 ~692dp,把它留在**固定区**会让建议行完全不组合(P6 实测:14 项既有测试失败);
+     * 故展开态的编辑器放进滚动容器(可达但可滚走),固定区只留一行摘要。
+     * 替换字符入口仍在对话框内:零高度成本,且与"清洗规则"的说明同处一室。
      */
     private fun openSanitizeDialog() {
+        expandEditor()
         rule.onNodeWithTag(TAG_PROPOSAL_LIST)
             .performScrollToNode(hasTestTag(TAG_SCHEME_SANITIZE_INFO))
         rule.waitForIdle()

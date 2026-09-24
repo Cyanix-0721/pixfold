@@ -1,5 +1,6 @@
 package com.pixfold.d1.ui.workflowa
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
@@ -7,6 +8,7 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -16,6 +18,7 @@ import androidx.compose.material3.ExposedDropdownMenuAnchorType
 import androidx.compose.material3.ExposedDropdownMenuBox
 import androidx.compose.material3.ExposedDropdownMenuDefaults
 import androidx.compose.material3.FilterChip
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -34,6 +37,7 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.pixfold.d1.R
 import com.pixfold.d1.domain.model.CasePolicy
@@ -53,7 +57,15 @@ import com.pixfold.d1.domain.naming.toggleComponent
 import com.pixfold.d1.domain.naming.updateComponent
 import com.pixfold.d1.domain.naming.updateScheme
 
+/** 编辑器**完整内容**(展开时才存在;折叠态下不在组合树里)。 */
 const val TAG_SCHEME_EDITOR = "scheme-editor"
+
+/** 折叠栏容器(常驻,不随列表滚动)。 */
+const val TAG_SCHEME_BAR = "scheme-bar"
+
+/** 折叠栏的点击目标(展开 / 收起)。 */
+const val TAG_SCHEME_TOGGLE = "scheme-toggle"
+
 const val TAG_SCHEME_ADD = "scheme-add"
 const val TAG_SCHEME_SANITIZE = "scheme-sanitize"
 const val TAG_SCHEME_ROOT_DIR = "scheme-root-dir"
@@ -99,6 +111,69 @@ fun compTextTag(i: Int) = "scheme-comp-text-$i"
 const val TAG_SCHEME_EXT_POLICY = "scheme-ext-policy"
 
 /**
+ * 命名结构编辑器的**折叠摘要栏**(常驻在命名页顶部,不随建议表滚动)。
+ *
+ * 左侧一行摘要([summary],由 `namingSummaryLine` 用**真实建议名**做样本),右侧一个
+ * 箭头指示当前展开态;整行可点,点击切换展开 / 收起。
+ *
+ * **为什么默认折叠**(P0,2026-09-24):真机(361dp × 794dp)实测展开态的编辑器
+ * 高达 **692dp = 视口的 87%**,首屏连一条建议行都放不下 —— 而"预览是主工作区"
+ * (约束 3)要求用户一进页面就能看到建议名。折叠后固定区约 140dp,首屏可容 6~7 行。
+ *
+ * 展开态的编辑器**不作为固定区块**,而是插进建议表这个**唯一滚动容器**的头部:
+ * 否则编辑器增长(用户加组件)会再次把主工作区挤到 0 高,那正是 P0 的成因。
+ *
+ * @param expanded 当前展开态(由上层持有,故切换集合 / 重组都不丢)。
+ * @param onToggle 点击回调(上层翻转展开态)。
+ */
+@Composable
+fun SchemeSummaryBar(
+    summary: String,
+    expanded: Boolean,
+    onToggle: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Column(
+        modifier = modifier
+            .fillMaxWidth()
+            .testTag(TAG_SCHEME_BAR),
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                // 触控目标 ≥48dp(约束 7);摘要行本身只有一行文字,靠最小高度撑开
+                .heightIn(min = 48.dp)
+                .clickable(onClick = onToggle)
+                .padding(horizontal = 12.dp)
+                .testTag(TAG_SCHEME_TOGGLE)
+                .semantics {
+                    contentDescription = if (expanded) "收起命名结构" else "展开命名结构"
+                },
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(4.dp),
+        ) {
+            Text(
+                text = summary,
+                style = MaterialTheme.typography.titleSmall,
+                color = MaterialTheme.colorScheme.onBackground,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.weight(1f),
+            )
+            // 复用既有箭头资源:展开时朝上(提示"点它收起"),折叠时朝下
+            Icon(
+                painter = painterResource(
+                    if (expanded) R.drawable.ic_arrow_drop_up else R.drawable.ic_arrow_drop_down,
+                ),
+                contentDescription = null, // 语义由整行的 contentDescription 统一播报
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        HorizontalDivider()
+    }
+}
+
+/**
  * 命名结构编辑器(验收第 8 项:组件启用/顺序/分隔符/大小写/补零/扩展名策略可调)。
  *
  * 与 `SortRuleEditor` 同样的设计:**无草稿,单一事实来源** —— 每次改动立刻通过
@@ -106,6 +181,8 @@ const val TAG_SCHEME_EXT_POLICY = "scheme-ext-policy"
  *
  * 覆盖(overrides)存放在 [NamingState] 内、**独立于 scheme**,
  * 故改结构不会动到用户已覆盖的名字(验收第 9 项,规格 §6.3)。
+ *
+ * **只在展开态才组合**(折叠态由 [SchemeSummaryBar] 承担入口,P0,2026-09-24)。
  */
 @Composable
 fun SchemeEditor(
@@ -236,10 +313,12 @@ fun SchemeEditor(
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
             // 替换字符放在**说明对话框内**(而非再加一行):
-            // 命名页整页只有一个 LazyColumn,头部(编辑器)在真机上已高达 ~862dp,
-            // 视口仅剩约 130dp 给建议表 —— 再加一行会把**主工作区**挤出屏幕
-            // (实测:加行后建议行完全不组合,14 项既有测试失败)。
+            // 编辑器展开时在真机上高达 ~692dp(占视口 87%),再加一行会把它顶得更高
+            // —— 折叠摘要栏(P0 修复,2026-09-24)已经把"主工作区被挤出屏幕"这个后果
+            // 消掉了,但"不给一个低频字段再加一行高度"这个取舍仍然成立。
             // 放进对话框既零高度成本,也与「清洗规则」的说明同处一室,语义更顺。
+            // 历史注:首版曾加成行内新行,当时展开态常驻,加行后建议行完全不组合、
+            // 14 项既有测试失败 —— 这条教训促成了后来的折叠修复。
             SanitizeInfoButton(
                 scheme = scheme,
                 onScheme = { onChange(updateScheme(state, it)) },
