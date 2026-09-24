@@ -739,6 +739,8 @@ APK 安装启动成功、点击与横竖屏切换无崩溃(同 PID 未重启)。
 Manifest 显式 `enableOnBackInvokedCallback="true"`(targetSdk 33+ 默认,写明意图);
 该属性触发 lint `UnusedAttribute`(minSdk 低于 33 时),以 `tools:targetApi="33"` 标注。
 **2026-09-22 注**:minSdk 已由 24 提到 30(见 §12.6),该注解**仍然必要**(30 < 33),故保留。
+**2026-09-26 更新**:minSdk 已由 30 再提到 **34**(见 §12.6)⇒ 34 ≥ 33,该 `tools:targetApi="33"`
+注解与 `xmlns:tools` 声明**一并删除**。`enableOnBackInvokedCallback="true"` 本身保留不变。
 
 > **⚠️ 如实记录的范围与局限**:
 > 1. **超长(第 10 项的四类之一)未在真机复现** —— 真机上让 `baseName` 达到 181 字符需长文本输入,
@@ -1041,7 +1043,219 @@ Manifest 显式 `enableOnBackInvokedCallback="true"`(targetSdk 33+ 默认,写明
 > 展开态下滑到策略行后标题/摘要栏/汇总行坐标**一字未变**(吸顶成立);折叠态滑到 `005`~`010` 后点展开**自动回顶**、
 > 编辑器立即可见(证明 LazyList 前插锚定陷阱确已修掉);展开态下 ⓘ「自动清洗说明」对话框可正常打开。
 > 设备已复位(`stayon false`、`force-stop`、调试产物已清理),未发现新的 UI 摩擦点。
+
+**底栏化轮(P1,2026-09-25)**:
+
+> **来源**:用户提问「是否有必要在底部做上下一步按钮,毕竟顶部TAB也可以切换」→
+> 经盘点后用户裁决 **「全部固定:5 个列表内动作全移到底栏」** + 旧注释**「改写为事实」**。
+>
+> **问题**:`LazyColumn` 只组合可见项 ⇒ 列表末尾的终局动作在滚到之前**根本没被组合**
+> (A 侧整库计划 **56 行**,真机连滑 **8–12 次**才够得到);且同样是"推进到下一步",
+> `NamingPage` 的按钮固定在底栏、`RenamePlanPage` 的却要滚到底 —— **无意的行为分裂**。
+>
+> **修复**:新增共享组件 `pixfold-d1/app/src/main/kotlin/com/pixfold/d1/ui/components/PageActionBar.kt`
+> (`HorizontalDivider()` + 内边距 `Column`;调用方放在页面级 `Column` 之内、`LazyColumn` 之外,
+> 列表保留 `weight(1f)`;按钮由调用方给 —— 各页动作数量与危险级别不同),5 个动作全部移入:
+> `RenamePlanPage`「确认执行」、`ExecutionReportPage`「撤销/完成」、`LibraryPage`「下一步 编辑元数据」、
+> `MetadataPage`「下一步 打包计划」、`PackPreviewPage`「确认打包」。
+> 后两者由 `FilterChip` 改 `Button`(`FilterChip` 语义是"多选中的选中态",用于推进动作不当);
+> A 侧早已固定在底栏的 `TAG_NEXT_STEP`(排序页)与 `TAG_TO_PLAN`(命名页)**不动**。
+> **⚠️ 顺带修掉一个真实缺陷**:`RenamePlanPage` 的 `contentInsets` 参数**声明了却从未使用**
+> (根 `Column` 缺 `.windowInsetsPadding(contentInsets)`)—— 同类页都有,只有它漏了。
+>
+> **旧注释是错的,已改写为事实**:`WorkflowASteps.kt:209`、`WorkflowASteps.kt:229`、
+> `WorkflowBSteps.kt:148` 三处原写「Tab 也能切,但长表滚到底后 Tab 不在视口内」——
+> `PrimaryTabRow` 位于嵌套 `NavHost` **之外**、不在任何滚动容器里,**结构上不可能滚出视口**。
+> 保留底栏的真实理由是语义:① 这些是**不可逆操作**(确认执行真会改文件名),Tab 里没有对应项;
+> ②「下一步」是**向导式顺序推进**,Tab 是**平级视图索引**(可跳步,绕过步骤 2 的复核);
+> ③ 与 A 侧既有固定按钮统一才消歧。
+>
+> **验证**:`:app:testDebugUnitTest` **282**(280 → +2 真机视口守卫)、`:domain:test` **229**、
+> `lintDebug` `No issues found.`、`assembleDebug` 成功。
+> `PlanWiringTest.kt` 删掉 **4 处 `performScrollToNode`** —— 那正是本缺陷的显式编码
+> (底栏化之前,不滚过去就点不到);新增 2 条 `@Config(qualifiers = "w361dp-h794dp-560dpi")`
+> 守卫(类级是 `h2000dp` 超高视口,两种实现都能过 ⇒ 守卫必须单列;A 侧守卫还带视口自检
+> `rootHeightDp in 780f..810f`,防 qualifiers 写错时悄悄换宽松视口假绿)。
+> **6 组变异全部捕获**:删 A 侧底栏(5 失败)/ 删 B 侧库底栏(1)/ 删 B 侧元数据底栏(1)/
+> 报告动作移回列表内(3)/ A 侧确认移回列表内(5)/ B 侧确认移回列表内(6)。
+> **✅ 离线自证完成;真机核对已通过**(2026-09-25,与紧随其后的「底栏分槽 + 步骤1 头部伸缩轮」同一轮真机核对完成;
+> 5 个动作全部在底栏,长列表无需再滚到底)。详见 `docs/notes/d1-ui-friction-inventory.md` §2。
 > 逐项读数见 `docs/notes/d1-ui-friction-inventory.md` §1「真机核对」表。
+
+**底栏分槽 + 步骤1 头部伸缩轮(P1 续,2026-09-25)**:
+
+> **来源**:用户真机走查后追加 —— User said(逐字)「步骤1上面部分也做个伸缩吧，
+> 让网格/列表的空间可以大点显示.并且下一步、完成之类的按钮都放到底栏的右侧，
+> 返回、上一步的按钮改到左侧」。三条需求:①A 步骤1 头部可伸缩;②底栏**右** = 推进/终局;
+> ③底栏**左** = 返回类。
+>
+> **① 折叠范围(用户裁决:只折叠排序规则编辑器)**:集合切换行、「共 N 张」行、
+> 网格-列表切换行**全部常驻**(各自承担「当前在哪一组/多少张/哪种视图」的事实陈述);
+> 只把 `SortRuleEditor` 收成一行摘要栏,**默认折叠**(与 P0 命名页同一模式,用户已批准)。
+> 摘要文本形如「排序规则：目录名 ↑ · 文件名(自然) ↑」并带当前批次 `batchLabel`
+> —— 折叠的是**编辑控件**,不是**状态可见性**(约束 2「建议 ≠ 事实」)。
+> **折叠状态 hoist 在 `SortAndPreviewPage`**(`rememberSaveable`),
+> **`SortRuleEditor` 自身不折叠** ⇒ `SortRuleDirectionTest.kt`(以组件为 root 组合、
+> 13 次点击)**零改动**。`scopeLabel` **只在折叠态渲染**(展开后编辑器标题行已显示同一文案,
+> 两处都渲染会让 `onNodeWithText(batchLabel(...))` 精确匹配命中 2 个节点)。
+>
+> **②③ 双槽底栏**:`PageActionBar` 由单列改为 `leading` / `trailing` / `extraContent`,
+> 中间夹 **`Spacer(Modifier.weight(1f))`** —— 刻意**不用** `Arrangement.SpaceBetween`
+> (单侧按钮时它会把唯一按钮推到左边,`Spacer` 让按钮仍贴自己那侧)。
+> 按钮**不得 `fillMaxWidth()`**(否则同排另一侧被挤成 0 宽;B 侧三处原 `fillMaxWidth()` 已去)。
+> 分配:A 步骤1 = 右「下一步」(从**模式行**移出);A 步骤2 = 左「← 返回排序」/右「下一步：执行计划」;
+> A 步骤3 = 左「← 返回命名结构」/右「确认执行」;报告页 = 左「撤销本次执行」/右「完成」;
+> B 步骤1 = 右「下一步 编辑元数据」;B 步骤2 = 左「← 返回上一步」/右「下一步 打包计划」;
+> B 步骤3 = 左「← 返回上一步」/右「确认打包」。
+> 底栏仍由**各页自己渲染**(P1 已定的分层;约 10 个测试调用点直接组合页面并断言 tag),
+> 容器通过**可空回调** `onBack`/`onNext` 传入,页面 `if (onBack != null) …` 守卫;
+> `grep -rn "onNext" app/src/test` **零命中** ⇒ 单测里新底栏不组合、零布局影响。
+> 两个步骤容器因此删掉内容上下方的常驻返回/推进 `Column`(A 侧 3 处、B 侧 1 处)。
+>
+> **⚠️ 已知重复 tag 窗口(评估为可接受)**:转场期间父子 destination 同时组合,
+> `TAG_B_STEP_BACK` 会短暂出现 2 个节点;该 tag **测试零引用**,A 侧 `TAG_STEP_BACK`
+> 的查询全用 `onAllNodesWithTag`/空断言且都在 `waitForIdle()` 之后。
+>
+> **验证**:`:app:testDebugUnitTest` **287**(286 → +1 折叠用例;286 = 282 + **4 条位置守卫**)、
+> `:domain:test` **229**、`lintDebug` `No issues found.`、`assembleDebug` 成功
+> (APK 33,549,719 B,dex 内已确认含新 tag)。
+> **位置守卫 4 条**(`@Config(qualifiers = "w361dp-h794dp-560dpi")`):本次需求本质是**位置**,
+> 原先只有「按钮可见」类断言**抓不住位置放反** ⇒ 用 `getBoundsInRoot()` 比较 `.left`/`.right`:
+> B 步骤2 左右分槽(且同一行不换行)、A 步骤2 左右分槽、报告页左右分槽、
+> A 步骤1「下一步」在右半屏**且点击真能推进**。**8 组变异全部捕获**
+> (永不展开 9 / 默认展开 12 / 摘要丢规则 1 / 「下一步」塞 leading 1 /
+> B 步骤2 两槽互换 1 / 报告页两槽互换 1 / 网格回 `fillMaxSize()` 1 / `onNext = null` 10)。
+> **教训**:①`assertDoesNotExist()` 是 `SemanticsNodeInteraction` 的**成员方法不是顶层扩展**,
+> 不能 import;②变异若整体互换两个槽,必须**整段替换**,只改关键字会得到「重复具名参数」的
+> 编译错误(`tests=0` 的 NO-XML),那不是有效变异证据。
+> **✅ 离线自证完成**(纯布局位移)。详见 `docs/notes/d1-ui-friction-inventory.md` §2b。
+>
+> **✅ 真机核对已通过(2026-09-25,PJX110 / Android 16 / 361dp×794dp,用户授权)**:
+> 七个位置逐一读数 —— A 步骤1「下一步」**x989-1138 y2633-2703**(改造前在模式行内 **y791-861**);
+> A 步骤2 左「← 返回排序」x84-344 / 右「下一步：执行计划」x742-1138 **同排 y2633-2703**;
+> A 步骤3 左「← 返回命名结构」x84-443 / 右「确认执行」x939-1138 同排;
+> 报告页 左「撤销本次执行」x126-423 / 右「完成」x1038-1138(改造前两者紧邻居中);
+> B 步骤1 右「下一步 编辑元数据」x730-1138;B 步骤2/3 左「← 返回上一步」x84-394
+> —— 且**改造前位于 Tab 行下方 y399-469(内容之上)的那个返回入口已消失**。
+> **A 步骤1 折叠收益实测**:折叠态摘要栏 y931-1057、首图 **y1520**、网格可用高约 1113px;
+> 展开态首图 **y2080**、网格可用高约 553px ⇒ **折叠多出 560px ≈ 155dp(+38%)**;
+> 展开/收起均可复现,展开态「排序规则(2/4 级)」标题行与折叠态摘要的 `scopeLabel`
+> **不重复渲染**(符合设计)。设备已复位(`stayon false`、`force-stop`、
+> `/data/local/tmp` 调试产物已清理),未发现新的 UI 摩擦点。
+> 逐项读数见 `docs/notes/d1-ui-friction-inventory.md` §2b「真机核对」表。
+
+**底栏视觉规格轮(降高 + 底色 + 撤销红,2026-09-25)**:
+
+> **来源**:用户真机走查后追加 —— User said(逐字)「底栏高度可以稍微低一点，
+> 而且有的按钮还是纯文字描述而不是带背景的按钮，步骤3的撤销按钮背景改红色」。
+> 三条需求:①底栏降高;②返回类按钮**带填充底色**;③报告页「撤销本次执行」**红底**。
+>
+> **① 高度账(material3 1.4.0 源码级核实)**:`ButtonDefaults.MinHeight =
+> ButtonSmallTokens.ContainerHeight = 40.0.dp`、`ContentPadding` 上下各 8dp,
+> 但 `Button` 外层 `Surface` 带 `minimumInteractiveComponentSize()` ⇒ **实际渲染高 48dp**;
+> `FilledTonalButton` / `OutlinedButton` / `ElevatedButton` **复用同一套** MinHeight 与
+> ContentPadding ⇒ **换控件类型不改变尺寸,只改变是否画填充底色**(所以 ① 与 ②③ 不冲突)。
+> 改造:外层 `Column` **去掉** `spacedBy(6.dp)`、垂直内边距 8→**6dp**、行内间距 6→**4dp**
+> ⇒ 单按钮页 **71dp → 61dp**(实测 61.14dp)。**下限 = 48dp 触控尺寸(约束 7)**,
+> 内边距不可再往 0 收 —— 那是拿触控尺寸换高度。
+>
+> **② 返回类 4 处 `TextButton` → `FilledTonalButton`**:`NamingPage`(cd「返回步骤1」)、
+> `RenamePlanPage`(cd「返回步骤2」)、`MetadataPage`(**仅底栏那处**,页面内另 5 处
+> `TextButton` 是别的操作、不能连带换)、`PackPreviewPage`。前三个文件的 import 直接替换;
+> `MetadataPage` 新增 import 并保留 `TextButton`。
+>
+> **③ 撤销改红底**:`OutlinedButton` → `Button` +
+> `colors = ButtonDefaults.buttonColors(containerColor = colorScheme.error,
+> contentColor = colorScheme.onError)`(`enabled = report.canUndo` 不变)。
+> 理由:撤销是**破坏性 / 回退类**动作,按 Material 语义着 `error` 底;
+> 原先只有一圈描边,与「完成」相比几乎看不出是危险动作。**用 `colorScheme.error` 而不是
+> 写死红色**(约束 7:语义角色而非硬编码颜色);禁用态交给 `buttonColors` 默认 `disabled*`
+> 角色(灰化),**不用 `errorContainer`** —— 那在浅色主题下是粉底,危险语义被削弱。
+>
+> **新增像素级守卫 4 条(`BottomBarStyleTest.kt`)**:本轮三条需求**全都是「语义树分辨不出」的**
+> —— `TextButton` 与 `FilledTonalButton` 语义树完全一样(`Role.Button` + 同一段文字),
+> `assertIsDisplayed()` 看不出区别;`OutlinedButton` 与红底 `Button` 同样无从区分;
+> `getBoundsInRoot()` 只比 `.left`/`.right`,抓不住「没底色」「不是红」「底栏偏高」。
+> ⇒ 必须**取像素**(`@GraphicsMode(NATIVE)` + `captureToImage().asAndroidBitmap()`,
+> 与 `TransitionStyleTest` 同做法;LEGACY 图形后端画不出真实颜色)。
+> 判据与实测:高度 `56f <= h <= 64f` → **61.14dp**;有底色 = 按钮容器色 vs 同排空白处底色
+> 通道差 ≥ 12 → 底 `#FEF7FF` / 返回 `#E8DEF8` / 下一步 `#6750A4`;撤销偏红
+> `r > g+40 && r > b+40` → `#B3261E`。取样点 = 垂直居中、水平距左边缘 4dp
+> (M3 按钮是胶囊形 `CornerFull`,垂直中线上填充延伸到左边缘;同时避开居中文字字形)。
+> **断「偏红」而不写死 `#RRGGBB`**:写死色值会在切换强调色 / 换深色主题时误报。
+> **为什么这层守护必要**:它正是第 4 层验收「UI 判断是否符合需要的操作逻辑」的**视觉子集**
+> —— 前 3 层在控件类型换错时会**全绿**,因为换错控件类型**不改变任何语义,只改变像素**。
+>
+> **验证**:`:app:testDebugUnitTest` **291**(287 → +4 条像素守卫)、`:domain:test` **229**、
+> `lintDebug` `No issues found.`、`assembleDebug` 成功(APK **33,549,783 B**,较上轮
+> 33,549,719 B 仅 +64 B)。**5 组变异全部捕获,且各自只命中预期的那一条守卫**:
+> 高度退回改造前(命中 `height`)/ B 步骤2 返回退回 `TextButton`(命中 `workflow B step 2`)/
+> A 步骤2 返回退回 `TextButton`(命中 `workflow A step 2`)/ 撤销退回默认主色底(命中 `undo`)/
+> 撤销底色 `error`→`primary`(命中 `undo`)。变异脚本 `app/build/mut_p1c.py`(不跟踪),
+> 每组变异**先 assert 变异真的落盘**再解读结果,并在 `finally` 里逐条还原。
+> **教训**:①`DpRect` **没有 `center`**(与 `androidx.compose.ui.geometry.Rect` 不同),
+> 写 `bounds.center.y` 编译失败,须自己算 `(top + bottom) / 2`;
+> ②像素取样取在文字字形上会把「有没有底色」与「文字反色差异」混在一起,取左边缘内 4dp 才稳定。
+> **✅ 真机核对已完成(2026-09-26,PJX110 / Android 16 / 1264×2780 / 560dpi = 361dp×794dp)**:
+> 底栏分隔线 y=2566(`(84,68,69)`),按钮**触控框** 2591–2759 = 168px = **48dp**(`minimumInteractiveComponentSize()`),
+> 按钮**可视填充** 2605–2745 = 140px = **40dp**,⇒ 底栏 = 1 + 6 + 48 + 6 ≈ **61dp**,与 Robolectric
+> 探针 `bar height = 61.142883 dp` 一致;最下一个非黑像素 y=2744,距屏底 36px,整个按钮落在手势区内**不被遮挡**。
+> 返回类按钮已确认**有 tonal 底色**(A 步骤2 左键 x=46 `(80,52,55)` 胶囊外沿、x=146 `(222,181,184)` 填充;
+> B 步骤2 同款);右键为 primary 填充 `(247,182,187)`。B 步骤2 最宽配对实测 `[42,520]` + `[695,1222]`
+> ⇒ 中间 175px 空档、1264 宽屏内**未溢出**。撤销底色见下条「撤销按钮深色不像危险动作」。
+> 详见 `docs/notes/d1-ui-friction-inventory.md` §2c。
+
+**撤销按钮深色不像危险动作(P1 续,2026-09-26 已修)**:
+
+> **来源**:用户真机走查后**收紧措辞** —— User said(逐字)「撤销本次执行的按钮背景改成
+> 红色表示这是个危险性质的按钮」。上一轮的 V3 在浅色下确实读到 `#B3261E` 深红、守卫也绿,
+> 但**真机是深色**,用户看到的是**淡粉** —— 所以这句是在说"看起来不像危险"。
+> 用户裁决(ask_user_question `danger_color`)= **「深色改用 M3 的 `errorContainer` 族」**。
+>
+> **根因(源码 + 真机像素双向确认)**:`ColorSchemes.kt:145-152` 把 error 族**刻意钉死为
+> material3 默认**(正是为保住全仓 18 处把 `error`/`onError` 当**文字色**用的地方),
+> 而 material3 的 error 族**按模式反转**(从 `material3@1.4.0` sources jar 的
+> `ColorDarkTokens.kt:23-30` + `PaletteTokens.kt:26-35` 逐行核实):
+>
+> | 角色 | 浅色 | 深色 |
+> | --- | --- | --- |
+> | `error` | `#B3261E` 深红 ✅ | `#F2B8B5` **淡粉** ❌ |
+> | `onError` | `#FFFFFF` 白 | `#601410` 暗红 |
+> | `errorContainer` | `#F9DEDC` **粉底** ❌ | `#8C1D18` 深红 ✅ |
+> | `onErrorContainer` | `#8C1D18` 深红 | `#F9DEDC` 米白 |
+>
+> ⇒ **没有哪一个角色能同时在深浅两色下都"像危险"**。真机像素采样 `(247,182,187)` ≈ `#F7B6BB`
+> 印证淡粉。**不能改 `error` 角色本身**:淡粉当**文字**在深底上是合适的(要提亮才读得清),
+> 那是 18 处文字色的诉求,与"底色"冲突 —— `grep -rn "colorScheme\.error\|colorScheme\.onError"`
+> 全为文字色,当容器底色用的全仓只有报告页撤销按钮一处。
+>
+> **修复**:`Theme.kt` 新增 `@Composable fun dangerActionButtonColors(): ButtonColors`,
+> 按 `background.luminance() < 0.5f` 在两档间切换 —— **浅色走 `error`**(`#B3261E`)、
+> **深色走 `errorContainer`**(`#8C1D18`),两档各取所长,**零新增色值、全部落在 M3 令牌内**;
+> `ExecutionReportPage.kt:120` 改用之。判底色明度是 M3 自己的做法(`ColorScheme` **无**
+> `isLight()` 辅助,主题里算出的 `dark` 局部变量传不到叶子页面;`BasicEdgeToEdgeDialog` 即如此),
+> 对纯黑模式同样成立。**禁用态不在此处理**:`buttonColors` 只传 container/content 时
+> `disabled*` 自动继承 `defaultButtonColors` 灰化(已核 `Button.kt:584-596`)。
+>
+> **⚠️ 守卫原 4 条全部假绿,已一并修**:它们**裸组合页面、没包 `PixFoldTheme`**
+> ⇒ 采到 material3 **基线浅色**(`error` `#B3261E`),而设备是**深色**(`#F2B8B5`),
+> 真实缺陷因此被放过。修正:新增 `setContentLight` / `setContentDark` 两个入口
+> (`dynamicColor = false` 保证确定性 —— 动态取色依赖系统壁纸、Robolectric 下不可控),
+> 全部取样改在真实主题下进行。
+> **且原「偏红」断言抓不住本缺陷**:深色基线 `error = (242,184,181)`,`242 > 184+40` 且
+> `242 > 181+40`,**照样通过** —— 可它是淡粉。⇒ 新增**明度判据** `lum < 0.25`,
+> 并把原单条测试**拆成浅色 / 深色两条**(浅色 `#B3261E` lum 0.1106 / 深色 `#8C1D18` lum 0.0652)。
+>
+> **验证**:`:app:testDebugUnitTest` **292**(291 → +1 条深色守卫)、`:domain:test` **229**、
+> `lintDebug` `No issues found.`、`assembleDebug` 成功(APK **33,046,763 B**)。
+> **2 组变异各自命中自己那条**:永远用 `error`(即修复前行为)→ 深色用例,报错逐字
+> `实测亮度=0.5649442091904655 (#FFF2B8B5)`(**精确复现用户抱怨的颜色,且旧断言会放行**);
+> 浅色分支改用 `errorContainer` → 浅色用例,报错逐字 `r=249 g=222 b=220 (#FFF9DEDC)`。
+> 变异脚本 `app/build/mut_danger.py`(不跟踪)。
+> **教训**⚠️:**`git checkout -- <file>` 会连未提交的改动一起丢掉** —— 用它"还原变异"时把新写的
+> `dangerActionButtonColors` 与早先的 minSdk 34 清理一起抹掉,靠 `edit` 逐条重放才恢复;
+> **变异还原必须用 `cp` 备份文件**(备份放工作区,沙箱 `/tmp` 不跨 bash 调用保留)。
+> 详见 `docs/notes/d1-ui-friction-inventory.md` §2d。
 
 ### ⏭️ 设置与主题体系 —— 现状与后续(2026-09-21 记录,供换机续接)
 
@@ -2022,8 +2236,9 @@ mise ls                  # 看 mise 管的工具版本
 | Git / VS Code / Android Studio | 2.55.0.windows.5 / 1.138.0 / 2026.1.4.7 |
 | JDK | temurin-17.0.20+101(mise;Android/Gradle 构建所需);另有 Studio 内置 **JBR 25.0.3** 可用(完整 JDK) |
 | Gradle / AGP / Kotlin / Compose BOM | **9.7.1 / 9.4.1 / 2.4.20 / 2026.09.00** —— **2026-09-20 主动升级到当时最新 stable**(用户决策:"尽量都用新的稳定版本",考虑后期维护)。原值 9.6.0 / 9.4.0 / 2.2.10 / 2026.02.01 来自 Studio 2026.1.4 模板。**升级动因**:引入 AboutLibraries 15.2.0 需 Kotlin ≥ 2.4.10。**升级经探针实测**(临时分支验证后弃用):编译通过 + **既有 461 项测试全绿** + assembleDebug + lint 零告警。证据见 `docs/notes/d1-toolchain-evidence.md` §8 |
-| compileSdk / minSdk / targetSdk | **37** / **30** / **36** —— `compileSdk` 于 2026-09-20 由 36 升到 37 (新依赖链 AboutLibraries → Compose 1.12.1 要求;`platforms;android-37.0` 本机已装)。**`targetSdk` 仍锁 36**(与真机 Android 16 对齐,§12.6 策略不变)—— 二者分离:`compileSdk` 只决定"用哪个 SDK 编译",`targetSdk` 决定运行时行为契约。故 `OldTargetApi` 的 lint 豁免理由继续成立 |
+| compileSdk / minSdk / targetSdk | **37** / **34** / **36** —— `compileSdk` 于 2026-09-20 由 36 升到 37 (新依赖链 AboutLibraries → Compose 1.12.1 要求;`platforms;android-37.0` 本机已装)。**`targetSdk` 仍锁 36**(与真机 Android 16 对齐,§12.6 策略不变)—— 二者分离:`compileSdk` 只决定"用哪个 SDK 编译",`targetSdk` 决定运行时行为契约。故 `OldTargetApi` 的 lint 豁免理由继续成立。**`minSdk` 于 2026-09-26 由 30 再提到 34**(见下一行) |
 | minSdk 由 24 提到 **30** | **2026-09-22 用户裁决**。起因:用户问"为什么要做 API 24/25 回退,我的安卓手机最低安卓 16"。**功能面实测**(查 `android-36/data/api-versions.xml` 类级 `since`):roadmap 所需 API 在 minSdk=30 已全部到手 —— `java/nio/file/Files`=26(D2a 归档)、`android/graphics/ImageDecoder`=28(D3/D4 解码)、`android/app/NotificationChannel`=26(D4 进度通知);`LocaleManager`=33 未到手但**已有 `Build.VERSION` 分支**(`Theme.kt:48`、`PixFoldApp.kt:192`);`ZipOutputStream`/`ZipFile`/`ZipEntry` 全部 since=1、SAF `DocumentsContract`=19 ⇒ **CBZ 打包与 SAF 在任意 minSdk 都可行**。**依赖面实测**:activity-compose 1.13.0→23、material3/material3-ripple/navigation-compose 2.10.2→24、material-color-utilities→21、aboutlibraries-compose/-m3→21 ⇒ **无任何依赖阻止 minSdk=30**。**连带改动**:①`mipmap-anydpi-v26/` 必须删、三层 `<adaptive-icon>` 移入 `mipmap-anydpi/`(否则 lint 报 `UnnecessaryQualifier` 而本项目 `warningsAsErrors=true` 直接失败);②原先给 API 24/25 兜底的 48dp 普通 vector 回退档及其源码结构用例**一并删除**。**Java 工具链不动**(`JavaVersion.VERSION_17` + `:domain` 的 `jvmToolchain(17)`)。**已否决的 minSdk=36**:虽可删尽三处版本分支并与真机完全对齐,但 Robolectric 的 SDK 36 sandbox 硬性要求 **Java 21**(逐字 `Failed to create a Robolectric sandbox: Android SDK 36 requires Java 21 (have Java 17)`),且 29 个测试文件的 `@Config(sdk=[34])` 需全部改 `[36]`,代价不成比例。**连带现象(非缺陷)**:minSdk≥28 时 AGP **故意不压缩 dex**,debug APK 由 13 MB 变为 33 MB —— AGP 的 `DexPackaging` DSL 源码逐字「If null, dex files will be uncompressed when minSdk >= 28」,用意是 ART 可直接 mmap 加载、省安装期解压。逐档实测 26→13,040,830 B(全 DEFLATED)、28/29/30→33.2 MB(全 STORED);加 `packaging { dex { useLegacyPackaging = true } }` 可回到 13,007,710 B,但**用户裁决保持默认**。详见 `docs/notes/d1-toolchain-evidence.md` §9.7 |
+| minSdk 由 30 提到 **34** | **2026-09-26 用户裁决**(用户问「minSDK34有什么新的功能可以用吗要不直接切34」)。**起因**:`docs/notes/d1-toolchain-evidence.md:292` 记录应用内语言依赖 `LocaleManager`/`LocaleConfig`(API 33+),minSdk=30 时需要 `Build.VERSION` 分支兜底。**33 与 34 的代码清理成本完全相同** —— 两者都要求删掉同一批 3 处 `ObsoleteSdkInt` 守卫:`AndroidManifest.xml` 的 `tools:targetApi="33"`、`PixFoldApp.kt` 的 `SDK_INT < TIRAMISU`、`Theme.kt` 的 `SDK_INT >= S`。⇒ 既然成本一样,取 34 可额外拿到 **HDR gainmap**(`android/graphics/Gainmap`、`Bitmap.getGainmap()/hasGainmap()/setGainmap()`),供 D3/D4 图片管线用。**连带删除**:`AndroidManifest.xml` 的 `xmlns:tools` 与 `tools:targetApi`、`PixFoldApp.kt` 的 `import android.os.Build` + 版本守卫、`Theme.kt` 的 `import android.os.Build` + 版本守卫(`settings.monetEnabled && Build.VERSION.SDK_INT >= S` → `if (settings.monetEnabled)`)。⚠️ **纠正一处早先的错判**:上一行里"29 个测试文件的 `@Config(sdk=[34])` 必须全改 `[36]`"是 **minSdk=36 的代价**;minSdk=34 与测试用的 `@Config(sdk=[34])` **完全一致,零测试改动**(实测 `app` 292 / `domain` 229 全绿、无一条用例需改)。**未受影响**:`compileSdk=37`/`targetSdk=36`/Java 17 全部不动。**最小真机验证**:APK 由 33,549,783 B → **33,046,763 B**(−503,020 B,dex 压缩策略随 minSdk 档位变化)。详见 `docs/notes/d1-toolchain-evidence.md` §9(以 30→34 为准) |
 | **16 KB 页大小支持** | ✅ **已达标,零配置**(2026-09-24 核查)。权威判定 = SDK 自带 `zipalign -c -P 16 -v 4 app-debug.apk` → `Verification successful`、`exit=0`,4 条 `lib/**/*.so` 偏移 `% 16384` 全为 **0**;**ELF 侧** `readelf -lW` 的 3 个 `LOAD` 段 `Align` 全为 **`0x4000`**;4 条 `.so` 在 APK 内均 **STORED 未压缩**(对齐的前提)。**未做任何配置** —— AGP ≥ 8.5.1 会自动做(官方逐字「align them on a 16 KB zip-aligned boundary」),本项目 AGP **9.4.1** 远高于门槛;`gradle.properties` 与 `app/build.gradle.kts` 内**无** `packaging`/`useLegacyPackaging`/`alignment` 任何配置(已 grep 确认)。**唯一 `.so` 来源** = 传递依赖 `androidx.graphics:graphics-path:1.0.1`(经 `androidx.compose.ui:ui-graphics-android:1.12.1`),本项目**无** `jniLibs/`、**无** `externalNativeBuild`/`ndkVersion`/`cmake`。⚠️ **教训**:按 ZIP 结构自算 data 偏移会得出**错误结论**(arm64-v8a 自算 `% 16384 = 1536` 看似未对齐),因为没计入 AGP 注入的 alignment extra field ⇒ **对齐判定只认 `zipalign -c -P 16`**。Play 对该项的强制要求(2025-11-01 起)**不适用**(本项目不上架,`HANGOFF.md:1719`),但零成本达标,如实登记。详见 `docs/notes/d1-toolchain-evidence.md` §10 |
 | Android platform | `platforms;android-36`(**已装**,与真机 Android 16 对齐);`android-37.0` 也在(模板默认带的) |
 | Android SDK 根 | `C:\Users\Administrator\AppData\Local\Android\Sdk` |

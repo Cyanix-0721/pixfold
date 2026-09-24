@@ -2,10 +2,13 @@ package com.pixfold.d1.ui.theme
 
 import android.os.Build
 import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.material3.ButtonColors
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.dynamicDarkColorScheme
 import androidx.compose.material3.dynamicLightColorScheme
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalContext
 import com.pixfold.d1.domain.settings.AccentChoice
@@ -69,6 +72,59 @@ fun PixFoldTheme(
     }
 
     MaterialTheme(colorScheme = scheme, content = content)
+}
+
+/**
+ * 「危险动作」按钮配色(破坏性 / 回退类动作,如报告页的「撤销本次执行」)。
+ *
+ * ## 为什么不直接用 `colorScheme.error` 着底
+ *
+ * material3 的 error 族是**按模式反转**的(已从 `material3@1.4.0` 的
+ * `ColorDarkTokens` / `PaletteTokens` 逐行核实):
+ *
+ * | 角色              | 浅色               | 深色               |
+ * | ----------------- | ------------------ | ------------------ |
+ * | `error`           | `#B3261E` 深红 ✅  | `#F2B8B5` **淡粉** ❌ |
+ * | `onError`         | `#FFFFFF` 白       | `#601410` 暗红     |
+ * | `errorContainer`  | `#F9DEDC` **粉底** ❌ | `#8C1D18` 深红 ✅  |
+ * | `onErrorContainer`| `#8C1D18` 深红     | `#F9DEDC` 米白     |
+ *
+ * `error` 在深色下是**淡粉**——它设计给「错误文字」用,不是给「危险动作的底」用;
+ * 而 `errorContainer` 在浅色下是**粉底**,同样不够醒目。所以**两个模式必须取不同档位**,
+ * 没有哪一个角色能同时在深浅两色下都「像危险」。
+ *
+ * ## 为什么不能改 `error` 角色本身
+ *
+ * 全仓 `colorScheme.error` / `onError` 有 18 处当**文字色**用(冲突、警告、失败原因、
+ * 跳过原因…),当底色用的只有本函数。淡粉当**文字**在深色下是合适的
+ * (深底上要提亮才读得清);所以这是「底色」与「文字色」两套诉求,
+ * 不能改 `error` 角色本身去迁就其中一方(`ColorSchemes.kt:145-152` 把 error 族
+ * 刻意钉死为 material3 默认,正是为了保住那 18 处文字色)。
+ *
+ * ## 深浅判定为什么用 `background.luminance()`
+ *
+ * `ColorScheme` **没有** `isLight()` 之类的现成辅助;`Theme.kt` 里算主题时那个 `dark`
+ * 局部变量也传不到叶子页面。判底色明度是 M3 自己的做法
+ * (material3 内部 `BasicEdgeToEdgeDialog` 即 `luminance() < 0.5f`)。
+ * 它对纯黑模式也成立——`withPureBlack()` 把 `background` 压成 `Color.Black`。
+ *
+ * 禁用态**不在此处理**:`buttonColors` 只传 container/content 时,
+ * `disabled*` 自动继承 `defaultButtonColors` 的灰化角色。
+ */
+@Composable
+fun dangerActionButtonColors(): ButtonColors {
+    val scheme = MaterialTheme.colorScheme
+    return if (scheme.background.luminance() < 0.5f) {
+        ButtonDefaults.buttonColors(
+            containerColor = scheme.errorContainer,
+            contentColor = scheme.onErrorContainer,
+        )
+    } else {
+        ButtonDefaults.buttonColors(
+            containerColor = scheme.error,
+            contentColor = scheme.onError,
+        )
+    }
 }
 
 /**

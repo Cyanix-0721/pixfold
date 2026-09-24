@@ -45,6 +45,17 @@ class RuleAutoApplyPageTest {
         }
     }
 
+    /**
+     * 展开排序规则编辑器。
+     *
+     * 用户 2026-09-25 指定:步骤 1 的规则编辑器**默认折叠**(把高度让给网格/列表)。
+     * 本文件断言的是"改规则后页面是否真的重排",所以每次都要先展开再点芯片。
+     */
+    private fun expandRuleEditor() {
+        rule.onNodeWithTag(TAG_RULE_SUMMARY_TOGGLE).performClick()
+        rule.waitForIdle()
+    }
+
     /** 读网格**首项**;先滚到顶部,避免"语义树只含可见项"导致的误读(见 HANGOOF W1)。 */
     private fun firstCardName(): String {
         val action = SemanticsActions.ScrollToIndex
@@ -74,6 +85,7 @@ class RuleAutoApplyPageTest {
         )
 
         // 改第 1 级为"文件名(自然)"并**再点一次**翻成降序 —— 全程不点任何"应用"按钮
+        expandRuleEditor()
         rule.onNodeWithTag(fieldTag(0, SortField.NaturalName)).performClick()
         rule.onNodeWithTag(fieldTag(0, SortField.NaturalName)).performClick()
 
@@ -92,6 +104,7 @@ class RuleAutoApplyPageTest {
         // 默认首项 day1/001;把第 2 级(文件名自然)翻转不影响主序(主序是目录名),
         // 故这里直接改第 1 级为文件名自然(升序)-> 首项仍是 day1/001,
         // 再翻转一次 -> 首项应变为 day2/012
+        expandRuleEditor()
         rule.onNodeWithTag(fieldTag(0, SortField.NaturalName)).performClick() // 切字段(升序)
         val afterSwitch = firstCardName()
         assertTrue(afterSwitch.contains("IMG_20260701_001"), "升序时首项应为 001,实际=$afterSwitch")
@@ -106,6 +119,7 @@ class RuleAutoApplyPageTest {
         setPage()
 
         val before = firstCardName()
+        expandRuleEditor()
         rule.onNodeWithTag(TAG_RULE_ADD).performClick()
 
         // 新增级默认升序,不应让首项变成空/异常;仍应能读到卡片
@@ -132,6 +146,7 @@ class RuleAutoApplyPageTest {
         )
 
         // 改排序规则(换字段)-> 应自动回顶(按钮随之隐藏)
+        expandRuleEditor()
         rule.onNodeWithTag(fieldTag(0, SortField.FileName)).performClick()
         rule.waitForIdle()
 

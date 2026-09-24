@@ -1,29 +1,32 @@
 package com.pixfold.d1.ui.plan
 
 import androidx.compose.ui.test.assertIsDisplayed
-import androidx.compose.ui.test.hasTestTag
+import androidx.compose.ui.test.getBoundsInRoot
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
-import androidx.compose.ui.test.performScrollToNode
 import com.pixfold.d1.domain.mock.MockData
 import com.pixfold.d1.domain.mock.MockDataB
 import com.pixfold.d1.domain.plan.OutputConflictPolicy
 import com.pixfold.d1.domain.plan.SourcePolicy
 import com.pixfold.d1.ui.workflowa.TAG_A_PLAN_CLEAN_TOGGLE
 import com.pixfold.d1.ui.workflowa.TAG_A_PLAN_CONFIRM
-import com.pixfold.d1.ui.workflowa.TAG_A_PLAN_LIST
 import com.pixfold.d1.ui.workflowa.TAG_A_PLAN_PAGE
+import com.pixfold.d1.ui.workflowa.TAG_NEXT_STEP
 import com.pixfold.d1.ui.workflowa.TAG_STEP_NAMING
 import com.pixfold.d1.ui.workflowa.TAG_STEP_PLAN
 import com.pixfold.d1.ui.workflowa.TAG_STEP_SORT
+import com.pixfold.d1.ui.workflowa.TAG_STEP_BACK
 import com.pixfold.d1.ui.workflowa.TAG_TO_PLAN
 import com.pixfold.d1.ui.workflowa.WorkflowASteps
+import com.pixfold.d1.ui.workflowb.TAG_B_STEP_BACK
 import com.pixfold.d1.ui.workflowb.TAG_B_STEP_PACK
 import com.pixfold.d1.ui.workflowb.TAG_CLEAN_EMPTY_TOGGLE
 import com.pixfold.d1.ui.workflowb.TAG_DELETE_WARNING
-import com.pixfold.d1.ui.workflowb.TAG_PACK_LIST
+import com.pixfold.d1.ui.workflowb.TAG_LIBRARY_NEXT
+import com.pixfold.d1.ui.workflowb.TAG_METADATA_NEXT
 import com.pixfold.d1.ui.workflowb.WorkflowBSteps
 import org.junit.Rule
 import org.junit.Test
@@ -56,13 +59,14 @@ class PlanWiringTest {
     }
 
     /**
-     * 滚到「确认执行」再点。
+     * 点「确认执行」。
      *
-     * 计划有 56 行(A 侧整库),按钮在 LazyColumn 末尾 —— 不滚过去它**根本没被组合**,
-     * 点击自然无效。这是 LazyColumn 的正常行为(只组合可见项),不是缺陷。
+     * 该按钮如今**常驻底栏**(在 `LazyColumn` 之外),不再需要先 `performScrollToNode`。
+     * 底栏化之前的写法是「滚到它再点」——因为计划有 56 行(A 侧整库),按钮在列表末尾,
+     * 不滚过去它根本没被组合。这里先断言「不进列表就可见」,把这个性质钉住。
      */
     private fun clickAPlanConfirm() {
-        rule.onNodeWithTag(TAG_A_PLAN_LIST).performScrollToNode(hasTestTag(TAG_A_PLAN_CONFIRM))
+        rule.onNodeWithTag(TAG_A_PLAN_CONFIRM).assertIsDisplayed()
         rule.onNodeWithTag(TAG_A_PLAN_CONFIRM).performClick()
     }
 
@@ -70,8 +74,24 @@ class PlanWiringTest {
     fun `workflow A has a third step that opens the plan page`() {
         openWorkflowAPlanStep()
         rule.onNodeWithTag(TAG_A_PLAN_PAGE).assertIsDisplayed()
-        // 确认按钮在 56 行计划之后 —— 滚过去才被组合(LazyColumn 只组合可见项)
-        rule.onNodeWithTag(TAG_A_PLAN_LIST).performScrollToNode(hasTestTag(TAG_A_PLAN_CONFIRM))
+        // 确认按钮常驻底栏:计划有 56 行,但按钮不滚也该可见
+        rule.onNodeWithTag(TAG_A_PLAN_CONFIRM).assertIsDisplayed()
+    }
+
+    /**
+     * 终局动作在**真机视口**下也必须可见(台账 §2 的回归守卫)。
+     *
+     * 类级 `@Config` 是 `h2000dp` 的超高视口,足以让「滚到底」和「常驻」两种实现都通过 ——
+     * 那会让这个守卫假绿。这里单独用真机视口(361dp × 794dp,与 PJX110 一致)跑一次。
+     */
+    @Test
+    @Config(sdk = [34], qualifiers = "w361dp-h794dp-560dpi")
+    fun `workflow A confirm stays visible on the device viewport`() {
+        openWorkflowAPlanStep()
+        // 视口自检:Qualifiers 写错时直接失败,而不是悄悄换一个宽松视口
+        val rootHeightDp =
+            (rule.onRoot().getBoundsInRoot().bottom - rule.onRoot().getBoundsInRoot().top).value
+        assertTrue(rootHeightDp in 780f..810f, "视口高度应为 794dp，实际 $rootHeightDp dp")
         rule.onNodeWithTag(TAG_A_PLAN_CONFIRM).assertIsDisplayed()
     }
 
@@ -120,8 +140,7 @@ class PlanWiringTest {
         clickAPlanConfirm()
         rule.onNodeWithTag(TAG_CONFIRM_OK).performClick()
         rule.onNodeWithTag(TAG_REPORT_PAGE).assertIsDisplayed()
-        // 撤销入口在报告列表末尾(56 行之后),需滚过去
-        rule.onNodeWithTag(TAG_REPORT_LIST).performScrollToNode(hasTestTag(TAG_REPORT_UNDO))
+        // 撤销入口常驻底部动作栏(报告 56 行),不再需要滚动
         rule.onNodeWithTag(TAG_REPORT_UNDO).assertIsDisplayed()
     }
 
@@ -133,17 +152,33 @@ class PlanWiringTest {
         rule.onNodeWithTag(TAG_B_STEP_PACK).performClick()
     }
 
-    /** 滚到「确认打包」再点(计划区在页码预览之后,不滚过去不会被组合)。 */
+    /** 点「确认打包」(常驻底栏,计划区在页码预览之后也不再需要滚动)。 */
     private fun clickBPackConfirm() {
-        rule.onNodeWithTag(TAG_PACK_LIST).performScrollToNode(hasTestTag(TAG_PLAN_CONFIRM))
+        rule.onNodeWithTag(TAG_PLAN_CONFIRM).assertIsDisplayed()
         rule.onNodeWithTag(TAG_PLAN_CONFIRM).performClick()
+    }
+
+    @Test
+    @Config(sdk = [34], qualifiers = "w361dp-h794dp-560dpi")
+    fun `workflow B next and confirm stay visible on the device viewport`() {
+        val lib = MockDataB.library
+        rule.setContent { WorkflowBSteps(rootPath = lib.rootPath, volumes = lib.volumes) }
+
+        // 库步骤:下一步常驻底栏(卷多时不必滚到底)
+        rule.onNodeWithTag(TAG_LIBRARY_NEXT).assertIsDisplayed()
+        rule.onNodeWithTag(TAG_LIBRARY_NEXT).performClick()
+        // 元数据步骤:逐卷字段很多,下一步同样常驻
+        rule.onNodeWithTag(TAG_METADATA_NEXT).assertIsDisplayed()
+        rule.onNodeWithTag(TAG_METADATA_NEXT).performClick()
+        // 打包步骤:终局动作常驻
+        rule.onNodeWithTag(TAG_PLAN_CONFIRM).assertIsDisplayed()
     }
 
     @Test
     fun `workflow B pack step shows the plan section not just the preview`() {
         openWorkflowBPackStep()
         rule.onNodeWithTag(TAG_PLAN_SUMMARY).assertExists()
-        rule.onNodeWithTag(TAG_PLAN_CONFIRM).assertExists()
+        rule.onNodeWithTag(TAG_PLAN_CONFIRM).assertIsDisplayed()
     }
 
     @Test
@@ -202,5 +237,97 @@ class PlanWiringTest {
         clickBPackConfirm()
         rule.onNodeWithTag(TAG_CONFIRM_OK).performClick()
         rule.onNodeWithTag(TAG_CONFIRM_DANGER).assertIsDisplayed()
+    }
+
+    // ================= 底栏左右分槽(用户 2026-09-25 指定) =================
+
+    /**
+     * 底栏必须**左 = 退回、右 = 推进**。
+     *
+     * 为什么要有这条断言:页面上「返回上一步」与「下一步」两个按钮都在时,
+     * 只断言"两个都显示"是抓不住"位置放反"的 —— 位置才是本次需求本身
+     * (用户原话:「下一步、完成之类的按钮都放到底栏的右侧,返回、上一步的按钮改到左侧」)。
+     * 这里用 `getBoundsInRoot()` 比较两者的水平位置,并额外确认退回类确实落在左半屏。
+     */
+    @Test
+    @Config(sdk = [34], qualifiers = "w361dp-h794dp-560dpi")
+    fun `workflow B bottom bar puts back on the left and next on the right`() {
+        val lib = MockDataB.library
+        rule.setContent { WorkflowBSteps(rootPath = lib.rootPath, volumes = lib.volumes) }
+
+        rule.onNodeWithTag(TAG_LIBRARY_NEXT).performClick() // 进入步骤 2:两个按钮同时在
+
+        val back = rule.onNodeWithTag(TAG_B_STEP_BACK).getBoundsInRoot()
+        val next = rule.onNodeWithTag(TAG_METADATA_NEXT).getBoundsInRoot()
+        val rootWidth = rule.onRoot().getBoundsInRoot().right
+
+        assertTrue(back.right <= next.left, "返回应在左、下一步应在右,实际 back=$back next=$next")
+        assertTrue(
+            back.left < rootWidth / 2,
+            "返回是退回类动作,应贴左半屏;实际 left=${back.left} 视口宽=$rootWidth",
+        )
+        assertTrue(
+            next.left > rootWidth / 2,
+            "下一步是推进类动作,应贴右半屏;实际 left=${next.left} 视口宽=$rootWidth",
+        )
+        // 两者同在一行(底栏),不因分槽而换行
+        assertTrue(back.top == next.top, "同一底栏行的两个按钮应对齐,实际 ${back.top} vs ${next.top}")
+    }
+
+    /** 工作流 A 步骤 2 同理:底栏左 = 返回排序、右 = 下一步 执行计划。 */
+    @Test
+    @Config(sdk = [34], qualifiers = "w361dp-h794dp-560dpi")
+    fun `workflow A naming step bottom bar puts back on the left and next on the right`() {
+        val collections = MockData.workspaceA.collections
+        rule.setContent { WorkflowASteps(collections = collections) }
+        rule.onNodeWithTag(TAG_STEP_NAMING).performClick()
+
+        val back = rule.onNodeWithTag(TAG_STEP_BACK).getBoundsInRoot()
+        val next = rule.onNodeWithTag(TAG_TO_PLAN).getBoundsInRoot()
+        val rootWidth = rule.onRoot().getBoundsInRoot().right
+
+        assertTrue(back.right <= next.left, "返回应在左、下一步应在右,实际 back=$back next=$next")
+        assertTrue(back.left < rootWidth / 2, "返回应贴左半屏;实际 left=${back.left}")
+        assertTrue(next.left > rootWidth / 2, "下一步应贴右半屏;实际 left=${next.left}")
+    }
+
+    /** 报告页底栏:左 = 撤销本次执行、右 = 完成。 */
+    @Test
+    @Config(sdk = [34], qualifiers = "w361dp-h794dp-560dpi")
+    fun `report bottom bar puts undo on the left and done on the right`() {
+        openWorkflowAPlanStep()
+        clickAPlanConfirm()
+        rule.onNodeWithTag(TAG_CONFIRM_OK).performClick()
+        rule.onNodeWithTag(TAG_REPORT_PAGE).assertIsDisplayed()
+
+        val undo = rule.onNodeWithTag(TAG_REPORT_UNDO).getBoundsInRoot()
+        val done = rule.onNodeWithTag(TAG_REPORT_DONE).getBoundsInRoot()
+        val rootWidth = rule.onRoot().getBoundsInRoot().right
+
+        assertTrue(undo.right <= done.left, "撤销应在左、完成应在右,实际 undo=$undo done=$done")
+        assertTrue(undo.left < rootWidth / 2, "撤销应贴左半屏;实际 left=${undo.left}")
+        assertTrue(done.left > rootWidth / 2, "完成应贴右半屏;实际 left=${done.left}")
+    }
+
+    /**
+     * 工作流 A 步骤 1 的「下一步」也必须在**底栏右侧**。
+     *
+     * 底栏化之前它是模式行里的一个 `TextButton`,与「网格/列表」「本组独立」挤在同一行;
+     * 用户 2026-09-25 要求推进类动作统一进底栏。这里从步骤 1 底部进入步骤 2,
+     * 既钉住「按钮在底栏右侧」,也钉住「点了真的能推进」。
+     */
+    @Test
+    @Config(sdk = [34], qualifiers = "w361dp-h794dp-560dpi")
+    fun `workflow A step 1 next sits in the bottom bar and advances`() {
+        val collections = MockData.workspaceA.collections
+        rule.setContent { WorkflowASteps(collections = collections) }
+
+        val next = rule.onNodeWithTag(TAG_NEXT_STEP).getBoundsInRoot()
+        val rootWidth = rule.onRoot().getBoundsInRoot().right
+        assertTrue(next.left > rootWidth / 2, "步骤 1 的下一步应贴底栏右侧;实际 left=${next.left}")
+
+        rule.onNodeWithTag(TAG_NEXT_STEP).performClick()
+        // 推进到了步骤 2(命名结构):其底栏的「下一步 执行计划」出现
+        rule.onNodeWithTag(TAG_TO_PLAN).assertIsDisplayed()
     }
 }

@@ -10,6 +10,8 @@ import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.material3.Button
+import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -22,6 +24,8 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import com.pixfold.d1.domain.model.ImageCollection
 import com.pixfold.d1.domain.model.NamingScheme
@@ -34,6 +38,7 @@ import com.pixfold.d1.domain.naming.clearOverride
 import com.pixfold.d1.domain.naming.namingSummaryLine
 import com.pixfold.d1.domain.naming.setOverride
 import com.pixfold.d1.domain.sort.PageOrderState
+import com.pixfold.d1.ui.components.PageActionBar
 
 const val TAG_NAMING_PAGE = "naming-page"
 const val TAG_NAMING_TITLE = "naming-title"
@@ -76,6 +81,14 @@ const val TAG_NAMING_TITLE = "naming-title"
  *
  * @param initialState 初值(上层持有的批次级状态);为 null 时用集合默认结构。
  * @param onStateChange 状态变化上报(上层据此在离开本页后仍保留覆盖)。
+ * @param onBack 返回步骤 1 的回调;**为 null 时不显示返回入口**(单独使用/测试场景)。
+ * @param onNext 进入步骤 3 的回调;为 null 时不显示推进按钮(单独使用/测试场景)。
+ *
+ * ## 底栏(用户 2026-09-25 指定)
+ *
+ * 「下一步、完成之类的按钮都放到底栏的**右侧**,返回、上一步的按钮改到**左侧**。」
+ * 左 = [onBack](返回排序),右 = [onNext](下一步:执行计划)。两处都用 `if (… != null)` 守卫,
+ * 因为测试直接组合本页时不传回调 —— 不守卫的话底栏会凭空出现并改变既有断言的可视区域。
  */
 @Composable
 fun NamingPage(
@@ -85,6 +98,8 @@ fun NamingPage(
     contentInsets: WindowInsets = WindowInsets.safeDrawing,
     initialState: NamingState? = null,
     onStateChange: (NamingState) -> Unit = {},
+    onBack: (() -> Unit)? = null,
+    onNext: (() -> Unit)? = null,
 ) {
     // 状态模式:**本地状态权威,初值取自 initialState,每次变更上报上层**。
     // 不用 `initialState ?: local` —— 那样一旦上层传值,就地编辑就永不显示(实测踩过)。
@@ -204,6 +219,35 @@ fun NamingPage(
                     onResetOverride = { id -> update(clearOverride(state, id)) },
                 )
             }
+        }
+
+        // 底栏:左 = 返回排序,右 = 下一步:执行计划(用户 2026-09-25 指定)。
+        // 任一回调为 null 时不渲染底栏 —— 测试直接组合本页,底栏凭空出现会改变可视区域。
+        if (onBack != null || onNext != null) {
+            val back = onBack
+            val next = onNext
+            PageActionBar(
+                leading = {
+                    if (back != null) {
+                        FilledTonalButton(
+                            onClick = back,
+                            modifier = Modifier
+                                .testTag(TAG_STEP_BACK)
+                                .semantics { contentDescription = "返回步骤1" },
+                        ) { Text("← 返回排序") }
+                    }
+                },
+                trailing = {
+                    if (next != null) {
+                        Button(
+                            onClick = next,
+                            modifier = Modifier
+                                .testTag(TAG_TO_PLAN)
+                                .semantics { contentDescription = "下一步 执行计划" },
+                        ) { Text("下一步：执行计划") }
+                    }
+                },
+            )
         }
     }
 }

@@ -13,7 +13,6 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material3.Button
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -25,11 +24,14 @@ import androidx.compose.ui.unit.dp
 import com.pixfold.d1.domain.plan.ExecEntry
 import com.pixfold.d1.domain.plan.ExecOutcome
 import com.pixfold.d1.domain.plan.ExecutionReport
+import com.pixfold.d1.ui.components.PageActionBar
+import com.pixfold.d1.ui.theme.dangerActionButtonColors
 
 const val TAG_REPORT_PAGE = "report-page"
 const val TAG_REPORT_LIST = "report-list"
 const val TAG_REPORT_SUMMARY = "report-summary"
 const val TAG_REPORT_UNDO = "report-undo"
+const val TAG_REPORT_DONE = "report-done"
 const val TAG_REPORT_UNDO_MESSAGE = "report-undo-message"
 const val TAG_REPORT_EMPTY = "report-empty"
 
@@ -101,51 +103,53 @@ fun ExecutionReportPage(
             items(report.entries.size) { i ->
                 ReportRow(report.entries[i], i)
             }
-
-            item(key = "actions") {
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 12.dp, vertical = 8.dp),
-                    verticalArrangement = Arrangement.spacedBy(6.dp),
-                ) {
-                    HorizontalDivider()
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        OutlinedButton(
-                            onClick = onUndo,
-                            enabled = report.canUndo,
-                            modifier = Modifier
-                                .testTag(TAG_REPORT_UNDO)
-                                .semantics { contentDescription = UNDO_BUTTON_LABEL },
-                        ) { Text(UNDO_BUTTON_LABEL) }
-
-                        Button(
-                            onClick = onDone,
-                            modifier = Modifier.semantics { contentDescription = "完成" },
-                        ) { Text("完成") }
-                    }
-                    if (!report.canUndo) {
-                        Text(
-                            text = "没有成功执行的操作，无需撤销",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                    }
-                    if (undoMessage != null) {
-                        Text(
-                            text = undoMessage,
-                            style = MaterialTheme.typography.labelMedium,
-                            color = MaterialTheme.colorScheme.tertiary,
-                            modifier = Modifier.testTag(TAG_REPORT_UNDO_MESSAGE),
-                        )
-                    }
-                }
-            }
         }
+
+        // 终局动作常驻底栏(A 侧整库报告有 56 行,原先要滚到底才够得到撤销入口)。
+        // 左 = 退回(撤销本次执行),右 = 推进(完成)—— 与全站底栏一致(用户 2026-09-25)。
+        PageActionBar(
+            leading = {
+                // 撤销是**破坏性 / 回退类**动作,用「危险动作」配色着底
+                // (用户 2026-09-25:「步骤3的撤销按钮背景改红色」;
+                //  2026-09-26 收紧为「表示这是个危险性质的按钮」)。
+                // 深浅两种模式要取 error 族的**不同档位**:浅色 `error`(#B3261E 深红)、
+                // 深色 `errorContainer`(#8C1D18 深红)—— 深色的 `error` 是 #F2B8B5 淡粉,
+                // 当底色不像危险动作。完整理由见 `dangerActionButtonColors()` 的 KDoc。
+                Button(
+                    onClick = onUndo,
+                    enabled = report.canUndo,
+                    colors = dangerActionButtonColors(),
+                    modifier = Modifier
+                        .testTag(TAG_REPORT_UNDO)
+                        .semantics { contentDescription = UNDO_BUTTON_LABEL },
+                ) { Text(UNDO_BUTTON_LABEL) }
+            },
+            trailing = {
+                Button(
+                    onClick = onDone,
+                    modifier = Modifier
+                        .testTag(TAG_REPORT_DONE)
+                        .semantics { contentDescription = "完成" },
+                ) { Text("完成") }
+            },
+            extraContent = {
+                if (!report.canUndo) {
+                    Text(
+                        text = "没有成功执行的操作，无需撤销",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                if (undoMessage != null) {
+                    Text(
+                        text = undoMessage,
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.tertiary,
+                        modifier = Modifier.testTag(TAG_REPORT_UNDO_MESSAGE),
+                    )
+                }
+            },
+        )
     }
 }
 

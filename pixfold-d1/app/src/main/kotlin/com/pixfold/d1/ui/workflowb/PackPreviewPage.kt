@@ -14,6 +14,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material3.Button
+import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
@@ -44,6 +45,7 @@ import com.pixfold.d1.domain.model.ComicVolume
 import com.pixfold.d1.domain.model.LangChoice
 import com.pixfold.d1.domain.workflowb.WorkflowBState
 import com.pixfold.d1.domain.workflowb.selectVolume
+import com.pixfold.d1.ui.components.PageActionBar
 
 const val TAG_PACK_PAGE = "pack-page"
 const val TAG_PACK_LIST = "pack-list"
@@ -91,6 +93,7 @@ fun PackPreviewPage(
     onCancelConfirm: () -> Unit = {},
     onExecute: () -> Unit = {},
     showPlanSection: Boolean = false,
+    onBack: (() -> Unit)? = null,
 ) {
     val volume = libraryState.activeVolume
     val preview = previewOf(volume)
@@ -322,17 +325,36 @@ fun PackPreviewPage(
                         for (i in plans.indices) {
                             PlanRow(plans[i], i)
                         }
-
-                        Button(
-                            onClick = onStartConfirm,
-                            modifier = Modifier
-                                .padding(horizontal = 12.dp, vertical = 8.dp)
-                                .testTag(TAG_PLAN_CONFIRM)
-                                .semantics { contentDescription = "确认打包" },
-                        ) { Text("确认打包") }
                     }
                 }
             }
+        }
+
+        // 底栏:左 = 返回上一步,右 = 确认打包(用户 2026-09-25 指定)。
+        // 终局动作原先在计划区末尾,计划覆盖全部 included 卷,长列表要滚很久才够得到,
+        // 且未滚到之前按钮根本没被组合。与 A 侧 [TAG_A_PLAN_CONFIRM] 一致。
+        if (showPlanSection) {
+            val back = onBack
+            PageActionBar(
+                leading = {
+                    if (back != null) {
+                        FilledTonalButton(
+                            onClick = back,
+                            modifier = Modifier
+                                .testTag(TAG_B_STEP_BACK)
+                                .semantics { contentDescription = "返回上一步" },
+                        ) { Text("← 返回上一步") }
+                    }
+                },
+                trailing = {
+                    Button(
+                        onClick = onStartConfirm,
+                        modifier = Modifier
+                            .testTag(TAG_PLAN_CONFIRM)
+                            .semantics { contentDescription = "确认打包" },
+                    ) { Text("确认打包") }
+                },
+            )
         }
     }
 

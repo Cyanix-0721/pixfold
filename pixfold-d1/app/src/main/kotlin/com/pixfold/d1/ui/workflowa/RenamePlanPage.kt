@@ -8,8 +8,10 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material3.Button
+import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
@@ -31,6 +33,7 @@ import com.pixfold.d1.domain.plan.buildConfirmSequence
 import com.pixfold.d1.domain.plan.renameSummaryLines
 import com.pixfold.d1.domain.plan.workflowADangerActions
 import com.pixfold.d1.domain.sort.PageOrderState
+import com.pixfold.d1.ui.components.PageActionBar
 import com.pixfold.d1.ui.plan.ConfirmDialog
 import com.pixfold.d1.ui.plan.PlanHeader
 import com.pixfold.d1.ui.plan.planLineTag
@@ -66,6 +69,7 @@ fun RenamePlanPage(
     onExecute: () -> Unit,
     modifier: Modifier = Modifier,
     contentInsets: WindowInsets = WindowInsets.safeDrawing,
+    onBack: (() -> Unit)? = null,
 ) {
     val plan = buildLibraryRenamePlan(collections, orders, namingState)
     val dangers = workflowADangerActions(cleanEmptyDirs)
@@ -73,6 +77,7 @@ fun RenamePlanPage(
     Column(
         modifier = modifier
             .fillMaxSize()
+            .windowInsetsPadding(contentInsets)
             .testTag(TAG_A_PLAN_PAGE),
     ) {
         LazyColumn(
@@ -115,23 +120,33 @@ fun RenamePlanPage(
             items(plan.ops.size) { i ->
                 RenamePlanRow(plan.ops[i], i, plan.collectionNames[plan.ops[i].proposal.image.collectionId])
             }
-
-            item(key = "execute") {
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 12.dp, vertical = 8.dp),
-                ) {
-                    HorizontalDivider(modifier = Modifier.padding(bottom = 8.dp))
-                    Button(
-                        onClick = onStartConfirm,
-                        modifier = Modifier
-                            .testTag(TAG_A_PLAN_CONFIRM)
-                            .semantics { contentDescription = "确认执行" },
-                    ) { Text("确认执行") }
-                }
-            }
         }
+
+        // 终局动作常驻底栏(台账 §2):A 侧整库计划 56 行,原先要连滑 8–12 次才够得到,
+        // 且未滚到之前按钮根本没被组合。移出 LazyColumn 后与 [TAG_TO_PLAN] 一致。
+        // 左 = 退回(返回命名结构),右 = 终局(确认执行)—— 与全站底栏一致(用户 2026-09-25)。
+        // `onBack` 为 null 表示本页被单独使用(无多步骤流程),此时左侧为空槽。
+        val back = onBack
+        PageActionBar(
+            leading = {
+                if (back != null) {
+                    FilledTonalButton(
+                        onClick = back,
+                        modifier = Modifier
+                            .testTag(TAG_STEP_BACK)
+                            .semantics { contentDescription = "返回步骤2" },
+                    ) { Text("← 返回命名结构") }
+                }
+            },
+            trailing = {
+                Button(
+                    onClick = onStartConfirm,
+                    modifier = Modifier
+                        .testTag(TAG_A_PLAN_CONFIRM)
+                        .semantics { contentDescription = "确认执行" },
+                ) { Text("确认执行") }
+            },
+        )
     }
 
     // 确认对话框:严格按领域层给出的序列推进(通用 → 危险)

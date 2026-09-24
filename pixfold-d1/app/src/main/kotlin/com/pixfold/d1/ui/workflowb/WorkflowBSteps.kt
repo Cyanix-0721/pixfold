@@ -4,13 +4,11 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.material3.PrimaryTabRow
 import androidx.compose.material3.Tab
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -20,7 +18,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.unit.dp
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
@@ -145,19 +142,9 @@ fun WorkflowBSteps(
         // 步骤内容不重复叠加 inset(外层已处理)
         val innerInsets = WindowInsets(0, 0, 0, 0)
 
-        // 非首步给一个显式返回入口(Tab 也能切,但长列表滚到底后 Tab 不在视口内)。
-        // **位置保持在嵌套 NavHost 之外** —— 迁移前它也在 TabRow 与内容之间、weight 体系之外,
-        // 挪进去反而会随步骤内容转场,并且让 TAG_B_STEP_BACK 出现重复组合。
-        if (currentIndex > 0) {
-            TextButton(
-                onClick = { navController.popBackStack() },
-                modifier = Modifier
-                    .padding(start = 4.dp)
-                    .testTag(TAG_B_STEP_BACK)
-                    .semantics { contentDescription = "返回上一步" },
-            ) { Text("← 返回上一步") }
-        }
-
+        // 返回入口已随「底栏化」迁入各页自己的底栏(用户 2026-09-25 指定:
+        // 左 = 退回、右 = 推进)。原先常驻在 TabRow 与内容之间的那个返回按钮已删除 ——
+        // 它把内容夹在中间,且与底栏的推进按钮分处两端,不符合统一的底栏布局。
         PixFoldNavHost(
             navController = navController,
             startDestination = WorkflowBLibraryRoute,
@@ -189,6 +176,7 @@ fun WorkflowBSteps(
                             onLibraryChange = { state = it },
                             contentInsets = innerInsets,
                             onNext = { navController.navigate(WorkflowBPackRoute) },
+                            onBack = { navController.popBackStack() },
                             modifier = Modifier.weight(1f),
                         )
                     }
@@ -245,6 +233,7 @@ fun WorkflowBSteps(
                                 onCancelConfirm = { confirmFlow = confirmFlow.cancel() },
                                 onExecute = {},
                                 showPlanSection = true,
+                                onBack = { navController.popBackStack() },
                                 modifier = Modifier.weight(1f),
                             )
                         }

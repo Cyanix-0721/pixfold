@@ -7,12 +7,10 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.windowInsetsPadding
-import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Tab
 import androidx.compose.material3.PrimaryTabRow
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -206,36 +204,19 @@ fun WorkflowASteps(
                     val order = collection?.let { state.orders[it.id] }
                     if (collection != null && order != null) {
                         Column(modifier = Modifier.fillMaxSize()) {
-                            // 返回步骤 1 的显式入口(Tab 也能切,但长表滚到底后 Tab 不在视口内)
-                            Column(modifier = Modifier.fillMaxWidth()) {
-                                TextButton(
-                                    onClick = { navController.popBackStack() },
-                                    modifier = Modifier
-                                        .padding(start = 4.dp)
-                                        .testTag(TAG_STEP_BACK)
-                                        .semantics { contentDescription = "返回步骤1" },
-                                ) {
-                                    Text("← 返回排序")
-                                }
-                            }
+                            // 返回与推进都交给页面自己的底栏(用户 2026-09-25 指定:
+                            // 左 = 退回、右 = 推进)。原先这里的「返回排序」入口在上、
+                            // 「下一步：执行计划」入口在下,把内容夹在中间 —— 已删除。
                             NamingPage(
                                 collection = collection,
                                 order = order,
                                 contentInsets = innerInsets,
                                 initialState = namingState,
                                 onStateChange = { namingState = it },
+                                onBack = { navController.popBackStack() },
+                                onNext = { navController.navigate(WorkflowAPlanRoute) },
                                 modifier = Modifier.weight(1f),
                             )
-                            // 常驻在底部的下一步:长表滚到底后 Tab 与返回入口都可能不在视口内
-                            Column(modifier = Modifier.fillMaxWidth()) {
-                                Button(
-                                    onClick = { navController.navigate(WorkflowAPlanRoute) },
-                                    modifier = Modifier
-                                        .padding(horizontal = 12.dp, vertical = 4.dp)
-                                        .testTag(TAG_TO_PLAN)
-                                        .semantics { contentDescription = "下一步 执行计划" },
-                                ) { Text("下一步：执行计划") }
-                            }
                         }
                     } else {
                         // `align` 是 ColumnScope 扩展,故这里必须自带一个 Column 作用域
@@ -276,17 +257,7 @@ fun WorkflowASteps(
                         }
                     } else {
                         Column(modifier = Modifier.fillMaxSize()) {
-                            Column(modifier = Modifier.fillMaxWidth()) {
-                                TextButton(
-                                    onClick = { navController.popBackStack() },
-                                    modifier = Modifier
-                                        .padding(start = 4.dp)
-                                        .testTag(TAG_STEP_BACK)
-                                        .semantics { contentDescription = "返回步骤2" },
-                                ) {
-                                    Text("← 返回命名结构")
-                                }
-                            }
+                            // 返回入口由 RenamePlanPage 的底栏提供(用户 2026-09-25 指定)
                             RenamePlanPage(
                                 collections = collections,
                                 orders = state.orders,
@@ -315,6 +286,7 @@ fun WorkflowASteps(
                                 onExecute = {},
                                 contentInsets = innerInsets,
                                 modifier = Modifier.weight(1f),
+                                onBack = { navController.popBackStack() },
                             )
                         }
                     }

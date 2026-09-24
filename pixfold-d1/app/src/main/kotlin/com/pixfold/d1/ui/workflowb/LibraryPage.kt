@@ -12,8 +12,8 @@ import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.material3.Button
 import androidx.compose.material3.Checkbox
-import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -30,10 +30,14 @@ import com.pixfold.d1.domain.model.ComicVolume
 import com.pixfold.d1.domain.workflowb.WorkflowBState
 import com.pixfold.d1.domain.workflowb.selectVolume
 import com.pixfold.d1.domain.workflowb.setVolumeIncluded
+import com.pixfold.d1.ui.components.PageActionBar
 
 const val TAG_LIBRARY_PAGE = "library-page"
 const val TAG_LIBRARY_LIST = "library-list"
 const val TAG_LIBRARY_SUMMARY = "library-summary"
+
+/** 「下一步 编辑元数据」按钮。 */
+const val TAG_LIBRARY_NEXT = "library-next"
 
 /** 卷卡片(整卡可选)。 */
 fun volumeCardTag(id: String) = "library-volume-$id"
@@ -117,31 +121,24 @@ fun LibraryPage(
                     )
                 }
             }
+        }
 
-            if (onNext != null) {
-                item(key = "next") {
-                    Row(
+        // 下一步常驻底栏(台账 §2):向导式推进动作原先在列表末尾,长库要滚到底才够得到;
+        // 顶部 Tab 能切目的地,但那是「平级视图索引」,与「按顺序推进」语义不同。
+        if (onNext != null) {
+            PageActionBar(
+                trailing = {
+                    Button(
+                        onClick = onNext,
                         modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 12.dp, vertical = 8.dp),
-                        horizontalArrangement = Arrangement.End,
-                    ) {
-                        FilterChip(
-                            selected = false,
-                            onClick = onNext,
-                            label = { Text("下一步 编辑元数据") },
-                            modifier = Modifier
-                                .testTag(TAG_LIBRARY_NEXT)
-                                .semantics { contentDescription = "下一步 编辑元数据" },
-                        )
-                    }
-                }
-            }
+                            .testTag(TAG_LIBRARY_NEXT)
+                            .semantics { contentDescription = "下一步 编辑元数据" },
+                    ) { Text("下一步 编辑元数据") }
+                },
+            )
         }
     }
 }
-
-const val TAG_LIBRARY_NEXT = "library-next"
 
 /** 系列分组头(含"待确认"聚合,对齐归档 `_seriesHeader`)。 */
 @Composable

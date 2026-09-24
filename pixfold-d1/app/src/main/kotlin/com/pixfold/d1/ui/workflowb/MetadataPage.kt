@@ -13,12 +13,14 @@ import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.horizontalScroll
+import androidx.compose.material3.Button
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExposedDropdownMenuAnchorType
 import androidx.compose.material3.ExposedDropdownMenuBox
 import androidx.compose.material3.ExposedDropdownMenuDefaults
+import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
@@ -49,6 +51,7 @@ import com.pixfold.d1.domain.workflowb.batchApplyToLibrary
 import com.pixfold.d1.domain.workflowb.selectVolume
 import com.pixfold.d1.domain.workflowb.setVolumeIncluded
 import com.pixfold.d1.domain.workflowb.updateVolume
+import com.pixfold.d1.ui.components.PageActionBar
 
 const val TAG_METADATA_PAGE = "metadata-page"
 const val TAG_METADATA_LIST = "metadata-list"
@@ -61,6 +64,9 @@ const val TAG_BATCH_FIELD = "metadata-batch-field"
 const val TAG_BATCH_VALUE = "metadata-batch-value"
 const val TAG_BATCH_FORCE = "metadata-batch-force"
 const val TAG_WRITER_CLEAN = "metadata-writer-clean"
+
+/** 「下一步 打包计划」按钮(常驻底栏)。 */
+const val TAG_METADATA_NEXT = "metadata-next"
 
 /** 元数据字段输入框(逐卷)。 */
 fun metaFieldTag(field: MetaField) = "metadata-field-${field.name}"
@@ -103,6 +109,7 @@ fun MetadataPage(
     modifier: Modifier = Modifier,
     contentInsets: WindowInsets = WindowInsets.safeDrawing,
     onNext: (() -> Unit)? = null,
+    onBack: (() -> Unit)? = null,
 ) {
     var state by remember { mutableStateOf(libraryState) }
     fun update(next: WorkflowBState) {
@@ -247,31 +254,38 @@ fun MetadataPage(
                     },
                 )
             }
+        }
 
-            if (onNext != null) {
-                item(key = "next") {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 12.dp, vertical = 8.dp),
-                        horizontalArrangement = Arrangement.End,
-                    ) {
-                        FilterChip(
-                            selected = false,
-                            onClick = onNext,
-                            label = { Text("下一步 打包计划") },
+        // 底栏:左 = 返回上一步,右 = 下一步 打包计划(用户 2026-09-25 指定)。
+        // 任一回调为 null 时不渲染底栏 —— 测试直接组合本页,底栏凭空出现会改变可视区域。
+        if (onBack != null || onNext != null) {
+            val back = onBack
+            val next = onNext
+            PageActionBar(
+                leading = {
+                    if (back != null) {
+                        FilledTonalButton(
+                            onClick = back,
+                            modifier = Modifier
+                                .testTag(TAG_B_STEP_BACK)
+                                .semantics { contentDescription = "返回上一步" },
+                        ) { Text("← 返回上一步") }
+                    }
+                },
+                trailing = {
+                    if (next != null) {
+                        Button(
+                            onClick = next,
                             modifier = Modifier
                                 .testTag(TAG_METADATA_NEXT)
                                 .semantics { contentDescription = "下一步 打包计划" },
-                        )
+                        ) { Text("下一步 打包计划") }
                     }
-                }
-            }
+                },
+            )
         }
     }
 }
-
-const val TAG_METADATA_NEXT = "metadata-next"
 
 /** 步骤 2/3 的卷切换行:让"当前卷"在切步骤后仍可换(选中项在领域状态里)。 */
 @Composable
