@@ -15,7 +15,9 @@ android {
 
     defaultConfig {
         applicationId = "com.pixfold.d1"
-        minSdk = 24
+        // 2026-09-22 由 24 提到 30(用户裁决)。理由与取舍见
+        // HANGOFF.md §12.6 与 docs/notes/d1-toolchain-evidence.md §9。
+        minSdk = 30
         targetSdk = 36
         versionCode = 1
         versionName = "0.1.0-dev"

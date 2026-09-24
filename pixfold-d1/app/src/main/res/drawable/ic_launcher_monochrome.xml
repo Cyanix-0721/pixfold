@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  自适应图标的单色层(Android 13 / API 33 起的"主题化图标")。
+  系统只取这一层的 alpha 当蒙版,再用用户壁纸与主题的取色重新上色,
+  因此这里只画形状、以纯白填充,颜色本身不参与显示。
+  坐标与 ic_launcher_foreground.xml 完全一致(见该文件的尺寸推导)。
+  与前景层分成两个文件而不是复用同一个 drawable,是因为将来换成真正的
+  图标后前景可能是多色/带渐变的,不一定适合直接当单色蒙版。
+-->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M30,34h20v40h-20z M58,34h20v18h-20z M58,60h20v14h-20z" />
+</vector>

@@ -22,6 +22,8 @@
 4. 不应用 `kotlin-android` 插件（AGP 9 内置 Kotlin）；Compose 编译器插件 `org.jetbrains.kotlin.plugin.compose` 必须单独应用且版本锁 **2.2.10**；子模块声明插件**不带版本号**。
 5. 构建走 Windows 原生：经 `cmd.exe /c gradlew.bat` 调用，不在 WSL 内跑 Gradle。
 6. compileSdk / minSdk / targetSdk = 36 / 24 / 36；namespace 与 applicationId = `com.pixfold.d1`。
+   > **⚠️ 2026-09-22 更新**：本行是 09-16 的取值。`compileSdk` 已升到 37、`minSdk` 已由 24 提到 **30**
+   > （见 `docs/notes/d1-toolchain-evidence.md` §9 与 `HANGOFF.md` §12.6）。原文保留作设计记录。
 7. `local.properties`、`build/`、`.gradle/`、`.kotlin/` 不入库。
 8. `domain/` 不得 import 任何 `android.*` / `androidx.*`。
 9. 不可变状态 + 纯函数；不用可变通知链。

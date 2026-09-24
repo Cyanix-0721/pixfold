@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  自适应图标的底色(浅色档)。
+  深色档在 values-night/colors.xml —— launcher 图标按系统 Configuration 解析,
+  所以它跟随的是"系统深色模式",而不是应用内设置页里的主题模式选择。
+-->
+<resources>
+    <color name="ic_launcher_background">#3F51B5</color>
+</resources>

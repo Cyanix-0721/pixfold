@@ -737,7 +737,8 @@ APK 安装启动成功、点击与横竖屏切换无崩溃(同 PID 未重启)。
 `WorkflowASteps` 用**单个** `BackHandler` 按层级决策(而非"非首步才启用 + 靠外层兜底"),
 使注册始终 enabled —— 系统据此知道"返回有去处",预测性返回才会走应用内后退。
 Manifest 显式 `enableOnBackInvokedCallback="true"`(targetSdk 33+ 默认,写明意图);
-因 minSdk=24 该属性会触发 lint `UnusedAttribute`,以 `tools:targetApi="33"` 标注。
+该属性触发 lint `UnusedAttribute`(minSdk 低于 33 时),以 `tools:targetApi="33"` 标注。
+**2026-09-22 注**:minSdk 已由 24 提到 30(见 §12.6),该注解**仍然必要**(30 < 33),故保留。
 
 > **⚠️ 如实记录的范围与局限**:
 > 1. **超长(第 10 项的四类之一)未在真机复现** —— 真机上让 `baseName` 达到 181 字符需长文本输入,
@@ -1019,11 +1020,13 @@ Manifest 显式 `enableOnBackInvokedCallback="true"`(targetSdk 33+ 默认,写明
 
 ### ⏭️ 设置与主题体系 —— 现状与后续(2026-09-21 记录,供换机续接)
 
-> **分支**:`d1/settings-impl`(**未合回 `dev`**),15 个提交(自 `dev` 起算;
+> **分支**:`d1/settings-impl`(**未合回 `dev`**),20 个提交(自 `dev` 起算;
 > `dev` 自身另有 14 个未推送提交,均未 push —— push 由用户处理)。
-> **工作区干净**。规格:`docs/superpowers/specs/2026-09-20-d1-settings-theme-design.md`。
-> **验证**(2026-09-21 复跑):`domain:test` **224** + `app:testDebugUnitTest` **273** 全绿;
-> `assembleDebug` 成功;`lintDebug` 零告警。(273 = 原 264 + §9.1 第 2 步新增 9 条
+> **⚠️ 工作区有未提交改动**(启动图标主题化 + minSdk 24→30,见本章
+> 「✅ 启动图标 MD 主题化 + minSdk 提到 30」)。规格:`docs/superpowers/specs/2026-09-20-d1-settings-theme-design.md`。
+> **验证**(2026-09-22 复跑):`domain:test` **224** + `app:testDebugUnitTest` **278** 全绿;
+> `assembleDebug` 成功;`lintDebug` 零告警。(278 = 上一轮 273 + `LauncherIconTest` 6 条
+> − 随 minSdk 删除的 API 24/25 回退档用例 1 条;273 = 原 264 + §9.1 第 2 步新增 9 条
 > `PredictiveBackTest`;此前 264 = 261 + 扩展角色回归 1 条 + 「色彩标准」置灰 2 条。)
 
 **已交付并真机核对通过**:
@@ -1284,6 +1287,35 @@ FruitSalad 时,切换 2021↔2025 **不改变任何颜色、界面无任何反�
   → **已放弃该做法**;改为迁移 Navigation Compose(见上方更新)。**该迁移已于 2026-09-22 完成。**
 - **决策前置**:见下方「⚠️ 未决策:D1 范围 vs MVP」——
   该步的投入是否值得,取决于本阶段按"原型"还是"MVP"对待。
+
+---
+
+#### ✅ 启动图标 MD 主题化 + minSdk 提到 30(2026-09-22)
+
+> **分支**:`d1/settings-impl`。**改动未提交**(与 minSdk 变更同批)。
+> **验证**:`app:testDebugUnitTest` **278** + `domain:test` **224** 全绿、`lintDebug` **零告警**、
+> `assembleDebug` 成功。
+
+**起因**:用户问「为什么要做 API 24/25 回退,我的安卓手机最低安卓 16」/「minTarget 写太低了?」,
+随后裁决 **minSdk=30 + 保持 Java 17**(逐字:「至少 30 以下完全没必要,33/34/35 还是升级 JDK 用 36」)。
+minSdk 本身的完整实测(功能面 / 依赖面 / lint 逐档代价 / 为何没选 36 / APK 体积连带现象)
+是**工具链**问题,记录在 **`docs/notes/d1-toolchain-evidence.md` §9** 与 **§12.6**;此处只记产品面。
+
+**启动图标改造**(用户逐字:「2,图标后期再画先用这个占位的」):
+
+| 项 | 结果 |
+| --- | --- |
+| 形态 | 单层 `drawable/ic_launcher.xml` → **三层自适应图标** `mipmap-anydpi/ic_launcher.xml`(`<background>` + `<foreground>` + **`<monochrome>`**) |
+| 主题化 | 带 `monochrome` 层后,Android 13+ 用户开启主题化图标时系统会按壁纸着色(**真机 Material You 已开**) |
+| 字形 | **仍用占位方块几何**(`ic_launcher_foreground.xml` / `ic_launcher_monochrome.xml` 同一 `pathData`),正式图标后绘 |
+| 背景 | `values/colors.xml` = `#3F51B5`(Indigo,与内置强调色种子同源)/ `values-night/colors.xml` = `#1A237E`(Indigo 900) |
+| 回退档 | API 24/25 的 48dp 普通 vector **整体删除**(minSdk=30 已不需要);`mipmap-anydpi-v26/` 并入 `mipmap-anydpi/` |
+| 护栏 | 新建 `app/src/test/kotlin/com/pixfold/d1/LauncherIconTest.kt`(**5 用例**,`GraphicsMode.NATIVE` 实栅格化),含「单色层与前景字形同步」的**源码结构断言** |
+
+> **为什么图标需要专门断言**:图标是**唯一一类坏掉也全绿的资源** —— 它不参与任何逻辑,
+> 编译通过、测试通过、APK 正常,只有在桌面/抽屉里才看得出错。故用「解析实际 drawable +
+> 逐像素栅格化 + 源码结构比对」三条腿兜住。
+> **防回退**:`monochrome` 层被删 = 2 处失败;夜间背景色被改回日间色 = 1 处失败(变异已实测)。
 
 ---
 
@@ -1965,7 +1997,9 @@ mise ls                  # 看 mise 管的工具版本
 | Git / VS Code / Android Studio | 2.55.0.windows.5 / 1.138.0 / 2026.1.4.7 |
 | JDK | temurin-17.0.20+101(mise;Android/Gradle 构建所需);另有 Studio 内置 **JBR 25.0.3** 可用(完整 JDK) |
 | Gradle / AGP / Kotlin / Compose BOM | **9.7.1 / 9.4.1 / 2.4.20 / 2026.09.00** —— **2026-09-20 主动升级到当时最新 stable**(用户决策:"尽量都用新的稳定版本",考虑后期维护)。原值 9.6.0 / 9.4.0 / 2.2.10 / 2026.02.01 来自 Studio 2026.1.4 模板。**升级动因**:引入 AboutLibraries 15.2.0 需 Kotlin ≥ 2.4.10。**升级经探针实测**(临时分支验证后弃用):编译通过 + **既有 461 项测试全绿** + assembleDebug + lint 零告警。证据见 `docs/notes/d1-toolchain-evidence.md` §8 |
-| compileSdk / minSdk / targetSdk | **37** / 24 / **36** —— `compileSdk` 于 2026-09-20 由 36 升到 37 (新依赖链 AboutLibraries → Compose 1.12.1 要求;`platforms;android-37.0` 本机已装)。**`targetSdk` 仍锁 36**(与真机 Android 16 对齐,§12.6 策略不变)—— 二者分离:`compileSdk` 只决定"用哪个 SDK 编译",`targetSdk` 决定运行时行为契约。故 `OldTargetApi` 的 lint 豁免理由继续成立 |
+| compileSdk / minSdk / targetSdk | **37** / **30** / **36** —— `compileSdk` 于 2026-09-20 由 36 升到 37 (新依赖链 AboutLibraries → Compose 1.12.1 要求;`platforms;android-37.0` 本机已装)。**`targetSdk` 仍锁 36**(与真机 Android 16 对齐,§12.6 策略不变)—— 二者分离:`compileSdk` 只决定"用哪个 SDK 编译",`targetSdk` 决定运行时行为契约。故 `OldTargetApi` 的 lint 豁免理由继续成立 |
+| minSdk 由 24 提到 **30** | **2026-09-22 用户裁决**。起因:用户问"为什么要做 API 24/25 回退,我的安卓手机最低安卓 16"。**功能面实测**(查 `android-36/data/api-versions.xml` 类级 `since`):roadmap 所需 API 在 minSdk=30 已全部到手 —— `java/nio/file/Files`=26(D2a 归档)、`android/graphics/ImageDecoder`=28(D3/D4 解码)、`android/app/NotificationChannel`=26(D4 进度通知);`LocaleManager`=33 未到手但**已有 `Build.VERSION` 分支**(`Theme.kt:48`、`PixFoldApp.kt:192`);`ZipOutputStream`/`ZipFile`/`ZipEntry` 全部 since=1、SAF `DocumentsContract`=19 ⇒ **CBZ 打包与 SAF 在任意 minSdk 都可行**。**依赖面实测**:activity-compose 1.13.0→23、material3/material3-ripple/navigation-compose 2.10.2→24、material-color-utilities→21、aboutlibraries-compose/-m3→21 ⇒ **无任何依赖阻止 minSdk=30**。**连带改动**:①`mipmap-anydpi-v26/` 必须删、三层 `<adaptive-icon>` 移入 `mipmap-anydpi/`(否则 lint 报 `UnnecessaryQualifier` 而本项目 `warningsAsErrors=true` 直接失败);②原先给 API 24/25 兜底的 48dp 普通 vector 回退档及其源码结构用例**一并删除**。**Java 工具链不动**(`JavaVersion.VERSION_17` + `:domain` 的 `jvmToolchain(17)`)。**已否决的 minSdk=36**:虽可删尽三处版本分支并与真机完全对齐,但 Robolectric 的 SDK 36 sandbox 硬性要求 **Java 21**(逐字 `Failed to create a Robolectric sandbox: Android SDK 36 requires Java 21 (have Java 17)`),且 29 个测试文件的 `@Config(sdk=[34])` 需全部改 `[36]`,代价不成比例。**连带现象(非缺陷)**:minSdk≥28 时 AGP **故意不压缩 dex**,debug APK 由 13 MB 变为 33 MB —— AGP 的 `DexPackaging` DSL 源码逐字「If null, dex files will be uncompressed when minSdk >= 28」,用意是 ART 可直接 mmap 加载、省安装期解压。逐档实测 26→13,040,830 B(全 DEFLATED)、28/29/30→33.2 MB(全 STORED);加 `packaging { dex { useLegacyPackaging = true } }` 可回到 13,007,710 B,但**用户裁决保持默认**。详见 `docs/notes/d1-toolchain-evidence.md` §9.7 |
+| **16 KB 页大小支持** | ✅ **已达标,零配置**(2026-09-24 核查)。权威判定 = SDK 自带 `zipalign -c -P 16 -v 4 app-debug.apk` → `Verification successful`、`exit=0`,4 条 `lib/**/*.so` 偏移 `% 16384` 全为 **0**;**ELF 侧** `readelf -lW` 的 3 个 `LOAD` 段 `Align` 全为 **`0x4000`**;4 条 `.so` 在 APK 内均 **STORED 未压缩**(对齐的前提)。**未做任何配置** —— AGP ≥ 8.5.1 会自动做(官方逐字「align them on a 16 KB zip-aligned boundary」),本项目 AGP **9.4.1** 远高于门槛;`gradle.properties` 与 `app/build.gradle.kts` 内**无** `packaging`/`useLegacyPackaging`/`alignment` 任何配置(已 grep 确认)。**唯一 `.so` 来源** = 传递依赖 `androidx.graphics:graphics-path:1.0.1`(经 `androidx.compose.ui:ui-graphics-android:1.12.1`),本项目**无** `jniLibs/`、**无** `externalNativeBuild`/`ndkVersion`/`cmake`。⚠️ **教训**:按 ZIP 结构自算 data 偏移会得出**错误结论**(arm64-v8a 自算 `% 16384 = 1536` 看似未对齐),因为没计入 AGP 注入的 alignment extra field ⇒ **对齐判定只认 `zipalign -c -P 16`**。Play 对该项的强制要求(2025-11-01 起)**不适用**(本项目不上架,`HANGOFF.md:1719`),但零成本达标,如实登记。详见 `docs/notes/d1-toolchain-evidence.md` §10 |
 | Android platform | `platforms;android-36`(**已装**,与真机 Android 16 对齐);`android-37.0` 也在(模板默认带的) |
 | Android SDK 根 | `C:\Users\Administrator\AppData\Local\Android\Sdk` |
 

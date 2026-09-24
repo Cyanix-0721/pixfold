@@ -16,6 +16,7 @@ import com.pixfold.d1.ui.TAG_SETTINGS_BUTTON
 import com.pixfold.d1.ui.settings.TAG_SETTINGS_PAGE
 import com.pixfold.d1.ui.workflowa.TAG_STEP_BACK
 import com.pixfold.d1.ui.workflowa.TAG_STEP_NAMING
+import com.pixfold.d1.ui.workflowa.TAG_STEP_TABS
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -55,6 +56,13 @@ import kotlin.test.assertTrue
  * (彼时 alpha 恰好为 0,上层页彻底消失,屏幕上只剩目标页)。缩放单独存在时,
  * 缩小中的设置页仍然盖在首页上,这一条必然失败。步骤级同样用这一条兜底。
  *
+ * ## 比对范围:只比内容区,不比整屏
+ *
+ * 步骤页签行(`TAG_STEP_TABS`)在**嵌套 NavHost 子树之外**,不受转场管辖;松手返回时
+ * 它的选中项会**合法地**从「命名」切回「排序」。因此所有与收敛性有关的像素比对都走
+ * [contentBitmap](裁掉页签带),否则会把页签翻转误判为"过渡没收敛" —— 这正是
+ * SDK 35/36 下那 8000 余个虚假残差的真因(详见该函数的 KDoc)。
+ *
  * ## 不能断言什么
  *
  * 真实返回手势的**系统绘制**本身(系统那道边缘拖拽层)。那部分由真机走查覆盖,
@@ -87,6 +95,25 @@ class TransitionStyleTest {
     }
 
     private fun rootBitmap(): Bitmap = rule.onRoot().captureToImage().asAndroidBitmap()
+
+    /**
+     * 裁掉**步骤页签行**之后再取内容区。
+     *
+     * **为什么必须裁**(2026-09-22 定位出的测试缺陷):步骤页签行
+     * (`PrimaryTabRow`,`TAG_STEP_TABS`)位于**嵌套 NavHost 子树之外** ——
+     * 它不在转场的管辖范围内。松手真正返回时,它的选中项**合法地**从「命名」切回「排序」,
+     * 于是「整屏比对」会把这段页签翻转也算进"过渡残差"里。
+     *
+     * 差异定位探针实测:SDK 35/36 下那 8000 余个差异像素 **100% 落在
+     * `box=(15,0)-(265,59)`** 即页签的 `Rect.fromLTRB(0.0, 0.0, 400.0, 60.0)` 带内;
+     * 排除该带后内容区差 **0**。故凡与转场收敛性有关的比对,都必须只比内容区。
+     */
+    private fun contentBitmap(): Bitmap {
+        val full = rootBitmap()
+        val tabsBottom = rule.onNodeWithTag(TAG_STEP_TABS)
+            .fetchSemanticsNode().boundsInRoot.bottom.toInt()
+        return Bitmap.createBitmap(full, 0, tabsBottom, full.width, full.height - tabsBottom)
+    }
 
     private fun width(tag: String): Float =
         rule.onNodeWithTag(tag).fetchSemanticsNode().boundsInRoot.width
@@ -131,17 +158,18 @@ class TransitionStyleTest {
         }
         openNamingStep()
 
-        val before = rootBitmap()
+        // 用 contentBitmap 而非 rootBitmap:页签行不在转场管辖内,松手时它会合法翻转选中项。
+        val before = contentBitmap()
         val widthBefore = width(TAG_STEP_BACK)
 
         gestureTo(1f)
 
-        val during = rootBitmap()
+        val during = contentBitmap()
         val widthDuring = width(TAG_STEP_BACK)
         val changed = changedPixels(before, during)
 
         release()
-        val after = rootBitmap()
+        val after = contentBitmap()
         val settled = changedPixels(after, during)
         println(
             "StepStyle probe: widthBefore=$widthBefore widthDuring=$widthDuring " +
