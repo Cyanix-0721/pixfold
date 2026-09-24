@@ -1020,9 +1020,9 @@ Manifest 显式 `enableOnBackInvokedCallback="true"`(targetSdk 33+ 默认,写明
 
 ### ⏭️ 设置与主题体系 —— 现状与后续(2026-09-21 记录,供换机续接)
 
-> **分支**:`d1/settings-impl`(**未合回 `dev`**),20 个提交(自 `dev` 起算;
+> **分支**:`d1/settings-impl`(**未合回 `dev`**),21 个提交(自 `dev` 起算;
 > `dev` 自身另有 14 个未推送提交,均未 push —— push 由用户处理)。
-> **⚠️ 工作区有未提交改动**(启动图标主题化 + minSdk 24→30,见本章
+> **工作区干净**。启动图标主题化 + minSdk 24→30 **已提交**(`2ba10f8`,见本章
 > 「✅ 启动图标 MD 主题化 + minSdk 提到 30」)。规格:`docs/superpowers/specs/2026-09-20-d1-settings-theme-design.md`。
 > **验证**(2026-09-22 复跑):`domain:test` **224** + `app:testDebugUnitTest` **278** 全绿;
 > `assembleDebug` 成功;`lintDebug` 零告警。(278 = 上一轮 273 + `LauncherIconTest` 6 条
@@ -1292,7 +1292,7 @@ FruitSalad 时,切换 2021↔2025 **不改变任何颜色、界面无任何反�
 
 #### ✅ 启动图标 MD 主题化 + minSdk 提到 30(2026-09-22)
 
-> **分支**:`d1/settings-impl`。**改动未提交**(与 minSdk 变更同批)。
+> **分支**:`d1/settings-impl`。**已提交** `2ba10f8`(17 files,+566/−30)。
 > **验证**:`app:testDebugUnitTest` **278** + `domain:test` **224** 全绿、`lintDebug` **零告警**、
 > `assembleDebug` 成功。
 
