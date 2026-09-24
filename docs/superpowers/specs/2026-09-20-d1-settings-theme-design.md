@@ -744,6 +744,34 @@ domain **224** + app **273** 全绿、`lintDebug` 零告警。
    边缘滑动中,顶层 `PrimaryTabRow` 底分隔线由 y=346/跨度 `[1,1263]` 变 y=418/跨度 `[44,1221]`,
    两轴独立推出的手势进度一致(p≈0.13 与 p≈0.69),中心停在 x≈632 —— 与绕中心
    `scaleX = scaleY = 1f - 0.10f * p` 吻合;**关掉开关**后同样滑动内容逐值不变,松手仍完成 2→1。
-3. ⬜ **目标页显示在背后(大)** —— 现只缩放当前页、背后是空背景;真预测性返回需两层渲染。
+3. ✅ **目标页显示在背后(大,2026-09-22 已完成)** —— 原计划手写两层渲染,用户裁决改为
+   **把导航整体迁移到 Navigation Compose**(`NavHost` 自己同时渲染两层、自己订阅手势进度)。
+   落地:根导航改 type-safe `@Serializable` route 的 `NavHost`;两个步骤容器改**嵌套 NavHost**
+   (栈深 1 时自动禁用内层返回处理器,回落免费);转场只在 NavHost 级配
+   (`predictivePopEnterTransition = EnterTransition.None` 让目标页静止在背后
+   + `predictivePopExitTransition` 按层级分档,开关关闭时后者退为 `None`,
+   即"保留普通转场、只是不跟手");旧 `PredictiveBackContainer.kt` **整体删除**
+   (与 NavHost 共用 `OnBackPressedDispatcher` 的 LIFO 队列,不能共存);
+   新增 `DestinationSurface` 不透明底座。`PredictiveBackTest` 9 → 7 条
+   (删 2 条直渲染旧容器的,改写 3 条 `boundsInRoot` 缩放断言),`BackNavigationTest` 6 → 8 条
+   (补 2 条"反向 Tab 跳转后返回链线性"—— 该约束由变异实验发现原本无人守护)。
+
+   **2026-09-22 追加:转场形态改为「分层」**(用户看真机录像后判定「动画有点长且生硬」)。
+   用户逐字规格:工作流内部「侧面拖动越多当前页越透明然后显示上级页面」、
+   大页面切换「当前页面虚化缩小」;进入动画仍瞬切(`forward_anim` = 只做返回/手势)。
+   新增 `NavTransitionStyle { Step, Page }` + `PixFoldNavHost` 的第 4 个必填参数 `style`,
+   三个调用点各声明一档(根图 `Page`、两个嵌套图 `Step`):
+   **步骤级 = `fadeOut()`(不缩放)/ 根级 = `scaleOut(0.90f) + fadeOut()`**。
+   ⚠️ 根级必须显式 `+ fadeOut()`——`scaleOut` 产物只含 scale、不含 alpha。
+   ⚠️「虚化」以 alpha 近似,该 compose 版本无模糊原语。
+   形态断言迁入新建 `TransitionStyleTest.kt`(3 条:`@GraphicsMode(NATIVE)` + `captureToImage` 像素对比),
+   `PredictiveBackTest` **7 → 4** 条(原 3 条断言"步骤内容变窄",与新规格相反,已删)。
+   骨架判据:根级 400→360 px、步骤级 99→99 px 且像素变化 28 万、开关关闭逐字节不变。
+
+   **验证**:app **273** + domain **224** 全绿、`lintDebug` 零告警、APK 13,069,573 B;
+   迁移后 6 组变异(转场两级接线 4 组 + Tab 往回 pop 2 组)均被新断言杀死。
+   ✅ **2026-09-22 真机核对通过**(用户授权后实测;用户逐字「实测现在这样很不错了,后续还要改就得到走查阶段了」
+   ⇒ 分层形态**定稿**,后续形态调整**推迟到走查阶段**)。完整记录见
+   `docs/notes/d1-navigation-compose-migration.md`(含 F1–F13 源码级事实表、§7 实施结果与 §7.8 分层转场)。
 
 **未决策**:D1 范围 vs MVP(设置阶段超出 D1 的六项交付,归属待用户定调)。

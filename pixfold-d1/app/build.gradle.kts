@@ -1,6 +1,11 @@
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.compose.compiler)
+    // 导航迁移(2026-09-22)起 route 用 type-safe 形式:
+    // `@Serializable` route 类需要这个插件在**编译期**生成序列化器。
+    // 注意 navigation 只把 kotlinx-serialization-core 放在 runtime 变体,
+    // 编译期必须自己加 —— 见 docs/notes/d1-navigation-compose-migration.md §4.1。
+    alias(libs.plugins.kotlin.serialization)
     alias(libs.plugins.aboutLibraries)
 }
 
@@ -76,6 +81,8 @@ dependencies {
     implementation(libs.aboutlibraries.core)
     implementation(libs.aboutlibraries.compose.m3)
     implementation(libs.material.color.utilities)
+    implementation(libs.navigation.compose)
+    implementation(libs.kotlinx.serialization.core)
 
     testImplementation(composeBom)
     testImplementation(kotlin("test"))

@@ -1056,7 +1056,7 @@ Manifest 显式 `enableOnBackInvokedCallback="true"`(targetSdk 33+ 默认,写明
 
 ---
 
-#### ⏭️ 后续三步(按性价比排序,用户 2026-09-21 指定记录) —— **第 1、2 步已完成,剩第 3 步**
+#### ⏭️ 后续三步(按性价比排序,用户 2026-09-21 指定记录) —— **三步全部完成(第 3 步于 2026-09-22 以「迁移 Navigation Compose」方式完成,见 `docs/notes/d1-navigation-compose-migration.md`)**
 
 **第 1 步(小,先做):补 `2021 ≠ 2025` 断言 —— ✅ 已完成(2026-09-21)**
 
@@ -1243,7 +1243,36 @@ FruitSalad 时,切换 2021↔2025 **不改变任何颜色、界面无任何反�
 - **取证说明**:合成滑动确实触发了系统边缘返回手势(旁证:工作流步骤 2→1 完成);
   进度值 p 由几何**反推**(x/y 两轴自洽),不是日志读数。
 
-**第 3 步(大):让**目标页**显示在背后(真正的预测性返回观感)**
+**第 3 步(大):让**目标页**显示在背后(真正的预测性返回观感)—— ✅ 已完成(2026-09-22)**
+
+> **✅ 2026-09-22 完成:本步已通过「把导航整体迁移到 Navigation Compose」实现**(用户裁决)。
+> `NavHost` 自己同时渲染两层(目标页画在 `initialZIndex - 1f`)、自己订阅手势进度。
+> 落地要点:根导航改 type-safe `@Serializable` route;两个步骤容器改**嵌套 NavHost**
+> (栈深 1 时自动禁用内层返回处理器,回落免费);转场只在 NavHost 级配
+> (`predictivePopEnterTransition = None` 让目标页静止在背后 + `predictivePopExitTransition` 按层级分档,
+> 开关关闭时后者退为 `None`);旧 `PredictiveBackContainer` **整体删除**;
+> 新增 `DestinationSurface` 不透明底座。**app 273 + domain 224 全绿、lint 零告警、6 组变异均被杀死。**
+>
+> **✅ 2026-09-22 追加:返回转场改为「分层」**(用户看完真机录像后判定「动画有点长且生硬」,
+> 并给出两条分开的规格 —— 见 `docs/notes/d1-navigation-compose-migration.md` §7.8)。
+> 用户逐字规格:工作流内部「**侧面拖动越多当前页越透明然后显示上级页面**」、
+> 大页面切换「**当前页面虚化缩小**」;进入动画维持瞬切(`forward_anim` = 只做返回/手势)。
+> 落地:新增 `NavTransitionStyle { Step, Page }`,`PixFoldNavHost` 多一个必填 `style` 参数,
+> 三个调用点各声明一档(根图 `Page`、两个嵌套图 `Step`);
+> **步骤级 = `fadeOut()`(不缩放,上级页原样露出)/ 根级 = `scaleOut(0.90f) + fadeOut()`**。
+> ⚠️ **根级必须显式 `+ fadeOut()`**:compose animation 1.12.1 的 `scaleOut` 产物**只有** scale、
+> **不含 alpha**(`EnterExitTransition.kt:447`),漏掉就退化成"只缩小不虚化",而**只看宽度与像素变化的断言抓不住**。
+> ⚠️ **「虚化」只能是透明度,不是模糊** —— 该版本 `grep renderEffect|BlurEffect` 零命中,
+> `ExitTransition` 无模糊原语,故一律以 alpha 近似(如实登记,勿当 bug 追)。
+> 形态断言迁入新建 `TransitionStyleTest.kt`(3 条,判别式 = 几何 + 像素 + "满进度画面 ≈ 落地画面"),
+> `PredictiveBackTest` 7 → 4 条(其原 3 条用 `boundsInRoot` 断言**步骤内容变窄**,与新规格直接相反)。
+> 骨架判据:根级 400 → 360 px(恰 `PREDICTIVE_MIN_SCALE`)、步骤级 99 → 99 px 且像素变化 28 万、
+> 开关关闭**逐字节不变**;6 组变异全被杀死。
+> ✅ **2026-09-22 真机核对通过**(用户授权后实测;用户逐字「实测现在这样很不错了,后续还要改就得到走查阶段了」
+> ⇒ 分层形态**定稿**,后续形态调整**推迟到走查阶段**;「虚化」为 alpha 近似、16dp 圆角丢失两项落差真机确认可接受)。
+> 完整记录(`PixFoldRoutes.kt`/`PixFoldNav.kt`/`StepNavigation.kt`、F1–F13 源码级事实表、
+> §7 实施结果 + §7.8 分层转场、已知可接受落差)见 **`docs/notes/d1-navigation-compose-migration.md`**。
+> 以下原文保留以存证"问题是怎么被描述和归因的"。
 
 - **现状**:用户反馈「设置返回有缩放渐变效果,**但没有显示到 home 页**」。
   即:当前页会随手势缩放/淡出,但**背后是空背景**(Surface 底色),看不到目标页。
@@ -1252,6 +1281,7 @@ FruitSalad 时,切换 2021↔2025 **不改变任何颜色、界面无任何反�
   (目标页 + 当前页),手势进行中同时呈现二者。
 - **做法**:需把根导航改成两层渲染(例如维护"当前 screen + 上一个 screen",
   手势中同时绘制两者,当前页缩放/平移、目标页在下方),属**实质性结构改动**。
+  → **已放弃该做法**;改为迁移 Navigation Compose(见上方更新)。**该迁移已于 2026-09-22 完成。**
 - **决策前置**:见下方「⚠️ 未决策:D1 范围 vs MVP」——
   该步的投入是否值得,取决于本阶段按"原型"还是"MVP"对待。
 

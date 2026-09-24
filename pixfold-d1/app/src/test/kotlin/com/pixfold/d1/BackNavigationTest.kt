@@ -10,9 +10,12 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import com.pixfold.d1.ui.components.TAG_GRID_CARD
 import com.pixfold.d1.ui.preview.TAG_PREVIEW
+import com.pixfold.d1.ui.workflowa.TAG_A_PLAN_PAGE
 import com.pixfold.d1.ui.workflowa.TAG_STEP_BACK
 import com.pixfold.d1.ui.workflowa.TAG_STEP_NAMING
 import com.pixfold.d1.ui.workflowa.TAG_STEP_SORT
+import com.pixfold.d1.ui.workflowa.TAG_TO_PLAN
+import com.pixfold.d1.ui.workflowb.TAG_B_STEP_LIBRARY
 import com.pixfold.d1.ui.workflowb.TAG_B_STEP_PACK
 import com.pixfold.d1.ui.workflowb.TAG_LIBRARY_PAGE
 import com.pixfold.d1.ui.workflowb.TAG_METADATA_PAGE
@@ -144,5 +147,52 @@ class BackNavigationTest {
 
         back()   // 步骤1 -> 首页
         rule.onNodeWithText("工作流 B · CBZ 制作").assertIsDisplayed()
+    }
+
+    /**
+     * Tab **反向**跳转后返回链仍须是线性的。
+     *
+     * 步骤序号以前是 `stepIndex: Int`,Tab 点击只是赋值,返回链天然线性。
+     * 迁移到嵌套 NavHost 后,Tab 跳转若不 `popBackStack` 而是 `navigate`,
+     * 返回栈会变成 `[步骤1, 步骤2, 步骤3, 步骤1]` —— 此时按返回会退到**步骤3**,
+     * 而不是退到首页,层级返回就断了。
+     *
+     * 这条断言是**变异存活后补的**:把 `goToWorkflowAStep` 的往回分支改成
+     * `navigate` 时,原有 6 条用例全部通过 —— 说明该约束此前无人守护。
+     */
+    @Test
+    fun `a backward tab jump in workflow A keeps the back chain linear`() {
+        rule.setContent { PixFoldApp() }
+        rule.onNodeWithText("工作流 A · 图片整理与命名").performClick()
+        rule.onNodeWithTag(TAG_STEP_NAMING).performClick()
+        rule.onNodeWithTag(TAG_TO_PLAN).performClick()
+        rule.onNodeWithTag(TAG_A_PLAN_PAGE).assertIsDisplayed()
+
+        // 从步骤3 直接点回步骤1 —— 返回栈应被裁剪回 [步骤1]
+        rule.onNodeWithTag(TAG_STEP_SORT).performClick()
+        assertTrue(rule.onAllNodesWithTag(TAG_GRID_CARD).fetchSemanticsNodes().isNotEmpty(), "应回到步骤1(网格)")
+
+        back()
+        // 线性栈下:步骤1 的上一层是首页。若非线性(残留 [步骤2, 步骤3]),
+        // 这里会退到步骤3 的执行计划页。
+        rule.onNodeWithText("工作流 B · CBZ 制作").assertIsDisplayed()
+    }
+
+    /** 同上,工作流 B 走的是独立的 `goToWorkflowBStep`。 */
+    @Test
+    fun `a backward tab jump in workflow B keeps the back chain linear`() {
+        rule.setContent { PixFoldApp() }
+        rule.onNodeWithText("工作流 B · CBZ 制作").performClick()
+        // 步骤1 -> 步骤3(按 helper 会逐级推入元数据、打包)
+        rule.onNodeWithTag(TAG_B_STEP_PACK).performClick()
+        rule.onNodeWithTag(TAG_PACK_PAGE).assertIsDisplayed()
+
+        // 从步骤3 直接点回步骤1
+        rule.onNodeWithTag(TAG_B_STEP_LIBRARY).performClick()
+        rule.onNodeWithTag(TAG_LIBRARY_PAGE).assertIsDisplayed()
+
+        back()
+        // 线性栈下直接回首页;非线性的 `navigate` 版本会退到步骤2/步骤3
+        rule.onNodeWithText("工作流 A · 图片整理与命名").assertIsDisplayed()
     }
 }

@@ -14,38 +14,39 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.navigation.compose.composable
+import androidx.navigation.compose.rememberNavController
+import androidx.navigation.toRoute
 import com.pixfold.d1.domain.mock.MockData
 import com.pixfold.d1.domain.mock.MockDataB
 import com.pixfold.d1.data.SharedPrefsSettingsStore
 import com.pixfold.d1.domain.settings.AppLanguage
 import com.pixfold.d1.domain.settings.PixFoldSettings
 import com.pixfold.d1.domain.settings.SettingsStore
+import com.pixfold.d1.nav.DestinationSurface
+import com.pixfold.d1.nav.HomeRoute
+import com.pixfold.d1.nav.LicensesRoute
+import com.pixfold.d1.nav.NavTransitionStyle
+import com.pixfold.d1.nav.PixFoldNavHost
+import com.pixfold.d1.nav.PreviewRoute
+import com.pixfold.d1.nav.SettingsRoute
+import com.pixfold.d1.nav.WorkflowARoute
+import com.pixfold.d1.nav.WorkflowBRoute
 import com.pixfold.d1.ui.HomeScreen
-import com.pixfold.d1.ui.components.PredictiveBackContainer
+import com.pixfold.d1.ui.preview.ImagePreview
 import com.pixfold.d1.ui.settings.LicensesScreen
 import com.pixfold.d1.ui.settings.SettingsScreen
-import com.pixfold.d1.ui.preview.ImagePreview
 import com.pixfold.d1.ui.theme.PixFoldTheme
 import com.pixfold.d1.ui.workflowa.WorkflowASteps
 import com.pixfold.d1.ui.workflowb.WorkflowBSteps
 
 /**
- * 应用根。用**状态驱动的轻量导航**(密封类 + `mutableStateOf`),不引入 Navigation 组件
- * ——保持"零三方依赖"与最小实现面;页面层级浅(首页 → 工作流 → 预览),无需路由库。
+ * 应用根:主题、设置、演示数据与**根导航图**。
  *
- * D1 不连真实文件系统,工作流 A 的数据取自确定性 mock(§9 D1)。
- */
-sealed interface Screen {
-    data object Home : Screen
-    data object Settings : Screen
-    data object Licenses : Screen
-    data object WorkflowA : Screen
-    data object WorkflowB : Screen
-    data class Preview(val index: Int) : Screen
-}
-
-/**
- * 应用根。
+ * 路由由 `navigation-compose` 的 type-safe route 接管(2026-09-22 迁移)。
+ * 迁移前是 `sealed interface Screen` + `mutableStateOf` 的手写路由 —— 它没有返回栈、
+ * 没有转场引擎,因此"目标页显示在背后"这类预测性返回效果无从实现;
+ * 官方适配要求也用 Navigation 组件托管返回栈(见 `docs/notes/d1-navigation-compose-migration.md`)。
  *
  * @param store 设置存储。默认用 [SharedPrefsSettingsStore];测试可注入内存实现,
  *   从而无需 Android 持久化环境即可断言"设置真的驱动了主题"。
@@ -56,9 +57,14 @@ fun PixFoldApp(store: SettingsStore? = null) {
     val settingsStore = store ?: remember { SharedPrefsSettingsStore(context) }
     // 设置在**应用根**持有:主题、语言、各页面都要读它,提上层是唯一合理位置。
     var settings by remember { mutableStateOf(settingsStore.load()) }
-    val updateSettings: (PixFoldSettings) -> Unit = { next ->
-        settings = next
-        settingsStore.save(next)
+    // 包 remember:避免每次重组都产生新 lambda 身份。即便不包也无害 ——
+    // `NavGraph.equals` 是**结构相等**(见 docs/notes/d1-navigation-compose-migration.md F4),
+    // 图实例变化不会清空返回栈。
+    val updateSettings: (PixFoldSettings) -> Unit = remember(settingsStore) {
+        { next ->
+            settings = next
+            settingsStore.save(next)
+        }
     }
 
     // 语言必须**真正应用**到系统 per-app locale,否则只是存了个值、界面不变
@@ -71,7 +77,7 @@ fun PixFoldApp(store: SettingsStore? = null) {
             modifier = Modifier.fillMaxSize(),
             color = MaterialTheme.colorScheme.background,
         ) {
-            var screen by remember { mutableStateOf<Screen>(Screen.Home) }
+            val navController = rememberNavController()
 
             // 工作流 A 演示数据:trip(30 张)+ scan(14 张)+ misc(12 张),
             // 多集合用于演示"批次默认 + 本组独立"(验收第 7 项)。
@@ -82,80 +88,84 @@ fun PixFoldApp(store: SettingsStore? = null) {
             // 预览跟随**当前集合**:切集合后打开预览应看到该集合的图,
             // 否则页码与图片会对不上(索引来自当前集合)。
             var activeCollectionId by remember { mutableStateOf(collections.first().id) }
-            val previewItems = collections.firstOrNull { it.id == activeCollectionId }?.images
-                ?: collections.first().images
 
-            // 返回手势/返回键:按**层级**逐级后退,而不是一步退出应用。
-            // 真机实测(2026-09-18):未处理时在"命名结构"步骤按返回会**直接退出到桌面**,
-            // 用户丢失当前浏览位置,与 Android 的层级返回预期不符。
-            // 注意:BackHandler 注册在**最内层**,故各级返回由内向外依次生效。
-            // 根级返回去处(按当前页面决定)。
-            // 工作流内部**步骤级**的返回由各自的步骤容器处理 —— 它们注册得更深、
-            // 优先级更高,故不会与本处冲突(详见 PredictiveBackContainer 注释)。
-            val rootBack: (() -> Unit)? = when (screen) {
-                Screen.Home -> null // 首页:交回系统(退出应用)
-                Screen.Settings -> ({ screen = Screen.Home })
-                Screen.Licenses -> ({ screen = Screen.Settings })
-                Screen.WorkflowA -> ({ screen = Screen.Home })
-                Screen.WorkflowB -> ({ screen = Screen.Home })
-                is Screen.Preview -> ({ screen = Screen.WorkflowA })
-            }
-
-            PredictiveBackContainer(
-                enabled = settings.predictiveBackAnimation,
-                onBack = rootBack,
+            // 返回手势/返回键:由 NavHost 自带的 handler 统一处理(它会随返回栈深度
+            // 自动 enable/disable)。返回首页 = pop 掉 WorkflowA/B;首页(栈深 1)时
+            // NavHost 不再注册 handler,交回系统退出应用 —— 与迁移前 `rootBack = null` 同义。
+            //
+            // 注意:返回栈是**唯一**事实来源,不再有 `screen` 这样的第二份状态。
+            PixFoldNavHost(
+                navController = navController,
+                startDestination = HomeRoute,
+                predictiveBackAnimation = settings.predictiveBackAnimation,
+                // 根级 = 大页面切换:虚化 + 缩小
+                style = NavTransitionStyle.Page,
             ) {
-            when (val current = screen) {
-                Screen.Home -> HomeScreen(
-                    onOpenWorkflowA = { screen = Screen.WorkflowA },
-                    onOpenWorkflowB = { screen = Screen.WorkflowB },
-                    onOpenSettings = { screen = Screen.Settings },
-                )
-
-                Screen.Settings -> {
-                    SettingsScreen(
-                        settings = settings,
-                        onChange = updateSettings,
-                        onBack = { screen = Screen.Home },
-                        onOpenLicenses = { screen = Screen.Licenses },
-                    )
+                composable<HomeRoute> {
+                    DestinationSurface {
+                        HomeScreen(
+                            onOpenWorkflowA = { navController.navigate(WorkflowARoute) },
+                            onOpenWorkflowB = { navController.navigate(WorkflowBRoute) },
+                            onOpenSettings = { navController.navigate(SettingsRoute) },
+                        )
+                    }
                 }
 
-                Screen.Licenses -> {
-                    LicensesScreen(onBack = { screen = Screen.Settings })
+                composable<SettingsRoute> {
+                    DestinationSurface {
+                        SettingsScreen(
+                            settings = settings,
+                            onChange = updateSettings,
+                            onBack = { navController.popBackStack() },
+                            onOpenLicenses = { navController.navigate(LicensesRoute) },
+                        )
+                    }
                 }
 
-                Screen.WorkflowA -> WorkflowASteps(
-                    collections = collections,
-                    // 步骤级返回同样跟随手势进度(2026-09-21):把开关透传进容器。
-                    // 此前步骤容器用普通 BackHandler,优先级高于根级 PredictiveBackHandler,
-                    // 导致工作流内部完全没有手势跟随动画 —— 详见 HANGOFF §9.1 第 2 步。
-                    predictiveBackAnimation = settings.predictiveBackAnimation,
-                    onOpenPreview = { index -> screen = Screen.Preview(index) },
-                    onActiveCollectionChange = { activeCollectionId = it },
-                    // 在工作流 A 内按返回 -> 回首页(步骤内的返回由 WorkflowASteps 自己处理)
-                    onBack = { screen = Screen.Home },
-                )
+                composable<LicensesRoute> {
+                    DestinationSurface {
+                        LicensesScreen(onBack = { navController.popBackStack() })
+                    }
+                }
 
-                is Screen.Preview -> {
+                composable<WorkflowARoute> {
+                    DestinationSurface {
+                        WorkflowASteps(
+                            collections = collections,
+                            // 步骤级返回同样跟随手势进度:开关透传进嵌套 NavHost 的转场策略。
+                            predictiveBackAnimation = settings.predictiveBackAnimation,
+                            onOpenPreview = { index -> navController.navigate(PreviewRoute(index)) },
+                            onActiveCollectionChange = { activeCollectionId = it },
+                        )
+                    }
+                }
+
+                composable<PreviewRoute> { entry ->
                     // 预览是最内层:返回即关闭预览,回到工作流 A。
                     // (ImagePreview 内部也有自己的关闭按钮;二者语义一致。)
-                    ImagePreview(
-                        items = previewItems,
-                        initialIndex = current.index,
-                        onClose = { screen = Screen.WorkflowA },
-                    )
+                    val route = entry.toRoute<PreviewRoute>()
+                    // 在目的地内容里读取,保证拿到**当前**集合的图(而非图建立时的快照)。
+                    val previewItems = collections.firstOrNull { it.id == activeCollectionId }?.images
+                        ?: collections.first().images
+                    DestinationSurface {
+                        ImagePreview(
+                            items = previewItems,
+                            initialIndex = route.index,
+                            onClose = { navController.popBackStack() },
+                        )
+                    }
                 }
 
-                Screen.WorkflowB -> WorkflowBSteps(
-                    rootPath = library.rootPath,
-                    volumes = library.volumes,
-                    // 同上:步骤级返回跟随手势进度。
-                    predictiveBackAnimation = settings.predictiveBackAnimation,
-                    // 在工作流 B 内按返回 -> 回首页(步骤内的返回由 WorkflowBSteps 自己处理)
-                    onBack = { screen = Screen.Home },
-                )
-            }
+                composable<WorkflowBRoute> {
+                    DestinationSurface {
+                        WorkflowBSteps(
+                            rootPath = library.rootPath,
+                            volumes = library.volumes,
+                            // 同上:步骤级返回跟随手势进度。
+                            predictiveBackAnimation = settings.predictiveBackAnimation,
+                        )
+                    }
+                }
             }
         }
     }
