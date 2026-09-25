@@ -12,7 +12,7 @@
 > **✅ 真机核对已通过(2026-09-27,PJX110 / Android 16 / 361dp×794dp,用户授权后执行)**:第 13 条点 `章节` 芯片 → `共 16 张`、`第一话`…`第九话` 滚动后 `第10话 / 第十话 / … / 第21话`,**与单测期望逐字一致**;第 15 条 `Series` 批量设 `BATCH1` → `已设置到 5 卷`,**再点一次仍是 `已设置到 5 卷`**(缺陷版会变 `0 卷 / 跳过 5 卷`)。⚠️ **第 13 条原本真机不可见** —— 设备数据全来自 mock 且原先只有阿拉伯数字卷名,故本轮**新增第 4 组 mock 集合 `chapters()`**(16 张中阿混排、**声明顺序故意不是正确顺序**);没有它核对会退化成空验证。⚠️ 真机坑:`adb shell input text` 在中文 IME 下抛 `NullPointerException: Attempt to get length of null array`,**只能输入 ASCII**;点按钮前须先收键盘(ESC = `keyevent 111`)。
 > **🚨 同轮真机核对中发现并修掉「芯片行溢出」(7 处同源,`docs/notes/d1-ui-friction-inventory.md` §12)**:集合芯片行 `杂图` 右边界 = **1264 = 屏宽**,第 4 个集合 `章节` 完全在视口外;**3 个集合时缺陷本就存在**(`杂图` 已顶到屏宽),新集合只是让它显形。逐一排查确认同源共 **7 处**(A 排序字段 6 项只见 3、B 卷切换 5 卷只见 3 等),用户裁决「改成 `FlowRow` 自动换行」⇒ 4 个文件里 7 处 `Row + horizontalScroll` 全改 `FlowRow`(`FlowRow` **无 `verticalAlignment`**,须用 `itemVerticalAlignment`;foundation 1.12.1 下**无需** `@OptIn(ExperimentalLayoutApi::class)`)。⚠️ **离线只能守"结构"守不了"放得下"** —— Robolectric 不做真实文本测量,芯片宽度全算成 ~0,故新建 `ChipRowWrappingTest`(2 条:不得再出现 `horizontalScroll` / `FlowRow` 数量须等于期望表),**变异验证两条可判别**(改回 `Row+scroll` → 两条都红;改普通 `Row` → 只第 2 条红);**真机 `dumpui.bat` 量坐标才是唯一能证伪的场合**。
 > **四道闸门**:`app 313`(+2 守卫)/`domain 242`(230→+10)全绿、lint `No issues found.`、APK **33,691,473 B**。文档已同步 `HANGOFF.md`(§11 两条 + §6.3 分工段 + §9.1 本轮回写含芯片行)、`docs/notes/d1-archive-domain-semantics.md`(归档原型历史语义与新栈的全部差异 + 新增 `cn` 集合)、`docs/notes/d1-ui-friction-inventory.md`(新增 §12)、`docs/superpowers/specs/2026-09-16-d1-interaction-prototype-design.md`(§14 未决列表去掉第 13 条)。真机 7 处逐一复核通过,设备已复位。
-**后续见 HANGOFF §9.1「设置与主题体系 —— 现状与后续」**:①✅ **补 `2021≠2025` 断言(已完成 2026-09-21,3 组变异全捕获)** ②✅ **工作流内部预测性返回(已完成 2026-09-21,9 条断言 + 5 组变异全捕获;`SemanticsNode.boundsInRoot` 能反映 `graphicsLayer` 缩放,故动画接线离线可断言;**并已真机量化核对:手势中工作流页面绕中心随进度缩放(分隔线 y 346→418、跨度 1263→1178,两轴独立推出的进度一致),关掉开关则同一滑动内容逐值不变**) ③✅ **目标页显示在背后(大)—— 已完成(2026-09-22)**:用户裁决「不再手写两层渲染,改为把导航整体迁移到 Navigation Compose」,当日**写码完成、验收矩阵全绿**。根导航由手写 `when (screen)` 改为 type-safe `NavHost`(`@Serializable` route),两个步骤容器改为**嵌套 NavHost**(回落免费:栈深 1 时自动禁用内层返回处理器);预测性转场在 NavHost 级配置 —— `predictivePopEnterTransition = EnterTransition.None`(目标页静止在背后)+ `predictivePopExitTransition = scaleOut(0.90f)`,开关关闭时后者退为 `None`(**选项 b**:保留普通 pop 转场,不硬切);`PredictiveBackContainer.kt` 已**整体删除**(与 NavHost 共用 `OnBackPressedDispatcher` LIFO 队列,不能共存);新增 `DestinationSurface` 不透明底座(nav 把目标页画在下层,透明会让两层文字糊在一起)。**验证:app 273 + domain 224 全绿、lint 零告警**。**2026-09-22 追加:返回转场改为「分层」**(用户看真机录像后判定「动画有点长且生硬」,逐字给出两条规格 —— 工作流内部「侧面拖动越多当前页越透明然后显示上级页面」、大页面切换「当前页面虚化缩小」;进入动画仍瞬切):新增 `NavTransitionStyle { Step, Page }` + `PixFoldNavHost` 的 `style` 必填参数,**步骤级 = `fadeOut()`(不缩放)/ 根级 = `scaleOut(0.90f) + fadeOut()`**(⚠️ `scaleOut` 产物只含 scale 不含 alpha,漏 `fadeOut` 即成「只缩小不虚化」;「虚化」以 alpha 近似,该 compose 版本无模糊原语);形态断言迁入新建 `TransitionStyleTest.kt`,`PredictiveBackTest` **7 → 4** 条,**6 组变异全被杀死**。**2026-09-22 真机核对通过**(用户逐字「实测现在这样很不错了,后续还要改就得到走查阶段了」⇒ 分层形态定稿,后续调整推迟到走查阶段)。完整记录(`PixFoldRoutes.kt`/`PixFoldNav.kt`/`StepNavigation.kt` 三个新文件、F1–F13 源码级事实表、§7 实施结果、已知可接受落差 16dp 圆角丢失)见 `docs/notes/d1-navigation-compose-migration.md`;**①顺带实测出的两个新问题已由用户裁决并修复(2026-09-21)**:「色彩标准」开关对 9 个色彩风格中的 **5 个是无操作**(`ColorSpec2025` 只重写 4 个变体)→ 设置页对该 5 个风格**置灰该行**(`COLOR_SPEC_SENSITIVE_STYLES` 单一事实源);**配色只映射约 24 个角色**、`surfaceContainer*`/`*Fixed*` 不随种子变化(深色下卡片为 material3 基线紫灰,与种子派生背景色相错配)→ **补全 19 个扩展角色映射** + `withPureBlack()` 补压 `surfaceBright`/`surfaceDim`,详见 HANGOFF §9.1 与 `docs/notes/d1-ui-friction-inventory.md` 第 10、11 节;**✅ 这两项属行为变更,已**真机核对通过**(2026-09-21:深色 + 绿强调色 + 纯黑关下卡片实测 `#28281D` 绿调,与背景同色相;置灰行 `enabled="false"` 且点击无对话框)**;✅ **归属与阶段设计已定(2026-09-21)**:D1 已完成且 **UI 即 D4 基座**;**D4 拆为 D4a(UI 层真实功能,进行中)/ D4b(真实文件闭环,依赖 D2b+D3)**;打包留 D4b;门槛表已由"严格串行"重述为"**按依赖并行推进**"(事实早已并行)。**⚠️ 当前进行中(2026-09-20,用户新增需求):「先调基础 UI」+ 设置与主题体系。**设置规格见 `docs/superpowers/specs/2026-09-20-d1-settings-theme-design.md`(阶段 1 = 设置页 + 主题体系;阶段 2 = 全量 i18n)。UI 摩擦点台账见 `docs/notes/d1-ui-friction-inventory.md`(**P0 = 命名页头部占约 88% 可视高度、预览不在首屏**,违反约束 3,**✅ 2026-09-24 已修**(折叠摘要栏 + 摘要行吸顶:固定区 692dp→154dp、首屏建议行 0→5 行以上;`app 280 + domain 229` 全绿、lint 零告警;详见 `docs/notes/d1-ui-friction-inventory.md` §1 与 HANGOFF §9.1;**真机核对已完成** 2026-09-24:固定区 141dp、首屏建议行 0→5 条、摘要栏吸顶与展开回顶均在真机复现)。另:返回手势已适配(预测性返回,层级后退),根目录名**跟随集合**(用户 2026-09-18 决定)。**真机已接入**(用户手机固定无线调试地址 `192.168.43.1:4444`,PJX110 / Android 16;调试走 `pixfold-d1/adb.bat`;**注意 `input swipe` 触发不了长按手势、拖拽须用 `input draganddrop`;Gboard 中文模式下 `input text` 不落字须先切英文、收键盘用 ESC 而非 BACK**,见 §12.5)。**验收仍按 HANGOFF §9《D1 验收清单》20 项在 Android 真机逐条打勾——判据不因换栈调整**,清单全绿 = D1 退出条件达成。**流程约定:凡交互/数据改动须走"修复自证三层(领域单测 → UI 层断言 → 真机实证)+ 操作逻辑符合性走查"(2026-09-21 用户追加第 4 层,见 §9 D1);完成判据须含"该能力在真机上可操作"**且**"操作逻辑符合用户需要",不得以"有单测通过"代替。三层验证"实现是否正确",第 4 层验证"设计是否正确"——二者都绿 UI 仍可能不符合操作逻辑。**⚠️ 2026-09-21 重述:`pixfold-d1/` 已由"原型"升级为 **D4 MVP 的代码基座**(用户确认 D1 的 UI 即 MVP 基座),不再另起正式工程;设置页/主题体系等属 **D4 提前启动**。发版仍按 §9.1 拓扑(`dev` → `main`)。**
+> **后续见 HANGOFF §9.1「设置与主题体系 —— 现状与后续」**:①✅ **补 `2021≠2025` 断言(已完成 2026-09-21,3 组变异全捕获)** ②✅ **工作流内部预测性返回(已完成 2026-09-21,9 条断言 + 5 组变异全捕获;`SemanticsNode.boundsInRoot` 能反映 `graphicsLayer` 缩放,故动画接线离线可断言;**并已真机量化核对:手势中工作流页面绕中心随进度缩放(分隔线 y 346→418、跨度 1263→1178,两轴独立推出的进度一致),关掉开关则同一滑动内容逐值不变**) ③✅ **目标页显示在背后(大)—— 已完成(2026-09-22)**:用户裁决「不再手写两层渲染,改为把导航整体迁移到 Navigation Compose」,当日**写码完成、验收矩阵全绿**。根导航由手写 `when (screen)` 改为 type-safe `NavHost`(`@Serializable` route),两个步骤容器改为**嵌套 NavHost**(回落免费:栈深 1 时自动禁用内层返回处理器);预测性转场在 NavHost 级配置 —— `predictivePopEnterTransition = EnterTransition.None`(目标页静止在背后)+ `predictivePopExitTransition = scaleOut(0.90f)`,开关关闭时后者退为 `None`(**选项 b**:保留普通 pop 转场,不硬切);`PredictiveBackContainer.kt` 已**整体删除**(与 NavHost 共用 `OnBackPressedDispatcher` LIFO 队列,不能共存);新增 `DestinationSurface` 不透明底座(nav 把目标页画在下层,透明会让两层文字糊在一起)。**验证:app 273 + domain 224 全绿、lint 零告警**。**2026-09-22 追加:返回转场改为「分层」**(用户看真机录像后判定「动画有点长且生硬」,逐字给出两条规格 —— 工作流内部「侧面拖动越多当前页越透明然后显示上级页面」、大页面切换「当前页面虚化缩小」;进入动画仍瞬切):新增 `NavTransitionStyle { Step, Page }` + `PixFoldNavHost` 的 `style` 必填参数,**步骤级 = `fadeOut()`(不缩放)/ 根级 = `scaleOut(0.90f) + fadeOut()`**(⚠️ `scaleOut` 产物只含 scale 不含 alpha,漏 `fadeOut` 即成「只缩小不虚化」;「虚化」以 alpha 近似,该 compose 版本无模糊原语);形态断言迁入新建 `TransitionStyleTest.kt`,`PredictiveBackTest` **7 → 4** 条,**6 组变异全被杀死**。**2026-09-22 真机核对通过**(用户逐字「实测现在这样很不错了,后续还要改就得到走查阶段了」⇒ 分层形态定稿,后续调整推迟到走查阶段)。完整记录(`PixFoldRoutes.kt`/`PixFoldNav.kt`/`StepNavigation.kt` 三个新文件、F1–F13 源码级事实表、§7 实施结果、已知可接受落差 16dp 圆角丢失)见 `docs/notes/d1-navigation-compose-migration.md`;**①顺带实测出的两个新问题已由用户裁决并修复(2026-09-21)**:「色彩标准」开关对 9 个色彩风格中的 **5 个是无操作**(`ColorSpec2025` 只重写 4 个变体)→ 设置页对该 5 个风格**置灰该行**(`COLOR_SPEC_SENSITIVE_STYLES` 单一事实源);**配色只映射约 24 个角色**、`surfaceContainer*`/`*Fixed*` 不随种子变化(深色下卡片为 material3 基线紫灰,与种子派生背景色相错配)→ **补全 19 个扩展角色映射** + `withPureBlack()` 补压 `surfaceBright`/`surfaceDim`,详见 HANGOFF §9.1 与 `docs/notes/d1-ui-friction-inventory.md` 第 10、11 节;**✅ 这两项属行为变更,已**真机核对通过**(2026-09-21:深色 + 绿强调色 + 纯黑关下卡片实测 `#28281D` 绿调,与背景同色相;置灰行 `enabled="false"` 且点击无对话框)**;✅ **归属与阶段设计已定(2026-09-21)**:D1 已完成且 **UI 即 D4 基座**;**D4 拆为 D4a(UI 层真实功能,进行中)/ D4b(真实文件闭环,依赖 D2b+D3)**;打包留 D4b;门槛表已由"严格串行"重述为"**按依赖并行推进**"(事实早已并行)。**⚠️ 当前进行中(2026-09-20,用户新增需求):「先调基础 UI」+ 设置与主题体系。**设置规格见 `docs/superpowers/specs/2026-09-20-d1-settings-theme-design.md`(阶段 1 = 设置页 + 主题体系;阶段 2 = 全量 i18n)。UI 摩擦点台账见 `docs/notes/d1-ui-friction-inventory.md`(**P0 = 命名页头部占约 88% 可视高度、预览不在首屏**,违反约束 3,**✅ 2026-09-24 已修**(折叠摘要栏 + 摘要行吸顶:固定区 692dp→154dp、首屏建议行 0→5 行以上;`app 280 + domain 229` 全绿、lint 零告警;详见 `docs/notes/d1-ui-friction-inventory.md` §1 与 HANGOFF §9.1;**真机核对已完成** 2026-09-24:固定区 141dp、首屏建议行 0→5 条、摘要栏吸顶与展开回顶均在真机复现)。另:返回手势已适配(预测性返回,层级后退),根目录名**跟随集合**(用户 2026-09-18 决定)。**真机已接入**(用户手机固定无线调试地址 `192.168.43.1:4444`,PJX110 / Android 16;调试走 `pixfold-d1/adb.bat`;**注意 `input swipe` 触发不了长按手势、拖拽须用 `input draganddrop`;Gboard 中文模式下 `input text` 不落字须先切英文、收键盘用 ESC 而非 BACK**,见 §12.5)。**验收仍按 HANGOFF §9《D1 验收清单》20 项在 Android 真机逐条打勾——判据不因换栈调整**,清单全绿 = D1 退出条件达成。**流程约定:凡交互/数据改动须走"修复自证三层(领域单测 → UI 层断言 → 真机实证)+ 操作逻辑符合性走查"(2026-09-21 用户追加第 4 层,见 §9 D1);完成判据须含"该能力在真机上可操作"**且**"操作逻辑符合用户需要",不得以"有单测通过"代替。三层验证"实现是否正确",第 4 层验证"设计是否正确"——二者都绿 UI 仍可能不符合操作逻辑。**⚠️ 2026-09-21 重述:`pixfold-d1/` 已由"原型"升级为 **D4 MVP 的代码基座**(用户确认 D1 的 UI 即 MVP 基座),不再另起正式工程;设置页/主题体系等属 **D4 提前启动**。发版仍按 §9.1 拓扑(`dev` → `main`)。**
 > 本文件优先级低于用户当回合指令,高于全局 AGENTS.md;技术栈/流程/环境类全局约定见全局文件。
 
 ## 1. 文档层级(谁在哪记录什么)
@@ -55,7 +55,7 @@
 - **验证工程实况(2026-09-13;归档位置 2026-09-16 复检)**:`pixfold-d1` / `pixfold-saf-spike` 两个工程**目录已删除,`ready` 分支从未包含过它们**;内容在分支 `archive-flutter-verify`(**已推远程**;本地无同名分支,取用走 `origin/archive-flutter-verify`)。**要参考 SAF 的 Kotlin 实现或旧原型领域层语义时,去归档分支取(`git show 9efef5b:<路径>`),不要按文档里的 `C:\Personal\...` 旧路径找文件**;新栈重建时不迁移其代码;
 - D1 交互原型(当前主线):范围 = 缩略图/拖拽排序、命名结构编辑、CBZ 元数据编辑、执行计划预览,可不连真实文件系统;**完成判据 = HANGOFF §9《D1 验收清单》20 项在 Android 真机全部勾满(§9 门槛表已把该清单定为 D1 退出条件);判据未满足前不得宣称 D1 完成**;清单已于 2026-09-10 由双列收敛为 **Android 单列**(条目未改);
 - 下一阶段 D2b(完整平台能力,见 §9):缩略图生成策略 / 后台任务与进度 / 授权失效恢复;D2a(SAF 闭环)已于 2026-09-08 提前验收,不再重复;
-- 流程约定(**修复自证三层**,§9 D1):凡交互或数据改动,须依次过"领域单测 → UI 层断言 → 真机实证(埋点 + 模拟输入 + 像素/快照对比)",不得只凭"测试通过"交付;
+- 流程约定(**修复自证三层**,§9 D1):凡交互或数据改动,须依次过"领域单测 → UI 层断言 → 真机实证(埋点 + 模拟输入 + 像素/快照对比)",不得只凭"测试通过"交付;**每轮任务的固定步骤与真机核对规约见 §7(含授权、取证、收尾与已知坑)**;
 - 环境与工具维护:版本声明经 `.mise.toml`(项目);全局工具声明不属本仓库管辖(见 §12.2);**环境已于 2026-09-16 复检**(§12 顶部横幅):`platforms;android-36` / cmdline-tools 23.0.0 均已就位,**Kotlin/Gradle 侧已在 `temurin-17` 下完整实证**(探针工程:assembleDebug + 纯 JVM 单测 + Robolectric UI 测试 + lint 全绿,证据 `docs/notes/d1-toolchain-evidence.md`;原"待 D1 确认"项已关闭),曾遮蔽 SDK 的 system32 残留 adb 已清除(§12.5);`.mise.toml` 现仅 `java = "temurin-17"`(已去掉 `flutter` 声明)。
 
 **不该做**:
@@ -78,3 +78,66 @@
 - Git:本仓库独立于 chezmoi dotfiles 仓库;忽略项现状为 **`.agents/`**（用户 2026-09-19 移除 `.kilo/`、`.workbuddy*/` —— 两者已不再使用）。
 - **分支模型(2026-09-16 起)**:`ready`(设计文档线,原型代码永不进)→ **`dev`(开发主线)** → 阶段分支 `d1/pN`。阶段分支从 `dev` 开、**完成即合回 `dev` 并回写文档**、随即删除;D1 全绿后 `dev` → `main` 发 release,此后开发继续在 `dev`。**push 由用户自行处理**,agent 只提交不推送。详见 HANGOFF §9.1。
 - 验收:任何改动对照 `HANGOFF.md` §10(功能 / 数据正确性 / 平台)自检。
+
+## 7. 每轮任务的固定步骤与真机核对规约
+
+> 本节把已反复踩过的坑固化为步骤。**用户可当回合覆盖本节**;未覆盖时按此执行,不得跳步。
+
+### 7.1 固定步骤(顺序不可调换)
+
+1. **对齐依据**:读 `HANGOFF.md` 对应条目(产品决策唯一权威)+ `docs/notes/d1-ui-friction-inventory.md` + 用户当回合指令;**有歧义先请用户裁决**,把裁决项写下来再动手。
+2. **红 → 绿**:先写会失败的断言,再改码;跑四道闸门(见 7.2)。
+3. **变异验证**:证明断言有杀伤力(见 7.4)。
+4. **真机核对**:必须**先获用户授权**(见 7.3)。
+5. **回写文档**:`HANGOFF.md` → 同步本文件头部快照 + `README.md`(变更路由三处一致)。
+6. **展示改动集等批准**:列出文件与行数,**等用户点头**。
+7. **提交**(只提交不推送)→ **合回 `dev`** → 再补一次"提交号 + 合并结果"的文档同步提交。
+
+⚠️ **不得在真机核对前宣布完成、不得先催提交**:用户已明确纠正 —— `User said (m13805)`「你经常嘴上说完成要提交却没有给我真机校验先，而且任务进度会卡着」。**正确顺序是「真机核对 → 回写文档 → 展示改动集 → 提交」**。
+
+### 7.2 四道闸门(Gradle 必须在 Windows 侧跑)
+
+```
+cmd.exe /c "D:\Programing\Personal\pixfold\pixfold-d1\run-gradle.bat :app:lintDebug :app:testDebugUnitTest :domain:test :app:assembleDebug"
+```
+
+- **绝不在 WSL 里跑 Gradle**;cmd.exe 下**禁用 `--tests`**(会静默假绿 0 测试)。
+- **测试数只认 JUnit XML**:`pixfold-d1/app/build/test-results/testDebugUnitTest/TEST-*.xml`、`pixfold-d1/domain/build/test-results/test/TEST-*.xml`(用 Python 解析;本机无 `bc`)。
+- `app` 的 `@Test` 总数比 XML 多 1 是**正常的** —— `NegativeControlTest` 是故意失败的负向对照,默认排除,仅 `-PincludeNegativeControl` 时运行。
+- **lint 必须零告警**:`warningsAsErrors = true` + `abortOnError = true`,一条 warning 即硬失败。新增资源/权限/API 后尤其容易多出 `ObsoleteSdkInt`、`UnusedQuantity`、`ExtraTranslation`。
+
+### 7.3 真机核对规约(三层自证的第三层)
+
+**授权**:动手机前必须先通知用户并取得明确授权;**每轮单独授权,不继承上一轮**。用户未授权时可先把前两层做完并汇报,不要自行连设备。
+
+**设备与环境**(固定):无线调试 `adb connect 192.168.43.1:4444`;PJX110 / Android 16 / `1264×2780px` / `560dpi` = **361dp × 794dp**;系统 locale `zh-CN`。
+- 唤醒常亮:`input keyevent KEYCODE_WAKEUP` → `input keyevent 82`(解锁)→ `svc power stayon true`。
+- 安装:`adb install -r pixfold-d1/app/build/outputs/apk/debug/app-debug.apk`。
+- 启动:`adb shell monkey -p com.pixfold.d1 -c android.intent.category.LAUNCHER 1`(⚠️ `input keyevent 4` 可能直接退出应用,不是回首页)。
+
+**取证**:`pixfold-d1/dumpui.bat NAME` → dump 到 `/data/local/tmp/NAME.xml` → 落入 `pixfold-d1/artifacts/`(已 gitignored)。**读节点 `bounds` 坐标是唯一能证伪"控件放不下 / 落在视口外"的场合**;`uiautomator dump` 的坐标会过期,**每次 tap 前重新 dump**。
+
+**已知坑(必须遵守)**:
+- **边缘 x 不可用于应用内滑动**:`input swipe 1200 …` 的 x=1200 落在手势导航边缘区 → 被系统当成返回手势、**直接退出应用**;应用内滑动用 **x ≤ 1000**。
+- **中文 IME 下 `adb shell input text` 抛异常**:`NullPointerException: Attempt to get length of null array`(`InputShellCommand.sendText:410`)⇒ **只能输入 ASCII**;且键盘弹出会把页面整体上移,**点按钮前必须先收键盘**(ESC = `input keyevent 111`),否则坐标落在 IME 上。
+- `input swipe` 触发不了长按 → 用 `input draganddrop`。
+- `cmd.exe /c "adb.bat shell ls … | grep …"` 的管道**会被 cmd.exe 吞掉** → 管道放到 WSL 侧执行。
+- **调试产物绝不写 `/sdcard` / `/storage/emulated`**(`adb.bat` 已有守卫);只走 `/data/local/tmp`。
+- 汇报要给**读数**(坐标/尺寸/数值),不能只说"已通过"。
+
+**收尾(每次必做)**:清理 `/data/local/tmp` 内的 `.xml`/`.png`(计数须为 0)、`svc power stayon false` 复位、`am force-stop` 退出应用。
+
+### 7.4 纪律:哪类结论必须真机,哪类可以离线
+
+**Robolectric 不做真实文本测量与真实布局**:芯片宽度一律算成 ~0(实测 trip 34.9dp / scan 34.6 / misc 34.3 / cn 34.3)。因此:
+
+| 结论类型 | 能否离线断 | 说明 |
+| --- | --- | --- |
+| 领域逻辑(排序/命名/元数据) | ✅ 领域单测 | 第一层 |
+| 结构/接线(节点存在、点击推进、按钮左右槽位) | ✅ UI 断言 | `getBoundsInRoot()` 能反映 `graphicsLayer` 缩放 |
+| **"放得下"、"是否挤出视口"** | ❌ **只能真机** | 删掉 `horizontalScroll` 后 312 项全绿 = 纯假保障 |
+| **视觉规格(底色、高度、危险红)** | ⚠️ 像素断言 + 真机 | 需 `@GraphicsMode(NATIVE)` + `captureToImage()`;LEGACY 后端画不出真实颜色 |
+| **动画观感/是否生硬** | ❌ **只能真机(用户判定)** | 用户观感判定才算定稿 |
+
+⚠️ **变异能存活就说明断言没有杀伤力 —— 删掉它,并写明为什么刻意不设这条断言**;留着只会给假保障。
+⚠️ **变异纪律**:先用 assert 确认旧串真的消失、再解读结果(否则"存活"是假象);`/tmp` 不跨 bash 调用保留,故**备份+变异+还原必须在同一次调用内完成**;还原**一律用 `cp` 备份,绝不用 `git checkout --`**(会连未提交改动一起丢掉)。
