@@ -6,14 +6,17 @@ import com.pixfold.d1.domain.model.NameProposal
 import com.pixfold.d1.domain.model.NamingScheme
 import com.pixfold.d1.domain.model.NamingState
 import com.pixfold.d1.domain.model.ProposalWarningType
+import com.pixfold.d1.domain.text.Msg
+import com.pixfold.d1.domain.text.TextKey
 
 /** 改名操作状态(规格 §4.6)。 */
-enum class OpStatus(val label: String) {
-    Ok("将重命名"),
-    Skipped("将跳过"),
+enum class OpStatus(val textKey: TextKey) {
+    Ok(TextKey.OpStatusRename),
+    Skipped(TextKey.OpStatusSkip),
 }
 
-data class RenameOp(val proposal: NameProposal, val status: OpStatus, val reason: String?) {
+/** [reason] 承接冲突警告的 [Msg](未解析的键 + 参数),见 `text/Msg.kt`。 */
+data class RenameOp(val proposal: NameProposal, val status: OpStatus, val reason: Msg?) {
     val id: String get() = proposal.image.id
     val finalName: String get() = proposal.finalName
     val isSkipped: Boolean get() = status == OpStatus.Skipped

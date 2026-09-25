@@ -13,28 +13,32 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material3.Button
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
+import com.pixfold.d1.R
 import com.pixfold.d1.domain.plan.ExecEntry
 import com.pixfold.d1.domain.plan.ExecOutcome
 import com.pixfold.d1.domain.plan.ExecutionReport
+import com.pixfold.d1.domain.text.Msg
+import com.pixfold.d1.ui.components.PageActionBar
+import com.pixfold.d1.ui.text.textOf
+import com.pixfold.d1.ui.text.textOfOrNull
+import com.pixfold.d1.ui.theme.dangerActionButtonColors
 
 const val TAG_REPORT_PAGE = "report-page"
 const val TAG_REPORT_LIST = "report-list"
 const val TAG_REPORT_SUMMARY = "report-summary"
 const val TAG_REPORT_UNDO = "report-undo"
+const val TAG_REPORT_DONE = "report-done"
 const val TAG_REPORT_UNDO_MESSAGE = "report-undo-message"
 const val TAG_REPORT_EMPTY = "report-empty"
-
-/** 「撤销本次执行」按钮文案(UI 与测试共用,避免两处各写一遍)。 */
-const val UNDO_BUTTON_LABEL = "撤销本次执行"
 
 /** 报告里第 i 行的 testTag。 */
 fun reportRowTag(index: Int) = "report-row-$index"
@@ -54,7 +58,7 @@ fun reportOutcomeTag(index: Int) = "report-row-$index-outcome"
 @Composable
 fun ExecutionReportPage(
     report: ExecutionReport,
-    undoMessage: String?,
+    undoMessage: Msg?,
     onUndo: () -> Unit,
     onDone: () -> Unit,
     modifier: Modifier = Modifier,
@@ -68,12 +72,12 @@ fun ExecutionReportPage(
     ) {
         Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 6.dp)) {
             Text(
-                text = report.kind.title,
+                text = textOf(report.kind.titleKey),
                 style = MaterialTheme.typography.titleMedium,
                 color = MaterialTheme.colorScheme.onBackground,
             )
             Text(
-                text = report.summaryLine,
+                text = textOf(report.summary),
                 style = MaterialTheme.typography.titleSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.testTag(TAG_REPORT_SUMMARY),
@@ -83,7 +87,7 @@ fun ExecutionReportPage(
 
         if (report.entries.isEmpty()) {
             Text(
-                text = "本次没有任何操作（计划为空）",
+                text = stringResource(R.string.report_empty),
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier
@@ -101,56 +105,63 @@ fun ExecutionReportPage(
             items(report.entries.size) { i ->
                 ReportRow(report.entries[i], i)
             }
-
-            item(key = "actions") {
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 12.dp, vertical = 8.dp),
-                    verticalArrangement = Arrangement.spacedBy(6.dp),
-                ) {
-                    HorizontalDivider()
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        OutlinedButton(
-                            onClick = onUndo,
-                            enabled = report.canUndo,
-                            modifier = Modifier
-                                .testTag(TAG_REPORT_UNDO)
-                                .semantics { contentDescription = UNDO_BUTTON_LABEL },
-                        ) { Text(UNDO_BUTTON_LABEL) }
-
-                        Button(
-                            onClick = onDone,
-                            modifier = Modifier.semantics { contentDescription = "完成" },
-                        ) { Text("完成") }
-                    }
-                    if (!report.canUndo) {
-                        Text(
-                            text = "没有成功执行的操作，无需撤销",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                    }
-                    if (undoMessage != null) {
-                        Text(
-                            text = undoMessage,
-                            style = MaterialTheme.typography.labelMedium,
-                            color = MaterialTheme.colorScheme.tertiary,
-                            modifier = Modifier.testTag(TAG_REPORT_UNDO_MESSAGE),
-                        )
-                    }
-                }
-            }
         }
+
+        // 终局动作常驻底栏(A 侧整库报告有 56 行,原先要滚到底才够得到撤销入口)。
+        // 左 = 退回(撤销本次执行),右 = 推进(完成)—— 与全站底栏一致(用户 2026-09-25)。
+        PageActionBar(
+            leading = {
+                // ⚠️ 无障碍文案必须在 `semantics {}` **外面**解析(那个 lambda 不是 `@Composable`)。
+                val undoLabel = stringResource(R.string.report_undo)
+                // 撤销是**破坏性 / 回退类**动作,用「危险动作」配色着底
+                // (用户 2026-09-25:「步骤3的撤销按钮背景改红色」;
+                //  2026-09-26 收紧为「表示这是个危险性质的按钮」)。
+                // 深浅两种模式要取 error 族的**不同档位**:浅色 `error`(#B3261E 深红)、
+                // 深色 `errorContainer`(#8C1D18 深红)—— 深色的 `error` 是 #F2B8B5 淡粉,
+                // 当底色不像危险动作。完整理由见 `dangerActionButtonColors()` 的 KDoc。
+                Button(
+                    onClick = onUndo,
+                    enabled = report.canUndo,
+                    colors = dangerActionButtonColors(),
+                    modifier = Modifier
+                        .testTag(TAG_REPORT_UNDO)
+                        .semantics { contentDescription = undoLabel },
+                ) { Text(undoLabel) }
+            },
+            trailing = {
+                val done = stringResource(R.string.report_done)
+                Button(
+                    onClick = onDone,
+                    modifier = Modifier
+                        .testTag(TAG_REPORT_DONE)
+                        .semantics { contentDescription = done },
+                ) { Text(done) }
+            },
+            extraContent = {
+                if (!report.canUndo) {
+                    Text(
+                        text = stringResource(R.string.report_nothing_to_undo),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                textOfOrNull(undoMessage)?.let { message ->
+                    Text(
+                        text = message,
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.tertiary,
+                        modifier = Modifier.testTag(TAG_REPORT_UNDO_MESSAGE),
+                    )
+                }
+            },
+        )
     }
 }
 
 @Composable
 private fun ReportRow(entry: ExecEntry, index: Int) {
+    // ⚠️ `semantics {}` 的 lambda 不是 `@Composable`,故无障碍文案必须在外面取好。
+    val outcomeCd = stringResource(R.string.report_outcome_cd, textOf(entry.outcome.textKey))
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -163,12 +174,12 @@ private fun ReportRow(entry: ExecEntry, index: Int) {
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Text(
-                text = entry.outcome.label,
+                text = textOf(entry.outcome.textKey),
                 style = MaterialTheme.typography.labelMedium,
                 color = outcomeColor(entry.outcome),
                 modifier = Modifier
                     .testTag(reportOutcomeTag(index))
-                    .semantics { contentDescription = "结果：${entry.outcome.label}" },
+                    .semantics { contentDescription = outcomeCd },
             )
             Text(
                 text = entry.label,
@@ -177,9 +188,9 @@ private fun ReportRow(entry: ExecEntry, index: Int) {
                 modifier = Modifier.weight(1f),
             )
         }
-        if (entry.reason != null) {
+        textOfOrNull(entry.reason)?.let { reason ->
             Text(
-                text = "原因：${entry.reason}",
+                text = stringResource(R.string.report_reason, reason),
                 style = MaterialTheme.typography.labelSmall,
                 color = outcomeColor(entry.outcome),
             )

@@ -1,5 +1,8 @@
 package com.pixfold.d1.domain.plan
 
+import com.pixfold.d1.domain.text.Msg
+import com.pixfold.d1.domain.text.TextKey
+
 /**
  * 危险动作的确认模型(规格 §9.2,验收第 16 项)。
  *
@@ -10,38 +13,40 @@ package com.pixfold.d1.domain.plan
  * 若把两次确认散落在 UI 的 `if (showDialog)` 嵌套里,测试只能断言"点了一次还有弹窗",
  * 很难证明"**恰好**两次""顺序是先通用后独立""危险动作未选中时**不会**多弹一次"。
  * 这里把确认序列算成**数据**,于是"两次"成为结构性质,可被断言、可被变异验证。
+ *
+ * **文案**:动作的三种文案都是 [TextKey],不在此处解析(见 `text/Msg.kt`)。
  */
 
 /** 触发独立二次确认的危险动作(默认全部关闭)。 */
 enum class DangerAction(
     /** 确认框标题里的措辞。 */
-    val label: String,
+    val labelKey: TextKey,
     /** 独立确认框正文。 */
-    val confirmBody: String,
+    val bodyKey: TextKey,
     /** 确认按钮文案。 */
-    val confirmButton: String,
+    val buttonKey: TextKey,
 ) {
     DeleteSourceDir(
-        label = "打包后删除源目录",
-        confirmBody = "你选择了「打包后删除源目录」。删除不可恢复，确认继续？",
-        confirmButton = "确认删除源目录",
+        labelKey = TextKey.DangerDeleteSourceDirLabel,
+        bodyKey = TextKey.DangerDeleteSourceDirBody,
+        buttonKey = TextKey.DangerDeleteSourceDirButton,
     ),
     CleanEmptyDirs(
-        label = "清理空目录",
-        confirmBody = "你勾选了「移动后清理空目录」。删除不可恢复，确认继续？",
-        confirmButton = "确认清理空目录",
+        labelKey = TextKey.DangerCleanEmptyDirsLabel,
+        bodyKey = TextKey.DangerCleanEmptyDirsBody,
+        buttonKey = TextKey.DangerCleanEmptyDirsButton,
     ),
     OverwriteExisting(
-        label = "覆盖已有 CBZ",
-        confirmBody = "你选择了「覆盖已有文件」。原文件将被替换，覆盖不可恢复，确认继续？",
-        confirmButton = "确认覆盖",
+        labelKey = TextKey.DangerOverwriteExistingLabel,
+        bodyKey = TextKey.DangerOverwriteExistingBody,
+        buttonKey = TextKey.DangerOverwriteExistingButton,
     ),
 }
 
 /** 确认序列里的一步。 */
 sealed interface ConfirmStep {
     /** 通用确认:标题 `确认执行？`,正文列明影响范围。 */
-    data class General(val summaryLines: List<String>) : ConfirmStep
+    data class General(val summaryLines: List<Msg>) : ConfirmStep
 
     /**
      * 独立危险确认:标题固定为 `⚠️ 危险操作独立确认`,一次只处理**一个**动作。
@@ -50,14 +55,6 @@ sealed interface ConfirmStep {
      */
     data class Danger(val action: DangerAction) : ConfirmStep
 }
-
-/** 危险动作独立确认框的固定标题(UI 与测试共用同一字面量)。 */
-const val DANGER_DIALOG_TITLE = "⚠️ 危险操作独立确认"
-
-/** 通用确认框标题与按钮文案(规格 §9.2)。 */
-const val GENERAL_CONFIRM_TITLE = "确认执行？"
-const val GENERAL_CONFIRM_CANCEL = "再看看"
-const val GENERAL_CONFIRM_OK = "执行"
 
 /**
  * 危险动作按**固定顺序**排列,与用户在界面上看到的顺序无关。
@@ -83,7 +80,7 @@ private val DANGER_ORDER = listOf(
  */
 fun buildConfirmSequence(
     dangerActions: Set<DangerAction>,
-    summaryLines: List<String>,
+    summaryLines: List<Msg>,
 ): List<ConfirmStep> = buildList {
     add(ConfirmStep.General(summaryLines))
     DANGER_ORDER.filter { it in dangerActions }.forEach { add(ConfirmStep.Danger(it)) }
@@ -117,28 +114,51 @@ fun effectiveDangerActions(
  *
  * **为什么必须由领域层生成**:这些行要同时出现在确认框与执行报告里,
  * 两处各写一份必然漂移。这里是唯一来源。
+ *
+ * 返回 [Msg] 列表 —— 卷数等数值以 `Int` 传参,以便英文侧用 `<plurals>` 正确变格。
  */
 fun generalSummaryLines(
     plans: List<VolumePackPlan>,
     dangerActions: Set<DangerAction>,
-): List<String> = buildList {
+): List<Msg> = buildList {
     val counts = planCountsOf(plans)
-    add("将处理 ${counts.runnable} 卷（跳过 ${counts.skipped} 卷）")
-    add("源目录：" + if (DangerAction.DeleteSourceDir in dangerActions) "删除（危险）" else "保留")
+    add(Msg(TextKey.SummaryProcessingVolumes, listOf(counts.runnable, counts.skipped)))
+    add(
+        Msg(
+            TextKey.SummarySourceDirPrefix,
+            listOf(
+                Msg(
+                    if (DangerAction.DeleteSourceDir in dangerActions) {
+                        TextKey.SummarySourceDirDelete
+                    } else {
+                        TextKey.SummarySourceDirKeep
+                    },
+                ),
+            ),
+        ),
+    )
     if (DangerAction.CleanEmptyDirs in dangerActions) {
-        add("⚠️ 勾选了「清理空目录」，执行后空目录将被删除")
+        add(Msg(TextKey.SummaryCleanEmptyDirsWarning))
     }
     if (DangerAction.OverwriteExisting in dangerActions) {
-        add("⚠️ 已有同名 CBZ 将被覆盖：${
-            plans.filter { !it.skipped && it.volume.outputExists }
-                .joinToString("、") { it.outputPath }
-        }")
+        add(
+            Msg(
+                TextKey.SummaryOverwriteCbz,
+                listOf(
+                    plans.filter { !it.skipped && it.volume.outputExists }.map { it.outputPath },
+                ),
+            ),
+        )
     }
     // 末条必须与"本次实际会做什么"一致:选了删除源目录却说"只写入输出文件"
     // 会与上一行的「源目录：删除（危险）」直接矛盾(真机核对时发现)。
-    if (DangerAction.DeleteSourceDir in dangerActions) {
-        add("⚠️ 打包完成后源目录将被删除，且不可恢复")
-    } else {
-        add("本操作只写入输出文件；不会删除任何源文件")
-    }
+    add(
+        Msg(
+            if (DangerAction.DeleteSourceDir in dangerActions) {
+                TextKey.SummaryDeleteSourceDirWarning
+            } else {
+                TextKey.SummaryWriteOnly
+            },
+        ),
+    )
 }

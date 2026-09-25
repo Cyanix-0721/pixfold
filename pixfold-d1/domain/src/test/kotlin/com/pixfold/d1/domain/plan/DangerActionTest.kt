@@ -1,6 +1,8 @@
 package com.pixfold.d1.domain.plan
 
 import com.pixfold.d1.domain.mock.MockDataB
+import com.pixfold.d1.domain.text.Msg
+import com.pixfold.d1.domain.text.TextKey
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -13,12 +15,29 @@ import kotlin.test.assertTrue
  * 1. 默认值下**不产生**任何危险确认(默认关闭);
  * 2. 选中危险动作后,**恰好**多出一步独立确认(不是零次、也不是并进通用确认);
  * 3. 未选中的动作**不产生**步骤(不会让用户白确认)。
+ *
+ * **断言的是密钥而非文案**:领域层产出 [Msg](纯数据,不含语言),文案在 UI 层解析。
+ * 故这里只断言 `key` 与 `args` —— 换语言(或改译文)不会让本文件变红,
+ * 而"漏了一行""参数传错"仍会被抓住。成品文案的逐字断言在 app 侧资源测试里。
  */
 class DangerActionTest {
 
     private val library = MockDataB.library
     private val aot1 = library.volumes.first { it.id == "aot-1" }
     private val op102 = library.volumes.first { it.id == "op-102" } // outputExists = true
+
+    // ---- 断言辅助(全部只看 TextKey / args,不看语言)----
+
+    private fun List<Msg>.keys(): List<TextKey> = map { it.key }
+
+    private fun List<Msg>.find(key: TextKey): Msg? = firstOrNull { it.key == key }
+
+    /** 取某行的**唯一**参数(用来断言嵌套 Msg 或数值)。 */
+    private fun Msg.singleArg(): Any = args.single()
+
+    /** 「源目录：X」这一行里嵌的 X 是哪个键。 */
+    private fun List<Msg>.sourceDirKey(): TextKey? =
+        find(TextKey.SummarySourceDirPrefix)?.singleArg()?.let { (it as Msg).key }
 
     // ---- 默认关闭 ----
 
@@ -108,7 +127,6 @@ class DangerActionTest {
         assertEquals(3, dangers.size)
         val seq = buildConfirmSequence(dangers, generalSummaryLines(plans, dangers))
         assertEquals(4, seq.size, "1 通用 + 3 危险 = 4 步；不得合并成一次确认")
-        assertEquals(DANGER_DIALOG_TITLE, "⚠️ 危险操作独立确认")
         val dangerSteps = seq.filterIsInstance<ConfirmStep.Danger>().map { it.action }
         assertEquals(
             listOf(DangerAction.DeleteSourceDir, DangerAction.OverwriteExisting, DangerAction.CleanEmptyDirs),
@@ -117,15 +135,42 @@ class DangerActionTest {
         )
     }
 
+    @Test
+    fun `each danger action has its own distinct wording`() {
+        // 每个危险动作的三份文案必须两两不同 —— 否则两个动作会弹出字面相同的框,
+        // 用户无法从文字上分辨自己正在放行哪一个不可恢复动作。
+        // (标题「⚠️ 危险操作独立确认」是共享的,故这里只查动作自有的 label/body/button。)
+        for (keySelector in listOf(
+            { a: DangerAction -> a.labelKey },
+            { a: DangerAction -> a.bodyKey },
+            { a: DangerAction -> a.buttonKey },
+        )) {
+            val keys = DangerAction.entries.map { keySelector(it) }
+            assertEquals(keys.size, keys.toSet().size, "危险动作文案键重复：$keys")
+        }
+    }
+
     // ---- 影响范围 ----
 
     @Test
     fun `general summary always lists the impact scope`() {
         val plans = buildPackagePlans(library.volumes, conflictPolicy = OutputConflictPolicy.Skip)
         val lines = generalSummaryLines(plans, emptySet())
-        assertTrue(lines.any { "将处理 4 卷" in it && "跳过 1 卷" in it }, "必须列出卷数，实际 $lines")
-        assertTrue(lines.any { "源目录：保留" in it }, "必须说明源目录去向，实际 $lines")
-        assertTrue(lines.none { "删除（危险）" in it }, "未选删除时不该出现危险字样")
+        assertEquals(
+            Msg(TextKey.SummaryProcessingVolumes, listOf(4, 1)),
+            lines.find(TextKey.SummaryProcessingVolumes),
+            "必须列出卷数（已处理 / 跳过），实际 ${lines.keys()}",
+        )
+        assertEquals(
+            TextKey.SummarySourceDirKeep,
+            lines.sourceDirKey(),
+            "必须说明源目录去向，实际 ${lines.keys()}",
+        )
+        assertEquals(
+            null,
+            lines.sourceDirKey()?.takeIf { it == TextKey.SummarySourceDirDelete },
+            "未选删除时不该出现危险字样",
+        )
     }
 
     @Test
@@ -133,7 +178,11 @@ class DangerActionTest {
         val plans = buildPackagePlans(library.volumes, sourcePolicy = SourcePolicy.Delete)
         val dangers = effectiveDangerActions(plans)
         val lines = generalSummaryLines(plans, dangers)
-        assertTrue(lines.any { "源目录：删除（危险）" in it }, "通用确认必须写出影响范围，实际 $lines")
+        assertEquals(
+            TextKey.SummarySourceDirDelete,
+            lines.sourceDirKey(),
+            "通用确认必须写出影响范围，实际 ${lines.keys()}",
+        )
     }
 
     @Test
@@ -144,14 +193,14 @@ class DangerActionTest {
         val dangers = effectiveDangerActions(plans)
         val lines = generalSummaryLines(plans, dangers)
 
-        assertTrue(lines.any { "源目录：删除（危险）" in it }, "应列出删除影响，实际 $lines")
+        assertEquals(TextKey.SummarySourceDirDelete, lines.sourceDirKey(), "应列出删除影响，实际 ${lines.keys()}")
         assertTrue(
-            lines.none { "只写入输出文件" in it },
-            "选了删除源目录就不得再说「只写入输出文件」，实际 $lines",
+            TextKey.SummaryWriteOnly !in lines.keys(),
+            "选了删除源目录就不得再说「只写入输出文件」，实际 ${lines.keys()}",
         )
         assertTrue(
-            lines.any { "源目录将被删除" in it && "不可恢复" in it },
-            "应明确告知源目录将被删除且不可恢复，实际 $lines",
+            TextKey.SummaryDeleteSourceDirWarning in lines.keys(),
+            "应明确告知源目录将被删除且不可恢复，实际 ${lines.keys()}",
         )
     }
 
@@ -160,18 +209,20 @@ class DangerActionTest {
         val plans = buildPackagePlans(listOf(op102), conflictPolicy = OutputConflictPolicy.Overwrite)
         val dangers = effectiveDangerActions(plans)
         val lines = generalSummaryLines(plans, dangers)
-        assertTrue(
-            lines.any { "E:\\漫画库\\_output/海贼王 第102卷.cbz" in it },
-            "覆盖确认必须列出**具体哪个文件**,实际 $lines",
+        assertEquals(
+            Msg(TextKey.SummaryOverwriteCbz, listOf(listOf("E:\\漫画库\\_output/海贼王 第102卷.cbz"))),
+            lines.find(TextKey.SummaryOverwriteCbz),
+            "覆盖确认必须列出**具体哪个文件**，实际 ${lines.keys()}",
         )
     }
 
     @Test
     fun `general summary warns about clean empty dirs only when enabled`() {
         val plans = buildPackagePlans(listOf(aot1))
-        assertTrue(generalSummaryLines(plans, emptySet()).none { "清理空目录" in it })
+        assertTrue(TextKey.SummaryCleanEmptyDirsWarning !in generalSummaryLines(plans, emptySet()).keys())
         assertTrue(
-            generalSummaryLines(plans, setOf(DangerAction.CleanEmptyDirs)).any { "清理空目录" in it },
+            TextKey.SummaryCleanEmptyDirsWarning in
+                generalSummaryLines(plans, setOf(DangerAction.CleanEmptyDirs)).keys(),
         )
     }
 
@@ -181,8 +232,8 @@ class DangerActionTest {
         val lines = generalSummaryLines(plans, emptySet())
         assertFalse(lines.isEmpty())
         assertTrue(
-            lines.any { "不会删除任何源文件" in it },
-            "安全操作也要说清「不删任何东西」，实际 $lines",
+            TextKey.SummaryWriteOnly in lines.keys(),
+            "安全操作也要说清「不删任何东西」，实际 ${lines.keys()}",
         )
     }
 }

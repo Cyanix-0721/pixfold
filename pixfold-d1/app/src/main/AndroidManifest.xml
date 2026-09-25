@@ -1,6 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<manifest xmlns:android="http://schemas.android.com/apk/res/android"
-    xmlns:tools="http://schemas.android.com/tools">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
     <!--
       android:enableOnBackInvokedCallback="true" —— 启用 Android 13+ 的预测性返回
       (predictive back)。targetSdk 33+ 默认即为 true,这里**显式声明**以表明意图:
@@ -14,17 +13,23 @@
            否则系统在根级直接执行"退出应用"。
       真机实测(2026-09-18):未处理返回时,在"步骤2 命名结构"按返回会**直接退出应用**。
 
-      tools:targetApi="33" —— 该属性 API 33 才存在,而 minSdk=24,
-      lint 的 UnusedAttribute 会把它判为"对低版本无用"(本项目 warningsAsErrors=true
-      时会直接失败)。标注后 lint 知道我们是有意为之:低版本系统忽略它,
-      行为退回传统返回(仍是 `BackHandler` 驱动的层级后退,只是没有预览动画)。
+      **2026-09-26 注**:此处原先还有 `tools:targetApi="33"`,用于在 minSdk<33 时
+      压掉 lint 的 `UnusedAttribute`。minSdk 提到 **34** 后该属性对系统仍然有效
+      (34 ≥ 33),lint 不再需要这层豁免,故连同 `xmlns:tools` 一并删除。
+    -->
+    <!--
+      android:icon="@mipmap/ic_launcher" —— 自适应图标(三层:background / foreground /
+      monochrome),由系统按厂商遮罩裁形、Android 13+ 用 monochrome 层做"主题化图标"
+      (跟随壁纸取色)。资源只有一档 `mipmap-anydpi/`(无 `-v26`):自适应图标是 API 26 引入,
+      而本项目 minSdk 已于 2026-09-26 提到 **34**,不存在需要旧版回退的系统。
+      图形本身仍是原型占位(三条块),不是最终视觉设计。
     -->
     <application
         android:label="@string/app_name"
-        android:icon="@drawable/ic_launcher"
+        android:icon="@mipmap/ic_launcher"
         android:enableOnBackInvokedCallback="true"
-        tools:targetApi="33"
         android:supportsRtl="true"
+        android:localeConfig="@xml/locales_config"
         android:theme="@style/Theme.PixFold">
         <activity
             android:name=".MainActivity"

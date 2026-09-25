@@ -13,6 +13,8 @@ import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollToNode
+import com.pixfold.d1.R
+import com.pixfold.d1.TestText
 import com.pixfold.d1.domain.comic.renumberPages
 import com.pixfold.d1.domain.mock.MockDataB
 import com.pixfold.d1.domain.model.ComicVolume
@@ -80,12 +82,14 @@ class PackPreviewPageTest {
     fun `xml preview and page preview are both shown`() {
         show()
         scrollTo(TAG_XML_PREVIEW)
+        val volume = library.volumes.first { it.id == "aot-1" }
         rule.onNodeWithTag(TAG_XML_PREVIEW).assertIsDisplayed()
-        rule.onNodeWithText("ComicInfo.xml 预览").assertIsDisplayed()
+        rule.onNodeWithText(TestText.of(R.string.pack_xml_title)).assertIsDisplayed()
 
         scrollTo(TAG_PAGE_PREVIEW_COUNT)
         rule.onNodeWithTag(TAG_PAGE_PREVIEW_COUNT).assertIsDisplayed()
-        rule.onNodeWithText("页码预览", substring = true).assertIsDisplayed()
+        rule.onNodeWithText(TestText.plural(R.plurals.pack_page_header, volume.pageCount, volume.pageCount), substring = true)
+            .assertIsDisplayed()
     }
 
     @Test
@@ -93,7 +97,8 @@ class PackPreviewPageTest {
         show()
         val volume = library.volumes.first { it.id == "aot-1" }
         scrollTo(TAG_PAGE_PREVIEW_COUNT)
-        rule.onNodeWithText("共 ${volume.pageCount} 项", substring = true).assertIsDisplayed()
+        rule.onNodeWithText(TestText.plural(R.plurals.pack_page_header, volume.pageCount, volume.pageCount), substring = true)
+            .assertIsDisplayed()
 
         // 第一项与最后一项的页码文件名都必须在界面上出现(与领域层 renumberPages 一致)
         val expected = renumberPages(volume)
@@ -128,7 +133,8 @@ class PackPreviewPageTest {
         rule.waitForIdle()
         val xml = xmlOnScreen()
         assertTrue(xml.contains("<Number>${volume.volume}</Number>"), "XML 未跟随切卷:\n$xml")
-        rule.onNodeWithText("共 ${volume.pageCount} 项", substring = true).assertIsDisplayed()
+        rule.onNodeWithText(TestText.plural(R.plurals.pack_page_header, volume.pageCount, volume.pageCount), substring = true)
+            .assertIsDisplayed()
     }
 
     @Test
@@ -165,7 +171,7 @@ class PackPreviewPageTest {
         show(volumes)
         scrollTo(packPageRowTag(0))
         assertTrue(
-            rule.onAllNodesWithText("人工调整", substring = true).fetchSemanticsNodes().isNotEmpty(),
+            rule.onAllNodesWithText(TestText.of(R.string.pack_page_manual), substring = true).fetchSemanticsNodes().isNotEmpty(),
             "人工调整过的页必须在预览里标出来",
         )
     }
@@ -199,7 +205,7 @@ class PackPreviewPageTest {
         scrollTo(TAG_PACK_PENDING)
         rule.onNodeWithTag(TAG_PACK_PENDING).assertIsDisplayed()
         assertTrue(
-            rule.onAllNodesWithText("语言未确认", substring = true).fetchSemanticsNodes().isNotEmpty(),
+            rule.onAllNodesWithText(TestText.of(R.string.domain_pending_language), substring = true).fetchSemanticsNodes().isNotEmpty(),
             "待确认项必须可见",
         )
     }
@@ -209,7 +215,7 @@ class PackPreviewPageTest {
         show()
         rule.onNodeWithTag(packVolumeChipTag("op-102")).performClick()
         rule.waitForIdle()
-        rule.onNodeWithText("已存在同名文件", substring = true).assertIsDisplayed()
+        rule.onNodeWithText(TestText.of(R.string.pack_output_exists), substring = true).assertIsDisplayed()
     }
 
     @Test
@@ -217,7 +223,7 @@ class PackPreviewPageTest {
         show()
         // 卷头在列表顶部,起始位置即可见
         assertTrue(
-            rule.onAllNodesWithText("不写入（语言未确认）", substring = true)
+            rule.onAllNodesWithText(TestText.of(R.string.pack_lang_unset), substring = true)
                 .fetchSemanticsNodes().isNotEmpty(),
             "未确认语言必须说明「不写入」的原因,而不是静默留空",
         )
@@ -256,7 +262,7 @@ class PackPreviewPageTest {
         val volumes = library.volumes.map { if (it.id == "aot-1") it.copy(included = false) else it }
         show(volumes)
         assertTrue(
-            rule.onAllNodesWithText("本卷未勾选", substring = true).fetchSemanticsNodes().isNotEmpty(),
+            rule.onAllNodesWithText(TestText.of(R.string.pack_excluded_warning), substring = true).fetchSemanticsNodes().isNotEmpty(),
             "未勾选的卷必须在预览页显式说明不会打包",
         )
     }
@@ -265,7 +271,7 @@ class PackPreviewPageTest {
     fun `an included volume shows no exclusion warning`() {
         show()
         assertTrue(
-            rule.onAllNodesWithText("本卷未勾选", substring = true).fetchSemanticsNodes().isEmpty(),
+            rule.onAllNodesWithText(TestText.of(R.string.pack_excluded_warning), substring = true).fetchSemanticsNodes().isEmpty(),
             "已勾选的卷不应出现「不会打包」的提示",
         )
     }
@@ -275,7 +281,7 @@ class PackPreviewPageTest {
         // 这个数字来自领域层 includedVolumes(此前是死代码:界面从未使用)
         show()
         assertTrue(
-            rule.onAllNodesWithText("本次将打包 5 / 5 卷", substring = true)
+            rule.onAllNodesWithText(TestText.plural(R.plurals.pack_included_count, 5, 5, 5), substring = true)
                 .fetchSemanticsNodes().isNotEmpty(),
             "预览必须回答「这次到底做什么」",
         )
@@ -286,7 +292,7 @@ class PackPreviewPageTest {
         val volumes = library.volumes.map { if (it.id == "op-102") it.copy(included = false) else it }
         show(volumes)
         assertTrue(
-            rule.onAllNodesWithText("本次将打包 4 / 5 卷", substring = true)
+            rule.onAllNodesWithText(TestText.plural(R.plurals.pack_included_count, 4, 4, 5), substring = true)
                 .fetchSemanticsNodes().isNotEmpty(),
             "取消勾选后打包卷数必须跟着变",
         )
@@ -297,7 +303,7 @@ class PackPreviewPageTest {
         val volumes = library.volumes.map { if (it.id == "aot-1") it.copy(included = false) else it }
         show(volumes)
         assertTrue(
-            rule.onAllNodesWithText("（未勾选）", substring = true).fetchSemanticsNodes().isNotEmpty(),
+            rule.onAllNodesWithText(TestText.of(R.string.pack_volume_excluded, ""), substring = true).fetchSemanticsNodes().isNotEmpty(),
             "卷切换 chip 上要能看出哪些卷未勾选",
         )
     }
@@ -309,7 +315,7 @@ class PackPreviewPageTest {
         show()
         scrollTo(TAG_PAGE_PREVIEW_COUNT)
         assertTrue(
-            rule.onAllNodesWithText("确认打包").fetchSemanticsNodes().isEmpty(),
+            rule.onAllNodesWithText(TestText.of(R.string.pack_confirm)).fetchSemanticsNodes().isEmpty(),
             "P5 不应出现执行按钮(执行属 P6)",
         )
     }

@@ -1,5 +1,7 @@
 package com.pixfold.d1
 
+import com.pixfold.d1.TestText
+
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
@@ -38,14 +40,14 @@ class AppNavigationTest {
     @Test
     fun `workflow A entry actually opens the grid page`() {
         rule.setContent { PixFoldApp() }
-        rule.onNodeWithText("工作流 A · 图片整理与命名").performClick()
+        rule.onNodeWithText(TestText.of(R.string.home_workflow_a)).performClick()
         rule.onNodeWithTag(TAG_GRID).assertIsDisplayed()
     }
 
     @Test
     fun `tapping a thumbnail opens preview and close returns`() {
         rule.setContent { PixFoldApp() }
-        rule.onNodeWithText("工作流 A · 图片整理与命名").performClick()
+        rule.onNodeWithText(TestText.of(R.string.home_workflow_a)).performClick()
         rule.onNodeWithTag(TAG_GRID).assertIsDisplayed()
 
         rule.onAllNodesWithTag(TAG_GRID_CARD)[0].performClick()
@@ -58,12 +60,12 @@ class AppNavigationTest {
     @Test
     fun `preview opened from grid allows paging`() {
         rule.setContent { PixFoldApp() }
-        rule.onNodeWithText("工作流 A · 图片整理与命名").performClick()
+        rule.onNodeWithText(TestText.of(R.string.home_workflow_a)).performClick()
         rule.onAllNodesWithTag(TAG_GRID_CARD)[0].performClick()
 
-        rule.onNodeWithTag(TAG_PREVIEW_PAGE_LABEL).assertTextEquals("第 1 / 30 页")
+        rule.onNodeWithTag(TAG_PREVIEW_PAGE_LABEL).assertTextEquals(TestText.of(R.string.preview_page_label, 1, 30))
         rule.onNodeWithTag(TAG_PREVIEW_NEXT).performClick()
-        rule.onNodeWithTag(TAG_PREVIEW_PAGE_LABEL).assertTextEquals("第 2 / 30 页")
+        rule.onNodeWithTag(TAG_PREVIEW_PAGE_LABEL).assertTextEquals(TestText.of(R.string.preview_page_label, 2, 30))
     }
 
     @Test
@@ -71,7 +73,7 @@ class AppNavigationTest {
         // P5 起工作流 B 有真实页面:断言"真的到了漫画库步骤"(出现卷卡片),
         // 而不是只断言回调被调用 —— 后者会放过"回调触发但界面没换"的缺陷。
         rule.setContent { PixFoldApp() }
-        rule.onNodeWithText("工作流 B · CBZ 制作").performClick()
+        rule.onNodeWithText(TestText.of(R.string.home_workflow_b)).performClick()
         rule.onNodeWithTag(TAG_LIBRARY_PAGE).assertIsDisplayed()
         rule.onAllNodesWithTag(volumeCardTag("aot-1")).assertCountEquals(1)
     }

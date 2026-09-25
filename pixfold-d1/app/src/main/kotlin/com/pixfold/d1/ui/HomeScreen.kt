@@ -3,6 +3,7 @@ package com.pixfold.d1.ui
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -10,14 +11,20 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.material3.Card
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
+import com.pixfold.d1.R
 
 /**
  * 首页:两条工作流入口(验收第 19 项"从首页完整走通")。
@@ -33,9 +40,15 @@ import androidx.compose.ui.unit.dp
 fun HomeScreen(
     onOpenWorkflowA: () -> Unit,
     onOpenWorkflowB: () -> Unit,
+    // Modifier 必须是**第一个可选参数**(Compose 约定,lint ModifierParameter 强制)。
     modifier: Modifier = Modifier,
+    onOpenSettings: () -> Unit = {},
     contentInsets: WindowInsets = WindowInsets.safeDrawing,
 ) {
+    // `stringResource` 不能在 `semantics {}` 里调用(那不是 @Composable lambda),须先取出。
+    val settingsCd = stringResource(R.string.home_settings_cd)
+    val workflowATitle = stringResource(R.string.home_workflow_a)
+    val workflowBTitle = stringResource(R.string.home_workflow_b)
     Column(
         modifier = modifier
             .fillMaxSize()
@@ -43,18 +56,42 @@ fun HomeScreen(
             .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        Text(
-            text = "PixFold",
-            modifier = Modifier.testTag(TAG_TITLE),
-            style = MaterialTheme.typography.headlineMedium,
-            color = MaterialTheme.colorScheme.onBackground,
-        )
-        WorkflowEntry("工作流 A · 图片整理与命名", onOpenWorkflowA)
-        WorkflowEntry("工作流 B · CBZ 制作", onOpenWorkflowB)
+        // 标题行:标题左对齐,设置入口在右上角。
+        // 设置是**次要入口**,故用图标按钮而非等宽卡片 —— 不与两条工作流入口抢视觉重量。
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(
+                text = "PixFold",
+                modifier = Modifier.testTag(TAG_TITLE),
+                style = MaterialTheme.typography.headlineMedium,
+                color = MaterialTheme.colorScheme.onBackground,
+            )
+            IconButton(
+                onClick = onOpenSettings,
+                // M3 IconButton 默认触控目标已 ≥ 48dp(HANGOFF §6.5)。
+                modifier = Modifier
+                    .testTag(TAG_SETTINGS_BUTTON)
+                    .semantics { contentDescription = settingsCd },
+            ) {
+                Icon(
+                    painter = painterResource(R.drawable.ic_settings),
+                    contentDescription = null, // 语义由外层 contentDescription 统一播报
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
+        WorkflowEntry(workflowATitle, onOpenWorkflowA)
+        WorkflowEntry(workflowBTitle, onOpenWorkflowB)
     }
 }
 
 const val TAG_TITLE = "home-title"
+
+/** 首页右上角的设置入口。 */
+const val TAG_SETTINGS_BUTTON = "home-settings"
 
 @Composable
 private fun WorkflowEntry(title: String, onClick: () -> Unit) {

@@ -1,0 +1,209 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Domain-layer strings (English, default / fallback).
+
+  These are the English renderings of the `domain/` module's `TextKey` entries. The
+  domain layer itself only produces a key + arguments (see `domain/.../text/TextKey.kt`
+  and `Msg.kt`); resolution happens at render time in the app layer.
+  Naming rule: `domain_<area>_<semantics>`, one-to-one with the `TextKey` enum
+  (see `ui/text/PixFoldText.kt`).
+
+  ⚠️ English is the default (`values/`) and Chinese lives in `values-zh/`: until the user
+  picks a language the app follows the system, so a device in any third language falls
+  back to the strings below. (User decision 2026-09-26.)
+
+  ⚠️ Maintenance: a new `TextKey` member must be added to BOTH this file and
+  `values-zh/domain_strings.xml`, or lint `MissingTranslation` / `ExtraTranslation`
+  hard-fails under `warningsAsErrors = true`.
+
+  ⚠️ Plurals: entries marked as plural keys must be <plurals> in both files (a resource
+  type may not differ per language). English writes both the `one` and `other` items;
+  Chinese legitimately has only `other` (lint's `UnusedQuantity` rejects a `one` variant
+  for language "zh").
+-->
+<resources
+    xmlns:tools="http://schemas.android.com/tools">
+
+    <!-- ============ Sort fields (SortField) ============ -->
+    <string name="domain_sort_natural_name">File name (natural)</string>
+    <string name="domain_sort_file_name">File name (lexical)</string>
+    <string name="domain_sort_dir_name">Directory name</string>
+    <string name="domain_sort_modified">Date modified</string>
+    <string name="domain_sort_created">Date created</string>
+    <string name="domain_sort_size">File size</string>
+
+    <!-- ============ Name component kinds (NameComponentKind) ============ -->
+    <string name="domain_name_kind_prefix">Custom prefix</string>
+    <string name="domain_name_kind_root_dir">Root folder name</string>
+    <string name="domain_name_kind_rel_dir">Relative folder segment</string>
+    <string name="domain_name_kind_dir_index">Folder index</string>
+    <string name="domain_name_kind_image_index">Image index</string>
+    <string name="domain_name_kind_orig_name">Original file name</string>
+    <string name="domain_name_kind_custom_text">Custom text</string>
+
+    <!-- ============ Case policy (CasePolicy) ============ -->
+    <string name="domain_case_policy_keep">Keep as is</string>
+    <string name="domain_case_policy_lower">Lowercase</string>
+    <string name="domain_case_policy_upper">Uppercase</string>
+
+    <!-- ============ Extension policy (ExtPolicy) ============ -->
+    <string name="domain_ext_policy_keep">Keep as is</string>
+    <string name="domain_ext_policy_lower">Lowercase</string>
+    <string name="domain_ext_policy_upper">Uppercase</string>
+    <string name="domain_ext_policy_strip">Strip extension</string>
+
+    <!-- ============ Warning type labels (ProposalWarningType) ============ -->
+    <string name="domain_warn_type_duplicate">Duplicate</string>
+    <string name="domain_warn_type_illegal_char">Illegal character</string>
+    <string name="domain_warn_type_case_collision">Case conflict</string>
+    <string name="domain_warn_type_too_long">Too long</string>
+    <string name="domain_warn_type_overridden">Manual override</string>
+
+    <!-- ============ Language choice (LangChoice) ============ -->
+    <string name="domain_lang_unset">Not set (needs confirmation)</string>
+    <string name="domain_lang_zh">zh · Chinese</string>
+    <string name="domain_lang_ja">ja · Japanese</string>
+    <string name="domain_lang_other" tools:ignore="TypographyDashes">Other ISO 639-1</string>
+    <string name="domain_lang_unknown">Unknown</string>
+    <string name="domain_lang_skip">Do not write tag</string>
+
+    <!-- ============ Metadata fields (MetaField) ============ -->
+    <!-- The first five are ComicInfo.xml tag names, not translated -->
+    <string name="domain_meta_field_title" translatable="false">Title</string>
+    <string name="domain_meta_field_series" translatable="false">Series</string>
+    <string name="domain_meta_field_writer" translatable="false">Writer</string>
+    <string name="domain_meta_field_volume" translatable="false">Number</string>
+    <string name="domain_meta_field_language" translatable="false">LanguageISO</string>
+    <string name="domain_meta_field_cbz_name">CBZ file name</string>
+    <string name="domain_meta_field_output_dir">Output folder</string>
+
+    <!-- ============ Rename plan item status (OpStatus) ============ -->
+    <string name="domain_op_status_rename">Will rename</string>
+    <string name="domain_op_status_skip">Will skip</string>
+
+    <!-- ============ Execution outcome (ExecOutcome) ============ -->
+    <string name="domain_outcome_succeeded">Succeeded</string>
+    <string name="domain_outcome_skipped">Skipped</string>
+    <string name="domain_outcome_failed">Failed</string>
+
+    <!-- ============ Execution report titles (ExecKind) ============ -->
+    <string name="domain_exec_kind_rename">Rename report</string>
+    <string name="domain_exec_kind_package">Package report</string>
+
+    <!-- ============ Output conflict policy (OutputConflictPolicy) ============ -->
+    <string name="domain_conflict_auto_rename">Rename automatically (add number)</string>
+    <string name="domain_conflict_skip_volume">Skip this volume</string>
+    <string name="domain_conflict_overwrite">Overwrite existing file</string>
+
+    <!-- ============ Source folder handling (SourcePolicy) ============ -->
+    <string name="domain_source_keep">Keep source folder (default)</string>
+    <string name="domain_source_delete">Delete source folder after packing (dangerous)</string>
+
+    <!-- ============ Danger actions (DangerAction) ============ -->
+    <string name="domain_danger_delete_source_dir_label">Delete source folder after packing</string>
+    <string name="domain_danger_delete_source_dir_body">You chose “delete the source folder after packing”. Deletion cannot be undone. Continue?</string>
+    <string name="domain_danger_delete_source_dir_button">Delete source folder</string>
+    <string name="domain_danger_clean_empty_dirs_label">Clean up empty folders</string>
+    <string name="domain_danger_clean_empty_dirs_body">You checked “clean up empty folders after moving”. Deletion cannot be undone. Continue?</string>
+    <string name="domain_danger_clean_empty_dirs_button">Clean empty folders</string>
+    <string name="domain_danger_overwrite_existing_label">Overwrite existing CBZ</string>
+    <string name="domain_danger_overwrite_existing_body">You chose “overwrite existing files”. The original files will be replaced and overwriting cannot be undone. Continue?</string>
+    <string name="domain_danger_overwrite_existing_button">Overwrite</string>
+
+    <!-- ============ Separate confirmation dialogs ============ -->
+    <string name="domain_danger_dialog_title">⚠️ Confirm dangerous action</string>
+    <string name="domain_general_confirm_title">Confirm?</string>
+    <string name="domain_general_confirm_cancel">Not now</string>
+    <string name="domain_general_confirm_ok">Run</string>
+
+    <!-- ============ Pending markers / unnamed series ============ -->
+    <string name="domain_pending_language">Language unconfirmed</string>
+    <string name="domain_pending_volume">Volume number missing</string>
+    <string name="domain_unnamed_series">(Untitled series)</string>
+
+    <!-- ============ Summary lines (generalSummaryLines) ============ -->
+    <plurals name="domain_summary_processing_volumes">
+        <item quantity="one">Will process %1$d volume (%2$d skipped)</item>
+        <item quantity="other">Will process %1$d volumes (%2$d skipped)</item>
+    </plurals>
+    <string name="domain_summary_source_dir_prefix">Source folder: %1$s</string>
+    <string name="domain_summary_source_dir_delete">delete (dangerous)</string>
+    <string name="domain_summary_source_dir_keep">keep</string>
+    <string name="domain_summary_clean_empty_dirs_warning">⚠️ “Clean up empty folders” is checked; empty folders will be deleted afterwards</string>
+    <string name="domain_summary_overwrite_cbz">⚠️ Existing CBZ files will be overwritten: %1$s</string>
+    <string name="domain_summary_delete_source_dir_warning">⚠️ The source folder will be deleted after packing and cannot be recovered</string>
+    <string name="domain_summary_write_only">This only writes output files; no source files will be deleted</string>
+    <!-- Separator between list items when a message enumerates several paths -->
+    <string name="domain_list_separator">,\u0020</string>
+
+    <!-- ============ Package plan lines (VolumePackPlan.describe) ============ -->
+    <string name="domain_pack_create_cbz">Create CBZ → %1$s</string>
+    <string name="domain_pack_write_comic_info">Write ComicInfo.xml (Title=%1$s, Series=%2$s, Number=%3$s, Writer=%4$s, LanguageISO=%5$s)</string>
+    <plurals name="domain_pack_pack_pages">
+        <item quantity="one">Pack %1$d page in page order and rename to page numbers (starting at 0001)</item>
+        <item quantity="other">Pack %1$d pages in page order and rename to page numbers (starting at 0001)</item>
+    </plurals>
+    <string name="domain_pack_delete_source_dir">Delete source folder after packing: %1$s</string>
+    <string name="domain_pack_value_unset">not set</string>
+    <string name="domain_pack_value_empty">empty</string>
+    <string name="domain_pack_value_not_written">not written</string>
+    <string name="domain_pack_skip_output_exists">Output already exists: %1$s</string>
+
+    <!-- ============ Execution report text ============ -->
+    <plurals name="domain_exec_summary">
+        <item quantity="one">%1$d item: %2$d succeeded · %3$d skipped · %4$d failed</item>
+        <item quantity="other">%1$d items: %2$d succeeded · %3$d skipped · %4$d failed</item>
+    </plurals>
+    <string name="domain_pack_fail_no_pages">No pages to pack</string>
+    <string name="domain_pack_fail_empty_output_dir">Output folder is empty</string>
+    <string name="domain_rename_fail_empty_name">New name is empty</string>
+    <string name="domain_undo_nothing">Nothing to undo</string>
+    <plurals name="domain_undo_recorded">
+        <item quantity="one">Recorded %1$d inverse operation; the release version will roll it back from the UndoRecord (the prototype does not touch the real file system)</item>
+        <item quantity="other">Recorded %1$d inverse operations; the release version will roll them back from the UndoRecord (the prototype does not touch the real file system)</item>
+    </plurals>
+
+    <!-- ============ Rename warnings (attachWarnings) ============ -->
+    <plurals name="domain_warn_duplicate">
+        <item quantity="one">Duplicate: %1$d item shares the name “%2$s”; it will be skipped</item>
+        <item quantity="other">Duplicate: %1$d items share the name “%2$s”; they will be skipped</item>
+    </plurals>
+    <string name="domain_warn_illegal_char_control">control character</string>
+    <string name="domain_warn_illegal_char_separator">\u0020</string>
+    <string name="domain_warn_illegal_char">Illegal characters: %1$s (will be skipped; enable auto-clean to fix)</string>
+    <plurals name="domain_warn_case_collision">
+        <item quantity="one">Case conflict: differs only in letter case from %1$d other item and may overwrite each other on some file systems</item>
+        <item quantity="other">Case conflict: differs only in letter case from %1$d other items and may overwrite each other on some file systems</item>
+    </plurals>
+    <plurals name="domain_warn_too_long">
+        <item quantity="one">Too long: %1$d character, over the %2$d limit</item>
+        <item quantity="other">Too long: %1$d characters, over the %2$d limit</item>
+    </plurals>
+    <string name="domain_warn_overridden">Manual override: name set by hand</string>
+
+    <!-- ============ Naming scheme summary (namingSummaryLine) ============ -->
+    <plurals name="domain_naming_summary_enabled">
+        <item quantity="one">%1$d component enabled</item>
+        <item quantity="other">%1$d components enabled</item>
+    </plurals>
+    <plurals name="domain_naming_summary_with_head">
+        <item quantity="one">%1$s · %2$d component enabled</item>
+        <item quantity="other">%1$s · %2$d components enabled</item>
+    </plurals>
+
+    <!-- ============ Rename summary (renameSummaryLines) ============ -->
+    <plurals name="domain_rename_summary">
+        <item quantity="one">Will rename %1$d item (%2$d conflicts skipped)</item>
+        <item quantity="other">Will rename %1$d items (%2$d conflicts skipped)</item>
+    </plurals>
+    <string name="domain_rename_summary_source_kept">Source files are kept; nothing is deleted</string>
+    <string name="domain_rename_summary_clean_empty_dirs">⚠️ “Clean up empty folders” is checked; empty folders will be deleted after moving</string>
+
+    <!-- ============ Confirmation flow progress (ConfirmFlowState.progressLabel) ============ -->
+    <string name="domain_confirm_progress">Step %1$d of %2$d</string>
+
+    <!-- ============ Page consistency check (shown on the pack preview page) ============ -->
+    <string name="domain_page_issue_count_mismatch">Page item count does not match the page order (%1$d ≠ %2$d)</string>
+    <string name="domain_page_issue_wrong_index" tools:ignore="PluralsCandidate">Page %1$d should be %2$s but is %3$s</string>
+
+</resources>

@@ -13,6 +13,8 @@ import androidx.compose.ui.test.performScrollToNode
 import androidx.compose.ui.test.performTextClearance
 import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.test.hasTestTag
+import com.pixfold.d1.R
+import com.pixfold.d1.TestText
 import com.pixfold.d1.domain.mock.MockData
 import com.pixfold.d1.domain.model.ImageCollection
 import com.pixfold.d1.domain.model.NameComponent
@@ -48,6 +50,12 @@ class ReplacementFieldTest {
     val rule = createComposeRule()
 
     private val collection: ImageCollection = MockData.workspaceA.collections.first()
+
+    /**
+     * 清洗示例的输入名 —— **示例数据不是文案**,与 `SchemeEditor.SANITIZE_EXAMPLE_INPUT`
+     * 是同一个值(界面在英文下也展示这个中文名,反而更能说明问题)。
+     */
+    private val ILLEGAL_INPUT = "封:面?.jpg"
 
     /** 含「原文件名」组件的方案 —— 让非法字符真的进入输出。 */
     private val illegalComponents = listOf(
@@ -91,14 +99,26 @@ class ReplacementFieldTest {
         editableTextOf(proposalFieldTag(collection.images.first().id))
 
     /**
+     * 展开命名结构编辑器 —— P0(2026-09-24)后编辑器**默认折叠**成一行摘要。
+     *
+     * 真机(361dp × 794dp)实测展开态的编辑器高达 692dp(视口的 87%),首屏连一条建议行
+     * 都放不下;折叠栏常驻在页面固定区(不在 LazyColumn 内),点一下即可展开。
+     */
+    private fun expandEditor() {
+        rule.onNodeWithTag(TAG_SCHEME_TOGGLE).performClick()
+        rule.waitForIdle()
+    }
+
+    /**
      * 打开「自动清洗」说明对话框 —— 替换字符输入框就在其中。
      *
-     * **为什么不放在编辑器行内**:命名页整页只有一个 LazyColumn,头部(编辑器)在真机上
-     * 已高达 ~862dp,视口仅剩约 130dp 给建议表;再插一行会把**主工作区**挤出屏幕
-     * (实测:加行后建议行完全不组合,14 项既有测试失败)。
-     * 放进对话框零高度成本,且与"清洗规则"的说明同处一室。
+     * **为什么不放在编辑器行内**:命名页整页只有一个 LazyColumn,编辑器展开时在真机
+     * 上高达 ~692dp,把它留在**固定区**会让建议行完全不组合(P6 实测:14 项既有测试失败);
+     * 故展开态的编辑器放进滚动容器(可达但可滚走),固定区只留一行摘要。
+     * 替换字符入口仍在对话框内:零高度成本,且与"清洗规则"的说明同处一室。
      */
     private fun openSanitizeDialog() {
+        expandEditor()
         rule.onNodeWithTag(TAG_PROPOSAL_LIST)
             .performScrollToNode(hasTestTag(TAG_SCHEME_SANITIZE_INFO))
         rule.waitForIdle()
@@ -152,7 +172,7 @@ class ReplacementFieldTest {
         rule.waitForIdle()
 
         // 留空 = 删除非法字符(领域层 append("")),必须给出说明而非静默
-        rule.onNodeWithText("留空 = 直接删除非法字符").assertExists()
+        rule.onNodeWithText(TestText.of(R.string.a_scheme_replace_empty)).assertExists()
     }
 
     @Test
@@ -204,7 +224,8 @@ class ReplacementFieldTest {
             components = illegalComponents,
         ))
         openSanitizeDialog()
-        rule.onNodeWithText("示例：封:面?.jpg → 封_面_.jpg").assertExists()
+        rule.onNodeWithText(TestText.of(R.string.a_scheme_example, ILLEGAL_INPUT, sanitizeName(ILLEGAL_INPUT, "_")))
+            .assertExists()
     }
 
     @Test
@@ -220,7 +241,8 @@ class ReplacementFieldTest {
         rule.onNodeWithTag(TAG_SCHEME_REPLACEMENT).performTextClearance()
         rule.onNodeWithTag(TAG_SCHEME_REPLACEMENT).performTextInput("#")
         rule.waitForIdle()
-        rule.onNodeWithText("示例：封:面?.jpg → 封#面#.jpg").assertExists()
+        rule.onNodeWithText(TestText.of(R.string.a_scheme_example, ILLEGAL_INPUT, sanitizeName(ILLEGAL_INPUT, "#")))
+            .assertExists()
     }
 
     @Test
@@ -235,8 +257,8 @@ class ReplacementFieldTest {
             components = illegalComponents,
         ))
         openSanitizeDialog()
-        val expected = sanitizeName("封:面?.jpg", "@")
-        rule.onNodeWithText("示例：封:面?.jpg → $expected").assertExists()
+        val expected = sanitizeName(ILLEGAL_INPUT, "@")
+        rule.onNodeWithText(TestText.of(R.string.a_scheme_example, ILLEGAL_INPUT, expected)).assertExists()
         assertEquals("封@面@.jpg", expected, "前置:领域函数应把 : 与 ? 都替换为 @")
     }
 }

@@ -4,6 +4,8 @@ import com.pixfold.d1.domain.mock.MockData
 import com.pixfold.d1.domain.model.NamingScheme
 import com.pixfold.d1.domain.model.NamingState
 import com.pixfold.d1.domain.naming.setRootDirNameOnScheme
+import com.pixfold.d1.domain.text.Msg
+import com.pixfold.d1.domain.text.TextKey
 import com.pixfold.d1.domain.workflowa.workflowAStateOf
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -90,16 +92,24 @@ class RenameLibraryPlanTest {
     fun `rename summary states that source files are preserved`() {
         val plan = buildLibraryRenamePlan(collections, state.orders, naming)
         val lines = renameSummaryLines(plan, emptySet())
-        assertTrue(lines.any { "源文件保留" in it }, "必须说明不删文件，实际 $lines")
-        assertTrue(lines.any { "将重命名" in it })
-        assertTrue(lines.none { "清理空目录" in it }, "未勾选时不该提清理")
+        val keys = lines.map { it.key }
+        assertTrue(TextKey.RenameSummarySourceKept in keys, "必须说明不删文件，实际 $keys")
+        assertEquals(
+            Msg(TextKey.RenameSummary, listOf(plan.runnable, plan.skipped)),
+            lines.first(),
+            "首行必须是「将重命名 N 项（跳过 M）」并带上真实计数",
+        )
+        assertTrue(TextKey.RenameSummaryCleanEmptyDirs !in keys, "未勾选时不该提清理")
     }
 
     @Test
     fun `rename summary warns when clean empty dirs is selected`() {
         val plan = buildLibraryRenamePlan(collections, state.orders, naming)
         val lines = renameSummaryLines(plan, setOf(DangerAction.CleanEmptyDirs))
-        assertTrue(lines.any { "清理空目录" in it }, "勾选后必须警告，实际 $lines")
+        assertTrue(
+            TextKey.RenameSummaryCleanEmptyDirs in lines.map { it.key },
+            "勾选后必须警告，实际 ${lines.map { it.key }}",
+        )
     }
 
     @Test

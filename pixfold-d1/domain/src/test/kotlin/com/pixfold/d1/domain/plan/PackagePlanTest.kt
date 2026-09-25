@@ -2,6 +2,8 @@ package com.pixfold.d1.domain.plan
 
 import com.pixfold.d1.domain.mock.MockDataB
 import com.pixfold.d1.domain.model.LangChoice
+import com.pixfold.d1.domain.text.Msg
+import com.pixfold.d1.domain.text.TextKey
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -9,16 +11,26 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 /**
- * 打包计划与 `describe()` 文案契约(规格 §9.1 / 验收第 15 项)。
+ * 打包计划与 `describe()` 契约(规格 §9.1 / 验收第 15 项)。
  *
- * 第 15 项要的是「操作清单 + 冲突/跳过原因」——故测试必须断言**文案内容**,
+ * 第 15 项要的是「操作清单 + 冲突/跳过原因」——故测试必须断言**计划内容**,
  * 而不是"有个列表非空"。这样才能保证计划真的说清了"要做什么"。
+ *
+ * **断言的是 [Msg] 结构(key + args)而非成品文案**:领域层不产出语言,
+ * 成品文案在 app 侧由 `textOf(...)` 解析。故本文件在换语言后仍然有效,
+ * 而"漏了一条""参数传错/传反"会被抓住。
+ * 逐字文案由 `pixfold-d1/app/src/test/.../PlanUiTest.kt` 那一侧守卫。
  */
 class PackagePlanTest {
 
     private val library = MockDataB.library
     private val aot1 = library.volumes.first { it.id == "aot-1" }
     private val op102 = library.volumes.first { it.id == "op-102" } // outputExists = true
+
+    /** `describe()` 产出的键序列 —— 顺序本身是 §9.1 契约的一部分。 */
+    private fun List<Msg>.keys(): List<TextKey> = map { it.key }
+
+    private fun List<Msg>.line(key: TextKey): Msg = single { it.key == key }
 
     // ---- 只处理 included ----
 
@@ -36,45 +48,59 @@ class PackagePlanTest {
         assertTrue(plans.none { it.volume.id == "aot-1" })
     }
 
-    // ---- describe() 文案契约(§9.1 按序) ----
+    // ---- describe() 契约(§9.1 按序) ----
 
     @Test
     fun `describe follows the contract order for a normal volume`() {
         val plan = buildPackagePlans(listOf(aot1)).single()
         val lines = plan.describe()
         assertEquals(3, lines.size, "无危险动作时应为 3 条")
-        assertTrue(lines[0].startsWith("创建 CBZ → "), "第 1 条应为创建 CBZ，实际 ${lines[0]}")
-        assertTrue(lines[1].startsWith("写入 ComicInfo.xml（"), "第 2 条应为写入 XML，实际 ${lines[1]}")
-        assertTrue(lines[2].startsWith("按页序打包 16 张并重命名为页码（0001 起）"), "第 3 条实际 ${lines[2]}")
+        assertEquals(
+            listOf(TextKey.PackCreateCbz, TextKey.PackWriteComicInfo, TextKey.PackPackPages),
+            lines.keys(),
+            "第 1 条创建 CBZ / 第 2 条写入 XML / 第 3 条按页序打包",
+        )
+        assertEquals(listOf("进击的巨人 第01卷.cbz"), lines.line(TextKey.PackCreateCbz).args)
+        assertEquals(
+            Msg(TextKey.PackPackPages, listOf(16)),
+            lines.line(TextKey.PackPackPages),
+            "第 3 条必须带上真实的张数(快照值)",
+        )
     }
 
     @Test
     fun `describe includes the actual metadata values in the xml line`() {
         val plan = buildPackagePlans(listOf(aot1)).single()
-        val xmlLine = plan.describe()[1]
-        assertTrue("Title=进击的巨人" in xmlLine, "应含实际 Title，实际 $xmlLine")
-        assertTrue("Series=进击的巨人" in xmlLine, "应含实际 Series，实际 $xmlLine")
-        assertTrue("Number=1" in xmlLine, "应含实际 Number，实际 $xmlLine")
-        assertTrue("LanguageISO=不写入" in xmlLine, "语言未确认应写「不写入」，实际 $xmlLine")
+        val xmlLine = plan.describe().line(TextKey.PackWriteComicInfo)
+        val (title, series, number, _, lang) = xmlLine.args
+        assertEquals("进击的巨人", title, "应含实际 Title")
+        assertEquals("进击的巨人", series, "应含实际 Series")
+        assertEquals("1", number, "应含实际 Number")
+        assertEquals(TextKey.PackValueNotWritten, (lang as Msg).key, "语言未确认应写「不写入」")
     }
 
     @Test
-    fun `describe renders empty writer as the literal 空`() {
+    fun `describe renders empty writer as the placeholder key`() {
         val plan = buildPackagePlans(listOf(aot1.copy(writer = ""))).single()
-        assertTrue("Writer=空" in plan.describe()[1], "空作者应显示「空」，实际 ${plan.describe()[1]}")
+        val writer = plan.describe().line(TextKey.PackWriteComicInfo).args[3]
+        // 占位词必须是**键**而不是中文字面量 —— 否则英文界面下会冒出中文「空」。
+        assertEquals(TextKey.PackValueEmpty, (writer as Msg).key, "空作者应走可翻译的占位键")
     }
 
     @Test
-    fun `describe renders missing volume number as 未设置`() {
+    fun `describe renders missing volume number as the placeholder key`() {
         val aot0 = library.volumes.first { it.id == "aot-0" } // volume = null
         val plan = buildPackagePlans(listOf(aot0)).single()
-        assertTrue("Number=未设置" in plan.describe()[1], "缺卷号应显示「未设置」，实际 ${plan.describe()[1]}")
+        val number = plan.describe().line(TextKey.PackWriteComicInfo).args[2]
+        assertEquals(TextKey.PackValueUnset, (number as Msg).key, "缺卷号应走可翻译的占位键")
     }
 
     @Test
     fun `describe writes the langIso when language is confirmed`() {
         val plan = buildPackagePlans(listOf(aot1.copy(language = LangChoice.Ja))).single()
-        assertTrue("LanguageISO=ja" in plan.describe()[1], "已确认 ja 应写入，实际 ${plan.describe()[1]}")
+        val lang = plan.describe().line(TextKey.PackWriteComicInfo).args[4]
+        // 真实语言码是**数据**(ComicInfo.xml 的 LanguageISO 字段),不翻译,故仍是裸字符串。
+        assertEquals("ja", lang, "已确认 ja 应写入真实语言码")
     }
 
     @Test
@@ -85,7 +111,10 @@ class PackagePlanTest {
         val del = buildPackagePlans(listOf(aot1), sourcePolicy = SourcePolicy.Delete).single()
         val lines = del.describe()
         assertEquals(4, lines.size)
-        assertEquals("打包后删除源目录：E:\\漫画库\\进击的巨人\\第01卷", lines[3])
+        assertEquals(
+            Msg(TextKey.PackDeleteSourceDir, listOf("E:\\漫画库\\进击的巨人\\第01卷")),
+            lines[3],
+        )
     }
 
     // ---- 冲突与跳过 ----
@@ -134,8 +163,9 @@ class PackagePlanTest {
     fun `skip policy marks the plan skipped and describe returns exactly one line with the reason`() {
         val plan = buildPackagePlans(listOf(op102), conflictPolicy = OutputConflictPolicy.Skip).single()
         assertTrue(plan.skipped)
-        assertEquals("跳过：输出已存在 E:\\漫画库\\_output/海贼王 第102卷.cbz", plan.describe().single())
-        assertEquals("输出已存在 E:\\漫画库\\_output/海贼王 第102卷.cbz", plan.skipReason)
+        val expected = Msg(TextKey.PackSkipOutputExists, listOf("E:\\漫画库\\_output/海贼王 第102卷.cbz"))
+        assertEquals(expected, plan.describe().single(), "跳过的计划只应产出一行，且内容是跳过原因")
+        assertEquals(expected, plan.skipReason, "skipReason 与 describe() 的那一行必须是同一个键+参数")
     }
 
     @Test

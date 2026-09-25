@@ -88,10 +88,15 @@ class PreviewStateTest {
         assertTrue(only.hasPrevious.not())
     }
 
+    // 页码**文案**不在这里断言:`pageLabel` 已从 PreviewState 移除 ——
+    // 本类不是 @Composable,取不到 stringResource,文案由 ImagePreview 现场渲染
+    // (见 ImagePreviewTest 的 `next button actually updates the visible label`)。
+    // 这里只守"下标从 0 起、边界钳制"这些**与语言无关**的事实。
     @Test
-    fun `page label is one based`() {
-        val s = previewStateOf(0, 7)
-        assertEquals("第 1 / 7 页", s.pageLabel)
-        assertEquals("第 7 / 7 页", previewStateOf(6, 7).pageLabel)
+    fun `index is clamped within bounds`() {
+        assertEquals(0, previewStateOf(0, 7).previous().index, "首页的前一页仍是首页")
+        assertEquals(6, previewStateOf(6, 7).next().index, "末页的后一页仍是末页")
+        assertEquals(0, previewStateOf(0, 7).index)
+        assertEquals(6, previewStateOf(6, 7).index)
     }
 }

@@ -1,11 +1,15 @@
 package com.pixfold.d1.ui.workflowa
 
+import android.content.Context
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.test.core.app.ApplicationProvider
+import com.pixfold.d1.R
+import com.pixfold.d1.TestText
 import com.pixfold.d1.domain.mock.MockData
 import com.pixfold.d1.domain.model.ImageCollection
 import com.pixfold.d1.domain.model.SortField
@@ -28,6 +32,11 @@ import kotlin.test.assertTrue
 @Config(sdk = [34], qualifiers = "w400dp-h1000dp")
 class BatchRuleUiTest {
 
+    private val context: Context get() = ApplicationProvider.getApplicationContext()
+
+    /** [batchLabelRes] 返回的是**资源 id**而非成品文案(它要在非组合上下文里被调用)。 */
+    private fun batchLabel(isCustom: Boolean) = context.getString(batchLabelRes(isCustom))
+
     @get:Rule
     val rule = createComposeRule()
 
@@ -35,6 +44,17 @@ class BatchRuleUiTest {
 
     private fun setPage() {
         rule.setContent { SortAndPreviewPage(collections) }
+    }
+
+    /**
+     * 展开排序规则编辑器。
+     *
+     * 用户 2026-09-25 指定:步骤 1 的规则编辑器**默认折叠**(把高度让给网格/列表),
+     * 折叠态只剩一行摘要栏。凡是要点规则芯片(字段 / 方向 / 增删级)的用例都得先展开。
+     */
+    private fun expandRuleEditor() {
+        rule.onNodeWithTag(TAG_RULE_SUMMARY_TOGGLE).performClick()
+        rule.waitForIdle()
     }
 
     @Test
@@ -55,17 +75,17 @@ class BatchRuleUiTest {
 
         // 用"共 N 张"作为判据:各集合张数不同(30/16/12),且该文本唯一。
         // (不能用文件名断言 —— scan 的 ch01/page_01 与 ch02/page_01 同名,会匹配到 2 个节点)
-        rule.onNodeWithText("共 ${trip.images.size} 张").assertIsDisplayed()
+        rule.onNodeWithText(TestText.plural(R.plurals.a_image_count, trip.images.size, trip.images.size)).assertIsDisplayed()
 
         rule.onNodeWithTag(collectionTag("scan")).performClick()
-        rule.onNodeWithText("共 ${scan.images.size} 张").assertIsDisplayed()
+        rule.onNodeWithText(TestText.plural(R.plurals.a_image_count, scan.images.size, scan.images.size)).assertIsDisplayed()
 
         rule.onNodeWithTag(collectionTag("misc")).performClick()
-        rule.onNodeWithText("共 ${misc.images.size} 张").assertIsDisplayed()
+        rule.onNodeWithText(TestText.plural(R.plurals.a_image_count, misc.images.size, misc.images.size)).assertIsDisplayed()
 
         // 切回 trip:内容真的随集合切换
         rule.onNodeWithTag(collectionTag("trip")).performClick()
-        rule.onNodeWithText("共 ${trip.images.size} 张").assertIsDisplayed()
+        rule.onNodeWithText(TestText.plural(R.plurals.a_image_count, trip.images.size, trip.images.size)).assertIsDisplayed()
     }
 
     @Test
@@ -84,12 +104,12 @@ class BatchRuleUiTest {
         val active = collections.first()
 
         // 默认:非独立 -> 显示"批次默认"
-        rule.onNodeWithText(batchLabel(active.id, false)).assertIsDisplayed()
+        rule.onNodeWithText(batchLabel(false)).assertIsDisplayed()
 
         rule.onNodeWithTag(TAG_CUSTOM_RULE_TOGGLE).performClick()
 
         // 转独立 -> 文案变为"本组独立"
-        rule.onNodeWithText(batchLabel(active.id, true)).assertIsDisplayed()
+        rule.onNodeWithText(batchLabel(true)).assertIsDisplayed()
     }
 
     @Test
@@ -104,6 +124,7 @@ class BatchRuleUiTest {
         // (新交互:再次点击已选中字段即切换升降序)
         rule.onNodeWithTag(TAG_CUSTOM_RULE_TOGGLE).performClick()
         // 变动即自动应用(已无"应用排序"按钮)
+        expandRuleEditor()
         rule.onNodeWithTag(fieldTag(0, SortField.NaturalName)).performClick()
         rule.onNodeWithTag(fieldTag(0, SortField.NaturalName)).performClick()
 
@@ -128,7 +149,7 @@ class BatchRuleUiTest {
         // **关键补充**(变异测试发现):切回 trip 时必须记得"它仍是独立集合"。
         // 若页面把 apply 走了批次路径,独立标记会被抹掉 -> 这里会显示"批次默认规则"。
         rule.onNodeWithTag(collectionTag("trip")).performClick()
-        rule.onNodeWithText(batchLabel("trip", true)).assertIsDisplayed()
+        rule.onNodeWithText(batchLabel(true)).assertIsDisplayed()
         assertTrue(
             hasCardWithText(tripDescendingFirst),
             "切回独立集合时应仍是降序(规则被保留),首张应为 $tripDescendingFirst",
@@ -163,6 +184,7 @@ class BatchRuleUiTest {
     @Test
     fun `each level shows a direction indicator on its selected field`() {
         setPage()
+        expandRuleEditor()
         // 新交互:方向由"选中字段后的实心三角"表示,每级各有一个
         val l0 = rule.onNodeWithTag(TAG_SORT_RULE_EDITOR).fetchSemanticsNode()
         // 默认规则两级:第1级 DirName,第2级 NaturalName
@@ -182,6 +204,7 @@ class BatchRuleUiTest {
     @Test
     fun `add and remove level buttons exist with limits`() {
         setPage()
+        expandRuleEditor()
         rule.onNodeWithTag(TAG_RULE_ADD).assertIsDisplayed()
         rule.onNodeWithTag(ruleRemoveTag(0)).assertIsDisplayed()
     }
@@ -189,9 +212,33 @@ class BatchRuleUiTest {
     @Test
     fun `sort field options include all declared fields`() {
         setPage()
+        expandRuleEditor()
         // 字段可改:第 1 级能选到每个 SortField
         SortField.entries.forEach { f ->
             rule.onNodeWithTag("${ruleLevelTag(0)}-${f.name}").assertIsDisplayed()
         }
+    }
+
+    @Test
+    fun `rule editor is collapsed by default and toggles`() {
+        setPage()
+
+        // 默认折叠:摘要栏在,编辑器不在(把高度让给网格 —— 用户 2026-09-25 指定)
+        rule.onNodeWithTag(TAG_RULE_SUMMARY_BAR).assertIsDisplayed()
+        rule.onNodeWithTag(TAG_RULE_SUMMARY_TOGGLE).assertIsDisplayed()
+        rule.onNodeWithTag(TAG_SORT_RULE_EDITOR).assertDoesNotExist()
+
+        // 折叠态仍须显示当前规则(约束 2「建议 ≠ 事实」:折叠的是编辑入口,不是事实本身)
+        val summaryPrefix = TestText.of(R.string.a_rule_summary, "").trim()
+        rule.onNodeWithText(summaryPrefix, substring = true).assertIsDisplayed()
+
+        // 展开 -> 编辑器出现
+        expandRuleEditor()
+        rule.onNodeWithTag(TAG_SORT_RULE_EDITOR).assertIsDisplayed()
+
+        // 再点收起 -> 编辑器消失
+        rule.onNodeWithTag(TAG_RULE_SUMMARY_TOGGLE).performClick()
+        rule.waitForIdle()
+        rule.onNodeWithTag(TAG_SORT_RULE_EDITOR).assertDoesNotExist()
     }
 }

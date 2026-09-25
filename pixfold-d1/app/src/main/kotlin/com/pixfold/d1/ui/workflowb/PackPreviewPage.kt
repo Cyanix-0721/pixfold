@@ -14,6 +14,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material3.Button
+import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
@@ -22,10 +23,13 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
+import com.pixfold.d1.R
 import com.pixfold.d1.domain.comic.includedVolumes
 import com.pixfold.d1.domain.plan.ConfirmFlowState
 import com.pixfold.d1.domain.plan.OutputConflictPolicy
@@ -44,6 +48,8 @@ import com.pixfold.d1.domain.model.ComicVolume
 import com.pixfold.d1.domain.model.LangChoice
 import com.pixfold.d1.domain.workflowb.WorkflowBState
 import com.pixfold.d1.domain.workflowb.selectVolume
+import com.pixfold.d1.ui.components.PageActionBar
+import com.pixfold.d1.ui.text.textOf
 
 const val TAG_PACK_PAGE = "pack-page"
 const val TAG_PACK_LIST = "pack-list"
@@ -91,6 +97,7 @@ fun PackPreviewPage(
     onCancelConfirm: () -> Unit = {},
     onExecute: () -> Unit = {},
     showPlanSection: Boolean = false,
+    onBack: (() -> Unit)? = null,
 ) {
     val volume = libraryState.activeVolume
     val preview = previewOf(volume)
@@ -111,23 +118,25 @@ fun PackPreviewPage(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             libraryState.volumes.forEach { v ->
+                val chipCd = stringResource(R.string.pack_volume_chip_cd, v.id)
                 FilterChip(
                     selected = v.id == volume.id,
                     onClick = { onLibraryChange(selectVolume(libraryState, v.id)) },
                     // 未勾选的卷在 chip 上直接标出:否则用户在步骤 1 取消勾选后,
                     // 到步骤 3 仍能看到完整预览,会误以为它也会被打包。
                     label = {
+                        val title = v.title.ifEmpty { v.id }
                         Text(
                             if (v.included) {
-                                v.title.ifEmpty { v.id }
+                                title
                             } else {
-                                "${v.title.ifEmpty { v.id }}（未勾选）"
+                                stringResource(R.string.pack_volume_excluded, title)
                             },
                         )
                     },
                     modifier = Modifier
                         .testTag(packVolumeChipTag(v.id))
-                        .semantics { contentDescription = "预览卷 ${v.id}" },
+                        .semantics { contentDescription = chipCd },
                 )
             }
         }
@@ -154,7 +163,7 @@ fun PackPreviewPage(
                         .padding(horizontal = 12.dp),
                 ) {
                     Text(
-                        text = "ComicInfo.xml 预览",
+                        text = stringResource(R.string.pack_xml_title),
                         style = MaterialTheme.typography.titleSmall,
                         color = MaterialTheme.colorScheme.onBackground,
                     )
@@ -177,7 +186,7 @@ fun PackPreviewPage(
             item(key = "page-header") {
                 Column(modifier = Modifier.fillMaxWidth()) {
                     Text(
-                        text = "页码预览（按当前页序重编号，共 ${preview.pages.size} 项）",
+                        text = pluralStringResource(R.plurals.pack_page_header, preview.pages.size, preview.pages.size),
                         style = MaterialTheme.typography.titleSmall,
                         color = MaterialTheme.colorScheme.onBackground,
                         modifier = Modifier
@@ -185,7 +194,7 @@ fun PackPreviewPage(
                             .testTag(TAG_PAGE_PREVIEW_COUNT),
                     )
                     Text(
-                        text = "（序号从 001 起，扩展名统一小写；标「人工调整」的页被拖拽过）",
+                        text = stringResource(R.string.pack_page_hint),
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier
@@ -193,8 +202,13 @@ fun PackPreviewPage(
                             .testTag(TAG_PAGE_PREVIEW),
                     )
                     if (!preview.consistent) {
+                        // pageIssues 是领域层的 `List<Msg>` —— 逐条解析后在**这里**拼接,
+                        // 连接符也是资源(中英标点不同)。`map` 必须内联:`joinToString` 的
+                        // transform 是普通 lambda,里面调不了 @Composable。
+                        val issueSeparator = stringResource(R.string.pack_page_issue_separator)
+                        val issues = preview.pageIssues.map { textOf(it) }.joinToString(issueSeparator)
                         Text(
-                            text = "⚠️ 页码与页序不一致：" + preview.pageIssues.joinToString("；"),
+                            text = stringResource(R.string.pack_page_issues, issues),
                             style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.error,
                             modifier = Modifier.padding(horizontal = 12.dp),
@@ -232,7 +246,7 @@ fun PackPreviewPage(
                     if (volume.pageOrder.isManual(page.item.id)) {
                         // 人工调整过的页:预览必须能看出来(归档原型用蓝字标注同一意图)
                         Text(
-                            text = "人工调整",
+                            text = stringResource(R.string.pack_page_manual),
                             style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.primary,
                         )
@@ -253,7 +267,7 @@ fun PackPreviewPage(
                     Column(modifier = Modifier.fillMaxWidth()) {
                         HorizontalDivider(modifier = Modifier.padding(top = 8.dp))
                         Text(
-                            text = "执行计划",
+                            text = stringResource(R.string.pack_plan_title),
                             style = MaterialTheme.typography.titleSmall,
                             color = MaterialTheme.colorScheme.onBackground,
                             modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
@@ -262,7 +276,7 @@ fun PackPreviewPage(
                         // ---- 策略选择(默认 Rename / Keep) ----
                         Column(modifier = Modifier.padding(horizontal = 12.dp)) {
                             Text(
-                                text = "输出冲突策略",
+                                text = stringResource(R.string.pack_conflict_policy_title),
                                 style = MaterialTheme.typography.labelMedium,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
@@ -276,13 +290,13 @@ fun PackPreviewPage(
                                     FilterChip(
                                         selected = conflictPolicy == p,
                                         onClick = { onConflictPolicyChange(p) },
-                                        label = { Text(p.label) },
+                                        label = { Text(textOf(p.textKey)) },
                                         modifier = Modifier.testTag("policy-conflict-" + p.name),
                                     )
                                 }
                             }
                             Text(
-                                text = "源目录处置",
+                                text = stringResource(R.string.pack_source_policy_title),
                                 style = MaterialTheme.typography.labelMedium,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 modifier = Modifier.padding(top = 4.dp),
@@ -297,7 +311,7 @@ fun PackPreviewPage(
                                     FilterChip(
                                         selected = sourcePolicy == p,
                                         onClick = { onSourcePolicyChange(p) },
-                                        label = { Text(p.label) },
+                                        label = { Text(textOf(p.textKey)) },
                                         modifier = Modifier.testTag("policy-source-" + p.name),
                                     )
                                 }
@@ -305,12 +319,22 @@ fun PackPreviewPage(
                             FilterChip(
                                 selected = cleanEmptyDirs,
                                 onClick = { onCleanEmptyDirsChange(!cleanEmptyDirs) },
-                                label = { Text(if (cleanEmptyDirs) "清理空目录：开（危险）" else "清理空目录：关（默认）") },
+                                label = {
+                                    Text(
+                                        stringResource(
+                                            if (cleanEmptyDirs) {
+                                                R.string.pack_clean_empty_on
+                                            } else {
+                                                R.string.pack_clean_empty_off
+                                            },
+                                        ),
+                                    )
+                                },
                                 modifier = Modifier.testTag(TAG_CLEAN_EMPTY_TOGGLE),
                             )
                             if (sourcePolicy == SourcePolicy.Delete) {
                                 Text(
-                                    text = "⚠️ 已选择删除源目录：执行前需独立二次确认",
+                                    text = stringResource(R.string.pack_delete_warning),
                                     style = MaterialTheme.typography.labelMedium,
                                     color = MaterialTheme.colorScheme.error,
                                     modifier = Modifier.testTag(TAG_DELETE_WARNING),
@@ -322,17 +346,38 @@ fun PackPreviewPage(
                         for (i in plans.indices) {
                             PlanRow(plans[i], i)
                         }
-
-                        Button(
-                            onClick = onStartConfirm,
-                            modifier = Modifier
-                                .padding(horizontal = 12.dp, vertical = 8.dp)
-                                .testTag(TAG_PLAN_CONFIRM)
-                                .semantics { contentDescription = "确认打包" },
-                        ) { Text("确认打包") }
                     }
                 }
             }
+        }
+
+        // 底栏:左 = 返回上一步,右 = 确认打包(用户 2026-09-25 指定)。
+        // 终局动作原先在计划区末尾,计划覆盖全部 included 卷,长列表要滚很久才够得到,
+        // 且未滚到之前按钮根本没被组合。与 A 侧 [TAG_A_PLAN_CONFIRM] 一致。
+        if (showPlanSection) {
+            val back = onBack
+            val backCd = stringResource(R.string.b_step_back_cd)
+            val confirmCd = stringResource(R.string.pack_confirm_cd)
+            PageActionBar(
+                leading = {
+                    if (back != null) {
+                        FilledTonalButton(
+                            onClick = back,
+                            modifier = Modifier
+                                .testTag(TAG_B_STEP_BACK)
+                                .semantics { contentDescription = backCd },
+                        ) { Text(stringResource(R.string.b_step_back)) }
+                    }
+                },
+                trailing = {
+                    Button(
+                        onClick = onStartConfirm,
+                        modifier = Modifier
+                            .testTag(TAG_PLAN_CONFIRM)
+                            .semantics { contentDescription = confirmCd },
+                    ) { Text(stringResource(R.string.pack_confirm)) }
+                },
+            )
         }
     }
 
@@ -358,6 +403,13 @@ const val TAG_DELETE_WARNING = "pack-delete-warning"
 
 @Composable
 private fun PackHeader(volume: ComicVolume, includedCount: Int, totalCount: Int) {
+    val outputText = stringResource(R.string.pack_output, "${volume.outputDir}/${volume.cbzFileName}") +
+        if (volume.outputExists) stringResource(R.string.pack_output_exists) else ""
+    val languageText = stringResource(R.string.pack_language_iso, langLabel(volume))
+    val includedText = pluralStringResource(R.plurals.pack_included_count, includedCount, includedCount, totalCount) +
+        if (includedCount < totalCount) stringResource(R.string.pack_included_count_hint) else ""
+    // pendingIssues 是领域 `List<Msg>` —— 逐条解析后拼接(`map` 内联,理由同页码问题行)。
+    val issuesText = volume.pendingIssues.map { textOf(it) }.joinToString(" / ")
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -369,8 +421,7 @@ private fun PackHeader(volume: ComicVolume, includedCount: Int, totalCount: Int)
             color = MaterialTheme.colorScheme.onBackground,
         )
         Text(
-            text = "输出：${volume.outputDir}/${volume.cbzFileName}" +
-                if (volume.outputExists) "（已存在同名文件）" else "",
+            text = outputText,
             style = MaterialTheme.typography.labelSmall,
             color = if (volume.outputExists) {
                 MaterialTheme.colorScheme.error
@@ -379,14 +430,14 @@ private fun PackHeader(volume: ComicVolume, includedCount: Int, totalCount: Int)
             },
         )
         Text(
-            text = "LanguageISO：${langLabel(volume)}",
+            text = languageText,
             style = MaterialTheme.typography.labelSmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
         if (!volume.included) {
             // 未勾选 = 本次不打包。必须显式说明,否则"能看到预览"会被当成"会被打包"。
             Text(
-                text = "⚠️ 本卷未勾选，本次不会打包（在步骤 1 或步骤 2 的卷头可重新勾选）",
+                text = stringResource(R.string.pack_excluded_warning),
                 style = MaterialTheme.typography.labelMedium,
                 color = MaterialTheme.colorScheme.error,
                 modifier = Modifier.testTag(TAG_PACK_EXCLUDED),
@@ -395,15 +446,14 @@ private fun PackHeader(volume: ComicVolume, includedCount: Int, totalCount: Int)
         // 用领域层 includedVolumes 求"本次实际会打包几卷"——预览必须回答"这次到底做什么",
         // 而不是只展示当前这一卷(用户勾选状态改了却看不到反馈,是 P3 那类"界面没用上领域规则")。
         Text(
-            text = "本次将打包 $includedCount / $totalCount 卷" +
-                if (includedCount < totalCount) "（未勾选的卷不会打包）" else "",
+            text = includedText,
             style = MaterialTheme.typography.labelSmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.testTag(TAG_PACK_INCLUDED_COUNT),
         )
         if (volume.pendingIssues.isNotEmpty()) {
             Text(
-                text = "待确认：" + volume.pendingIssues.joinToString(" / "),
+                text = stringResource(R.string.meta_pending_prefix) + issuesText,
                 style = MaterialTheme.typography.labelMedium,
                 color = MaterialTheme.colorScheme.tertiary,
                 modifier = Modifier.testTag(TAG_PACK_PENDING),
@@ -413,12 +463,18 @@ private fun PackHeader(volume: ComicVolume, includedCount: Int, totalCount: Int)
     }
 }
 
-/** LanguageISO 的实际取值说明(不写入时给出"为什么")。 */
+/**
+ * LanguageISO 的实际取值说明(不写入时给出"为什么")。
+ *
+ * 因为要取 `stringResource`,本函数是 `@Composable`;`ifEmpty` 是 inline 函数,
+ * 故其 lambda 里可以直接调 composable。
+ */
+@Composable
 private fun langLabel(volume: ComicVolume): String = when (volume.language) {
     LangChoice.Zh -> "zh"
     LangChoice.Ja -> "ja"
-    LangChoice.Other -> volume.otherLangCode.ifEmpty { "（未填代码，不写入）" }
-    LangChoice.Unset -> "不写入（语言未确认）"
-    LangChoice.Unknown -> "不写入（未知）"
-    LangChoice.Skip -> "不写入"
+    LangChoice.Other -> volume.otherLangCode.ifEmpty { stringResource(R.string.pack_lang_other_empty) }
+    LangChoice.Unset -> stringResource(R.string.pack_lang_unset)
+    LangChoice.Unknown -> stringResource(R.string.pack_lang_unknown)
+    LangChoice.Skip -> stringResource(R.string.pack_lang_skip)
 }

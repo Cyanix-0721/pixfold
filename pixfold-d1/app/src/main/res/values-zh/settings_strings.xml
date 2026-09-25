@@ -1,0 +1,77 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  设置页文案(中文)。
+
+  ⚠️ 与默认文件 `values/settings_strings.xml` 必须同步增删 —— 缺一边会让 lint 的
+  `MissingTranslation` / `ExtraTranslation` 在 `warningsAsErrors = true` 下硬失败。
+-->
+
+<resources>
+    <string name="settings_title">设置</string>
+    <string name="settings_section_appearance">外观</string>
+    <string name="settings_theme_mode">主题模式</string>
+    <string name="settings_theme_system">跟随系统</string>
+    <string name="settings_theme_light">浅色</string>
+    <string name="settings_theme_dark">深色</string>
+    <string name="settings_monet">动态取色</string>
+    <string name="settings_monet_desc">从壁纸提取配色（Android 12+）</string>
+    <string name="settings_accent">强调色</string>
+    <string name="settings_color_style">色彩风格</string>
+    <string name="settings_color_spec">色彩标准</string>
+    <string name="settings_pure_black">深色使用纯黑背景</string>
+    <string name="settings_pure_black_desc">OLED 更省电；层级改由边框表达</string>
+    <string name="settings_section_language">语言</string>
+    <string name="settings_language">语言</string>
+    <string name="settings_language_note">其他页面的多语言将在后续版本补全</string>
+    <string name="settings_section_behavior">行为</string>
+    <string name="settings_storage">文件访问方式</string>
+    <string name="settings_storage_saf_desc">通过系统文件选择器授权目录，隐私友好、无需额外权限</string>
+    <string name="settings_storage_all_desc">直接读写存储，首次使用时需授权</string>
+    <string name="settings_storage_note">将在接入真实文件系统后生效</string>
+    <string name="settings_section_about">关于</string>
+    <string name="settings_version">版本</string>
+    <string name="settings_dev_suffix">开发版</string>
+    <string name="settings_repo">仓库地址</string>
+    <string name="settings_repo_desc">源码与文档</string>
+    <string name="settings_release">发布页面</string>
+    <string name="settings_release_desc">查看最新版本</string>
+    <string name="settings_author">作者</string>
+    <string name="settings_licenses">开源许可</string>
+    <string name="settings_reset">恢复默认设置</string>
+    <string name="settings_reset_title">恢复默认设置？</string>
+    <string name="settings_reset_body">所有外观、语言与行为设置将回到初始值。</string>
+    <string name="settings_reset_cancel">取消</string>
+    <string name="settings_reset_confirm">恢复</string>
+    <string name="settings_open_failed">未找到可打开链接的应用</string>
+    <string name="settings_back">返回</string>
+    <string name="licenses_title">开源许可</string>
+    <string name="licenses_thanks">本应用使用了以下开源组件，特此致谢。</string>
+    <string name="licenses_own">本项目</string>
+    <string name="licenses_third_party">第三方组件</string>
+    <!-- 枚举取值文案(中文) -->
+    <string name="accent_default">靛蓝</string>
+    <string name="accent_blue">蓝</string>
+    <string name="accent_green">绿</string>
+    <string name="accent_purple">紫</string>
+    <string name="accent_orange">橙</string>
+    <string name="accent_pink">粉</string>
+    <string name="style_tonal_spot">标准</string>
+    <string name="style_vibrant">鲜艳</string>
+    <string name="style_expressive">活泼</string>
+    <string name="style_neutral">中性</string>
+    <string name="style_monochrome">单色</string>
+    <string name="style_fidelity">还原</string>
+    <string name="style_content">内容</string>
+    <string name="style_rainbow">彩虹</string>
+    <string name="style_fruit_salad">缤纷</string>
+    <string name="spec_2021">Material 3 (2021)</string>
+    <string name="spec_2025">Material 3 Expressive (2025)</string>
+    <string name="language_chinese">中文</string>
+    <string name="language_english">English</string>
+    <string name="storage_saf">SAF（推荐）</string>
+    <string name="storage_all">全部文件访问</string>
+    <string name="settings_predictive_back">返回手势跟随动画</string>
+    <string name="settings_predictive_back_desc">返回手势进行中实时预览退场；关闭则立即切走</string>
+    <string name="licenses_correction_title">许可更正</string>
+    <string name="licenses_correction_body">com.materialkolor:material-color-utilities 的构件 POM 声明为 MIT，但其模块内 LICENSE 为 Apache-2.0（源码移植自 Google 的 material-foundation/material-color-utilities）。本应用按 Apache-2.0 履行声明义务。</string>
+</resources>

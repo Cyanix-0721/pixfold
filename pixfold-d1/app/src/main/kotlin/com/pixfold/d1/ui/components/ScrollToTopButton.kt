@@ -17,9 +17,11 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
+import com.pixfold.d1.R
 
 const val TAG_SCROLL_TO_TOP = "scroll-to-top"
 
@@ -41,6 +43,8 @@ fun ScrollToTopButton(
     modifier: Modifier = Modifier,
 ) {
     Box(modifier = modifier) {
+        // `stringResource` 不能在 `semantics {}` 内调用,提到组件顶层取出。
+        val scrollToTopCd = stringResource(R.string.common_scroll_to_top)
         AnimatedVisibility(
             visible = visible,
             enter = fadeIn(),
@@ -52,7 +56,7 @@ fun ScrollToTopButton(
                     .padding(16.dp)
                     .size(48.dp) // M3 触控下限
                     .testTag(TAG_SCROLL_TO_TOP)
-                    .semantics { contentDescription = "回到顶部" },
+                    .semantics { contentDescription = scrollToTopCd },
                 colors = IconButtonDefaults.filledTonalIconButtonColors(
                     containerColor = MaterialTheme.colorScheme.secondaryContainer,
                     contentColor = MaterialTheme.colorScheme.onSecondaryContainer,

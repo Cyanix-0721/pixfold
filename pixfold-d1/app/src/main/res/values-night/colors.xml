@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  自适应图标的底色(深色档):比浅色档的 Indigo 500 更深一档的 Indigo 900。
+  前景的白色三条块不变,因此深色档下图形与底色的对比度反而更高。
+  不需要这个行为时,删掉本文件即可回退为单一底色。
+-->
+<resources>
+    <color name="ic_launcher_background">#1A237E</color>
+</resources>

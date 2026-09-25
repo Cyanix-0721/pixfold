@@ -8,6 +8,8 @@ import com.pixfold.d1.domain.naming.buildProposals
 import com.pixfold.d1.domain.model.ImageCollection
 import com.pixfold.d1.domain.model.NamingState
 import com.pixfold.d1.domain.sort.PageOrderState
+import com.pixfold.d1.domain.text.Msg
+import com.pixfold.d1.domain.text.TextKey
 
 /**
  * 工作流 A 的整库改名计划(规格 §6.4 末条:「工作流 A 的计划遍历**所有集合**拼接成整库计划」)。
@@ -63,11 +65,11 @@ fun buildLibraryRenamePlan(
 fun workflowADangerActions(cleanEmptyDirs: Boolean): Set<DangerAction> =
     if (cleanEmptyDirs) setOf(DangerAction.CleanEmptyDirs) else emptySet()
 
-/** 工作流 A 通用确认框要列出的影响范围。 */
-fun renameSummaryLines(plan: LibraryRenamePlan, dangers: Set<DangerAction>): List<String> = buildList {
-    add("将重命名 ${plan.runnable} 项（跳过 ${plan.skipped} 项冲突）")
-    add("源文件保留，不删除任何文件")
+/** 工作流 A 通用确认框要列出的影响范围(键 + 参数,见 `text/Msg.kt`)。 */
+fun renameSummaryLines(plan: LibraryRenamePlan, dangers: Set<DangerAction>): List<Msg> = buildList {
+    add(Msg(TextKey.RenameSummary, listOf(plan.runnable, plan.skipped)))
+    add(Msg(TextKey.RenameSummarySourceKept))
     if (DangerAction.CleanEmptyDirs in dangers) {
-        add("⚠️ 勾选了「清理空目录」，移动后空目录将被删除")
+        add(Msg(TextKey.RenameSummaryCleanEmptyDirs))
     }
 }

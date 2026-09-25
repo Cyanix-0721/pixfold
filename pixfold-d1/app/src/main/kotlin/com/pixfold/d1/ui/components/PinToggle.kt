@@ -11,6 +11,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.Dp
@@ -57,15 +58,20 @@ fun PinToggle(
     } else {
         MaterialTheme.colorScheme.onSurfaceVariant
     }
+    // `stringResource` 不能在 `semantics {}` 内调用(那不是 @Composable lambda),须先取出。
+    // `itemName` 保持 String —— 它是图片文件名,不随界面语言变化(见 MetaEdit 的同类裁决)。
+    val pinCd = if (isPinned) {
+        stringResource(R.string.pin_toggle_pinned, itemName)
+    } else {
+        stringResource(R.string.pin_toggle_unpinned, itemName)
+    }
 
     Surface(
         modifier = modifier
             .size(size)
             .testTag(tag)
             .clickable(onClick = onClick)
-            .semantics {
-                contentDescription = if (isPinned) "$itemName 已固定" else "$itemName 固定位置"
-            },
+            .semantics { contentDescription = pinCd },
         shape = MaterialTheme.shapes.small,
         color = container,
     ) {

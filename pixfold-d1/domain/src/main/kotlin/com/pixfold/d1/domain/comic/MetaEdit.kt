@@ -27,6 +27,14 @@ private val ILLEGAL_FOR_FILE_NAME = Regex("[\\\\/:*?\"<>|]")
  * **用的是 [titleSug] 而不是用户改后的 `title`** —— 默认名只在构造时算一次,
  * 改 `title` **不会**自动重算(需手动改或点"恢复建议值")。这是归档既有语义,保留:
  * 否则用户手改的 CBZ 文件名会被 title 的编辑悄悄冲掉。
+ *
+ * **为什么这里不返回 [com.pixfold.d1.domain.text.Msg]**(全量 i18n 的例外):
+ * 返回值是**要写进磁盘的文件名**(`ComicVolume.cbzFileName`),不是界面文案 ——
+ * 它参与 `"${outputDir}/${cbzFileName}"` 的路径相等比较与 `skipReason` 的拼装。
+ * 若随界面语言变化,同一批图片在不同语言下会产出**文件名不同的 CBZ**,
+ * 且切换语言后"输出已存在"的判断会与上一次执行的结果对不上。
+ * 故文件名后缀(如「第 02 卷」)保持**与界面语言无关的固定形态**;
+ * 若日后要本地化文件名风格,那是一次**输出命名策略**决策,须单独裁决。
  */
 fun defaultCbzName(
     id: String,

@@ -8,8 +8,10 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material3.Button
+import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
@@ -17,9 +19,11 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
+import com.pixfold.d1.R
 import com.pixfold.d1.domain.model.ImageCollection
 import com.pixfold.d1.domain.model.NamingState
 import com.pixfold.d1.domain.naming.RenameOp
@@ -31,11 +35,13 @@ import com.pixfold.d1.domain.plan.buildConfirmSequence
 import com.pixfold.d1.domain.plan.renameSummaryLines
 import com.pixfold.d1.domain.plan.workflowADangerActions
 import com.pixfold.d1.domain.sort.PageOrderState
+import com.pixfold.d1.ui.components.PageActionBar
 import com.pixfold.d1.ui.plan.ConfirmDialog
 import com.pixfold.d1.ui.plan.PlanHeader
 import com.pixfold.d1.ui.plan.planLineTag
 import com.pixfold.d1.ui.plan.planRowTag
 import com.pixfold.d1.ui.plan.planSkipTag
+import com.pixfold.d1.ui.text.textOfOrNull
 
 const val TAG_A_PLAN_PAGE = "a-plan-page"
 const val TAG_A_PLAN_LIST = "a-plan-list"
@@ -66,13 +72,19 @@ fun RenamePlanPage(
     onExecute: () -> Unit,
     modifier: Modifier = Modifier,
     contentInsets: WindowInsets = WindowInsets.safeDrawing,
+    onBack: (() -> Unit)? = null,
 ) {
     val plan = buildLibraryRenamePlan(collections, orders, namingState)
     val dangers = workflowADangerActions(cleanEmptyDirs)
+    // 要进 semantics{} / 作为参数传给子组件,故先在组合上下文里解析
+    val cleanToggleCd = stringResource(R.string.a_plan_clean_empty_cd)
+    val backCd = stringResource(R.string.a_plan_back_cd)
+    val confirmCd = stringResource(R.string.a_plan_confirm_cd)
 
     Column(
         modifier = modifier
             .fillMaxSize()
+            .windowInsetsPadding(contentInsets)
             .testTag(TAG_A_PLAN_PAGE),
     ) {
         LazyColumn(
@@ -96,14 +108,24 @@ fun RenamePlanPage(
                         FilterChip(
                             selected = cleanEmptyDirs,
                             onClick = { onCleanEmptyDirsChange(!cleanEmptyDirs) },
-                            label = { Text(if (cleanEmptyDirs) "清理空目录：开（危险）" else "清理空目录：关（默认）") },
+                            label = {
+                                Text(
+                                    stringResource(
+                                        if (cleanEmptyDirs) {
+                                            R.string.a_plan_clean_empty_on
+                                        } else {
+                                            R.string.a_plan_clean_empty_off
+                                        },
+                                    ),
+                                )
+                            },
                             modifier = Modifier
                                 .testTag(TAG_A_PLAN_CLEAN_TOGGLE)
-                                .semantics { contentDescription = "清理空目录开关" },
+                                .semantics { contentDescription = cleanToggleCd },
                         )
                     }
                     Text(
-                        text = "默认关闭；勾选后仍需在确认对话框中再次确认",
+                        text = stringResource(R.string.a_plan_clean_empty_hint),
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.padding(horizontal = 12.dp),
@@ -115,23 +137,33 @@ fun RenamePlanPage(
             items(plan.ops.size) { i ->
                 RenamePlanRow(plan.ops[i], i, plan.collectionNames[plan.ops[i].proposal.image.collectionId])
             }
-
-            item(key = "execute") {
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 12.dp, vertical = 8.dp),
-                ) {
-                    HorizontalDivider(modifier = Modifier.padding(bottom = 8.dp))
-                    Button(
-                        onClick = onStartConfirm,
-                        modifier = Modifier
-                            .testTag(TAG_A_PLAN_CONFIRM)
-                            .semantics { contentDescription = "确认执行" },
-                    ) { Text("确认执行") }
-                }
-            }
         }
+
+        // 终局动作常驻底栏(台账 §2):A 侧整库计划 56 行,原先要连滑 8–12 次才够得到,
+        // 且未滚到之前按钮根本没被组合。移出 LazyColumn 后与 [TAG_TO_PLAN] 一致。
+        // 左 = 退回(返回命名结构),右 = 终局(确认执行)—— 与全站底栏一致(用户 2026-09-25)。
+        // `onBack` 为 null 表示本页被单独使用(无多步骤流程),此时左侧为空槽。
+        val back = onBack
+        PageActionBar(
+            leading = {
+                if (back != null) {
+                    FilledTonalButton(
+                        onClick = back,
+                        modifier = Modifier
+                            .testTag(TAG_STEP_BACK)
+                            .semantics { contentDescription = backCd },
+                    ) { Text(stringResource(R.string.a_plan_back)) }
+                }
+            },
+            trailing = {
+                Button(
+                    onClick = onStartConfirm,
+                    modifier = Modifier
+                        .testTag(TAG_A_PLAN_CONFIRM)
+                        .semantics { contentDescription = confirmCd },
+                ) { Text(stringResource(R.string.a_plan_confirm)) }
+            },
+        )
     }
 
     // 确认对话框:严格按领域层给出的序列推进(通用 → 危险)
@@ -149,6 +181,8 @@ fun RenamePlanPage(
 
 @Composable
 private fun RenamePlanRow(op: RenameOp, index: Int, collectionName: String?) {
+    // `reason` 是领域层的 `Msg`(语言无关),在此现场解析
+    val reason = textOfOrNull(op.reason)
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -170,7 +204,11 @@ private fun RenamePlanRow(op: RenameOp, index: Int, collectionName: String?) {
                 modifier = Modifier.weight(1f),
             )
             Text(
-                text = if (op.isSkipped) "将跳过" else "将重命名",
+                text = if (op.isSkipped) {
+                    stringResource(R.string.a_plan_status_skip)
+                } else {
+                    stringResource(R.string.a_plan_status_rename)
+                },
                 style = MaterialTheme.typography.labelSmall,
                 color = if (op.isSkipped) {
                     MaterialTheme.colorScheme.error
@@ -185,9 +223,9 @@ private fun RenamePlanRow(op: RenameOp, index: Int, collectionName: String?) {
             color = MaterialTheme.colorScheme.onBackground,
             modifier = Modifier.testTag(planLineTag(index, 0)),
         )
-        if (op.isSkipped) {
+        if (op.isSkipped && reason != null) {
             Text(
-                text = "⛔ ${op.reason.orEmpty()}",
+                text = stringResource(R.string.a_plan_skip_reason, reason),
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.error,
                 modifier = Modifier.testTag(planSkipTag(index)),

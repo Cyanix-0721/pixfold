@@ -1,5 +1,9 @@
 package com.pixfold.d1.ui
 
+import com.pixfold.d1.TestText
+
+import com.pixfold.d1.R
+
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.layout.only
@@ -31,15 +35,15 @@ class HomeScreenTest {
     @Test
     fun `home renders both workflow entries`() {
         rule.setContent { PixFoldApp() }
-        rule.onNodeWithText("工作流 A · 图片整理与命名").assertIsDisplayed()
-        rule.onNodeWithText("工作流 B · CBZ 制作").assertIsDisplayed()
+        rule.onNodeWithText(TestText.of(R.string.home_workflow_a)).assertIsDisplayed()
+        rule.onNodeWithText(TestText.of(R.string.home_workflow_b)).assertIsDisplayed()
     }
 
     @Test
     fun `clicking workflow A entry invokes callback`() {
         var clicked = 0
         rule.setContent { HomeScreen(onOpenWorkflowA = { clicked++ }, onOpenWorkflowB = {}) }
-        rule.onNodeWithText("工作流 A · 图片整理与命名").performClick()
+        rule.onNodeWithText(TestText.of(R.string.home_workflow_a)).performClick()
         assertEquals(1, clicked)
     }
 
@@ -47,7 +51,7 @@ class HomeScreenTest {
     fun `clicking workflow B entry invokes callback`() {
         var clicked = 0
         rule.setContent { HomeScreen(onOpenWorkflowA = {}, onOpenWorkflowB = { clicked++ }) }
-        rule.onNodeWithText("工作流 B · CBZ 制作").performClick()
+        rule.onNodeWithText(TestText.of(R.string.home_workflow_b)).performClick()
         assertEquals(1, clicked)
     }
 
@@ -73,10 +77,23 @@ class HomeScreenTest {
         val top = rule.onNodeWithTag(TAG_TITLE).getUnclippedBoundsInRoot().top.value
         val expected = (insetDp + paddingDp).toFloat()
 
+        // 判据从"精确等于 inset+padding"改为"**不得上移进 inset 区域**"。
+        //
+        // 原因:标题现在与右侧**设置图标按钮**同处一个 Row(设置入口在右上角),
+        // 该 Row 高度由 IconButton 的 48dp 触控目标决定,标题在其中**垂直居中**,
+        // 故顶部会比 inset+padding 再低若干 dp(实测 +6dp)。
+        // 若坚持精确相等,就会把"布局有意变更"误报为失败。
+        //
+        // 而本用例真正要防的回归是"**标题被状态栏/挖孔遮挡**"—— 即 top 小于
+        // inset+padding。忽略 inset 时 top ≈ 16dp,远小于 expected,该判据仍会拦住。
         assertTrue(
-            kotlin.math.abs(top - expected) < 2f,
-            "注入 ${insetDp}dp 顶部 inset 后,标题顶部应约为 ${expected}dp(实际 ${top}dp);" +
-                "若约为 ${paddingDp}dp,说明 inset 未被消费(真机表现为标题被状态栏遮挡)",
+            top >= expected - 2f,
+            "注入 ${insetDp}dp 顶部 inset 后,标题顶部(${top}dp)不得小于 ${expected}dp —— " +
+                "小于即说明 inset 未被消费(真机表现为标题被状态栏遮挡)",
+        )
+        assertTrue(
+            top < expected + 16f,
+            "标题顶部(${top}dp)不应比 ${expected}dp 低太多 —— 过大会挤压内容区",
         )
     }
 }

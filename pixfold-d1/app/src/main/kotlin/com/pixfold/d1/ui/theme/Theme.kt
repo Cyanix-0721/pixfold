@@ -1,26 +1,138 @@
 package com.pixfold.d1.ui.theme
 
-import android.os.Build
 import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.material3.ButtonColors
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.dynamicDarkColorScheme
 import androidx.compose.material3.dynamicLightColorScheme
-import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
-import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.luminance
+import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalContext
+import com.pixfold.d1.domain.settings.AccentChoice
+import com.pixfold.d1.domain.settings.PixFoldSettings
+import com.pixfold.d1.domain.settings.ThemeMode
 
 /**
  * PixFold 主题(HANGOFF §6.5「UI 须符合最新 Material Design」)。
  *
- * 基准 = material3 `1.4.0`(stable,由 Compose BOM 锁定)。做法:
- *  - 静态回退配色用 [lightColorScheme]/[darkColorScheme](M3 语义角色,不把色值硬编码进组件);
- *  - Android 12+(API 31)起优先用**动态取色**,支持 Material You;
- *  - 颜色一律经 `MaterialTheme.colorScheme` 语义角色消费,组件内不写死色值。
+ * 配色来源按优先级:
+ *  1. **动态取色**(强调色 = 跟随系统)→ 种子色取自系统壁纸(`dynamic*ColorScheme` 是
+ *     API 31+,而本项目 minSdk 已于 2026-09-26 提到 **34**,故不再需要版本分支);
+ *  2. 否则 → 取所选**预设种子色**。
  *
- * M3E(Material 3 Expressive)不在本阶段范围:其公开 API 仅存在于 1.5.0-alpha28,
- * stable 1.4.0 中相关类型为 internal(实测见 docs/notes/d1-toolchain-evidence.md §7)。
+ * 种子色再经**色彩风格**(TonalSpot / Vibrant / …)与**色彩标准**(2021 / 2025)
+ * 由 [ColorSchemes] 派生出完整 [androidx.compose.material3.ColorScheme]。
+ *
+ * ## 一个刻意的取舍:动态取色也要过一遍算法
+ *
+ * 系统已提供 `dynamicLight/DarkColorScheme(context)`(Android 自己的 M3 配色)。
+ * 我们**没有直接用它**,而是取它的 `primary` 作为种子、再走一遍色彩算法。
+ *
+ * **理由**:只有这样「色彩风格」「色彩标准」两个开关在**跟随系统时也生效**;
+ * 若跟随系统时直接用系统配色,这两个开关就会在默认(也是最常用)的设置下失效,
+ * 用户会认为"开关没用"。代价是跟随系统时的配色与系统自身有细微差异 ——
+ * 这是可接受的,且换来行为一致性。
+ */
+@Composable
+fun PixFoldTheme(
+    settings: PixFoldSettings,
+    systemDark: Boolean = isSystemInDarkTheme(),
+    content: @Composable () -> Unit,
+) {
+    val dark = when (settings.themeMode) {
+        ThemeMode.System -> systemDark
+        ThemeMode.Light -> false
+        ThemeMode.Dark -> true
+    }
+
+    val context = LocalContext.current
+    val seedArgb = if (settings.monetEnabled) {
+        // 取系统动态配色的 primary 作种子:深浅两种模式下它都来自同一套壁纸色调。
+        val systemScheme = if (dark) {
+            dynamicDarkColorScheme(context)
+        } else {
+            dynamicLightColorScheme(context)
+        }
+        systemScheme.primary.toArgb()
+    } else {
+        // 含 AccentChoice.System 但 API < 31 的情况(回退到内置默认种子)。
+        AccentPresets.seedOf(settings.accent).toArgb()
+    }
+
+    var scheme = ColorSchemes.fromSeed(
+        seedArgb = seedArgb,
+        dark = dark,
+        style = settings.colorStyle,
+        spec = settings.colorSpec,
+    )
+    if (settings.pureBlack && dark) {
+        scheme = scheme.withPureBlack()
+    }
+
+    MaterialTheme(colorScheme = scheme, content = content)
+}
+
+/**
+ * 「危险动作」按钮配色(破坏性 / 回退类动作,如报告页的「撤销本次执行」)。
+ *
+ * ## 为什么不直接用 `colorScheme.error` 着底
+ *
+ * material3 的 error 族是**按模式反转**的(已从 `material3@1.4.0` 的
+ * `ColorDarkTokens` / `PaletteTokens` 逐行核实):
+ *
+ * | 角色              | 浅色               | 深色               |
+ * | ----------------- | ------------------ | ------------------ |
+ * | `error`           | `#B3261E` 深红 ✅  | `#F2B8B5` **淡粉** ❌ |
+ * | `onError`         | `#FFFFFF` 白       | `#601410` 暗红     |
+ * | `errorContainer`  | `#F9DEDC` **粉底** ❌ | `#8C1D18` 深红 ✅  |
+ * | `onErrorContainer`| `#8C1D18` 深红     | `#F9DEDC` 米白     |
+ *
+ * `error` 在深色下是**淡粉**——它设计给「错误文字」用,不是给「危险动作的底」用;
+ * 而 `errorContainer` 在浅色下是**粉底**,同样不够醒目。所以**两个模式必须取不同档位**,
+ * 没有哪一个角色能同时在深浅两色下都「像危险」。
+ *
+ * ## 为什么不能改 `error` 角色本身
+ *
+ * 全仓 `colorScheme.error` / `onError` 有 18 处当**文字色**用(冲突、警告、失败原因、
+ * 跳过原因…),当底色用的只有本函数。淡粉当**文字**在深色下是合适的
+ * (深底上要提亮才读得清);所以这是「底色」与「文字色」两套诉求,
+ * 不能改 `error` 角色本身去迁就其中一方(`ColorSchemes.kt:145-152` 把 error 族
+ * 刻意钉死为 material3 默认,正是为了保住那 18 处文字色)。
+ *
+ * ## 深浅判定为什么用 `background.luminance()`
+ *
+ * `ColorScheme` **没有** `isLight()` 之类的现成辅助;`Theme.kt` 里算主题时那个 `dark`
+ * 局部变量也传不到叶子页面。判底色明度是 M3 自己的做法
+ * (material3 内部 `BasicEdgeToEdgeDialog` 即 `luminance() < 0.5f`)。
+ * 它对纯黑模式也成立——`withPureBlack()` 把 `background` 压成 `Color.Black`。
+ *
+ * 禁用态**不在此处理**:`buttonColors` 只传 container/content 时,
+ * `disabled*` 自动继承 `defaultButtonColors` 的灰化角色。
+ */
+@Composable
+fun dangerActionButtonColors(): ButtonColors {
+    val scheme = MaterialTheme.colorScheme
+    return if (scheme.background.luminance() < 0.5f) {
+        ButtonDefaults.buttonColors(
+            containerColor = scheme.errorContainer,
+            contentColor = scheme.onErrorContainer,
+        )
+    } else {
+        ButtonDefaults.buttonColors(
+            containerColor = scheme.error,
+            contentColor = scheme.onError,
+        )
+    }
+}
+
+/**
+ * 兼容重载:旧的 `PixFoldTheme(darkTheme, dynamicColor, content)` 调用点与测试
+ * 无需改动。内部转换为等价设置:
+ *  - `darkTheme` -> [ThemeMode.Light] / [ThemeMode.Dark]
+ *  - `dynamicColor` -> [AccentChoice.System] / [AccentChoice.Default]
+ *  - 色彩风格与标准取默认值(TonalSpot / 2021),即升级前的观感
  */
 @Composable
 fun PixFoldTheme(
@@ -28,28 +140,11 @@ fun PixFoldTheme(
     dynamicColor: Boolean = true,
     content: @Composable () -> Unit,
 ) {
-    val context = LocalContext.current
-    val colorScheme = when {
-        dynamicColor && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S -> {
-            if (darkTheme) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)
-        }
-        darkTheme -> DarkColors
-        else -> LightColors
-    }
-
-    MaterialTheme(
-        colorScheme = colorScheme,
+    PixFoldTheme(
+        settings = PixFoldSettings(
+            themeMode = if (darkTheme) ThemeMode.Dark else ThemeMode.Light,
+            accent = if (dynamicColor) AccentChoice.System else AccentChoice.Default,
+        ),
         content = content,
     )
 }
-
-// 静态回退方案(M3 语义角色)。仅在动态取色不可用(API < 31)或调用方显式关闭时使用。
-private val LightColors = lightColorScheme(
-    primary = Color(0xFF3F51B5),
-    secondary = Color(0xFF5C6BC0),
-)
-
-private val DarkColors = darkColorScheme(
-    primary = Color(0xFF9FA8DA),
-    secondary = Color(0xFFB0BEC5),
-)

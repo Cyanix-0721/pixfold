@@ -9,12 +9,15 @@ import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollToNode
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.performTextClearance
 import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.test.performTextReplacement
+import com.pixfold.d1.R
+import com.pixfold.d1.TestText
 import com.pixfold.d1.domain.mock.MockData
 import com.pixfold.d1.domain.model.CasePolicy
 import com.pixfold.d1.domain.model.ExtPolicy
@@ -104,11 +107,33 @@ class NamingPageTest {
         assertField(id, expected)
     }
 
+    /**
+     * 展开命名结构编辑器。
+     *
+     * P0(2026-09-24)后编辑器**默认折叠**成一行摘要 —— 真机上展开态高达 692dp(87% 视口),
+     * 首屏连一条建议行都放不下。折叠栏常驻在页面固定区(不在 LazyColumn 内),
+     * 故这里**无需先滚动**就能点到;展开态由 `NamingPage` 持有,同一次 `show()` 内持续有效。
+     */
+    private fun expandEditor() {
+        rule.onNodeWithTag(TAG_SCHEME_TOGGLE).performClick()
+        rule.waitForIdle()
+    }
+
     // ================= 验收第 8 项:命名结构各策略可调 =================
 
     @Test
     fun `scheme editor exposes every adjustable knob`() {
         show()
+        // 默认折叠:先只断言摘要栏在(这是首屏可见的那一行)
+        rule.onNodeWithTag(TAG_SCHEME_BAR).assertIsDisplayed()
+        rule.onNodeWithTag(TAG_SCHEME_TOGGLE).assertIsDisplayed()
+        // 折叠态下编辑器**根本不在组合树里**(不是"在树里但不可见")
+        assertTrue(
+            rule.onAllNodesWithTag(TAG_SCHEME_EDITOR).fetchSemanticsNodes().isEmpty(),
+            "默认折叠时编辑器不应被组合",
+        )
+
+        expandEditor()
         // 组件级
         rule.onNodeWithTag(TAG_SCHEME_EDITOR).assertIsDisplayed()
         rule.onNodeWithTag(compToggleTag(0)).assertIsDisplayed()
@@ -127,6 +152,60 @@ class NamingPageTest {
         rule.onNodeWithTag(TAG_SCHEME_ADD).assertIsDisplayed()
     }
 
+    /**
+     * **P0 回归守卫(2026-09-24)**:默认(折叠)状态下,首屏必须能看到建议行。
+     *
+     * 这正是 P0 的定义 —— 真机(361dp × 794dp)实测修复前展开态编辑器 692dp = 视口 87%,
+     * **首屏 0 条建议行**,直接违反约束 3「预览是主工作区,不是日志」。
+     * 这里不滚任何东西,直接量建议行的底边是否落在视口内。
+     *
+     * **必须钉在真机视口上**(361dp × 794dp)才有效:默认的 `h1000dp` 太宽松,
+     * 展开态下建议行底边恰好落在 1000dp 边界上 → 断言会**假通过**(变异检验 M3 实测)。
+     */
+    @Config(qualifiers = "w361dp-h794dp-560dpi")
+    @Test
+    fun `proposal rows are on the first screen without scrolling`() {
+        show()
+        val firstId = trip.images.first().id
+        val root = rule.onRoot().fetchSemanticsNode().boundsInRoot
+        val viewport = root.height
+        // 视口自检:确保上面的 @Config 真的生效(否则断言会在宽松视口上假通过)
+        val viewportDp = viewport / rule.density.density
+        assertTrue(
+            viewportDp in 780f..810f,
+            "本断言必须跑在真机视口上(约 794dp),实际 ${viewportDp}dp",
+        )
+
+        val row = rule.onNodeWithTag(proposalRowTag(firstId)).fetchSemanticsNode().boundsInRoot
+
+        assertTrue(
+            row.bottom <= viewport,
+            "首屏应能看到第一条建议行:row.bottom=${row.bottom} viewport=$viewport",
+        )
+        // 且摘要栏本身也要在首屏(它是编辑器的唯一入口,不能被挤出去)
+        val bar = rule.onNodeWithTag(TAG_SCHEME_TOGGLE).fetchSemanticsNode().boundsInRoot
+        assertTrue(bar.bottom <= viewport, "摘要栏应在首屏:bar.bottom=${bar.bottom} viewport=$viewport")
+    }
+
+    /**
+     * **P0 行为陷阱回归守卫**:点「展开」后编辑器必须真的出现在视口里。
+     *
+     * 编辑器是**前插**到 LazyColumn 首项的,而 LazyList 会锚定"当前第一个可见项"不让它跳动
+     * —— 若不主动滚回顶部,编辑器会被插到视口**上方**,用户点展开看不到任何变化
+     * (实测:14 项既有测试全部因此失败)。
+     */
+    @Test
+    fun `expanding the editor really shows it on screen`() {
+        show()
+        expandEditor()
+        val editor = rule.onNodeWithTag(TAG_SCHEME_EDITOR).fetchSemanticsNode().boundsInRoot
+        val viewport = rule.onRoot().fetchSemanticsNode().boundsInRoot.height
+        assertTrue(
+            editor.top < viewport,
+            "展开后编辑器顶部应落在视口内:editor.top=${editor.top} viewport=$viewport",
+        )
+    }
+
     @Test
     fun `editing root dir name changes the proposed names`() {
         show()
@@ -134,6 +213,7 @@ class NamingPageTest {
         // 默认结构 = <根目录名>_<序号> -> 初始应为 trip 的 rootDirName
         assertField(firstId, "旅行照片_001.jpg")
 
+        expandEditor()
         rule.onNodeWithTag(TAG_SCHEME_ROOT_DIR).performTextReplacement("新根名")
         assertField(firstId, "新根名_001.jpg")
     }
@@ -142,6 +222,7 @@ class NamingPageTest {
     fun `changing index padding changes proposed names`() {
         show()
         val firstId = trip.images.first().id
+        expandEditor()
         rule.onNodeWithTag(TAG_SCHEME_INDEX_PADDING).performTextReplacement("5")
         assertField(firstId, "旅行照片_00001.jpg")
     }
@@ -152,6 +233,7 @@ class NamingPageTest {
         val firstId = trip.images.first().id
         assertField(firstId, "旅行照片_001.jpg")
 
+        expandEditor()
         // 关掉第 0 个组件(RootDir)-> 只剩序号
         rule.onNodeWithTag(compToggleTag(0)).performClick()
         // RootDir 被停用后,ImageIndex 成为首个输出组件 -> 不出分隔符
@@ -162,6 +244,7 @@ class NamingPageTest {
     fun `changing separator changes proposed names`() {
         show()
         val firstId = trip.images.first().id
+        expandEditor()
         // 第 1 个组件(ImageIndex)的前置分隔符
         rule.onNodeWithTag(compSepTag(1)).performTextReplacement("-")
         assertField(firstId, "旅行照片-001.jpg")
@@ -172,6 +255,7 @@ class NamingPageTest {
         show()
         val firstId = trip.images.first().id
         assertField(firstId, "旅行照片_001.jpg")
+        expandEditor()
         // 把第 1 个组件(ImageIndex)上移到首位
         rule.onNodeWithTag(compMoveUpTag(1)).performClick()
         // ImageIndex 成首个输出组件(不出分隔符),RootDir 的 separatorBefore 默认 "_"
@@ -186,6 +270,7 @@ class NamingPageTest {
         val firstId = trip.images.first().id
         assertField(firstId, "根.jpg")
 
+        expandEditor()
         rule.onNodeWithTag(TAG_SCHEME_ADD).performClick()
         // 新组件默认是 CustomText(空文本)-> 空组件整体跳过,名字不变
         assertField(firstId, "根.jpg")
@@ -199,6 +284,7 @@ class NamingPageTest {
     @Test
     fun `at least one component is kept so remove is disabled at the last one`() {
         show(initial = NamingState(NamingScheme("根", components = listOf(NameComponent(NameComponentKind.RootDir)))))
+        expandEditor()
         rule.onNodeWithTag(compRemoveTag(0)).assertIsNotEnabled()
     }
 
@@ -235,9 +321,10 @@ class NamingPageTest {
     @Test
     fun `the long inline hint is gone and replaced by an icon`() {
         show()
+        expandEditor()
         // 行内不再有那段长文案(它正是把开关挤出屏幕的元凶)
         assertTrue(
-            rule.onAllNodesWithText("清洗把非法字符替换为 _ ；清洗后仍可能重名")
+            rule.onAllNodesWithText(TestText.of(R.string.a_scheme_sanitize_body))
                 .fetchSemanticsNodes().isEmpty(),
             "行内长文案应已被图标取代",
         )
@@ -253,16 +340,18 @@ class NamingPageTest {
             "未点击时不应有说明对话框",
         )
 
+        expandEditor()
         rule.onNodeWithTag(TAG_SCHEME_SANITIZE_INFO).performClick()
         rule.onNodeWithTag(TAG_SCHEME_SANITIZE_INFO_DIALOG).assertIsDisplayed()
         // 说明内容要点:替换为 _ ;且**不会去重**
-        rule.onNodeWithText("不会去重", substring = true).assertIsDisplayed()
-        rule.onNodeWithText("会被替换为「_」", substring = true).assertIsDisplayed()
+        rule.onNodeWithText(TestText.of(R.string.a_scheme_sanitize_body), substring = true).assertIsDisplayed()
+        rule.onNodeWithText(TestText.of(R.string.a_scheme_sanitize_body), substring = true).assertIsDisplayed()
     }
 
     @Test
     fun `the explanation dialog can be dismissed`() {
         show()
+        expandEditor()
         rule.onNodeWithTag(TAG_SCHEME_SANITIZE_INFO).performClick()
         rule.onNodeWithTag(TAG_SCHEME_SANITIZE_INFO_DIALOG).assertIsDisplayed()
 
@@ -277,6 +366,7 @@ class NamingPageTest {
     fun `the icon opens and closes repeatedly`() {
         // 防"只能开一次":状态必须在每次点击时正确翻转
         show()
+        expandEditor()
         repeat(2) {
             rule.onNodeWithTag(TAG_SCHEME_SANITIZE_INFO).performClick()
             rule.onNodeWithTag(TAG_SCHEME_SANITIZE_INFO_DIALOG).assertIsDisplayed()
@@ -298,6 +388,7 @@ class NamingPageTest {
     @Config(qualifiers = "w360dp-h800dp")
     fun `the sanitize switch stays on screen at device width`() {
         show()
+        expandEditor()
         // 先把该行滚进视口(纵向),再断言横向也没被挤出屏幕
         rule.onNodeWithTag(TAG_PROPOSAL_LIST)
             .performScrollToNode(androidx.compose.ui.test.hasTestTag(TAG_SCHEME_SANITIZE))
@@ -317,7 +408,7 @@ class NamingPageTest {
         rule.onNodeWithTag(proposalFieldTag(id)).performTextReplacement("我的名字.jpg")
         assertField(id, "我的名字.jpg")
         // 标签应变为"已覆盖"
-        rule.onNodeWithText("新名称（已覆盖）").assertIsDisplayed()
+        rule.onNodeWithText(TestText.of(R.string.a_table_new_name_overridden)).assertIsDisplayed()
     }
 
     @Test
@@ -331,6 +422,7 @@ class NamingPageTest {
         assertField(overriddenId, "必须保留.jpg")
 
         // 改结构:根目录名 + 补零位数(任何一个改动都会重算 proposedName)
+        expandEditor()
         rule.onNodeWithTag(TAG_SCHEME_ROOT_DIR).performTextReplacement("改了")
         rule.onNodeWithTag(TAG_SCHEME_INDEX_PADDING).performTextReplacement("5")
 
@@ -346,12 +438,14 @@ class NamingPageTest {
         val id = trip.images.first().id
         rule.onNodeWithTag(proposalFieldTag(id)).performTextReplacement("稳.jpg")
 
+        expandEditor()
         rule.onNodeWithTag(TAG_SCHEME_ROOT_DIR).performTextReplacement("A")
         rule.onNodeWithTag(TAG_SCHEME_INDEX_PADDING).performTextReplacement("4")
         rule.onNodeWithTag(compMoveUpTag(1)).performClick()
         rule.onNodeWithTag(compToggleTag(0)).performClick()
 
-        assertField(id, "稳.jpg")
+        // 展开态编辑器高达 804dp、占满滚动容器,建议行已被挤到视口外 -> 先滚到它
+        assertFieldAfterScroll(id, "稳.jpg")
     }
 
     @Test
@@ -455,7 +549,7 @@ class NamingPageTest {
         show(collection = col, order = pageOrderOf(col.images), initial = NamingState(scheme))
 
         // 两行本来就重名 -> 冲突 2
-        rule.onNodeWithTag(TAG_PROPOSAL_SUMMARY).assertTextEquals("共 2 项 · 冲突 2 · 警告 0")
+        rule.onNodeWithTag(TAG_PROPOSAL_SUMMARY).assertTextEquals(TestText.plural(R.plurals.a_table_summary, 2, 2, 2, 0))
     }
 
     // ================= 验收第 10 项:冲突与警告可见 =================
@@ -474,7 +568,7 @@ class NamingPageTest {
         rule.onNodeWithTag(proposalWarningTag("p1")).assertIsDisplayed()
         rule.onNodeWithTag(proposalWarningTag("p2")).assertIsDisplayed()
         // 汇总里应体现冲突数
-        rule.onNodeWithTag(TAG_PROPOSAL_SUMMARY).assertTextEquals("共 2 项 · 冲突 2 · 警告 0")
+        rule.onNodeWithTag(TAG_PROPOSAL_SUMMARY).assertTextEquals(TestText.plural(R.plurals.a_table_summary, 2, 2, 2, 0))
     }
 
     @Test
@@ -489,7 +583,7 @@ class NamingPageTest {
         show(collection = col, order = pageOrderOf(col.images), initial = NamingState(scheme))
 
         rule.onNodeWithTag(proposalWarningTag("bad")).assertIsDisplayed()
-        rule.onNodeWithText("· 非法字符：: ?（执行时将跳过；可开启自动清洗）").assertIsDisplayed()
+        rule.onNodeWithText("· " + TestText.of(R.string.domain_warn_illegal_char, ": ?")).assertIsDisplayed()
     }
 
     @Test
@@ -504,6 +598,7 @@ class NamingPageTest {
         show(collection = col, order = pageOrderOf(col.images), initial = NamingState(scheme))
         rule.onNodeWithTag(proposalWarningTag("bad")).assertIsDisplayed()
 
+        expandEditor()
         rule.onNodeWithTag(TAG_SCHEME_SANITIZE).performClick()
         // 清洗后不再有 IllegalChar 警告
         assertTrue(
@@ -524,7 +619,7 @@ class NamingPageTest {
 
         rule.onNodeWithTag(proposalWarningTag("c1")).assertIsDisplayed()
         // 大小写冲突仅警告(冲突数应为 0)
-        rule.onNodeWithTag(TAG_PROPOSAL_SUMMARY).assertTextEquals("共 2 项 · 冲突 0 · 警告 2")
+        rule.onNodeWithTag(TAG_PROPOSAL_SUMMARY).assertTextEquals(TestText.plural(R.plurals.a_table_summary, 2, 2, 0, 2))
     }
 
     @Test
@@ -556,14 +651,14 @@ class NamingPageTest {
     @Test
     fun `trip collection under default scheme has no conflicts`() {
         show()
-        rule.onNodeWithTag(TAG_PROPOSAL_SUMMARY).assertTextEquals("共 30 项 · 冲突 0 · 警告 0")
+        rule.onNodeWithTag(TAG_PROPOSAL_SUMMARY).assertTextEquals(TestText.plural(R.plurals.a_table_summary, 30, 30, 0, 0))
     }
 
     @Test
     fun `scan collection illegal char is sanitized by default so no conflict`() {
         // scan 含 封:面? ,默认 sanitize=true -> 应被清洗,不产生 IllegalChar 冲突
         show(collection = scan, order = pageOrderOf(scan.images))
-        rule.onNodeWithTag(TAG_PROPOSAL_SUMMARY).assertTextEquals("共 14 项 · 冲突 0 · 警告 0")
+        rule.onNodeWithTag(TAG_PROPOSAL_SUMMARY).assertTextEquals(TestText.plural(R.plurals.a_table_summary, 14, 14, 0, 0))
         // 实测次序(domain 探针):ch01 六张 -> 1..6;ch02 的 Page_01(大写) 在自然序中
         // 排在小写 page_01 之前? 不 —— 自然序先 lowercase,故二者等价,由 id 兜底,
         // 结果 Page_01 得 007、page_01 得 008 …… 封:面? 排最后得 014。
@@ -579,5 +674,20 @@ class NamingPageTest {
         val moved = com.pixfold.d1.domain.sort.moveItemTo(order, trip.images.first().id, trip.images.size - 1)
         show(collection = trip, order = moved)
         assertFieldAfterScroll(trip.images.first().id, "旅行照片_030.jpg")
+    }
+
+    /**
+     * 标题行的**数量在第 2 个参数**上(形态 `Naming structure · %1$s (%2$d images)`)。
+     *
+     * 这是唯一一个数量不在首位的 plurals 键 —— `PixFoldText.pluralQuantityIndex()` 为它返回 1。
+     * 若登记错(比如也写成 0),解析层会拿 `%1$s`(集合名,字符串)当 count,`as? Int` 落空后回退 0,
+     * 英文便渲染成 "1 images"。单张集合同时覆盖英文 `one` 变体(其余用例的计数都 >= 2)。
+     */
+    @Test
+    fun `naming title uses the page count as the plural quantity not the collection name`() {
+        val solo = ImageCollection("solo", "单张", "单张", listOf(item("s1")))
+        show(collection = solo, order = pageOrderOf(solo.images))
+        rule.onNodeWithTag(TAG_NAMING_TITLE)
+            .assertTextEquals(TestText.plural(R.plurals.a_naming_title, 1, solo.name, 1))
     }
 }

@@ -18,6 +18,8 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollToNode
 import androidx.compose.ui.test.performTextReplacement
+import com.pixfold.d1.R
+import com.pixfold.d1.TestText
 import com.pixfold.d1.domain.comic.setMetaValue
 import com.pixfold.d1.domain.mock.MockDataB
 import com.pixfold.d1.domain.model.ComicVolume
@@ -113,7 +115,16 @@ class MetadataPageTest {
     fun `the writer cleaning suggestion is displayed alongside the raw suggestion`() {
         show()
         scrollTo(TAG_WRITER_CLEAN)
-        rule.onNodeWithText("清理建议：谏山创", substring = true).assertIsDisplayed()
+        // 建议值与其来源都是 mock 数据(不是文案),故从模型取值代入模板 —— 断言的是**模板**渲染正确。
+        val aot = library.volumes.first { it.id == "aot-0" }
+        rule.onNodeWithText(
+            TestText.of(
+                R.string.meta_writer_cleaned_hint,
+                aot.writerCleanedSug.value.orEmpty(),
+                aot.writerCleanedSug.source,
+            ),
+            substring = true,
+        ).assertIsDisplayed()
         rule.onNodeWithTag(TAG_WRITER_CLEAN).assertIsDisplayed()
     }
 
@@ -157,8 +168,8 @@ class MetadataPageTest {
     fun `language defaults to unset with an explicit confirmation prompt`() {
         show()
         scrollTo(TAG_LANGUAGE_FIELD)
-        rule.onNodeWithText("未设置（需确认）").assertIsDisplayed()
-        rule.onNodeWithText("语言默认未设置，需人工确认").assertIsDisplayed()
+        rule.onNodeWithText(TestText.of(R.string.domain_lang_unset)).assertIsDisplayed()
+        rule.onNodeWithText(TestText.of(R.string.meta_lang_unset_error)).assertIsDisplayed()
     }
 
     @Test
@@ -168,7 +179,7 @@ class MetadataPageTest {
         // aot-1 的建议是 ja(低置信)—— 显示出来,但当前值仍是"未设置"
         rule.onNodeWithText("卷内文件名含日文片段（低置信）", substring = true).assertIsDisplayed()
         assertTrue(
-            rule.onAllNodesWithText("ja · 日文").fetchSemanticsNodes().isEmpty(),
+            rule.onAllNodesWithText(TestText.of(R.string.domain_lang_ja)).fetchSemanticsNodes().isEmpty(),
             "建议不是事实:语言不得自动采纳",
         )
     }
@@ -178,11 +189,11 @@ class MetadataPageTest {
         show()
         scrollTo(TAG_LANGUAGE_FIELD)
         rule.onNodeWithTag(TAG_LANGUAGE_FIELD).performClick()
-        rule.onNodeWithText("zh · 中文").performClick()
+        rule.onNodeWithText(TestText.of(R.string.domain_lang_zh)).performClick()
         rule.waitForIdle()
-        rule.onNodeWithText("zh · 中文").assertIsDisplayed()
+        rule.onNodeWithText(TestText.of(R.string.domain_lang_zh)).assertIsDisplayed()
         assertTrue(
-            rule.onAllNodesWithText("语言默认未设置，需人工确认").fetchSemanticsNodes().isEmpty(),
+            rule.onAllNodesWithText(TestText.of(R.string.meta_lang_unset_error)).fetchSemanticsNodes().isEmpty(),
             "确认语言后不应再显示未确认提示",
         )
     }
@@ -192,9 +203,9 @@ class MetadataPageTest {
         show()
         scrollTo(TAG_LANGUAGE_FIELD)
         rule.onNodeWithTag(TAG_LANGUAGE_FIELD).performClick()
-        rule.onNodeWithText("不写入标签").performClick()
+        rule.onNodeWithText(TestText.of(R.string.domain_lang_skip)).performClick()
         rule.waitForIdle()
-        rule.onNodeWithText("不写入标签").assertIsDisplayed()
+        rule.onNodeWithText(TestText.of(R.string.domain_lang_skip)).assertIsDisplayed()
     }
 
     @Test
@@ -203,14 +214,14 @@ class MetadataPageTest {
         // aot-1 语言未设置 -> 卷头必须显示待确认
         scrollTo(TAG_PENDING_ISSUES)
         rule.onNodeWithTag(TAG_PENDING_ISSUES).assertIsDisplayed()
-        rule.onNodeWithText("语言未确认", substring = true).assertIsDisplayed()
+        rule.onNodeWithText(TestText.of(R.string.domain_pending_language), substring = true).assertIsDisplayed()
 
         // aot-0 缺卷号 -> 出现"卷号缺失"
         rule.onNodeWithTag(volumeChipTag("aot-0")).performClick()
         rule.waitForIdle()
         scrollTo(TAG_PENDING_ISSUES)
         assertTrue(
-            rule.onAllNodesWithText("卷号缺失", substring = true).fetchSemanticsNodes().isNotEmpty(),
+            rule.onAllNodesWithText(TestText.of(R.string.domain_pending_volume), substring = true).fetchSemanticsNodes().isNotEmpty(),
             "缺卷号必须在编辑处可见",
         )
     }
@@ -220,14 +231,14 @@ class MetadataPageTest {
         show()
         scrollTo(TAG_LANGUAGE_FIELD)
         rule.onNodeWithTag(TAG_LANGUAGE_FIELD).performClick()
-        rule.onNodeWithText("zh · 中文").performClick()
+        rule.onNodeWithText(TestText.of(R.string.domain_lang_zh)).performClick()
         rule.waitForIdle()
 
         // 切到另一卷:语言仍是"未设置"(逐卷不同,不被全局选项静默覆盖)
         rule.onNodeWithTag(volumeChipTag("aot-2")).performClick()
         rule.waitForIdle()
         scrollTo(TAG_LANGUAGE_FIELD)
-        rule.onNodeWithText("未设置（需确认）").assertIsDisplayed()
+        rule.onNodeWithText(TestText.of(R.string.domain_lang_unset)).assertIsDisplayed()
     }
 
     // ================= 验收第 13 项:批量设置不覆盖逐项例外 =================
@@ -242,7 +253,7 @@ class MetadataPageTest {
 
         scrollTo(TAG_BATCH_RESULT)
         rule.onNodeWithTag(TAG_BATCH_RESULT).assertIsDisplayed()
-        rule.onNodeWithText("已设置到 5 卷", substring = true).assertIsDisplayed()
+        rule.onNodeWithText(TestText.plural(R.plurals.meta_batch_applied, 5, 5), substring = true).assertIsDisplayed()
     }
 
     @Test
@@ -259,7 +270,7 @@ class MetadataPageTest {
         rule.waitForIdle()
 
         scrollTo(TAG_BATCH_RESULT)
-        rule.onNodeWithText("已设置到 4 卷（跳过 1 卷逐项例外）").assertIsDisplayed()
+        rule.onNodeWithText(TestText.plural(R.plurals.meta_batch_applied_skipped, 4, 4, 1)).assertIsDisplayed()
 
         // 被跳过的卷值真的没变
         rule.onNodeWithTag(volumeChipTag("aot-1")).performClick()
@@ -282,7 +293,7 @@ class MetadataPageTest {
         rule.waitForIdle()
 
         scrollTo(TAG_BATCH_RESULT)
-        rule.onNodeWithText("已设置到 5 卷", substring = true).assertIsDisplayed()
+        rule.onNodeWithText(TestText.plural(R.plurals.meta_batch_applied, 5, 5), substring = true).assertIsDisplayed()
         rule.onNodeWithTag(volumeChipTag("aot-1")).performClick()
         rule.waitForIdle()
         assertEquals("强制系列", fieldText(MetaField.Series))
@@ -310,7 +321,7 @@ class MetadataPageTest {
         rule.waitForIdle()
 
         scrollTo(TAG_BATCH_RESULT)
-        rule.onNodeWithText("已设置到 4 卷", substring = true).assertIsDisplayed()
+        rule.onNodeWithText(TestText.plural(R.plurals.meta_batch_applied, 4, 4), substring = true).assertIsDisplayed()
     }
 
     @Test
@@ -319,7 +330,7 @@ class MetadataPageTest {
         rule.onNodeWithTag(volumeChipTag("op-102")).performClick()
         rule.waitForIdle()
         assertTrue(
-            rule.onAllNodesWithText("输出冲突", substring = true).fetchSemanticsNodes().isNotEmpty(),
+            rule.onAllNodesWithText(TestText.of(R.string.lib_output_conflict), substring = true).fetchSemanticsNodes().isNotEmpty(),
             "输出冲突卷必须在元数据页有明确提示",
         )
     }

@@ -1,5 +1,7 @@
 package com.pixfold.d1.domain.plan
 
+import com.pixfold.d1.domain.text.Msg
+import com.pixfold.d1.domain.text.TextKey
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -15,9 +17,9 @@ import kotlin.test.assertTrue
  */
 class ConfirmFlowTest {
 
-    private val safe = listOf(ConfirmStep.General(listOf("将重命名 3 项")))
+    private val safe = listOf(ConfirmStep.General(listOf(Msg(TextKey.RenameSummary, listOf(3, 0)))))
     private val oneDanger = listOf(
-        ConfirmStep.General(listOf("将处理 1 卷")),
+        ConfirmStep.General(listOf(Msg(TextKey.SummaryProcessingVolumes, listOf(1, 0)))),
         ConfirmStep.Danger(DangerAction.DeleteSourceDir),
     )
 
@@ -66,8 +68,8 @@ class ConfirmFlowTest {
     @Test
     fun `progress label counts from one`() {
         val flow = startConfirmFlow(oneDanger)
-        assertEquals("第 1 / 2 步确认", flow.progressLabel)
-        assertEquals("第 2 / 2 步确认", flow.confirmCurrent().first.progressLabel)
+        assertEquals(Msg(TextKey.ConfirmProgress, listOf(1, 2)), flow.progressLabel)
+        assertEquals(Msg(TextKey.ConfirmProgress, listOf(2, 2)), flow.confirmCurrent().first.progressLabel)
     }
 
     @Test
@@ -96,7 +98,7 @@ class ConfirmFlowTest {
             DangerAction.OverwriteExisting,
             DangerAction.CleanEmptyDirs,
         )
-        var flow = startConfirmFlow(buildConfirmSequence(dangers, listOf("将处理 5 卷")))
+        var flow = startConfirmFlow(buildConfirmSequence(dangers, listOf(Msg(TextKey.SummaryProcessingVolumes, listOf(5, 0)))))
         assertEquals(4, flow.totalSteps, "1 通用 + 3 危险")
 
         var done = false
@@ -130,11 +132,11 @@ class ConfirmFlowTest {
         // 同一个集合的不同迭代顺序不应改变确认顺序
         val a = buildConfirmSequence(
             linkedSetOf(DangerAction.CleanEmptyDirs, DangerAction.DeleteSourceDir),
-            listOf("x"),
+            listOf(Msg(TextKey.SummaryWriteOnly)),
         )
         val b = buildConfirmSequence(
             linkedSetOf(DangerAction.DeleteSourceDir, DangerAction.CleanEmptyDirs),
-            listOf("x"),
+            listOf(Msg(TextKey.SummaryWriteOnly)),
         )
         assertEquals(
             a.filterIsInstance<ConfirmStep.Danger>().map { it.action },

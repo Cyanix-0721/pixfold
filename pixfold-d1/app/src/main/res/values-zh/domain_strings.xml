@@ -1,0 +1,198 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  领域层文案(中文)。
+
+  这些字符串是 `domain/` 模块 `TextKey` 各键的**中文译文**;领域层本身只产出
+  键 + 参数(见 `domain/.../text/TextKey.kt` 与 `Msg.kt`),在 app 层渲染时才解析。
+  命名规则:`domain_<域>_<语义>`,与 `TextKey` 的枚举名一一对应(见 `ui/text/PixFoldText.kt`)。
+
+  ⚠️ 默认兜底是英文(`values/`),本目录是中文译文 —— 详见默认文件头的说明。
+  新增 `TextKey` 成员时必须**同时**改本文件与默认文件,否则 lint `MissingTranslation` /
+  `ExtraTranslation` 在 `warningsAsErrors = true` 下硬失败。
+
+  ⚠️ 复数:标了「复数键」的条目在本文件与默认文件里都必须是 <plurals>(资源类型不能跨语言不同)。
+  **中文只有 `other` 一档** —— lint 的 `UnusedQuantity` 明确指出「For language "zh" the following
+  quantities are not relevant: one」,故本文件不写 `one`(英文侧则 one/other 两档都要写)。
+
+  ⚠️ 前五个元数据字段(Title / Series / Writer / Number / LanguageISO)是 ComicInfo.xml
+  的标签名,在默认文件里标了 `translatable="false"`,故本文件不出现。
+-->
+<resources
+    xmlns:tools="http://schemas.android.com/tools">
+
+    <!-- ============ 排序字段(SortField) ============ -->
+    <string name="domain_sort_natural_name">文件名(自然)</string>
+    <string name="domain_sort_file_name">文件名(字典)</string>
+    <string name="domain_sort_dir_name">目录名</string>
+    <string name="domain_sort_modified">修改时间</string>
+    <string name="domain_sort_created">创建时间</string>
+    <string name="domain_sort_size">文件大小</string>
+
+    <!-- ============ 命名组件类型(NameComponentKind) ============ -->
+    <string name="domain_name_kind_prefix">自定义前缀</string>
+    <string name="domain_name_kind_root_dir">根目录名</string>
+    <string name="domain_name_kind_rel_dir">相对目录片段</string>
+    <string name="domain_name_kind_dir_index">目录序号</string>
+    <string name="domain_name_kind_image_index">图片序号</string>
+    <string name="domain_name_kind_orig_name">原文件名</string>
+    <string name="domain_name_kind_custom_text">自定义文本</string>
+
+    <!-- ============ 大小写策略(CasePolicy) ============ -->
+    <string name="domain_case_policy_keep">保持原样</string>
+    <string name="domain_case_policy_lower">转小写</string>
+    <string name="domain_case_policy_upper">转大写</string>
+
+    <!-- ============ 扩展名策略(ExtPolicy) ============ -->
+    <string name="domain_ext_policy_keep">保留原样</string>
+    <string name="domain_ext_policy_lower">统一小写</string>
+    <string name="domain_ext_policy_upper">统一大写</string>
+    <string name="domain_ext_policy_strip">去除扩展名</string>
+
+    <!-- ============ 警告类型标签(ProposalWarningType) ============ -->
+    <string name="domain_warn_type_duplicate">重名</string>
+    <string name="domain_warn_type_illegal_char">非法字符</string>
+    <string name="domain_warn_type_case_collision">大小写冲突</string>
+    <string name="domain_warn_type_too_long">超长</string>
+    <string name="domain_warn_type_overridden">人工覆盖</string>
+
+    <!-- ============ 语言选择(LangChoice) ============ -->
+    <string name="domain_lang_unset">未设置（需确认）</string>
+    <string name="domain_lang_zh">zh · 中文</string>
+    <string name="domain_lang_ja">ja · 日文</string>
+    <string name="domain_lang_other" tools:ignore="TypographyDashes">其他 ISO 639-1</string>
+    <string name="domain_lang_unknown">未知</string>
+    <string name="domain_lang_skip">不写入标签</string>
+
+    <!-- ============ 元数据字段(MetaField) ============ -->
+    <!-- 前五个是 ComicInfo.xml 的标签名,标了 translatable="false",只在默认文件里 -->
+    <string name="domain_meta_field_cbz_name">CBZ 文件名</string>
+    <string name="domain_meta_field_output_dir">输出目录</string>
+
+    <!-- ============ 重命名计划条目状态(OpStatus) ============ -->
+    <string name="domain_op_status_rename">将重命名</string>
+    <string name="domain_op_status_skip">将跳过</string>
+
+    <!-- ============ 执行结果(ExecOutcome) ============ -->
+    <string name="domain_outcome_succeeded">成功</string>
+    <string name="domain_outcome_skipped">跳过</string>
+    <string name="domain_outcome_failed">失败</string>
+
+    <!-- ============ 执行报告标题(ExecKind) ============ -->
+    <string name="domain_exec_kind_rename">重命名执行报告</string>
+    <string name="domain_exec_kind_package">打包执行报告</string>
+
+    <!-- ============ 输出冲突策略(OutputConflictPolicy) ============ -->
+    <string name="domain_conflict_auto_rename">自动重命名（加序号）</string>
+    <string name="domain_conflict_skip_volume">跳过该卷</string>
+    <string name="domain_conflict_overwrite">覆盖已有文件</string>
+
+    <!-- ============ 源目录处置(SourcePolicy) ============ -->
+    <string name="domain_source_keep">保留源目录（默认）</string>
+    <string name="domain_source_delete">打包后删除源目录（危险）</string>
+
+    <!-- ============ 危险动作(DangerAction):标签 / 正文 / 确认按钮 ============ -->
+    <string name="domain_danger_delete_source_dir_label">打包后删除源目录</string>
+    <string name="domain_danger_delete_source_dir_body">你选择了「打包后删除源目录」。删除不可恢复，确认继续？</string>
+    <string name="domain_danger_delete_source_dir_button">确认删除源目录</string>
+    <string name="domain_danger_clean_empty_dirs_label">清理空目录</string>
+    <string name="domain_danger_clean_empty_dirs_body">你勾选了「移动后清理空目录」。删除不可恢复，确认继续？</string>
+    <string name="domain_danger_clean_empty_dirs_button">确认清理空目录</string>
+    <string name="domain_danger_overwrite_existing_label">覆盖已有 CBZ</string>
+    <string name="domain_danger_overwrite_existing_body">你选择了「覆盖已有文件」。原文件将被替换，覆盖不可恢复，确认继续？</string>
+    <string name="domain_danger_overwrite_existing_button">确认覆盖</string>
+
+    <!-- ============ 独立确认对话框 ============ -->
+    <string name="domain_danger_dialog_title">⚠️ 危险操作独立确认</string>
+    <string name="domain_general_confirm_title">确认执行？</string>
+    <string name="domain_general_confirm_cancel">再看看</string>
+    <string name="domain_general_confirm_ok">执行</string>
+
+    <!-- ============ 待确认标记 / 未命名系列 ============ -->
+    <string name="domain_pending_language">语言未确认</string>
+    <string name="domain_pending_volume">卷号缺失</string>
+    <string name="domain_unnamed_series">（未命名系列）</string>
+
+    <!-- ============ 影响范围摘要(generalSummaryLines) ============ -->
+    <!-- 复数键:见文件头说明 -->
+    <plurals name="domain_summary_processing_volumes">
+        <item quantity="other">将处理 %1$d 卷（跳过 %2$d 卷）</item>
+    </plurals>
+    <string name="domain_summary_source_dir_prefix">源目录：%1$s</string>
+    <string name="domain_summary_source_dir_delete">删除（危险）</string>
+    <string name="domain_summary_source_dir_keep">保留</string>
+    <string name="domain_summary_clean_empty_dirs_warning">⚠️ 勾选了「清理空目录」，执行后空目录将被删除</string>
+    <string name="domain_summary_overwrite_cbz">⚠️ 已有同名 CBZ 将被覆盖：%1$s</string>
+    <string name="domain_summary_delete_source_dir_warning">⚠️ 打包完成后源目录将被删除，且不可恢复</string>
+    <string name="domain_summary_write_only">本操作只写入输出文件；不会删除任何源文件</string>
+    <!-- 列表项之间的分隔符(领域文案里枚举多条路径时用) -->
+    <string name="domain_list_separator">、</string>
+
+    <!-- ============ 打包计划行(VolumePackPlan.describe) ============ -->
+    <string name="domain_pack_create_cbz">创建 CBZ → %1$s</string>
+    <string name="domain_pack_write_comic_info">写入 ComicInfo.xml（Title=%1$s，Series=%2$s，Number=%3$s，Writer=%4$s，LanguageISO=%5$s）</string>
+    <!-- 复数键 -->
+    <plurals name="domain_pack_pack_pages">
+        <item quantity="other">按页序打包 %1$d 张并重命名为页码（0001 起）</item>
+    </plurals>
+    <string name="domain_pack_delete_source_dir">打包后删除源目录：%1$s</string>
+    <string name="domain_pack_value_unset">未设置</string>
+    <string name="domain_pack_value_empty">空</string>
+    <string name="domain_pack_value_not_written">不写入</string>
+    <string name="domain_pack_skip_output_exists">输出已存在 %1$s</string>
+
+    <!-- ============ 执行报告文本 ============ -->
+    <!-- 复数键 -->
+    <plurals name="domain_exec_summary">
+        <item quantity="other">共 %1$d 项：成功 %2$d · 跳过 %3$d · 失败 %4$d</item>
+    </plurals>
+    <string name="domain_pack_fail_no_pages">没有任何页，无法打包</string>
+    <string name="domain_pack_fail_empty_output_dir">输出目录为空</string>
+    <string name="domain_rename_fail_empty_name">新名称为空</string>
+    <string name="domain_undo_nothing">没有可撤销的操作</string>
+    <!-- 复数键 -->
+    <plurals name="domain_undo_recorded">
+        <item quantity="other">已记录 %1$d 项逆向操作；正式版将基于 UndoRecord 逐项回滚（原型不触碰真实文件系统）</item>
+    </plurals>
+
+    <!-- ============ 重命名警告(attachWarnings) ============ -->
+    <plurals name="domain_warn_duplicate">
+        <item quantity="other">重名：有 %1$d 项同名「%2$s」，执行时将跳过</item>
+    </plurals>
+    <string name="domain_warn_illegal_char_control">控制字符</string>
+    <!-- 非法字符列表内部的连接符(原文用空格,不是顿号) -->
+    <string name="domain_warn_illegal_char_separator">\u0020</string>
+    <string name="domain_warn_illegal_char">非法字符：%1$s（执行时将跳过；可开启自动清洗）</string>
+    <!-- 复数键 -->
+    <plurals name="domain_warn_case_collision">
+        <item quantity="other">大小写冲突：与 %1$d 项仅大小写不同，在部分系统上会互相覆盖</item>
+    </plurals>
+    <plurals name="domain_warn_too_long">
+        <item quantity="other">超长：%1$d 字符，超过 %2$d 上限</item>
+    </plurals>
+    <string name="domain_warn_overridden">人工覆盖：已手动指定名称</string>
+
+    <!-- ============ 命名结构摘要(namingSummaryLine) ============ -->
+    <!-- 复数键 -->
+    <plurals name="domain_naming_summary_enabled">
+        <item quantity="other">%1$d 个组件启用</item>
+    </plurals>
+    <plurals name="domain_naming_summary_with_head">
+        <item quantity="other">%1$s · %2$d 个组件启用</item>
+    </plurals>
+
+    <!-- ============ 重命名影响范围(renameSummaryLines) ============ -->
+    <!-- 复数键 -->
+    <plurals name="domain_rename_summary">
+        <item quantity="other">将重命名 %1$d 项（跳过 %2$d 项冲突）</item>
+    </plurals>
+    <string name="domain_rename_summary_source_kept">源文件保留，不删除任何文件</string>
+    <string name="domain_rename_summary_clean_empty_dirs">⚠️ 勾选了「清理空目录」，移动后空目录将被删除</string>
+
+    <!-- ============ 确认流程进度(ConfirmFlowState.progressLabel) ============ -->
+    <string name="domain_confirm_progress">第 %1$d / %2$d 步确认</string>
+
+    <!-- ============ 页码一致性自检(validatePageConsistency,显示在打包预览页) ============ -->
+    <string name="domain_page_issue_count_mismatch">页码项数与页序长度不一致（%1$d ≠ %2$d）</string>
+    <string name="domain_page_issue_wrong_index" tools:ignore="PluralsCandidate">第 %1$d 项页码应为 %2$s，实际 %3$s</string>
+
+</resources>

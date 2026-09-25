@@ -4,6 +4,8 @@ import com.pixfold.d1.domain.mock.MockDataB
 import com.pixfold.d1.domain.model.NameProposal
 import com.pixfold.d1.domain.naming.OpStatus
 import com.pixfold.d1.domain.naming.RenameOp
+import com.pixfold.d1.domain.text.Msg
+import com.pixfold.d1.domain.text.TextKey
 import kotlin.test.Test
 import kotlin.test.assertFailsWith
 import kotlin.test.assertEquals
@@ -17,6 +19,9 @@ import kotlin.test.assertTrue
  *
  * 第 17 项要「成功 / 跳过 / 失败」**三类**。故测试的重点是:
  * 三类都**可达**(不是只有成功),且每类都带**可读原因**。
+ *
+ * **断言的是 [Msg] 结构(key + args)而非成品文案**:领域层不产出语言。
+ * 逐字文案由 app 侧资源守卫;这里保证"原因被带上了、且是正确的那一条"。
  */
 class ExecutionReportTest {
 
@@ -41,7 +46,11 @@ class ExecutionReportTest {
         val plans = buildPackagePlans(listOf(op102), conflictPolicy = OutputConflictPolicy.Skip)
         val e = executePackagePlans(plans).entries.single()
         assertEquals(ExecOutcome.Skipped, e.outcome)
-        assertEquals("输出已存在 E:\\漫画库\\_output/海贼王 第102卷.cbz", e.reason)
+        assertEquals(
+            Msg(TextKey.PackSkipOutputExists, listOf("E:\\漫画库\\_output/海贼王 第102卷.cbz")),
+            e.reason,
+            "跳过原因必须原样沿用计划里的那一条(键+参数)",
+        )
         assertNull(e.createdPath, "跳过项没有产生输出")
     }
 
@@ -50,7 +59,7 @@ class ExecutionReportTest {
         val empty = aot1.copy(pageOrder = aot1.pageOrder.copy(order = emptyList()))
         val e = executePackagePlans(buildPackagePlans(listOf(empty))).entries.single()
         assertEquals(ExecOutcome.Failed, e.outcome)
-        assertEquals("没有任何页，无法打包", e.reason)
+        assertEquals(Msg(TextKey.PackFailNoPages), e.reason)
         assertNull(e.createdPath, "失败项没有产生输出")
     }
 
@@ -58,7 +67,7 @@ class ExecutionReportTest {
     fun `a volume with a blank output dir fails with a readable reason`() {
         val e = executePackagePlans(buildPackagePlans(listOf(aot1.copy(outputDir = "")))).entries.single()
         assertEquals(ExecOutcome.Failed, e.outcome)
-        assertEquals("输出目录为空", e.reason)
+        assertEquals(Msg(TextKey.PackFailEmptyOutputDir), e.reason)
     }
 
     @Test
@@ -83,7 +92,11 @@ class ExecutionReportTest {
         assertEquals(1, report.succeededCount)
         assertEquals(1, report.skippedCount)
         assertEquals(1, report.failedCount)
-        assertEquals("共 3 项：成功 1 · 跳过 1 · 失败 1", report.summaryLine)
+        assertEquals(
+            Msg(TextKey.ExecSummary, listOf(3, 1, 1, 1)),
+            report.summary,
+            "结论行必须带真实四元组(总数·成功·跳过·失败)",
+        )
     }
 
     // ---- 顺序与计数 ----
@@ -103,18 +116,22 @@ class ExecutionReportTest {
 
     // ---- 重命名报告 ----
 
-    private fun op(id: String, finalName: String, status: OpStatus = OpStatus.Ok, reason: String? = null) =
-        RenameOp(
-            proposal = NameProposal(
-                image = aot1.pages.first().copy(id = id),
-                // finalName 是 proposedName/overrideName 的派生属性,不可直接赋值
-                proposedName = finalName,
-                overrideName = null,
-                warnings = emptyList(),
-            ),
-            status = status,
-            reason = reason,
-        )
+    private fun op(
+        id: String,
+        finalName: String,
+        status: OpStatus = OpStatus.Ok,
+        reason: Msg? = null,
+    ) = RenameOp(
+        proposal = NameProposal(
+            image = aot1.pages.first().copy(id = id),
+            // finalName 是 proposedName/overrideName 的派生属性,不可直接赋值
+            proposedName = finalName,
+            overrideName = null,
+            warnings = emptyList(),
+        ),
+        status = status,
+        reason = reason,
+    )
 
     @Test
     fun `rename report has kind Rename and reports the new name as the created path`() {
@@ -127,17 +144,18 @@ class ExecutionReportTest {
 
     @Test
     fun `rename report marks skipped ops with their conflict reason`() {
-        val report = executeRenamePlan(listOf(op("i1", "撞名.jpg", OpStatus.Skipped, "重名：有 2 项同名")))
+        val conflict = Msg(TextKey.WarnDuplicate, listOf(2, "撞名.jpg"))
+        val report = executeRenamePlan(listOf(op("i1", "撞名.jpg", OpStatus.Skipped, conflict)))
         val e = report.entries.single()
         assertEquals(ExecOutcome.Skipped, e.outcome)
-        assertEquals("重名：有 2 项同名", e.reason)
+        assertEquals(conflict, e.reason)
     }
 
     @Test
     fun `rename report fails on a blank final name`() {
         val report = executeRenamePlan(listOf(op("i1", "   ")))
         assertEquals(ExecOutcome.Failed, report.entries.single().outcome)
-        assertEquals("新名称为空", report.entries.single().reason)
+        assertEquals(Msg(TextKey.RenameFailEmptyName), report.entries.single().reason)
     }
 
     // ---- 不变式:只有成功项才产生输出 ----
@@ -172,8 +190,18 @@ class ExecutionReportTest {
     @Test
     fun `skipped and failed entries without a path are legal`() {
         // 正常的跳过/失败项必须能构造(否则前面的用例会把合法用法一起挡掉)
-        ExecEntry(id = "x", label = "a.cbz", outcome = ExecOutcome.Skipped, reason = "冲突")
-        ExecEntry(id = "y", label = "b.cbz", outcome = ExecOutcome.Failed, reason = "无页")
+        ExecEntry(
+            id = "x",
+            label = "a.cbz",
+            outcome = ExecOutcome.Skipped,
+            reason = Msg(TextKey.WarnOverridden),
+        )
+        ExecEntry(
+            id = "y",
+            label = "b.cbz",
+            outcome = ExecOutcome.Failed,
+            reason = Msg(TextKey.PackFailNoPages),
+        )
     }
 
     // ---- 撤销 ----
@@ -202,7 +230,8 @@ class ExecutionReportTest {
         val record = undoRecordOf(executePackagePlans(buildPackagePlans(listOf(aot1))))
         val op = record!!.ops.single()
         assertTrue(op is UndoOp.DeleteCreated, "打包的撤销是删除新建文件，实际 $op")
-        assertEquals("E:\\漫画库\\_output/进击的巨人 第01卷.cbz", (op as UndoOp.DeleteCreated).path)
+        // assertTrue 带 contract(returns() implies actual)，上一行之后已智能转型
+        assertEquals("E:\\漫画库\\_output/进击的巨人 第01卷.cbz", op.path)
     }
 
     @Test
@@ -210,7 +239,7 @@ class ExecutionReportTest {
         val record = undoRecordOf(executeRenamePlan(listOf(op("i1", "新名.jpg"))))
         val undo = record!!.ops.single()
         assertTrue(undo is UndoOp.RestoreRenamed)
-        assertEquals("新名.jpg", (undo as UndoOp.RestoreRenamed).from)
+        assertEquals("新名.jpg", undo.from)
     }
 
     @Test
@@ -218,13 +247,17 @@ class ExecutionReportTest {
         val record = undoRecordOf(executePackagePlans(buildPackagePlans(listOf(aot1))))
         val result = performUndo(record)
         assertFalse(result.applied, "D1 不触碰真实文件系统，不得谎称已撤销")
-        assertTrue("1 项" in result.message, "应说明记录了几项逆向操作，实际 ${result.message}")
+        assertEquals(
+            Msg(TextKey.UndoRecorded, listOf(1)),
+            result.message,
+            "应说明记录了几项逆向操作",
+        )
     }
 
     @Test
     fun `undo on an empty record reports that there is nothing to undo`() {
         val result = performUndo(null)
         assertFalse(result.applied)
-        assertEquals("没有可撤销的操作", result.message)
+        assertEquals(Msg(TextKey.UndoNothing), result.message)
     }
 }

@@ -1,0 +1,77 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Settings screen strings (English, default / fallback).
+
+  ⚠️ Keep in sync with `values-zh/settings_strings.xml`: a key present in only one of
+  them fails lint (`MissingTranslation` / `ExtraTranslation`) because
+  `warningsAsErrors = true`.
+-->
+<resources>
+    <string name="settings_title">Settings</string>
+    <string name="settings_section_appearance">Appearance</string>
+    <string name="settings_theme_mode">Theme</string>
+    <string name="settings_theme_system">Follow system</string>
+    <string name="settings_theme_light">Light</string>
+    <string name="settings_theme_dark">Dark</string>
+    <string name="settings_monet">Dynamic color</string>
+    <string name="settings_monet_desc">Extract colors from wallpaper (Android 12+)</string>
+    <string name="settings_accent">Accent color</string>
+    <string name="settings_color_style">Color style</string>
+    <string name="settings_color_spec">Color standard</string>
+    <string name="settings_pure_black">Pure black in dark theme</string>
+    <string name="settings_pure_black_desc">Saves power on OLED; hierarchy is shown by borders</string>
+    <string name="settings_section_language">Language</string>
+    <string name="settings_language">Language</string>
+    <string name="settings_language_note">Other screens will be translated in a later version</string>
+    <string name="settings_section_behavior">Behavior</string>
+    <string name="settings_storage">File access</string>
+    <string name="settings_storage_saf_desc">Authorize folders via the system picker; privacy-friendly, no extra permission</string>
+    <string name="settings_storage_all_desc">Read and write storage directly; requires a one-time grant</string>
+    <string name="settings_storage_note">Takes effect once real file access is added</string>
+    <string name="settings_section_about">About</string>
+    <string name="settings_version">Version</string>
+    <string name="settings_dev_suffix">dev build</string>
+    <string name="settings_repo">Repository</string>
+    <string name="settings_repo_desc">Source and docs</string>
+    <string name="settings_release">Releases</string>
+    <string name="settings_release_desc">See the latest version</string>
+    <string name="settings_author">Author</string>
+    <string name="settings_licenses">Open source licenses</string>
+    <string name="settings_reset">Reset to defaults</string>
+    <string name="settings_reset_title">Reset to defaults?</string>
+    <string name="settings_reset_body">All appearance, language and behavior settings will be restored.</string>
+    <string name="settings_reset_cancel">Cancel</string>
+    <string name="settings_reset_confirm">Reset</string>
+    <string name="settings_open_failed">No app available to open this link</string>
+    <string name="settings_back">Back</string>
+    <string name="licenses_title">Open source licenses</string>
+    <string name="licenses_thanks">This app uses the following open source components. Thanks to their authors.</string>
+    <string name="licenses_own">This project</string>
+    <string name="licenses_third_party">Third-party components</string>
+    <!-- Enum value labels (English) -->
+    <string name="accent_default">Indigo</string>
+    <string name="accent_blue">Blue</string>
+    <string name="accent_green">Green</string>
+    <string name="accent_purple">Purple</string>
+    <string name="accent_orange">Orange</string>
+    <string name="accent_pink">Pink</string>
+    <string name="style_tonal_spot">Standard</string>
+    <string name="style_vibrant">Vibrant</string>
+    <string name="style_expressive">Expressive</string>
+    <string name="style_neutral">Neutral</string>
+    <string name="style_monochrome">Monochrome</string>
+    <string name="style_fidelity">Fidelity</string>
+    <string name="style_content">Content</string>
+    <string name="style_rainbow">Rainbow</string>
+    <string name="style_fruit_salad">Fruit salad</string>
+    <string name="spec_2021">Material 3 (2021)</string>
+    <string name="spec_2025">Material 3 Expressive (2025)</string>
+    <string name="language_chinese">中文</string>
+    <string name="language_english">English</string>
+    <string name="storage_saf">SAF (recommended)</string>
+    <string name="storage_all">All files access</string>
+    <string name="settings_predictive_back">Predictive back animation</string>
+    <string name="settings_predictive_back_desc">Preview the exit while swiping back; off switches immediately</string>
+    <string name="licenses_correction_title">License correction</string>
+    <string name="licenses_correction_body">The artifact POM for com.materialkolor:material-color-utilities declares MIT, but the module ships an Apache-2.0 LICENSE (ported from the official material-foundation/material-color-utilities). This app complies with Apache-2.0.</string>
+</resources>
