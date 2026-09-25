@@ -1988,7 +1988,8 @@ mock 数据(`MockLibraryBData.kt` 40 处、`MockData.kt` 8 处)**按裁决保留
 #### ✅ §11 第 13/15 条:中文数字自然排序 + 批量不再是逐项例外(2026-09-27)
 
 用户指定修复 §11 遗留的第 13、15 条(`User said: 「> HANGOFF.md §11 第 13 条 —— 第十话 排在 第二话 前（自然排序不支持中文数字） / > HANGOFF.md §11 第 15 条 —— 同字段批量设两次，第二次 applied=0/skipped=5 / 修这2个」`)。
-分支 **`d1/friction-sort-batch`**。
+分支 **`d1/friction-sort-batch`**(自 `dev` = `7a6f678` 开出),提交 **`27f3a13`**(23 files,+686/−64),
+**已 `--no-ff` 合回 `dev`**(`09f9b3f`;合后 `git rev-parse dev^{tree}` == 分支树,已校验),**未推送**。
 
 **第 13 条 —— 先纠正原条目的错误描述**。原条目称「`第十话` 可能排在 `第二话` 前」;
 用 Python 逐字复刻 `tokenizeNatural`/`isDigits`/`stripLeadingZeros`/`compareNaturalTokens`
