@@ -58,8 +58,32 @@ object MockData {
         return ImageCollection("misc", "杂图", "杂图", images)
     }
 
+    /**
+     * 集合 4:章节(中文数字自然排序的**常驻**样例)。
+     *
+     * 为什么单独放一组而不是改现有集合:中文数字卷序是用户可见行为,
+     * 必须在真机上能**一眼看出来**;而 mock 里原先全是阿拉伯数字,
+     * `第01卷` 这类写法归一化前后顺序完全相同,装了新包也看不出差别,
+     * 真机核对会退化成空验证。
+     *
+     * 声明顺序**故意打乱**,并且中文与阿拉伯写法混排:
+     * 归一化生效时顺序为 1..9 / 10 / 11..13 / 20 / 21;
+     * 归一化失效时退化成按码点比,顺序会被搅乱(`第十一话` 跑到 `第十话` 前)。
+     */
+    private fun chapters(): ImageCollection {
+        val names = listOf(
+            "第十二话", "第三话", "第21话", "第一话", "第十话", "第七话", "第二十话",
+            "第五话", "第十三话", "第二话", "第九话", "第10话", "第六话", "第四话",
+            "第八话", "第十一话",
+        )
+        val images = names.mapIndexed { i, name ->
+            img("cn-$i", "cn", "", name, seed = 600 + i)
+        }
+        return ImageCollection("cn", "章节", "章节", images)
+    }
+
     val workspaceA: MockWorkspaceA = MockWorkspaceA(
         rootPath = "D:\\照片整理_2026",
-        collections = listOf(trip(), scan(), misc()),
+        collections = listOf(trip(), scan(), misc(), chapters()),
     )
 }

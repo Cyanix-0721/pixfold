@@ -47,4 +47,47 @@ class NaturalOrderTest {
     fun `shorter string comes first when prefix equal`() {
         assertTrue(naturalCompare("img", "img1") < 0)
     }
+
+    // ========== 中文数字归一化(用户裁决 2026-09-26:只认 一~九 与 十) ==========
+
+    @Test
+    fun `chinese numerals sort by value not by code point`() {
+        // 修复前是逐字比码点(一 4E00 / 二 4E8C / 十 5341 ...),整段顺序被搅乱:
+        // 实测得到 第一话 第七话 第三话 第九话 第二话 第五话 第八话 第六话 第十一话 第十三话 第十二话 第十话 第四话
+        val names = listOf(
+            "第一话", "第二话", "第三话", "第四话", "第五话", "第六话", "第七话",
+            "第八话", "第九话", "第十话", "第十一话", "第十二话", "第十三话",
+        )
+        assertEquals(names, names.sortedWith { a, b -> naturalCompare(a, b) }, "中文数字必须按数值排序")
+    }
+
+    @Test
+    fun `chinese and arabic numerals interleave by value`() {
+        assertTrue(naturalCompare("第2话", "第十话") < 0, "2 < 10,两种数字必须混排")
+        assertTrue(naturalCompare("第十话", "第11话") < 0, "10 < 11")
+        assertEquals(0, naturalCompare("第十话", "第10话"), "同一个数的两种写法应比较相等")
+    }
+
+    @Test
+    fun `tens forms parse to the right value`() {
+        assertTrue(naturalCompare("第十话", "第二十话") < 0, "10 < 20")
+        assertTrue(naturalCompare("第十二话", "第二十话") < 0, "12 < 20")
+        assertTrue(naturalCompare("第二十话", "第二十一话") < 0, "20 < 21")
+        assertEquals(0, naturalCompare("二十话", "20话"))
+    }
+
+    @Test
+    fun `tokenizer normalizes chinese numerals into arabic tokens`() {
+        assertEquals(listOf("第", "10", "话.jpg"), tokenizeNatural("第十话.jpg"))
+        assertEquals(listOf("第", "21", "话.jpg"), tokenizeNatural("第二十一话.jpg"))
+        assertEquals(listOf("第", "1", "话.jpg"), tokenizeNatural("第一话.jpg"))
+    }
+
+    @Test
+    fun `chinese numeral recognition is limited to one through nine and ten`() {
+        // 裁决范围边界:百/千/万/〇 不在归一化范围内,必须原样留作文本记号
+        assertEquals(listOf("百"), tokenizeNatural("百"))
+        assertEquals(listOf("千万"), tokenizeNatural("千万"))
+        assertEquals(listOf("〇"), tokenizeNatural("〇"))
+    }
 }

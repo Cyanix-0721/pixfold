@@ -300,6 +300,29 @@ class MetadataPageTest {
     }
 
     @Test
+    fun `batch apply twice in a row applies both times`() {
+        // 真机摩擦(§11 第 15 条)的界面级回归:第二次批量原先报 applied=0/skipped=5
+        show()
+        scrollTo(TAG_BATCH_VALUE)
+        rule.onNodeWithTag(TAG_BATCH_VALUE).performTextReplacement("第一次")
+        rule.onNodeWithTag(TAG_BATCH_APPLY).performClick()
+        rule.waitForIdle()
+
+        scrollTo(TAG_BATCH_VALUE)
+        rule.onNodeWithTag(TAG_BATCH_VALUE).performTextReplacement("第二次")
+        rule.onNodeWithTag(TAG_BATCH_APPLY).performClick()
+        rule.waitForIdle()
+
+        scrollTo(TAG_BATCH_RESULT)
+        rule.onNodeWithText(TestText.plural(R.plurals.meta_batch_applied, 5, 5), substring = true)
+            .assertIsDisplayed()
+        // 值真的被第二次改写
+        rule.onNodeWithTag(volumeChipTag("aot-1")).performClick()
+        rule.waitForIdle()
+        assertEquals("第二次", fieldText(MetaField.Series))
+    }
+
+    @Test
     fun `batch apply is disabled while the value is empty`() {
         show()
         scrollTo(TAG_BATCH_APPLY)

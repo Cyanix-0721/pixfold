@@ -78,8 +78,9 @@ fun PixFoldApp(store: SettingsStore? = null) {
         ) {
             val navController = rememberNavController()
 
-            // 工作流 A 演示数据:trip(30 张)+ scan(14 张)+ misc(12 张),
-            // 多集合用于演示"批次默认 + 本组独立"(验收第 7 项)。
+            // 工作流 A 演示数据:trip(30 张)+ scan(14 张)+ misc(12 张)+ cn(16 张),
+            // 多集合用于演示"批次默认 + 本组独立"(验收第 7 项);
+            // cn 是中文数字自然序的可证伪样例(见 MockData.chapters 的 KDoc)。
             val collections = remember { MockData.workspaceA.collections }
             // 工作流 B 演示数据:5 卷覆盖缺卷号 / 无语言线索 / 输出冲突三类异常
             // (验收第 11–14 项;确定性 mock,不连真实文件系统)。

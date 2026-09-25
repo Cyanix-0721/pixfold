@@ -162,15 +162,22 @@ data class BatchApplyResult(
 )
 
 /**
- * 批量设置(规格 §8.2 / 验收第 13 项)。
+ * 批量设置(规格 §8.2 / §6.3 约束 4 / 验收第 13 项)。
  *
  * - 只作用于 `included == true` 的卷(未勾选的卷不参与打包,也不该被批量改写);
  * - **跳过** [ComicVolume.overridden] 中已含该字段的卷,除非 [force];
+ * - 写入后**清除该字段自己的逐项例外标记**(用户裁决 2026-09-26,见下);
  * - 返回[实际生效][BatchApplyResult.appliedCount]与[被跳过][BatchApplyResult.skippedCount]数量
  *   —— UI 据此提示 `已设置到 N 卷`,而不是笼统说"已应用"。
  *
  * **为什么强制要"返回实际生效数量"**:批量设置最危险的失败模式是"以为全改了,
  * 其实一半是逐项例外"。只报"成功"会让用户在计划页才发现差异。
+ *
+ * **为什么批量写入要清掉标记**(§11 第 15 条):约束 4 的分工是「批次统一 + **逐项**例外」,
+ * 「逐项」指的是**逐卷手工编辑**,不包含批量本身。若批量也记标记,第二次对同一字段批量
+ * 就会被自己上一次写下的标记挡住(`applied=0 / skipped=5`),用户看到的是"我只是批量设了一次,
+ * 怎么第二次就设不动了"。清除只针对**本次写入的那个字段**,其它字段的逐项例外原样保留;
+ * 而批量之后的手工编辑会重新写下标记,继续受保护。
  */
 fun batchApply(
     volumes: List<ComicVolume>,
@@ -187,7 +194,10 @@ fun batchApply(
             return@map v
         }
         applied++
-        setMetaValue(v, field, value)
+        // 清掉本字段的标记:批量是"批次统一",不该把自己变成逐项例外。
+        // 类型不匹配时 setMetaValue 原样返回同一个实例,此时什么也没写,标记也不该动。
+        val written = setMetaValue(v, field, value)
+        if (written === v) v else written.copy(overridden = v.overridden - field)
     }
     return BatchApplyResult(next, applied, skipped)
 }
