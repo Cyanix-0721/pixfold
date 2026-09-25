@@ -20,6 +20,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
@@ -44,6 +45,10 @@ fun HomeScreen(
     onOpenSettings: () -> Unit = {},
     contentInsets: WindowInsets = WindowInsets.safeDrawing,
 ) {
+    // `stringResource` 不能在 `semantics {}` 里调用(那不是 @Composable lambda),须先取出。
+    val settingsCd = stringResource(R.string.home_settings_cd)
+    val workflowATitle = stringResource(R.string.home_workflow_a)
+    val workflowBTitle = stringResource(R.string.home_workflow_b)
     Column(
         modifier = modifier
             .fillMaxSize()
@@ -69,7 +74,7 @@ fun HomeScreen(
                 // M3 IconButton 默认触控目标已 ≥ 48dp(HANGOFF §6.5)。
                 modifier = Modifier
                     .testTag(TAG_SETTINGS_BUTTON)
-                    .semantics { contentDescription = "设置" },
+                    .semantics { contentDescription = settingsCd },
             ) {
                 Icon(
                     painter = painterResource(R.drawable.ic_settings),
@@ -78,8 +83,8 @@ fun HomeScreen(
                 )
             }
         }
-        WorkflowEntry("工作流 A · 图片整理与命名", onOpenWorkflowA)
-        WorkflowEntry("工作流 B · CBZ 制作", onOpenWorkflowB)
+        WorkflowEntry(workflowATitle, onOpenWorkflowA)
+        WorkflowEntry(workflowBTitle, onOpenWorkflowB)
     }
 }
 

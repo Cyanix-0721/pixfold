@@ -14,12 +14,16 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import com.pixfold.d1.R
 import com.pixfold.d1.domain.model.NameProposal
 import com.pixfold.d1.domain.model.ProposalWarningType
+import com.pixfold.d1.ui.text.textOf
 
 /**
  * 整页唯一可滚动容器的 tag(建议表就是整页的 LazyColumn)。
@@ -58,6 +62,9 @@ fun ProposalSummary(
     onConflictOnlyChange: (Boolean) -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    // 要进 semantics{},故先在组合上下文里解析
+    val filterAllCd = stringResource(R.string.a_table_filter_all_cd)
+    val filterIssuesCd = stringResource(R.string.a_table_filter_issues_cd)
     Row(
         modifier = modifier
             .fillMaxWidth()
@@ -66,7 +73,7 @@ fun ProposalSummary(
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Text(
-            text = "共 $total 项 · 冲突 $conflictCount · 警告 $warningOnlyCount",
+            text = pluralStringResource(R.plurals.a_table_summary, total, total, conflictCount, warningOnlyCount),
             style = MaterialTheme.typography.labelMedium,
             color = if (conflictCount > 0) {
                 MaterialTheme.colorScheme.error
@@ -79,18 +86,25 @@ fun ProposalSummary(
             FilterChip(
                 selected = !conflictOnly,
                 onClick = { onConflictOnlyChange(false) },
-                label = { Text("全部") },
+                label = { Text(stringResource(R.string.a_table_filter_all)) },
                 modifier = Modifier
                     .testTag(TAG_FILTER_ALL)
-                    .semantics { contentDescription = "显示全部" },
+                    .semantics { contentDescription = filterAllCd },
             )
             FilterChip(
                 selected = conflictOnly,
                 onClick = { onConflictOnlyChange(true) },
-                label = { Text("仅问题（${conflictCount + warningOnlyCount}）") },
+                label = {
+                    Text(
+                        stringResource(
+                            R.string.a_table_filter_issues,
+                            conflictCount + warningOnlyCount,
+                        ),
+                    )
+                },
                 modifier = Modifier
                     .testTag(TAG_FILTER_CONFLICTS)
-                    .semantics { contentDescription = "仅显示有冲突或警告的项" },
+                    .semantics { contentDescription = filterIssuesCd },
             )
         }
     }
@@ -114,6 +128,8 @@ fun ProposalRow(
 ) {
     val id = proposal.image.id
     val hasConflict = proposal.hasConflict
+    // 要进 semantics{},故先在组合上下文里解析
+    val resetCd = stringResource(R.string.a_table_restore_cd, id)
 
     Column(
         modifier = Modifier
@@ -139,7 +155,17 @@ fun ProposalRow(
                 onValueChange = { onOverride(id, it) },
                 singleLine = true,
                 isError = hasConflict,
-                label = { Text(if (proposal.isOverridden) "新名称（已覆盖）" else "新名称") },
+                label = {
+                    Text(
+                        stringResource(
+                            if (proposal.isOverridden) {
+                                R.string.a_table_new_name_overridden
+                            } else {
+                                R.string.a_table_new_name
+                            },
+                        ),
+                    )
+                },
                 modifier = Modifier
                     .weight(1f)
                     .testTag(proposalFieldTag(id)),
@@ -150,8 +176,8 @@ fun ProposalRow(
                 enabled = proposal.isOverridden,
                 modifier = Modifier
                     .testTag(proposalResetTag(id))
-                    .semantics { contentDescription = "恢复建议值 $id" },
-            ) { Text("恢复建议") }
+                    .semantics { contentDescription = resetCd },
+            ) { Text(stringResource(R.string.a_table_restore)) }
         }
 
         if (proposal.warnings.isNotEmpty()) {
@@ -164,7 +190,8 @@ fun ProposalRow(
             ) {
                 proposal.warnings.forEach { w ->
                     Text(
-                        text = "· ${w.message}",
+                        // 「· 」是符号前缀,不属于文案(与 plan_skip_reason_prefix 同判)
+                        text = "· ${textOf(w.message)}",
                         style = MaterialTheme.typography.labelSmall,
                         // 会导致跳过 -> error 色;仅警告 -> 次级色(视觉分级)
                         color = if (w.type == ProposalWarningType.Duplicate ||

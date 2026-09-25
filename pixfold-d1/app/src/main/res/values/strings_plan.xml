@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  计划/报告页文案(中文,默认)。含 `ui/plan/PlanComponents.kt` 与
+  `ui/plan/ExecutionReportPage.kt`。
+
+  命名规则:每个界面一对 `values/strings_<screen>.xml` + `values-en/strings_<screen>.xml`,
+  避免多人/多轮改动挤在同一个文件里冲突。⚠️ 两文件必须同步新增键,
+  否则 `MissingTranslation` / `ExtraTranslation` 在 `warningsAsErrors = true` 下硬失败。
+-->
+<resources
+    xmlns:tools="http://schemas.android.com/tools">
+
+    <!-- ============ 计划头部(PlanHeader) ============ -->
+    <plurals name="plan_summary_title">
+        <item quantity="one">共 %1$d 卷 · 将执行 %2$d 卷</item>
+        <item quantity="other">共 %1$d 卷 · 将执行 %2$d 卷</item>
+    </plurals>
+    <string name="plan_summary_skipped" tools:ignore="PluralsCandidate">\u0020· 跳过 %1$d 卷</string>
+    <string name="plan_no_danger">无危险动作：源文件保留，不删除任何文件</string>
+    <string name="plan_danger_action">⚠️ 危险动作：%1$s（执行前需独立二次确认）</string>
+    <string name="plan_will_run">将执行</string>
+
+    <!-- ============ 计划行(PlanRow) ============ -->
+    <!-- 「· 」「⛔ 」是符号前缀,不属于文案,故保留在代码里 -->
+    <string name="plan_skip_reason_prefix">⛔ %1$s</string>
+
+    <!-- ============ 确认对话框(ConfirmDialog) ============ -->
+    <string name="plan_confirm_progress_cd">第 %1$d 步，共 %2$d 步</string>
+    <string name="common_cancel">取消</string>
+
+    <!-- ============ 执行报告页(ExecutionReportPage) ============ -->
+    <string name="report_undo">撤销本次执行</string>
+    <string name="report_done">完成</string>
+    <string name="report_empty">本次没有任何操作（计划为空）</string>
+    <string name="report_nothing_to_undo">没有成功执行的操作，无需撤销</string>
+    <string name="report_outcome_cd">结果：%1$s</string>
+    <string name="report_reason">原因：%1$s</string>
+
+</resources>

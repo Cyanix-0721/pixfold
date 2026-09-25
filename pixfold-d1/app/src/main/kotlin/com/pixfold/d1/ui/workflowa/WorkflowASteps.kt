@@ -19,12 +19,14 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
+import com.pixfold.d1.R
 import com.pixfold.d1.domain.model.ImageCollection
 import com.pixfold.d1.domain.model.NamingScheme
 import com.pixfold.d1.domain.model.NamingState
@@ -41,6 +43,7 @@ import com.pixfold.d1.domain.plan.renameSummaryLines
 import com.pixfold.d1.domain.plan.startConfirmFlow
 import com.pixfold.d1.domain.plan.undoRecordOf
 import com.pixfold.d1.domain.plan.workflowADangerActions
+import com.pixfold.d1.domain.text.Msg
 import com.pixfold.d1.domain.workflowa.workflowAStateOf
 import com.pixfold.d1.nav.DestinationSurface
 import com.pixfold.d1.nav.NavTransitionStyle
@@ -61,11 +64,16 @@ const val TAG_STEP_PLAN = "step-plan"
 /** 命名结构 -> 执行计划 的下一步入口(与步骤1的「下一步」区分,便于测试精确定位)。 */
 const val TAG_TO_PLAN = "step-to-plan"
 
-/** 工作流 A 的步骤(规格 §10.1:步骤1 排序与预览 / 步骤2 命名结构 / 步骤3 计划)。 */
-enum class WorkflowAStep(val label: String) {
-    Sort("步骤1 排序与预览"),
-    Naming("步骤2 命名结构"),
-    Plan("步骤3 执行计划"),
+/**
+ * 工作流 A 的步骤(规格 §10.1:步骤1 排序与预览 / 步骤2 命名结构 / 步骤3 计划)。
+ *
+ * 存**字符串资源 id 而非成品文案**:枚举是静态常量,而文案要随界面语言变化 ——
+ * 若在这里存 `String`,切语言后已构造的枚举成员仍是旧语言。解析放在组合里。
+ */
+enum class WorkflowAStep(val labelRes: Int) {
+    Sort(R.string.a_step_label_sort),
+    Naming(R.string.a_step_label_naming),
+    Plan(R.string.a_step_label_plan),
 }
 
 /**
@@ -117,7 +125,8 @@ fun WorkflowASteps(
     var cleanEmptyDirs by remember { mutableStateOf(false) }
     var confirmFlow by remember { mutableStateOf(ConfirmFlowState()) }
     var report by remember { mutableStateOf<ExecutionReport?>(null) }
-    var undoMessage by remember { mutableStateOf<String?>(null) }
+    // 领域层的 `Msg`(语言无关);成品文案由 ExecutionReportPage 现场解析
+    var undoMessage by remember { mutableStateOf<Msg?>(null) }
 
     var namingState by remember {
         mutableStateOf(
@@ -147,12 +156,14 @@ fun WorkflowASteps(
                 .testTag(TAG_STEP_TABS),
         ) {
             WorkflowAStep.entries.forEachIndexed { i, step ->
+                // 要进 semantics{},故先在组合上下文里解析
+                val stepLabel = stringResource(step.labelRes)
                 Tab(
                     selected = currentIndex == i,
                     // 跳步必须走 goToWorkflowAStep:往回 pop、往前逐级 push,
                     // 保证返回链始终是线性的一步一退(详见该函数注释)。
                     onClick = { navController.goToWorkflowAStep(currentIndex, i) },
-                    text = { Text(step.label) },
+                    text = { Text(stepLabel) },
                     modifier = Modifier
                         .testTag(
                             when (step) {
@@ -161,7 +172,7 @@ fun WorkflowASteps(
                                 WorkflowAStep.Plan -> TAG_STEP_PLAN
                             },
                         )
-                        .semantics { contentDescription = step.label },
+                        .semantics { contentDescription = stepLabel },
                 )
             }
         }
@@ -222,7 +233,7 @@ fun WorkflowASteps(
                         // `align` 是 ColumnScope 扩展,故这里必须自带一个 Column 作用域
                         Column(modifier = Modifier.fillMaxSize()) {
                             Text(
-                                text = "无可命名的集合",
+                                text = stringResource(R.string.a_step_empty),
                                 style = MaterialTheme.typography.bodyMedium,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 modifier = Modifier

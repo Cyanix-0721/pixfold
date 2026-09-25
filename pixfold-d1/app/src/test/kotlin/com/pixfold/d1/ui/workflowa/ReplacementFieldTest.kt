@@ -13,6 +13,8 @@ import androidx.compose.ui.test.performScrollToNode
 import androidx.compose.ui.test.performTextClearance
 import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.test.hasTestTag
+import com.pixfold.d1.R
+import com.pixfold.d1.TestText
 import com.pixfold.d1.domain.mock.MockData
 import com.pixfold.d1.domain.model.ImageCollection
 import com.pixfold.d1.domain.model.NameComponent
@@ -48,6 +50,12 @@ class ReplacementFieldTest {
     val rule = createComposeRule()
 
     private val collection: ImageCollection = MockData.workspaceA.collections.first()
+
+    /**
+     * 清洗示例的输入名 —— **示例数据不是文案**,与 `SchemeEditor.SANITIZE_EXAMPLE_INPUT`
+     * 是同一个值(界面在英文下也展示这个中文名,反而更能说明问题)。
+     */
+    private val ILLEGAL_INPUT = "封:面?.jpg"
 
     /** 含「原文件名」组件的方案 —— 让非法字符真的进入输出。 */
     private val illegalComponents = listOf(
@@ -164,7 +172,7 @@ class ReplacementFieldTest {
         rule.waitForIdle()
 
         // 留空 = 删除非法字符(领域层 append("")),必须给出说明而非静默
-        rule.onNodeWithText("留空 = 直接删除非法字符").assertExists()
+        rule.onNodeWithText(TestText.of(R.string.a_scheme_replace_empty)).assertExists()
     }
 
     @Test
@@ -216,7 +224,8 @@ class ReplacementFieldTest {
             components = illegalComponents,
         ))
         openSanitizeDialog()
-        rule.onNodeWithText("示例：封:面?.jpg → 封_面_.jpg").assertExists()
+        rule.onNodeWithText(TestText.of(R.string.a_scheme_example, ILLEGAL_INPUT, sanitizeName(ILLEGAL_INPUT, "_")))
+            .assertExists()
     }
 
     @Test
@@ -232,7 +241,8 @@ class ReplacementFieldTest {
         rule.onNodeWithTag(TAG_SCHEME_REPLACEMENT).performTextClearance()
         rule.onNodeWithTag(TAG_SCHEME_REPLACEMENT).performTextInput("#")
         rule.waitForIdle()
-        rule.onNodeWithText("示例：封:面?.jpg → 封#面#.jpg").assertExists()
+        rule.onNodeWithText(TestText.of(R.string.a_scheme_example, ILLEGAL_INPUT, sanitizeName(ILLEGAL_INPUT, "#")))
+            .assertExists()
     }
 
     @Test
@@ -247,8 +257,8 @@ class ReplacementFieldTest {
             components = illegalComponents,
         ))
         openSanitizeDialog()
-        val expected = sanitizeName("封:面?.jpg", "@")
-        rule.onNodeWithText("示例：封:面?.jpg → $expected").assertExists()
+        val expected = sanitizeName(ILLEGAL_INPUT, "@")
+        rule.onNodeWithText(TestText.of(R.string.a_scheme_example, ILLEGAL_INPUT, expected)).assertExists()
         assertEquals("封@面@.jpg", expected, "前置:领域函数应把 : 与 ? 都替换为 @")
     }
 }

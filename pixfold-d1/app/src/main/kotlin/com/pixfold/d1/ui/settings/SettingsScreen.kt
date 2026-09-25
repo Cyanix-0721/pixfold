@@ -111,6 +111,8 @@ fun SettingsScreen(
 ) {
     val context = LocalContext.current
     val openFailedMessage = stringResource(R.string.settings_open_failed)
+    // `stringResource` 不能在 `semantics {}` 里调用(非 @Composable lambda),先取出。
+    val backCd = stringResource(R.string.common_back)
 
     Column(
         modifier = modifier
@@ -129,7 +131,7 @@ fun SettingsScreen(
                 onClick = onBack,
                 modifier = Modifier
                     .testTag(TAG_SETTINGS_BACK)
-                    .semantics { contentDescription = "返回" },
+                    .semantics { contentDescription = backCd },
             ) {
                 Icon(
                     painter = painterResource(R.drawable.ic_arrow_back),

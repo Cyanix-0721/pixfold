@@ -28,10 +28,12 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.unit.dp
+import com.pixfold.d1.R
 import com.pixfold.d1.domain.model.SourceItem
 import com.pixfold.d1.ui.components.ProceduralThumb
 
@@ -42,8 +44,17 @@ const val TAG_PREVIEW_NEXT = "preview-next"
 const val TAG_PREVIEW_PREV = "preview-prev"
 const val TAG_PREVIEW_CLOSE = "preview-close"
 
-/** 用于可测的状态描述:把当前缩放写成可断言的语义值(避免只测内部数据)。 */
-fun zoomDescription(scale: Float): String = "缩放 ${"%.2f".format(scale)}"
+/**
+ * 用于可测的状态描述:把当前缩放写成可断言的语义值(避免只测内部数据)。
+ *
+ * 这里**只有数字,没有文案** —— `缩放` 二字由 `R.string.preview_zoom_cd` 提供。
+ * 这样它仍是纯函数(非 `@Composable`),测试可以照旧在组合之外反向调用它做自洽比较,
+ * 不因界面语言改变而失配。
+ *
+ * `Locale.ROOT` 是刻意的:否则德语等区域会格式化成 `1,00`,同一个小数点在不同设备上
+ * 表现不同(该值只作参数,不参与任何相等性/文件名判断)。
+ */
+fun zoomAmount(scale: Float): String = String.format(java.util.Locale.ROOT, "%.2f", scale)
 
 /** 双击放大的目标倍率。 */
 private const val DOUBLE_TAP_SCALE = 2f
@@ -66,13 +77,21 @@ fun ImagePreview(
 ) {
     if (items.isEmpty()) {
         Box(modifier.fillMaxSize().background(Color.Black), contentAlignment = Alignment.Center) {
-            Text("没有可预览的图片", color = Color.White)
+            Text(stringResource(R.string.preview_no_images), color = Color.White)
         }
         return
     }
 
     var state by remember { mutableStateOf(previewStateOf(initialIndex, items.size)) }
     val current = items[state.index.coerceIn(0, items.size - 1)]
+
+    // 无障碍/语义文案须在 `semantics {}` 之外取好(`stringResource` 不能在非 composable lambda 里调);
+    // 同理,页码在 UI 层解析而不放在 `PreviewState` 上 —— 那个类取不到资源。
+    val zoomCd = stringResource(R.string.preview_zoom_cd, zoomAmount(state.scale))
+    val pageLabel = stringResource(R.string.preview_page_label, state.index + 1, state.count)
+    val closeCd = stringResource(R.string.preview_close_cd)
+    val prevCd = stringResource(R.string.preview_previous)
+    val nextCd = stringResource(R.string.preview_next)
 
     Box(
         modifier = modifier
@@ -96,7 +115,7 @@ fun ImagePreview(
                     translationX = state.offsetX,
                     translationY = state.offsetY,
                 )
-                .semantics { stateDescription = zoomDescription(state.scale) }
+                .semantics { stateDescription = zoomCd }
                 .pointerInput(Unit) {
                     detectTransformGestures { _, pan, zoom, _ ->
                         state = if (zoom != 1f) state.zoomed(zoom) else state
@@ -128,16 +147,16 @@ fun ImagePreview(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Text(
-                text = state.pageLabel,
+                text = pageLabel,
                 modifier = Modifier.testTag(TAG_PREVIEW_PAGE_LABEL),
                 style = MaterialTheme.typography.titleMedium,
                 color = Color.White,
             )
             TextButton(
                 onClick = onClose,
-                modifier = Modifier.testTag(TAG_PREVIEW_CLOSE).semantics { contentDescription = "关闭预览" },
+                modifier = Modifier.testTag(TAG_PREVIEW_CLOSE).semantics { contentDescription = closeCd },
             ) {
-                Text("关闭", color = Color.White)
+                Text(stringResource(R.string.common_close), color = Color.White)
             }
         }
 
@@ -151,7 +170,7 @@ fun ImagePreview(
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
             Text(
-                text = "双击放大 · 双指拖动平移",
+                text = stringResource(R.string.preview_hint),
                 style = MaterialTheme.typography.labelSmall,
                 color = Color.White.copy(alpha = 0.7f),
             )
@@ -162,13 +181,13 @@ fun ImagePreview(
                 Button(
                     onClick = { state = state.previous() },
                     enabled = state.hasPrevious,
-                    modifier = Modifier.testTag(TAG_PREVIEW_PREV).semantics { contentDescription = "上一页" },
-                ) { Text("上一页") }
+                    modifier = Modifier.testTag(TAG_PREVIEW_PREV).semantics { contentDescription = prevCd },
+                ) { Text(stringResource(R.string.preview_previous)) }
                 Button(
                     onClick = { state = state.next() },
                     enabled = state.hasNext,
-                    modifier = Modifier.testTag(TAG_PREVIEW_NEXT).semantics { contentDescription = "下一页" },
-                ) { Text("下一页") }
+                    modifier = Modifier.testTag(TAG_PREVIEW_NEXT).semantics { contentDescription = nextCd },
+                ) { Text(stringResource(R.string.preview_next)) }
             }
         }
     }

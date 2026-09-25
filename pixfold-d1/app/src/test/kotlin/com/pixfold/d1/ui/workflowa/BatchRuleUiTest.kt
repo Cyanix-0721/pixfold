@@ -1,11 +1,15 @@
 package com.pixfold.d1.ui.workflowa
 
+import android.content.Context
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.test.core.app.ApplicationProvider
+import com.pixfold.d1.R
+import com.pixfold.d1.TestText
 import com.pixfold.d1.domain.mock.MockData
 import com.pixfold.d1.domain.model.ImageCollection
 import com.pixfold.d1.domain.model.SortField
@@ -27,6 +31,11 @@ import kotlin.test.assertTrue
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [34], qualifiers = "w400dp-h1000dp")
 class BatchRuleUiTest {
+
+    private val context: Context get() = ApplicationProvider.getApplicationContext()
+
+    /** [batchLabelRes] 返回的是**资源 id**而非成品文案(它要在非组合上下文里被调用)。 */
+    private fun batchLabel(isCustom: Boolean) = context.getString(batchLabelRes(isCustom))
 
     @get:Rule
     val rule = createComposeRule()
@@ -66,17 +75,17 @@ class BatchRuleUiTest {
 
         // 用"共 N 张"作为判据:各集合张数不同(30/16/12),且该文本唯一。
         // (不能用文件名断言 —— scan 的 ch01/page_01 与 ch02/page_01 同名,会匹配到 2 个节点)
-        rule.onNodeWithText("共 ${trip.images.size} 张").assertIsDisplayed()
+        rule.onNodeWithText(TestText.plural(R.plurals.a_image_count, trip.images.size, trip.images.size)).assertIsDisplayed()
 
         rule.onNodeWithTag(collectionTag("scan")).performClick()
-        rule.onNodeWithText("共 ${scan.images.size} 张").assertIsDisplayed()
+        rule.onNodeWithText(TestText.plural(R.plurals.a_image_count, scan.images.size, scan.images.size)).assertIsDisplayed()
 
         rule.onNodeWithTag(collectionTag("misc")).performClick()
-        rule.onNodeWithText("共 ${misc.images.size} 张").assertIsDisplayed()
+        rule.onNodeWithText(TestText.plural(R.plurals.a_image_count, misc.images.size, misc.images.size)).assertIsDisplayed()
 
         // 切回 trip:内容真的随集合切换
         rule.onNodeWithTag(collectionTag("trip")).performClick()
-        rule.onNodeWithText("共 ${trip.images.size} 张").assertIsDisplayed()
+        rule.onNodeWithText(TestText.plural(R.plurals.a_image_count, trip.images.size, trip.images.size)).assertIsDisplayed()
     }
 
     @Test
@@ -95,12 +104,12 @@ class BatchRuleUiTest {
         val active = collections.first()
 
         // 默认:非独立 -> 显示"批次默认"
-        rule.onNodeWithText(batchLabel(active.id, false)).assertIsDisplayed()
+        rule.onNodeWithText(batchLabel(false)).assertIsDisplayed()
 
         rule.onNodeWithTag(TAG_CUSTOM_RULE_TOGGLE).performClick()
 
         // 转独立 -> 文案变为"本组独立"
-        rule.onNodeWithText(batchLabel(active.id, true)).assertIsDisplayed()
+        rule.onNodeWithText(batchLabel(true)).assertIsDisplayed()
     }
 
     @Test
@@ -140,7 +149,7 @@ class BatchRuleUiTest {
         // **关键补充**(变异测试发现):切回 trip 时必须记得"它仍是独立集合"。
         // 若页面把 apply 走了批次路径,独立标记会被抹掉 -> 这里会显示"批次默认规则"。
         rule.onNodeWithTag(collectionTag("trip")).performClick()
-        rule.onNodeWithText(batchLabel("trip", true)).assertIsDisplayed()
+        rule.onNodeWithText(batchLabel(true)).assertIsDisplayed()
         assertTrue(
             hasCardWithText(tripDescendingFirst),
             "切回独立集合时应仍是降序(规则被保留),首张应为 $tripDescendingFirst",
@@ -220,7 +229,8 @@ class BatchRuleUiTest {
         rule.onNodeWithTag(TAG_SORT_RULE_EDITOR).assertDoesNotExist()
 
         // 折叠态仍须显示当前规则(约束 2「建议 ≠ 事实」:折叠的是编辑入口,不是事实本身)
-        rule.onNodeWithText("排序规则：", substring = true).assertIsDisplayed()
+        val summaryPrefix = TestText.of(R.string.a_rule_summary, "").trim()
+        rule.onNodeWithText(summaryPrefix, substring = true).assertIsDisplayed()
 
         // 展开 -> 编辑器出现
         expandRuleEditor()

@@ -35,11 +35,14 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.pixfold.d1.R
+import com.pixfold.d1.ui.text.textOf
 import com.pixfold.d1.domain.model.CasePolicy
 import com.pixfold.d1.domain.model.ExtPolicy
 import com.pixfold.d1.domain.model.NameComponent
@@ -133,6 +136,10 @@ fun SchemeSummaryBar(
     onToggle: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    // stringResource 不能进 semantics{} 的 lambda(非 @Composable 上下文),先取出来
+    val toggleCd = stringResource(
+        if (expanded) R.string.a_scheme_toggle_collapse_cd else R.string.a_scheme_toggle_expand_cd,
+    )
     Column(
         modifier = modifier
             .fillMaxWidth()
@@ -147,7 +154,7 @@ fun SchemeSummaryBar(
                 .padding(horizontal = 12.dp)
                 .testTag(TAG_SCHEME_TOGGLE)
                 .semantics {
-                    contentDescription = if (expanded) "收起命名结构" else "展开命名结构"
+                    contentDescription = toggleCd
                 },
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(4.dp),
@@ -195,6 +202,15 @@ fun SchemeEditor(
     // 用户改过则以用户的为准(判定内聚在 effectiveScheme,见 NamingState 注释)。
     val scheme = effective
 
+    // 下面这些要进 semantics{} / 作为 String 参数传给子组件,故必须先取到局部变量
+    // —— stringResource 只能在 @Composable 上下文里调用。
+    val addCd = stringResource(R.string.a_scheme_add_cd)
+    val rootDirLabel = stringResource(R.string.a_scheme_root_dir)
+    val indexStartLabel = stringResource(R.string.a_scheme_index_start)
+    val indexPaddingLabel = stringResource(R.string.a_scheme_index_padding)
+    val rootFollowCd = stringResource(R.string.a_scheme_root_follow_cd)
+    val sanitizeCd = stringResource(R.string.a_scheme_sanitize_cd)
+
     Column(
         modifier = modifier
             .fillMaxWidth()
@@ -208,7 +224,11 @@ fun SchemeEditor(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Text(
-                text = "命名结构（${scheme.components.count { it.enabled }} 个组件启用）",
+                text = pluralStringResource(
+                    R.plurals.a_scheme_title,
+                    scheme.components.count { it.enabled },
+                    scheme.components.count { it.enabled },
+                ),
                 style = MaterialTheme.typography.titleSmall,
                 color = MaterialTheme.colorScheme.onBackground,
             )
@@ -216,8 +236,8 @@ fun SchemeEditor(
                 onClick = { onChange(addComponent(state, NameComponentKind.CustomText)) },
                 modifier = Modifier
                     .testTag(TAG_SCHEME_ADD)
-                    .semantics { contentDescription = "添加命名组件" },
-            ) { Text("添加组件") }
+                    .semantics { contentDescription = addCd },
+            ) { Text(stringResource(R.string.a_scheme_add)) }
         }
 
         // ---- 组件列表:启用 / 类型 / 分隔符 / 文本 / 顺序 / 删除 ----
@@ -244,21 +264,21 @@ fun SchemeEditor(
             OutlinedTextField(
                 value = scheme.rootDirName,
                 onValueChange = { onChange(setRootDirNameOnScheme(state, it)) },
-                label = { Text("根目录名") },
+                label = { Text(rootDirLabel) },
                 singleLine = true,
                 modifier = Modifier
                     .widthInChars(12)
                     .testTag(TAG_SCHEME_ROOT_DIR),
             )
             NumberField(
-                label = "起始序号",
+                label = indexStartLabel,
                 value = scheme.indexStart,
                 tag = TAG_SCHEME_INDEX_START,
                 min = 1,
                 onValue = { onChange(updateScheme(state, scheme.copy(indexStart = it))) },
             )
             NumberField(
-                label = "补零位数",
+                label = indexPaddingLabel,
                 value = scheme.indexPadding,
                 tag = TAG_SCHEME_INDEX_PADDING,
                 min = 1,
@@ -273,11 +293,13 @@ fun SchemeEditor(
             horizontalArrangement = Arrangement.spacedBy(4.dp),
         ) {
             Text(
-                text = if (state.hasRootDirNameOverride) {
-                    "根目录名：已手动指定（不再跟随集合）"
-                } else {
-                    "根目录名：跟随当前集合"
-                },
+                text = stringResource(
+                    if (state.hasRootDirNameOverride) {
+                        R.string.a_scheme_root_override
+                    } else {
+                        R.string.a_scheme_root_follow
+                    },
+                ),
                 style = MaterialTheme.typography.labelSmall,
                 color = if (state.hasRootDirNameOverride) {
                     MaterialTheme.colorScheme.primary
@@ -291,8 +313,8 @@ fun SchemeEditor(
                 enabled = state.hasRootDirNameOverride,
                 modifier = Modifier
                     .testTag(TAG_ROOT_DIR_FOLLOW_RESET)
-                    .semantics { contentDescription = "恢复根目录名跟随集合" },
-            ) { Text("跟随集合") }
+                    .semantics { contentDescription = rootFollowCd },
+            ) { Text(stringResource(R.string.a_scheme_root_follow_btn)) }
         }
         Row(
             modifier = Modifier.fillMaxWidth(),
@@ -308,7 +330,7 @@ fun SchemeEditor(
             Spacer(Modifier.weight(1f))
 
             Text(
-                text = "自动清洗",
+                text = stringResource(R.string.a_scheme_sanitize),
                 style = MaterialTheme.typography.labelMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -328,31 +350,21 @@ fun SchemeEditor(
                 onCheckedChange = { onChange(updateScheme(state, scheme.copy(sanitize = it))) },
                 modifier = Modifier
                     .testTag(TAG_SCHEME_SANITIZE)
-                    .semantics { contentDescription = "自动清洗非法字符" },
+                    .semantics { contentDescription = sanitizeCd },
             )
         }
     }
 }
 
 /**
- * "自动清洗"的说明文案。
- *
- * 用**原始字符串**:它把非法字符集里的 `\` 与 `"` 原样保留(无需转义),
- * 且**不含跨行拼接** —— 后者会被 lint 的 `TextConcatSpace` 判为"可能漏空格"
- * (中文其实不需要空格,但项目要求 lint 零告警,故从结构上避免)。
- */
-/**
  * 清洗示例的**输入**名(含 `:` 与 `?` 两个非法字符 + 扩展名)。
  *
  * 选它是因为它同时演示两件事:非法字符被替换、**扩展名也参与清洗**(§6.1 第 7 步)。
+ *
+ * 这是**示例数据而非文案**,故不进资源文件:它演示的是"中文文件名里的非法字符"
+ * 这一真实场景,与界面语言无关(英文界面下同样展示它,反而更能说明问题)。
  */
 private const val SANITIZE_EXAMPLE_INPUT = "封:面?.jpg"
-
-private val SANITIZE_EXPLANATION = """
-    开启后，文件名中的非法字符（\ / : * ? " < > | 以及控制字符）会被替换为「_」。
-
-    注意：清洗只替换字符，「不会去重」—— 清洗后不同文件名可能变成同一个，仍会以「重名」提示。
-""".trimIndent()
 
 /**
  * "自动清洗"说明入口:圆形感叹号图标,点击弹出说明(用户 2026-09-18 指定)。
@@ -369,11 +381,33 @@ private fun SanitizeInfoButton(
 ) {
     var showInfo by remember { mutableStateOf(false) }
 
+    // 全部先取到局部变量:下面多处要进 semantics{} 或作为 String 分支
+    val infoCd = stringResource(R.string.a_scheme_sanitize_info_cd)
+    val title = stringResource(R.string.a_scheme_sanitize_title)
+    val body = stringResource(R.string.a_scheme_sanitize_body)
+    val replaceLabel = stringResource(R.string.a_scheme_replace_label)
+    val replaceCd = stringResource(R.string.a_scheme_replace_cd)
+    val replaceResetCd = stringResource(R.string.a_scheme_replace_reset_cd)
+    val replaceHint = stringResource(
+        if (scheme.replacement.isEmpty()) {
+            R.string.a_scheme_replace_empty
+        } else {
+            R.string.a_scheme_replace_hint
+        },
+    )
+    val exampleCd = stringResource(R.string.a_scheme_example_cd)
+    val exampleText = stringResource(
+        R.string.a_scheme_example,
+        SANITIZE_EXAMPLE_INPUT,
+        sanitizeName(SANITIZE_EXAMPLE_INPUT, scheme.replacement),
+    )
+    val gotItCd = stringResource(R.string.a_scheme_got_it_cd)
+
     IconButton(
         onClick = { showInfo = true },
         modifier = Modifier
             .testTag(TAG_SCHEME_SANITIZE_INFO)
-            .semantics { contentDescription = "自动清洗说明" },
+            .semantics { contentDescription = infoCd },
     ) {
         Icon(
             painter = painterResource(R.drawable.ic_exclamation_circle),
@@ -386,10 +420,10 @@ private fun SanitizeInfoButton(
     if (showInfo) {
         AlertDialog(
             onDismissRequest = { showInfo = false },
-            title = { Text("自动清洗") },
+            title = { Text(title) },
             text = {
                 Column {
-                    Text(SANITIZE_EXPLANATION)
+                    Text(body)
                     // 替换字符:**仅在开启清洗时可改**。
                     // 关闭时它完全不起作用(领域层 `if (scheme.sanitize)`),
                     // 留个改了没反应的框就是假控件 —— 故此处直接不显示。
@@ -401,7 +435,7 @@ private fun SanitizeInfoButton(
                             modifier = Modifier.fillMaxWidth(),
                         ) {
                             Text(
-                                text = "替换为",
+                                text = replaceLabel,
                                 style = MaterialTheme.typography.labelMedium,
                             )
                             OutlinedTextField(
@@ -415,25 +449,21 @@ private fun SanitizeInfoButton(
                                 modifier = Modifier
                                     .widthInChars(6)
                                     .testTag(TAG_SCHEME_REPLACEMENT)
-                                    .semantics { contentDescription = "非法字符替换为" },
+                                    .semantics { contentDescription = replaceCd },
                             )
                             TextButton(
                                 onClick = { onScheme(scheme.copy(replacement = DEFAULT_REPLACEMENT)) },
                                 enabled = scheme.replacement != DEFAULT_REPLACEMENT,
                                 modifier = Modifier
                                     .testTag(TAG_SCHEME_REPLACEMENT_RESET)
-                                    .semantics { contentDescription = "恢复默认替换字符" },
-                            ) { Text("默认") }
+                                    .semantics { contentDescription = replaceResetCd },
+                            ) { Text(stringResource(R.string.a_scheme_replace_reset)) }
                         }
                         Text(
                             // 留空不是"没填",而是一种真实语义:领域层 `append(replacement)`,
                             // 替换字符为空 = 把非法字符**删掉**。必须说清,否则用户清空后
                             // 看到非法字符凭空消失、却不知道是自己造成的。
-                            text = if (scheme.replacement.isEmpty()) {
-                                "留空 = 直接删除非法字符"
-                            } else {
-                                "非法字符将被替换为该字符"
-                            },
+                            text = replaceHint,
                             style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
@@ -449,13 +479,12 @@ private fun SanitizeInfoButton(
                             // 写死的话,一旦清洗规则变了(改非法字符集/改替换逻辑),
                             // 说明文字会与真实行为不符,而那种"文档说谎"极难被发现。
                             // 这里让示例**结构上不可能说谎**(规则一改,示例自动跟着改)。
-                            text = "示例：" + SANITIZE_EXAMPLE_INPUT + " → " +
-                                sanitizeName(SANITIZE_EXAMPLE_INPUT, scheme.replacement),
+                            text = exampleText,
                             style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             modifier = Modifier
                                 .testTag(TAG_SCHEME_SANITIZE_EXAMPLE)
-                                .semantics { contentDescription = "清洗示例" },
+                                .semantics { contentDescription = exampleCd },
                         )
                     }
                 }
@@ -465,8 +494,8 @@ private fun SanitizeInfoButton(
                     onClick = { showInfo = false },
                     modifier = Modifier
                         .testTag(TAG_SCHEME_SANITIZE_INFO_OK)
-                        .semantics { contentDescription = "知道了" },
-                ) { Text("知道了") }
+                        .semantics { contentDescription = gotItCd },
+                ) { Text(stringResource(R.string.a_scheme_got_it)) }
             },
             modifier = Modifier.testTag(TAG_SCHEME_SANITIZE_INFO_DIALOG),
         )
@@ -489,6 +518,14 @@ private fun ComponentRow(
     state: NamingState,
     onChange: (NamingState) -> Unit,
 ) {
+    // 全部先取到局部变量:要进 semantics{} / 作为 String 参数
+    val toggleCd = stringResource(R.string.a_scheme_comp_enable_cd, index + 1)
+    val removeCd = stringResource(R.string.a_scheme_comp_remove_cd, index + 1)
+    val sepLabel = stringResource(R.string.a_scheme_comp_sep)
+    val textLabel = stringResource(R.string.a_scheme_comp_text)
+    val upCd = stringResource(R.string.a_scheme_comp_up_cd, index + 1)
+    val downCd = stringResource(R.string.a_scheme_comp_down_cd, index + 1)
+
     Card(
         modifier = Modifier
             .fillMaxWidth()
@@ -516,7 +553,7 @@ private fun ComponentRow(
                     onCheckedChange = { onChange(toggleComponent(state, index)) },
                     modifier = Modifier
                         .testTag(compToggleTag(index))
-                        .semantics { contentDescription = "启用组件 ${index + 1}" },
+                        .semantics { contentDescription = toggleCd },
                 )
                 KindField(
                     value = component.kind,
@@ -529,8 +566,8 @@ private fun ComponentRow(
                     enabled = canRemove,
                     modifier = Modifier
                         .testTag(compRemoveTag(index))
-                        .semantics { contentDescription = "删除组件 ${index + 1}" },
-                ) { Text("删除") }
+                        .semantics { contentDescription = removeCd },
+                ) { Text(stringResource(R.string.a_scheme_comp_remove)) }
             }
 
             // 第二行:分隔符 + 文本(按需)+ 大小写 + 顺序
@@ -544,7 +581,7 @@ private fun ComponentRow(
                     onValueChange = { sep ->
                         onChange(updateComponent(state, index) { it.copy(separatorBefore = sep) })
                     },
-                    label = { Text("分隔符") },
+                    label = { Text(sepLabel) },
                     singleLine = true,
                     modifier = Modifier
                         .widthInChars(7)
@@ -558,7 +595,7 @@ private fun ComponentRow(
                     OutlinedTextField(
                         value = component.text,
                         onValueChange = { t -> onChange(updateComponent(state, index) { it.copy(text = t) }) },
-                        label = { Text("文本") },
+                        label = { Text(textLabel) },
                         singleLine = true,
                         modifier = Modifier
                             .widthInChars(9)
@@ -579,7 +616,7 @@ private fun ComponentRow(
                     onClick = { onChange(moveComponent(state, index, -1)) },
                     modifier = Modifier
                         .testTag(compMoveUpTag(index))
-                        .semantics { contentDescription = "上移组件 ${index + 1}" },
+                        .semantics { contentDescription = upCd },
                 ) {
                     Icon(
                         painter = painterResource(R.drawable.ic_arrow_drop_up),
@@ -591,7 +628,7 @@ private fun ComponentRow(
                     onClick = { onChange(moveComponent(state, index, +1)) },
                     modifier = Modifier
                         .testTag(compMoveDownTag(index))
-                        .semantics { contentDescription = "下移组件 ${index + 1}" },
+                        .semantics { contentDescription = downCd },
                 ) {
                     Icon(
                         painter = painterResource(R.drawable.ic_arrow_drop_down),
@@ -609,15 +646,18 @@ private fun ComponentRow(
 @Composable
 private fun KindField(value: NameComponentKind, index: Int, onValue: (NameComponentKind) -> Unit) {
     var expanded by remember { mutableStateOf(false) }
+    // 领域枚举只带 TextKey(语言无关),解析在 UI 层 —— 见 TextKey / Msg 的设计注释
+    val currentLabel = textOf(value.textKey)
+    val fieldLabel = stringResource(R.string.a_scheme_kind_label)
     ExposedDropdownMenuBox(
         expanded = expanded,
         onExpandedChange = { expanded = it },
     ) {
         OutlinedTextField(
-            value = value.label,
+            value = currentLabel,
             onValueChange = {},
             readOnly = true,
-            label = { Text("组件") },
+            label = { Text(fieldLabel) },
             trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
             modifier = Modifier
                 .menuAnchor(ExposedDropdownMenuAnchorType.PrimaryNotEditable)
@@ -627,7 +667,7 @@ private fun KindField(value: NameComponentKind, index: Int, onValue: (NameCompon
         ExposedDropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
             NameComponentKind.entries.forEach { kind ->
                 DropdownMenuItem(
-                    text = { Text(kind.label) },
+                    text = { Text(textOf(kind.textKey)) },
                     onClick = {
                         onValue(kind)
                         expanded = false
@@ -642,12 +682,14 @@ private fun KindField(value: NameComponentKind, index: Int, onValue: (NameCompon
 @Composable
 private fun CaseField(value: CasePolicy, index: Int, onValue: (CasePolicy) -> Unit) {
     var expanded by remember { mutableStateOf(false) }
+    val currentLabel = textOf(value.textKey)
+    val fieldLabel = stringResource(R.string.a_scheme_case_label)
     ExposedDropdownMenuBox(expanded = expanded, onExpandedChange = { expanded = it }) {
         OutlinedTextField(
-            value = value.label,
+            value = currentLabel,
             onValueChange = {},
             readOnly = true,
-            label = { Text("大小写") },
+            label = { Text(fieldLabel) },
             trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
             modifier = Modifier
                 .menuAnchor(ExposedDropdownMenuAnchorType.PrimaryNotEditable)
@@ -657,7 +699,7 @@ private fun CaseField(value: CasePolicy, index: Int, onValue: (CasePolicy) -> Un
         ExposedDropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
             CasePolicy.entries.forEach { p ->
                 DropdownMenuItem(
-                    text = { Text(p.label) },
+                    text = { Text(textOf(p.textKey)) },
                     onClick = {
                         onValue(p)
                         expanded = false
@@ -672,12 +714,14 @@ private fun CaseField(value: CasePolicy, index: Int, onValue: (CasePolicy) -> Un
 @Composable
 private fun ExtPolicyField(value: ExtPolicy, onValue: (ExtPolicy) -> Unit) {
     var expanded by remember { mutableStateOf(false) }
+    val currentLabel = textOf(value.textKey)
+    val fieldLabel = stringResource(R.string.a_scheme_ext_label)
     ExposedDropdownMenuBox(expanded = expanded, onExpandedChange = { expanded = it }) {
         OutlinedTextField(
-            value = value.label,
+            value = currentLabel,
             onValueChange = {},
             readOnly = true,
-            label = { Text("扩展名") },
+            label = { Text(fieldLabel) },
             trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
             modifier = Modifier
                 .menuAnchor(ExposedDropdownMenuAnchorType.PrimaryNotEditable)
@@ -687,7 +731,7 @@ private fun ExtPolicyField(value: ExtPolicy, onValue: (ExtPolicy) -> Unit) {
         ExposedDropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
             ExtPolicy.entries.forEach { p ->
                 DropdownMenuItem(
-                    text = { Text(p.label) },
+                    text = { Text(textOf(p.textKey)) },
                     onClick = {
                         onValue(p)
                         expanded = false

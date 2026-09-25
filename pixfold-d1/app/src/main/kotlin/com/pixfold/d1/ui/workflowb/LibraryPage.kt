@@ -21,16 +21,21 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import com.pixfold.d1.R
 import com.pixfold.d1.domain.model.ComicVolume
+import com.pixfold.d1.domain.text.TextKey
 import com.pixfold.d1.domain.workflowb.WorkflowBState
 import com.pixfold.d1.domain.workflowb.selectVolume
 import com.pixfold.d1.domain.workflowb.setVolumeIncluded
 import com.pixfold.d1.ui.components.PageActionBar
+import com.pixfold.d1.ui.text.textOf
 
 const val TAG_LIBRARY_PAGE = "library-page"
 const val TAG_LIBRARY_LIST = "library-list"
@@ -77,6 +82,8 @@ fun LibraryPage(
     contentInsets: WindowInsets = WindowInsets.safeDrawing,
     onNext: (() -> Unit)? = null,
 ) {
+    // 要进 semantics{},故先在组合上下文里解析
+    val nextCd = stringResource(R.string.lib_next_cd)
     Column(
         modifier = modifier
             .fillMaxSize()
@@ -84,14 +91,20 @@ fun LibraryPage(
             .testTag(TAG_LIBRARY_PAGE),
     ) {
         Text(
-            text = "漫画库：${state.rootPath}",
+            text = stringResource(R.string.lib_root, state.rootPath),
             style = MaterialTheme.typography.titleSmall,
             color = MaterialTheme.colorScheme.onBackground,
             modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
         )
         Text(
-            text = "识别到 ${state.seriesGroups.size} 个系列 / ${state.volumeCount} 卷 · " +
-                "已勾选 ${state.includedCount} 卷 · 待确认 ${state.pendingCount} 卷",
+            text = pluralStringResource(
+                R.plurals.lib_summary,
+                state.seriesGroups.size,
+                state.seriesGroups.size,
+                state.volumeCount,
+                state.includedCount,
+                state.pendingCount,
+            ),
             style = MaterialTheme.typography.labelMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier
@@ -107,6 +120,8 @@ fun LibraryPage(
             verticalArrangement = Arrangement.spacedBy(2.dp),
         ) {
             state.seriesGroups.forEach { (series, volumes) ->
+                // 分组键保持语言无关(空串 = 未命名系列,见 groupVolumesBySeries 的 KDoc);
+                // 只有**显示**时才翻译,故 testTag 用原始键、标题用解析结果。
                 item(key = "series-$series") {
                     SeriesHeader(series = series, volumes = volumes)
                 }
@@ -132,8 +147,8 @@ fun LibraryPage(
                         onClick = onNext,
                         modifier = Modifier
                             .testTag(TAG_LIBRARY_NEXT)
-                            .semantics { contentDescription = "下一步 编辑元数据" },
-                    ) { Text("下一步 编辑元数据") }
+                            .semantics { contentDescription = nextCd },
+                    ) { Text(stringResource(R.string.lib_next)) }
                 },
             )
         }
@@ -144,6 +159,9 @@ fun LibraryPage(
 @Composable
 private fun SeriesHeader(series: String, volumes: List<ComicVolume>) {
     val pending = volumes.count { it.needsConfirmation }
+    // 分组键是语言无关的稳定字符串(空串 = 未命名系列)—— 翻译只发生在**显示**这一层。
+    // 若把 `TextKey.UnnamedSeries` 存进键,切语言时同一批卷会被分到两个组里。
+    val seriesTitle = if (series.isEmpty()) textOf(TextKey.UnnamedSeries) else series
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -153,21 +171,21 @@ private fun SeriesHeader(series: String, volumes: List<ComicVolume>) {
         horizontalArrangement = Arrangement.spacedBy(6.dp),
     ) {
         Text(
-            text = series,
+            text = seriesTitle,
             style = MaterialTheme.typography.titleSmall,
             fontWeight = FontWeight.Bold,
             color = MaterialTheme.colorScheme.onBackground,
             modifier = Modifier.weight(1f),
         )
         Text(
-            text = "${volumes.size} 卷",
+            text = pluralStringResource(R.plurals.lib_series_volume_count, volumes.size, volumes.size),
             style = MaterialTheme.typography.labelSmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
         if (pending > 0) {
             // 待确认用 tertiary(主题语义色),不硬编码橙色
             Text(
-                text = "$pending 卷待确认",
+                text = stringResource(R.string.lib_series_pending, pending),
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.tertiary,
             )
@@ -189,6 +207,12 @@ private fun VolumeRow(
     onSelect: () -> Unit,
     onToggleIncluded: (Boolean) -> Unit,
 ) {
+    // 要进 semantics{} / 需要现场解析领域 `Msg`,故先在组合上下文里取到局部变量
+    val selectedSuffix = if (selected) stringResource(R.string.lib_volume_cd_selected) else ""
+    val volumeCd = stringResource(R.string.lib_volume_cd, volume.dirPath, selectedSuffix)
+    val includeCd = stringResource(R.string.lib_include_cd, volume.id)
+    val issuesText = volume.pendingIssues.map { textOf(it) }
+        .joinToString(stringResource(R.string.lib_issue_separator))
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -196,7 +220,7 @@ private fun VolumeRow(
             .padding(horizontal = 8.dp, vertical = 6.dp)
             .testTag(volumeCardTag(volume.id))
             .semantics {
-                contentDescription = "卷 ${volume.dirPath}${if (selected) "（当前选中）" else ""}"
+                contentDescription = volumeCd
             },
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(4.dp),
@@ -206,7 +230,7 @@ private fun VolumeRow(
             onCheckedChange = onToggleIncluded,
             modifier = Modifier
                 .testTag(volumeIncludedTag(volume.id))
-                .semantics { contentDescription = "勾选卷 ${volume.id}" },
+                .semantics { contentDescription = includeCd },
         )
         Column(modifier = Modifier.weight(1f)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -224,7 +248,7 @@ private fun VolumeRow(
                 )
                 if (selected) {
                     Text(
-                        text = " · 当前",
+                        text = stringResource(R.string.lib_volume_current),
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.primary,
                     )
@@ -233,8 +257,13 @@ private fun VolumeRow(
             // 建议 + 来源都必须是**真的可读**:来源被省略号截掉等于没有来源,
             // 故这一行给 2 行余量(验收第 11 项要求来源可见,不是"存在但看不到")。
             Text(
-                text = "${volume.pageCount} 页 · 建议 Title「${volume.titleSug.value}」" +
-                    "（${volume.titleSug.source}）",
+                text = pluralStringResource(
+                    R.plurals.lib_volume_suggestion,
+                    volume.pageCount,
+                    volume.pageCount,
+                    volume.titleSug.value.orEmpty(),
+                    volume.titleSug.source,
+                ),
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 maxLines = 2,
@@ -242,16 +271,16 @@ private fun VolumeRow(
                 modifier = Modifier.testTag(volumeSuggestionTag(volume.id)),
             )
             Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                if (volume.pendingIssues.isNotEmpty()) {
+                if (issuesText.isNotEmpty()) {
                     Text(
-                        text = volume.pendingIssues.joinToString(" / "),
+                        text = issuesText,
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.tertiary,
                     )
                 }
                 if (volume.outputExists) {
                     Text(
-                        text = "输出冲突",
+                        text = stringResource(R.string.lib_output_conflict),
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.error,
                     )

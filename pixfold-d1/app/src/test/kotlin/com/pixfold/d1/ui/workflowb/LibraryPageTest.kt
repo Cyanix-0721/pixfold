@@ -8,6 +8,8 @@ import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollToNode
+import com.pixfold.d1.R
+import com.pixfold.d1.TestText
 import com.pixfold.d1.domain.mock.MockDataB
 import com.pixfold.d1.domain.model.ComicVolume
 import com.pixfold.d1.domain.workflowb.WorkflowBState
@@ -81,8 +83,14 @@ class LibraryPageTest {
         show()
         val state = workflowBStateOf(library.rootPath, library.volumes)
         rule.onNodeWithText(
-            "识别到 ${state.seriesGroups.size} 个系列 / ${state.volumeCount} 卷 · " +
-                "已勾选 ${state.includedCount} 卷 · 待确认 ${state.pendingCount} 卷",
+            TestText.plural(
+                R.plurals.lib_summary,
+                state.seriesGroups.size,
+                state.seriesGroups.size,
+                state.volumeCount,
+                state.includedCount,
+                state.pendingCount,
+            ),
         ).assertIsDisplayed()
         assertEquals(5, state.pendingCount, "五卷的语言全部未确认")
     }
@@ -91,7 +99,7 @@ class LibraryPageTest {
     fun `series header aggregates the pending count`() {
         show()
         // 进击的巨人 3 卷:语言全部未确认 + aot-0 缺卷号 -> 3 卷待确认
-        rule.onNodeWithText("3 卷待确认").assertIsDisplayed()
+        rule.onNodeWithText(TestText.of(R.string.lib_series_pending, 3)).assertIsDisplayed()
     }
 
     @Test
@@ -109,14 +117,14 @@ class LibraryPageTest {
     fun `pending issue is shown on the volume row`() {
         show()
         rule.onNodeWithTag(TAG_LIBRARY_LIST).performScrollToNode(hasTestTag(volumeCardTag("aot-0")))
-        rule.onNodeWithText("卷号缺失", substring = true).assertIsDisplayed()
+        rule.onNodeWithText(TestText.of(R.string.domain_pending_volume), substring = true).assertIsDisplayed()
     }
 
     @Test
     fun `output conflict is marked on the volume row`() {
         show()
         rule.onNodeWithTag(TAG_LIBRARY_LIST).performScrollToNode(hasTestTag(volumeCardTag("op-102")))
-        rule.onNodeWithText("输出冲突").assertIsDisplayed()
+        rule.onNodeWithText(TestText.of(R.string.lib_output_conflict)).assertIsDisplayed()
     }
 
     @Test
@@ -137,13 +145,13 @@ class LibraryPageTest {
         rule.onNodeWithTag(volumeCardTag("op-101")).performClick()
         rule.waitForIdle()
         assertEquals("op-101", latest?.activeVolumeId, "点卷卡片应把它设为当前卷(供后续步骤使用)")
-        rule.onNodeWithText(" · 当前").assertIsDisplayed()
+        rule.onNodeWithText(TestText.of(R.string.lib_volume_current)).assertIsDisplayed()
     }
 
     @Test
     fun `library heading shows the root path`() {
         show()
-        rule.onNodeWithText("漫画库：${library.rootPath}").assertIsDisplayed()
+        rule.onNodeWithText(TestText.of(R.string.lib_root, library.rootPath)).assertIsDisplayed()
     }
 
     @Test
@@ -188,7 +196,7 @@ class LibraryPageTest {
                 contentInsets = WindowInsets(0, 0, 0, 0),
             )
         }
-        rule.onNodeWithText("已勾选 4 卷 · 待确认 5 卷", substring = true).assertIsDisplayed()
-        rule.onNodeWithText("3 卷待确认").assertIsDisplayed()
+        rule.onNodeWithText(TestText.plural(R.plurals.lib_summary, 2, 2, 5, 4, 5)).assertIsDisplayed()
+        rule.onNodeWithText(TestText.of(R.string.lib_series_pending, 3)).assertIsDisplayed()
     }
 }

@@ -7,6 +7,8 @@ import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
+import com.pixfold.d1.R
+import com.pixfold.d1.TestText
 import com.pixfold.d1.domain.mock.MockData
 import com.pixfold.d1.domain.mock.MockDataB
 import com.pixfold.d1.domain.plan.OutputConflictPolicy
@@ -200,7 +202,12 @@ class PlanWiringTest {
 
         clickBPackConfirm()
         rule.onNodeWithTag(TAG_CONFIRM_GENERAL).assertIsDisplayed()
-        rule.onNodeWithText("· 源目录：删除（危险）").assertIsDisplayed()
+        rule.onNodeWithText(
+            "· " + TestText.of(
+                R.string.domain_summary_source_dir_prefix,
+                TestText.of(R.string.domain_summary_source_dir_delete),
+            ),
+        ).assertIsDisplayed()
         rule.onNodeWithTag(TAG_CONFIRM_OK).performClick()
 
         rule.onNodeWithTag(TAG_CONFIRM_DANGER).assertIsDisplayed()

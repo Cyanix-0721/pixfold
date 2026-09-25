@@ -4,14 +4,18 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import android.content.Context
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
+import androidx.test.core.app.ApplicationProvider
+import com.pixfold.d1.R
 import com.pixfold.d1.domain.model.SortField
 import com.pixfold.d1.domain.model.SortKey
 import com.pixfold.d1.domain.model.SortRule
+import com.pixfold.d1.ui.text.resolveText
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -32,6 +36,15 @@ import kotlin.test.assertTrue
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [34], qualifiers = "w400dp-h800dp")
 class SortRuleDirectionTest {
+
+    /**
+     * 期望值取自资源 —— 领域枚举只带 `TextKey`,字段名由 UI 层解析。
+     * 若在测试里写死中文,等于把解析实现复制一份,且换语言即红。
+     */
+    private val context: Context get() = ApplicationProvider.getApplicationContext()
+
+    // 走界面用的同一条解析路径(领域枚举只带 TextKey,资源映射在 ui/text 集中一处)
+    private fun fieldLabel(field: SortField) = resolveText(context, field.textKey)
 
     @get:Rule
     val rule = createComposeRule()
@@ -199,8 +212,8 @@ class SortRuleDirectionTest {
     fun `direction is conveyed to accessibility with field name and order`() {
         setEditor(twoLevels, Harness(twoLevels))
         val d = description(fieldTag(0, SortField.NaturalName))
-        assertTrue(d.contains("升序"), "无障碍描述应说明当前方向(实际=$d)")
-        assertTrue(d.contains(SortField.NaturalName.label), "应包含字段名(实际=$d)")
+        assertTrue(d.contains(context.getString(R.string.a_sort_ascending)), "无障碍描述应说明当前方向(实际=$d)")
+        assertTrue(d.contains(fieldLabel(SortField.NaturalName)), "应包含字段名(实际=$d)")
     }
 
     @Test
@@ -208,6 +221,6 @@ class SortRuleDirectionTest {
         val initial = SortRule(listOf(SortKey(SortField.NaturalName, false)))
         setEditor(initial, Harness(initial))
         val d = description(fieldTag(0, SortField.NaturalName))
-        assertTrue(d.contains("降序"), "降序应体现在无障碍描述(实际=$d)")
+        assertTrue(d.contains(context.getString(R.string.a_sort_descending)), "降序应体现在无障碍描述(实际=$d)")
     }
 }

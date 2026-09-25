@@ -58,7 +58,7 @@ class BackNavigationTest {
 
     private fun openNamingStep() {
         rule.setContent { PixFoldApp() }
-        rule.onNodeWithText("工作流 A · 图片整理与命名").performClick()
+        rule.onNodeWithText(TestText.of(R.string.home_workflow_a)).performClick()
         rule.onNodeWithTag(TAG_STEP_NAMING).performClick()
         rule.waitForIdle()
         rule.onNodeWithTag(TAG_STEP_BACK).assertIsDisplayed()
@@ -79,18 +79,18 @@ class BackNavigationTest {
     @Test
     fun `back from sort step returns to home`() {
         rule.setContent { PixFoldApp() }
-        rule.onNodeWithText("工作流 A · 图片整理与命名").performClick()
+        rule.onNodeWithText(TestText.of(R.string.home_workflow_a)).performClick()
         assertTrue(rule.onAllNodesWithTag(TAG_GRID_CARD).fetchSemanticsNodes().isNotEmpty(), "应停在工作流 A")
 
         back()
         // 回到首页:两条工作流入口应再次出现
-        rule.onNodeWithText("工作流 B · CBZ 制作").assertIsDisplayed()
+        rule.onNodeWithText(TestText.of(R.string.home_workflow_b)).assertIsDisplayed()
     }
 
     @Test
     fun `back from preview closes the preview and stays in workflow A`() {
         rule.setContent { PixFoldApp() }
-        rule.onNodeWithText("工作流 A · 图片整理与命名").performClick()
+        rule.onNodeWithText(TestText.of(R.string.home_workflow_a)).performClick()
         rule.onAllNodesWithTag(TAG_GRID_CARD)[0].performClick()
         rule.onNodeWithTag(TAG_PREVIEW).assertIsDisplayed()
 
@@ -105,18 +105,18 @@ class BackNavigationTest {
     @Test
     fun `back from workflow B first step returns to home`() {
         rule.setContent { PixFoldApp() }
-        rule.onNodeWithText("工作流 B · CBZ 制作").performClick()
+        rule.onNodeWithText(TestText.of(R.string.home_workflow_b)).performClick()
         rule.onNodeWithTag(TAG_LIBRARY_PAGE).assertIsDisplayed()
 
         back()
-        rule.onNodeWithText("工作流 A · 图片整理与命名").assertIsDisplayed()
+        rule.onNodeWithText(TestText.of(R.string.home_workflow_a)).assertIsDisplayed()
     }
 
     @Test
     fun `back from workflow B third step walks down to the library step`() {
         // 层级:步骤3 打包计划 -> 步骤2 元数据 -> 步骤1 漫画库 -> 首页
         rule.setContent { PixFoldApp() }
-        rule.onNodeWithText("工作流 B · CBZ 制作").performClick()
+        rule.onNodeWithText(TestText.of(R.string.home_workflow_b)).performClick()
         rule.onNodeWithTag(TAG_B_STEP_PACK).performClick()
         rule.onNodeWithTag(TAG_PACK_PAGE).assertIsDisplayed()
 
@@ -127,14 +127,14 @@ class BackNavigationTest {
         rule.onNodeWithTag(TAG_LIBRARY_PAGE).assertIsDisplayed()
 
         back()
-        rule.onNodeWithText("工作流 A · 图片整理与命名").assertIsDisplayed()
+        rule.onNodeWithText(TestText.of(R.string.home_workflow_a)).assertIsDisplayed()
     }
 
     @Test
     fun `the whole back chain walks down level by level`() {
         // 端到端走一遍层级:命名 -> 排序 -> 首页
         rule.setContent { PixFoldApp() }
-        rule.onNodeWithText("工作流 A · 图片整理与命名").performClick()
+        rule.onNodeWithText(TestText.of(R.string.home_workflow_a)).performClick()
         rule.onNodeWithTag(TAG_STEP_NAMING).performClick()
         rule.onNodeWithTag(TAG_STEP_BACK).assertIsDisplayed()
 
@@ -146,7 +146,7 @@ class BackNavigationTest {
         )
 
         back()   // 步骤1 -> 首页
-        rule.onNodeWithText("工作流 B · CBZ 制作").assertIsDisplayed()
+        rule.onNodeWithText(TestText.of(R.string.home_workflow_b)).assertIsDisplayed()
     }
 
     /**
@@ -163,7 +163,7 @@ class BackNavigationTest {
     @Test
     fun `a backward tab jump in workflow A keeps the back chain linear`() {
         rule.setContent { PixFoldApp() }
-        rule.onNodeWithText("工作流 A · 图片整理与命名").performClick()
+        rule.onNodeWithText(TestText.of(R.string.home_workflow_a)).performClick()
         rule.onNodeWithTag(TAG_STEP_NAMING).performClick()
         rule.onNodeWithTag(TAG_TO_PLAN).performClick()
         rule.onNodeWithTag(TAG_A_PLAN_PAGE).assertIsDisplayed()
@@ -175,14 +175,14 @@ class BackNavigationTest {
         back()
         // 线性栈下:步骤1 的上一层是首页。若非线性(残留 [步骤2, 步骤3]),
         // 这里会退到步骤3 的执行计划页。
-        rule.onNodeWithText("工作流 B · CBZ 制作").assertIsDisplayed()
+        rule.onNodeWithText(TestText.of(R.string.home_workflow_b)).assertIsDisplayed()
     }
 
     /** 同上,工作流 B 走的是独立的 `goToWorkflowBStep`。 */
     @Test
     fun `a backward tab jump in workflow B keeps the back chain linear`() {
         rule.setContent { PixFoldApp() }
-        rule.onNodeWithText("工作流 B · CBZ 制作").performClick()
+        rule.onNodeWithText(TestText.of(R.string.home_workflow_b)).performClick()
         // 步骤1 -> 步骤3(按 helper 会逐级推入元数据、打包)
         rule.onNodeWithTag(TAG_B_STEP_PACK).performClick()
         rule.onNodeWithTag(TAG_PACK_PAGE).assertIsDisplayed()
@@ -193,6 +193,6 @@ class BackNavigationTest {
 
         back()
         // 线性栈下直接回首页;非线性的 `navigate` 版本会退到步骤2/步骤3
-        rule.onNodeWithText("工作流 A · 图片整理与命名").assertIsDisplayed()
+        rule.onNodeWithText(TestText.of(R.string.home_workflow_a)).assertIsDisplayed()
     }
 }

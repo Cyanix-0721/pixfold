@@ -16,6 +16,8 @@ import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.performTextClearance
 import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.test.performTextReplacement
+import com.pixfold.d1.R
+import com.pixfold.d1.TestText
 import com.pixfold.d1.domain.mock.MockData
 import com.pixfold.d1.domain.model.CasePolicy
 import com.pixfold.d1.domain.model.ExtPolicy
@@ -322,7 +324,7 @@ class NamingPageTest {
         expandEditor()
         // 行内不再有那段长文案(它正是把开关挤出屏幕的元凶)
         assertTrue(
-            rule.onAllNodesWithText("清洗把非法字符替换为 _ ；清洗后仍可能重名")
+            rule.onAllNodesWithText(TestText.of(R.string.a_scheme_sanitize_body))
                 .fetchSemanticsNodes().isEmpty(),
             "行内长文案应已被图标取代",
         )
@@ -342,8 +344,8 @@ class NamingPageTest {
         rule.onNodeWithTag(TAG_SCHEME_SANITIZE_INFO).performClick()
         rule.onNodeWithTag(TAG_SCHEME_SANITIZE_INFO_DIALOG).assertIsDisplayed()
         // 说明内容要点:替换为 _ ;且**不会去重**
-        rule.onNodeWithText("不会去重", substring = true).assertIsDisplayed()
-        rule.onNodeWithText("会被替换为「_」", substring = true).assertIsDisplayed()
+        rule.onNodeWithText(TestText.of(R.string.a_scheme_sanitize_body), substring = true).assertIsDisplayed()
+        rule.onNodeWithText(TestText.of(R.string.a_scheme_sanitize_body), substring = true).assertIsDisplayed()
     }
 
     @Test
@@ -406,7 +408,7 @@ class NamingPageTest {
         rule.onNodeWithTag(proposalFieldTag(id)).performTextReplacement("我的名字.jpg")
         assertField(id, "我的名字.jpg")
         // 标签应变为"已覆盖"
-        rule.onNodeWithText("新名称（已覆盖）").assertIsDisplayed()
+        rule.onNodeWithText(TestText.of(R.string.a_table_new_name_overridden)).assertIsDisplayed()
     }
 
     @Test
@@ -547,7 +549,7 @@ class NamingPageTest {
         show(collection = col, order = pageOrderOf(col.images), initial = NamingState(scheme))
 
         // 两行本来就重名 -> 冲突 2
-        rule.onNodeWithTag(TAG_PROPOSAL_SUMMARY).assertTextEquals("共 2 项 · 冲突 2 · 警告 0")
+        rule.onNodeWithTag(TAG_PROPOSAL_SUMMARY).assertTextEquals(TestText.plural(R.plurals.a_table_summary, 2, 2, 2, 0))
     }
 
     // ================= 验收第 10 项:冲突与警告可见 =================
@@ -566,7 +568,7 @@ class NamingPageTest {
         rule.onNodeWithTag(proposalWarningTag("p1")).assertIsDisplayed()
         rule.onNodeWithTag(proposalWarningTag("p2")).assertIsDisplayed()
         // 汇总里应体现冲突数
-        rule.onNodeWithTag(TAG_PROPOSAL_SUMMARY).assertTextEquals("共 2 项 · 冲突 2 · 警告 0")
+        rule.onNodeWithTag(TAG_PROPOSAL_SUMMARY).assertTextEquals(TestText.plural(R.plurals.a_table_summary, 2, 2, 2, 0))
     }
 
     @Test
@@ -581,7 +583,7 @@ class NamingPageTest {
         show(collection = col, order = pageOrderOf(col.images), initial = NamingState(scheme))
 
         rule.onNodeWithTag(proposalWarningTag("bad")).assertIsDisplayed()
-        rule.onNodeWithText("· 非法字符：: ?（执行时将跳过；可开启自动清洗）").assertIsDisplayed()
+        rule.onNodeWithText("· " + TestText.of(R.string.domain_warn_illegal_char, ": ?")).assertIsDisplayed()
     }
 
     @Test
@@ -617,7 +619,7 @@ class NamingPageTest {
 
         rule.onNodeWithTag(proposalWarningTag("c1")).assertIsDisplayed()
         // 大小写冲突仅警告(冲突数应为 0)
-        rule.onNodeWithTag(TAG_PROPOSAL_SUMMARY).assertTextEquals("共 2 项 · 冲突 0 · 警告 2")
+        rule.onNodeWithTag(TAG_PROPOSAL_SUMMARY).assertTextEquals(TestText.plural(R.plurals.a_table_summary, 2, 2, 0, 2))
     }
 
     @Test
@@ -649,14 +651,14 @@ class NamingPageTest {
     @Test
     fun `trip collection under default scheme has no conflicts`() {
         show()
-        rule.onNodeWithTag(TAG_PROPOSAL_SUMMARY).assertTextEquals("共 30 项 · 冲突 0 · 警告 0")
+        rule.onNodeWithTag(TAG_PROPOSAL_SUMMARY).assertTextEquals(TestText.plural(R.plurals.a_table_summary, 30, 30, 0, 0))
     }
 
     @Test
     fun `scan collection illegal char is sanitized by default so no conflict`() {
         // scan 含 封:面? ,默认 sanitize=true -> 应被清洗,不产生 IllegalChar 冲突
         show(collection = scan, order = pageOrderOf(scan.images))
-        rule.onNodeWithTag(TAG_PROPOSAL_SUMMARY).assertTextEquals("共 14 项 · 冲突 0 · 警告 0")
+        rule.onNodeWithTag(TAG_PROPOSAL_SUMMARY).assertTextEquals(TestText.plural(R.plurals.a_table_summary, 14, 14, 0, 0))
         // 实测次序(domain 探针):ch01 六张 -> 1..6;ch02 的 Page_01(大写) 在自然序中
         // 排在小写 page_01 之前? 不 —— 自然序先 lowercase,故二者等价,由 id 兜底,
         // 结果 Page_01 得 007、page_01 得 008 …… 封:面? 排最后得 014。
@@ -672,5 +674,20 @@ class NamingPageTest {
         val moved = com.pixfold.d1.domain.sort.moveItemTo(order, trip.images.first().id, trip.images.size - 1)
         show(collection = trip, order = moved)
         assertFieldAfterScroll(trip.images.first().id, "旅行照片_030.jpg")
+    }
+
+    /**
+     * 标题行的**数量在第 2 个参数**上(形态 `Naming structure · %1$s (%2$d images)`)。
+     *
+     * 这是唯一一个数量不在首位的 plurals 键 —— `PixFoldText.pluralQuantityIndex()` 为它返回 1。
+     * 若登记错(比如也写成 0),解析层会拿 `%1$s`(集合名,字符串)当 count,`as? Int` 落空后回退 0,
+     * 英文便渲染成 "1 images"。单张集合同时覆盖英文 `one` 变体(其余用例的计数都 >= 2)。
+     */
+    @Test
+    fun `naming title uses the page count as the plural quantity not the collection name`() {
+        val solo = ImageCollection("solo", "单张", "单张", listOf(item("s1")))
+        show(collection = solo, order = pageOrderOf(solo.images))
+        rule.onNodeWithTag(TAG_NAMING_TITLE)
+            .assertTextEquals(TestText.plural(R.plurals.a_naming_title, 1, solo.name, 1))
     }
 }

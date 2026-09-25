@@ -16,11 +16,13 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
+import com.pixfold.d1.R
 import com.pixfold.d1.domain.model.ComicVolume
 import com.pixfold.d1.domain.plan.ConfirmFlowState
 import com.pixfold.d1.domain.plan.ExecutionReport
@@ -36,6 +38,7 @@ import com.pixfold.d1.domain.plan.generalSummaryLines
 import com.pixfold.d1.domain.plan.performUndo
 import com.pixfold.d1.domain.plan.startConfirmFlow
 import com.pixfold.d1.domain.plan.undoRecordOf
+import com.pixfold.d1.domain.text.Msg
 import com.pixfold.d1.domain.workflowb.WorkflowBState
 import com.pixfold.d1.domain.workflowb.workflowBStateOf
 import com.pixfold.d1.nav.DestinationSurface
@@ -55,10 +58,10 @@ const val TAG_B_STEP_PACK = "b-step-pack"
 const val TAG_B_STEP_BACK = "b-step-back"
 
 /** 工作流 B 的步骤(规格 §10.1:步骤1 漫画库 / 步骤2 元数据 / 步骤3 打包计划)。 */
-enum class WorkflowBStep(val label: String) {
-    Library("步骤1 漫画库"),
-    Metadata("步骤2 元数据"),
-    Pack("步骤3 打包计划"),
+enum class WorkflowBStep(val labelRes: Int) {
+    Library(R.string.b_step_label_library),
+    Metadata(R.string.b_step_label_metadata),
+    Pack(R.string.b_step_label_pack),
 }
 
 /**
@@ -102,7 +105,8 @@ fun WorkflowBSteps(
     var cleanEmptyDirs by remember { mutableStateOf(false) }
     var confirmFlow by remember { mutableStateOf(ConfirmFlowState()) }
     var report by remember { mutableStateOf<ExecutionReport?>(null) }
-    var undoMessage by remember { mutableStateOf<String?>(null) }
+    // 领域层的 `Msg`(语言无关);成品文案由 ExecutionReportPage 现场解析
+    var undoMessage by remember { mutableStateOf<Msg?>(null) }
 
     val navController = rememberNavController()
     // 当前步骤**从导航栈派生**(理由同 WorkflowASteps):手势进行中 entry 不变,序号稳定。
@@ -121,11 +125,13 @@ fun WorkflowBSteps(
                 .testTag(TAG_B_STEP_TABS),
         ) {
             WorkflowBStep.entries.forEachIndexed { i, step ->
+                // 要进 semantics{},故先在组合上下文里解析
+                val stepLabel = stringResource(step.labelRes)
                 Tab(
                     selected = currentIndex == i,
                     // 跳步走 goToWorkflowBStep,保证返回链始终线性(详见该函数注释)
                     onClick = { navController.goToWorkflowBStep(currentIndex, i) },
-                    text = { Text(step.label) },
+                    text = { Text(stepLabel) },
                     modifier = Modifier
                         .testTag(
                             when (step) {
@@ -134,7 +140,7 @@ fun WorkflowBSteps(
                                 WorkflowBStep.Pack -> TAG_B_STEP_PACK
                             },
                         )
-                        .semantics { contentDescription = step.label },
+                        .semantics { contentDescription = stepLabel },
                 )
             }
         }

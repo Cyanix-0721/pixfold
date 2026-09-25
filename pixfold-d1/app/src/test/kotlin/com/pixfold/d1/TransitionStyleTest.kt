@@ -1,5 +1,7 @@
 package com.pixfold.d1
 
+import com.pixfold.d1.TestText
+
 import android.graphics.Bitmap
 import androidx.activity.BackEventCompat
 import androidx.activity.ComponentActivity
@@ -134,7 +136,7 @@ class TransitionStyleTest {
 
     /** 打开工作流 A 的步骤 2(命名页)。 */
     private fun openNamingStep() {
-        rule.onNodeWithText("工作流 A · 图片整理与命名").performClick()
+        rule.onNodeWithText(TestText.of(R.string.home_workflow_a)).performClick()
         rule.onNodeWithTag(TAG_STEP_NAMING).performClick()
         rule.waitForIdle()
         rule.onNodeWithTag(TAG_STEP_BACK).assertExists()

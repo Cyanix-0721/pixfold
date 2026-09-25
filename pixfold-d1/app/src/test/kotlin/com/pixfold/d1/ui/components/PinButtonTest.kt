@@ -1,5 +1,9 @@
 package com.pixfold.d1.ui.components
 
+import com.pixfold.d1.TestText
+
+import com.pixfold.d1.R
+
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithTag
@@ -43,14 +47,17 @@ class PinButtonTest {
     fun `unpinned description uses pin wording`() {
         rule.setContent { PinToggle(isPinned = false, itemName = "a.jpg", onClick = {}) }
         val d = descriptionOf(TAG_PIN_TOGGLE)
-        assertTrue(d.contains("固定"), "应表达'固定位置'语义,实际=$d")
+        assertTrue(d.contains(TestText.of(R.string.pin_toggle_unpinned, "").trim()), "应表达'固定位置'语义,实际=$d")
         assertTrue(!d.contains("收藏"), "不得用'收藏'语义(那是五角星的语义),实际=$d")
     }
 
     @Test
     fun `pinned description distinguishes state`() {
         rule.setContent { PinToggle(isPinned = true, itemName = "a.jpg", onClick = {}) }
-        assertTrue(descriptionOf(TAG_PIN_TOGGLE).contains("已固定"), "已固定态应有明确措辞")
+        assertTrue(
+            descriptionOf(TAG_PIN_TOGGLE).contains(TestText.of(R.string.pin_toggle_pinned, "").trim()),
+            "已固定态应有明确措辞",
+        )
     }
 
     @Test

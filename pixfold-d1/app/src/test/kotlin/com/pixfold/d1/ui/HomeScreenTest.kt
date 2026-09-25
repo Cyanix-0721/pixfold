@@ -1,5 +1,9 @@
 package com.pixfold.d1.ui
 
+import com.pixfold.d1.TestText
+
+import com.pixfold.d1.R
+
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.layout.only
@@ -31,15 +35,15 @@ class HomeScreenTest {
     @Test
     fun `home renders both workflow entries`() {
         rule.setContent { PixFoldApp() }
-        rule.onNodeWithText("工作流 A · 图片整理与命名").assertIsDisplayed()
-        rule.onNodeWithText("工作流 B · CBZ 制作").assertIsDisplayed()
+        rule.onNodeWithText(TestText.of(R.string.home_workflow_a)).assertIsDisplayed()
+        rule.onNodeWithText(TestText.of(R.string.home_workflow_b)).assertIsDisplayed()
     }
 
     @Test
     fun `clicking workflow A entry invokes callback`() {
         var clicked = 0
         rule.setContent { HomeScreen(onOpenWorkflowA = { clicked++ }, onOpenWorkflowB = {}) }
-        rule.onNodeWithText("工作流 A · 图片整理与命名").performClick()
+        rule.onNodeWithText(TestText.of(R.string.home_workflow_a)).performClick()
         assertEquals(1, clicked)
     }
 
@@ -47,7 +51,7 @@ class HomeScreenTest {
     fun `clicking workflow B entry invokes callback`() {
         var clicked = 0
         rule.setContent { HomeScreen(onOpenWorkflowA = {}, onOpenWorkflowB = { clicked++ }) }
-        rule.onNodeWithText("工作流 B · CBZ 制作").performClick()
+        rule.onNodeWithText(TestText.of(R.string.home_workflow_b)).performClick()
         assertEquals(1, clicked)
     }
 

@@ -24,9 +24,8 @@ data class PreviewState(
 ) {
     val hasPrevious: Boolean get() = index > 0
     val hasNext: Boolean get() = index < count - 1
-
-    /** 1-based 页码标签,如 `第 1 / 7 页`。 */
-    val pageLabel: String get() = "第 ${index + 1} / $count 页"
+    // 页码文案(如「第 1 / 7 页」)不在本类上 —— 本类不是 @Composable,取不到 stringResource;
+    // 由 `ImagePreview` 用 `R.string.preview_page_label` + `index + 1` / `count` 现场渲染。
 }
 
 fun previewStateOf(index: Int, count: Int): PreviewState =

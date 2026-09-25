@@ -35,9 +35,12 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
+import com.pixfold.d1.R
 import com.pixfold.d1.domain.comic.applyWriterCleaning
 import com.pixfold.d1.domain.comic.setMetaValue
 import com.pixfold.d1.domain.comic.useSuggestion
@@ -45,13 +48,15 @@ import com.pixfold.d1.domain.model.ComicVolume
 import com.pixfold.d1.domain.model.LangChoice
 import com.pixfold.d1.domain.model.MetaField
 import com.pixfold.d1.domain.model.MetaValue
-import com.pixfold.d1.domain.model.PENDING_VOLUME
+import com.pixfold.d1.domain.text.TextKey
 import com.pixfold.d1.domain.workflowb.WorkflowBState
 import com.pixfold.d1.domain.workflowb.batchApplyToLibrary
 import com.pixfold.d1.domain.workflowb.selectVolume
 import com.pixfold.d1.domain.workflowb.setVolumeIncluded
 import com.pixfold.d1.domain.workflowb.updateVolume
 import com.pixfold.d1.ui.components.PageActionBar
+import com.pixfold.d1.ui.text.textOf
+import com.pixfold.d1.ui.text.textOfOrNull
 
 const val TAG_METADATA_PAGE = "metadata-page"
 const val TAG_METADATA_LIST = "metadata-list"
@@ -118,7 +123,9 @@ fun MetadataPage(
     }
 
     val volume = state.activeVolume
-    var batchMessage by remember { mutableStateOf<String?>(null) }
+    // 批量结果存**计数**而非成品文案 —— 成品文案要在组合里用 stringResource 解析,
+    // 而回调不是 @Composable 上下文,取不到资源。
+    var batchApplied by remember { mutableStateOf<Pair<Int, Int>?>(null) }
 
     Column(
         modifier = modifier
@@ -159,7 +166,11 @@ fun MetadataPage(
                         field = MetaField.Title,
                         value = volume.title,
                         volume = volume,
-                        suggestionText = "${volume.titleSug.value.orEmpty()}（${volume.titleSug.source}）",
+                        suggestionText = stringResource(
+                            R.string.meta_suggestion_with_source,
+                            volume.titleSug.value.orEmpty(),
+                            volume.titleSug.source,
+                        ),
                         onValue = { update(updateVolume(state, setMetaValue(volume, MetaField.Title, MetaValue.Text(it)))) },
                         onReset = { update(updateVolume(state, useSuggestion(volume, MetaField.Title))) },
                     )
@@ -167,7 +178,11 @@ fun MetadataPage(
                         field = MetaField.Series,
                         value = volume.series,
                         volume = volume,
-                        suggestionText = "${volume.seriesSug.value.orEmpty()}（${volume.seriesSug.source}）",
+                        suggestionText = stringResource(
+                            R.string.meta_suggestion_with_source,
+                            volume.seriesSug.value.orEmpty(),
+                            volume.seriesSug.source,
+                        ),
                         onValue = { update(updateVolume(state, setMetaValue(volume, MetaField.Series, MetaValue.Text(it)))) },
                         onReset = { update(updateVolume(state, useSuggestion(volume, MetaField.Series))) },
                     )
@@ -175,18 +190,27 @@ fun MetadataPage(
                         field = MetaField.Writer,
                         value = volume.writer,
                         volume = volume,
-                        suggestionText = "${volume.writerSug.value.orEmpty()}（${volume.writerSug.source}）",
+                        suggestionText = stringResource(
+                            R.string.meta_suggestion_with_source,
+                            volume.writerSug.value.orEmpty(),
+                            volume.writerSug.source,
+                        ),
                         extraAction = {
+                            val cleanCd = stringResource(R.string.meta_writer_clean_cd)
                             TextButton(
                                 onClick = { update(updateVolume(state, applyWriterCleaning(volume))) },
                                 enabled = volume.writerCleanedSug.hasValue,
                                 modifier = Modifier
                                     .testTag(TAG_WRITER_CLEAN)
-                                    .semantics { contentDescription = "一键清理作者" },
-                            ) { Text("一键清理") }
+                                    .semantics { contentDescription = cleanCd },
+                            ) { Text(stringResource(R.string.meta_writer_clean)) }
                         },
                         extraHint = volume.writerCleanedSug.value?.let {
-                            "清理建议：$it（${volume.writerCleanedSug.source}）"
+                            stringResource(
+                                R.string.meta_writer_cleaned_hint,
+                                it,
+                                volume.writerCleanedSug.source,
+                            )
                         },
                         onValue = { update(updateVolume(state, setMetaValue(volume, MetaField.Writer, MetaValue.Text(it)))) },
                         onReset = { update(updateVolume(state, useSuggestion(volume, MetaField.Writer))) },
@@ -228,7 +252,10 @@ fun MetadataPage(
                         field = MetaField.CbzName,
                         value = volume.cbzFileName,
                         volume = volume,
-                        suggestionText = "由 Title + Number 建议值派生（${volume.titleSug.value.orEmpty()}）",
+                        suggestionText = stringResource(
+                            R.string.meta_cbz_name_hint,
+                            volume.titleSug.value.orEmpty(),
+                        ),
                         onValue = { update(updateVolume(state, setMetaValue(volume, MetaField.CbzName, MetaValue.Text(it)))) },
                         onReset = { update(updateVolume(state, useSuggestion(volume, MetaField.CbzName))) },
                     )
@@ -236,7 +263,10 @@ fun MetadataPage(
                         field = MetaField.OutputDir,
                         value = volume.outputDir,
                         volume = volume,
-                        suggestionText = "建议输出目录（${volume.outputDirSug}）",
+                        suggestionText = stringResource(
+                            R.string.meta_output_dir_hint,
+                            volume.outputDirSug,
+                        ),
                         onValue = { update(updateVolume(state, setMetaValue(volume, MetaField.OutputDir, MetaValue.Text(it)))) },
                         onReset = { update(updateVolume(state, useSuggestion(volume, MetaField.OutputDir))) },
                     )
@@ -245,12 +275,11 @@ fun MetadataPage(
 
             item(key = "batch") {
                 BatchSection(
-                    message = batchMessage,
+                    applied = batchApplied,
                     onApply = { field, value, force ->
                         val (next, result) = batchApplyToLibrary(state, field, value, force)
                         update(next)
-                        batchMessage = "已设置到 ${result.appliedCount} 卷" +
-                            if (result.skippedCount > 0) "（跳过 ${result.skippedCount} 卷逐项例外）" else ""
+                        batchApplied = result.appliedCount to result.skippedCount
                     },
                 )
             }
@@ -261,6 +290,8 @@ fun MetadataPage(
         if (onBack != null || onNext != null) {
             val back = onBack
             val next = onNext
+            val backCd = stringResource(R.string.b_step_back_cd)
+            val nextCd = stringResource(R.string.meta_next_cd)
             PageActionBar(
                 leading = {
                     if (back != null) {
@@ -268,8 +299,8 @@ fun MetadataPage(
                             onClick = back,
                             modifier = Modifier
                                 .testTag(TAG_B_STEP_BACK)
-                                .semantics { contentDescription = "返回上一步" },
-                        ) { Text("← 返回上一步") }
+                                .semantics { contentDescription = backCd },
+                        ) { Text(stringResource(R.string.b_step_back)) }
                     }
                 },
                 trailing = {
@@ -278,8 +309,8 @@ fun MetadataPage(
                             onClick = next,
                             modifier = Modifier
                                 .testTag(TAG_METADATA_NEXT)
-                                .semantics { contentDescription = "下一步 打包计划" },
-                        ) { Text("下一步 打包计划") }
+                                .semantics { contentDescription = nextCd },
+                        ) { Text(stringResource(R.string.meta_next)) }
                     }
                 },
             )
@@ -300,13 +331,14 @@ private fun VolumeSelector(state: WorkflowBState, onSelect: (String) -> Unit) {
         verticalAlignment = Alignment.CenterVertically,
     ) {
         state.volumes.forEach { v ->
+            val chipCd = stringResource(R.string.meta_volume_chip_cd, v.id)
             FilterChip(
                 selected = v.id == state.activeVolume.id,
                 onClick = { onSelect(v.id) },
                 label = { Text(v.title.ifEmpty { v.id }) },
                 modifier = Modifier
                     .testTag(volumeChipTag(v.id))
-                    .semantics { contentDescription = "卷 ${v.id}" },
+                    .semantics { contentDescription = chipCd },
             )
         }
     }
@@ -320,6 +352,22 @@ private fun VolumeSelector(state: WorkflowBState, onSelect: (String) -> Unit) {
  */
 @Composable
 private fun VolumeHeader(volume: ComicVolume, onToggleIncluded: (Boolean) -> Unit) {
+    // 语义文案与非 composable lambda 里的文案先取出(`textOf` 是 @Composable)。
+    val includeCd = stringResource(R.string.meta_include_cd, volume.id)
+    val statusText = pluralStringResource(
+        R.plurals.meta_volume_status,
+        volume.pageCount,
+        volume.pageCount,
+        volume.overridden.size,
+    )
+    val conflictText = stringResource(
+        R.string.meta_output_conflict,
+        "${volume.outputDir}/${volume.cbzFileName}",
+    )
+    // 待确认项是**领域层给的 Msg 列表**(不能预先拼成字符串:语言要在渲染时才定),
+    // `map` 必须内联 —— `joinToString` 的 transform 是普通 lambda,里面不能调 @Composable。
+    val issuesText = volume.pendingIssues.map { textOf(it) }.joinToString(" / ")
+
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -336,24 +384,24 @@ private fun VolumeHeader(volume: ComicVolume, onToggleIncluded: (Boolean) -> Uni
                 onCheckedChange = onToggleIncluded,
                 modifier = Modifier
                     .testTag(volumeIncludedTag(volume.id))
-                    .semantics { contentDescription = "勾选卷 ${volume.id}" },
+                    .semantics { contentDescription = includeCd },
             )
             Text(
-                text = "参与打包 · ${volume.pageCount} 页 · 已覆盖 ${volume.overridden.size} 个字段",
+                text = statusText,
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
         if (volume.outputExists) {
             Text(
-                text = "输出冲突：输出目录已存在同名 CBZ（${volume.outputDir}/${volume.cbzFileName}）",
+                text = conflictText,
                 style = MaterialTheme.typography.labelMedium,
                 color = MaterialTheme.colorScheme.error,
             )
         }
         if (volume.pendingIssues.isNotEmpty()) {
             Text(
-                text = "待确认：" + volume.pendingIssues.joinToString(" / "),
+                text = stringResource(R.string.meta_pending_prefix) + issuesText,
                 style = MaterialTheme.typography.labelMedium,
                 color = MaterialTheme.colorScheme.tertiary,
                 modifier = Modifier.testTag(TAG_PENDING_ISSUES),
@@ -381,6 +429,9 @@ private fun TextFieldRow(
     extraAction: (@Composable () -> Unit)? = null,
 ) {
     Column(modifier = Modifier.fillMaxWidth()) {
+        // 字段名来自领域枚举的 textKey(不是成品字符串);`testTag` 用 `field.name` 保持语言无关。
+        val fieldLabel = textOf(field.textKey)
+        val resetCd = stringResource(R.string.meta_reset_cd, fieldLabel)
         Row(
             modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically,
@@ -389,7 +440,7 @@ private fun TextFieldRow(
             OutlinedTextField(
                 value = value,
                 onValueChange = onValue,
-                label = { Text(field.label) },
+                label = { Text(fieldLabel) },
                 singleLine = true,
                 modifier = Modifier
                     .weight(1f)
@@ -401,11 +452,11 @@ private fun TextFieldRow(
                 enabled = field in volume.overridden,
                 modifier = Modifier
                     .testTag(metaResetTag(field))
-                    .semantics { contentDescription = "恢复建议值 ${field.label}" },
-            ) { Text("恢复建议") }
+                    .semantics { contentDescription = resetCd },
+            ) { Text(stringResource(R.string.meta_reset)) }
         }
         Text(
-            text = "建议：$suggestionText",
+            text = stringResource(R.string.meta_suggestion_prefix, suggestionText),
             style = MaterialTheme.typography.labelSmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.testTag(metaSuggestionTag(field)),
@@ -428,6 +479,12 @@ private fun VolumeNumberRow(
     onReset: () -> Unit,
 ) {
     val suggested = volume.volumeSug.value
+    // 卷号字段名与「卷号缺失」提示都来自领域键 —— 后者原是 `PENDING_VOLUME` 常量,
+    // 已并入 `TextKey.PendingVolume`(领域不再导出成品字符串)。
+    val volumeLabel = textOf(MetaField.Volume.textKey)
+    val pendingVolume = textOf(TextKey.PendingVolume)
+    val noValue = stringResource(R.string.meta_no_value)
+    val resetCd = stringResource(R.string.meta_reset_cd, volumeLabel)
     Column(modifier = Modifier.fillMaxWidth()) {
         Row(
             modifier = Modifier.fillMaxWidth(),
@@ -441,11 +498,11 @@ private fun VolumeNumberRow(
                     // 退格到空 = 明确"没有卷号"(待确认项随之出现),而不是拒绝输入
                     onValue(if (digits.isEmpty()) null else digits.toIntOrNull())
                 },
-                label = { Text(MetaField.Volume.label) },
+                label = { Text(volumeLabel) },
                 singleLine = true,
                 isError = volume.volume == null,
                 supportingText = if (volume.volume == null) {
-                    { Text(PENDING_VOLUME) }
+                    { Text(pendingVolume) }
                 } else {
                     null
                 },
@@ -458,11 +515,18 @@ private fun VolumeNumberRow(
                 enabled = MetaField.Volume in volume.overridden,
                 modifier = Modifier
                     .testTag(metaResetTag(MetaField.Volume))
-                    .semantics { contentDescription = "恢复建议值 ${MetaField.Volume.label}" },
-            ) { Text("恢复建议") }
+                    .semantics { contentDescription = resetCd },
+            ) { Text(stringResource(R.string.meta_reset)) }
         }
         Text(
-            text = "建议：${suggested ?: "无"}（${volume.volumeSug.source}）",
+            text = stringResource(
+                R.string.meta_suggestion_prefix,
+                stringResource(
+                    R.string.meta_suggestion_with_source,
+                    suggested ?: noValue,
+                    volume.volumeSug.source,
+                ),
+            ),
             style = MaterialTheme.typography.labelSmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.testTag(metaSuggestionTag(MetaField.Volume)),
@@ -487,6 +551,13 @@ private fun LanguageRow(
 ) {
     var expanded by remember { mutableStateOf(false) }
     val unset = volume.language == LangChoice.Unset
+    val languageLabel = textOf(MetaField.Language.textKey)
+    val unsetError = stringResource(R.string.meta_lang_unset_error)
+    // 「恢复建议值 LanguageISO」里的 LanguageISO 是 ComicInfo.xml 的**标签名**,不翻译,
+    // 故这里刻意用 `domain_meta_field_language`(`translatable="false"`)而非界面语言。
+    val resetCd = stringResource(R.string.meta_reset_cd, languageLabel)
+    val noValue = stringResource(R.string.meta_no_value)
+    val currentLabel = textOf(volume.language.textKey)
 
     Column(modifier = Modifier.fillMaxWidth()) {
         Row(
@@ -500,13 +571,13 @@ private fun LanguageRow(
                 modifier = Modifier.weight(1f),
             ) {
                 OutlinedTextField(
-                    value = volume.language.label,
+                    value = currentLabel,
                     onValueChange = {},
                     readOnly = true,
-                    label = { Text(MetaField.Language.label) },
+                    label = { Text(languageLabel) },
                     isError = unset,
                     supportingText = if (unset) {
-                        { Text("语言默认未设置，需人工确认") }
+                        { Text(unsetError) }
                     } else {
                         null
                     },
@@ -519,7 +590,7 @@ private fun LanguageRow(
                 ExposedDropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
                     LangChoice.entries.forEach { choice ->
                         DropdownMenuItem(
-                            text = { Text(choice.label) },
+                            text = { Text(textOf(choice.textKey)) },
                             onClick = {
                                 onChoice(choice)
                                 expanded = false
@@ -533,15 +604,15 @@ private fun LanguageRow(
                 enabled = MetaField.Language in volume.overridden,
                 modifier = Modifier
                     .testTag(metaResetTag(MetaField.Language))
-                    .semantics { contentDescription = "恢复建议值 LanguageISO" },
-            ) { Text("恢复建议") }
+                    .semantics { contentDescription = resetCd },
+            ) { Text(stringResource(R.string.meta_reset)) }
         }
 
         if (volume.language == LangChoice.Other) {
             OutlinedTextField(
                 value = volume.otherLangCode,
                 onValueChange = onOtherCode,
-                label = { Text("ISO 639-1 代码") },
+                label = { Text(stringResource(R.string.meta_lang_code_label)) },
                 singleLine = true,
                 modifier = Modifier
                     .width(200.dp)
@@ -550,7 +621,14 @@ private fun LanguageRow(
         }
 
         Text(
-            text = "建议：${volume.langSug.value ?: "无"}（${volume.langSug.source}）",
+            text = stringResource(
+                R.string.meta_suggestion_prefix,
+                stringResource(
+                    R.string.meta_suggestion_with_source,
+                    volume.langSug.value ?: noValue,
+                    volume.langSug.source,
+                ),
+            ),
             style = MaterialTheme.typography.labelSmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.testTag(metaSuggestionTag(MetaField.Language)),
@@ -567,12 +645,24 @@ private fun LanguageRow(
  */
 @Composable
 private fun BatchSection(
-    message: String?,
+    applied: Pair<Int, Int>?,
     onApply: (MetaField, MetaValue, Boolean) -> Unit,
 ) {
     var field by remember { mutableStateOf(MetaField.Series) }
     var text by remember { mutableStateOf("") }
     var force by remember { mutableStateOf(false) }
+
+    // 计数 → 文案在**组合里**解析(回调里取不到 stringResource,故状态只存计数)。
+    val message = applied?.let { (count, skipped) ->
+        if (skipped > 0) {
+            pluralStringResource(R.plurals.meta_batch_applied_skipped, count, count, skipped)
+        } else {
+            pluralStringResource(R.plurals.meta_batch_applied, count, count)
+        }
+    }
+    val valueLabel = stringResource(R.string.meta_batch_value_label)
+    val applyCd = stringResource(R.string.meta_batch_apply_cd)
+    val forceCd = stringResource(R.string.meta_batch_force_cd)
 
     Column(
         modifier = Modifier
@@ -583,7 +673,7 @@ private fun BatchSection(
     ) {
         HorizontalDivider()
         Text(
-            text = "批量设置（跳过已人工修改的字段）",
+            text = stringResource(R.string.meta_batch_title),
             style = MaterialTheme.typography.titleSmall,
             color = MaterialTheme.colorScheme.onBackground,
         )
@@ -597,13 +687,15 @@ private fun BatchSection(
             // 只开放文本类字段给批量(Number/Language 的取值形态不同,留给逐卷编辑器,
             // 避免把"批量语言"做成能一键把整库设成同一个语言的静默覆盖入口)
             listOf(MetaField.Series, MetaField.Writer, MetaField.OutputDir).forEach { f ->
+                val fLabel = textOf(f.textKey)
+                val fCd = stringResource(R.string.meta_batch_field_cd, fLabel)
                 FilterChip(
                     selected = field == f,
                     onClick = { field = f },
-                    label = { Text(f.label) },
+                    label = { Text(fLabel) },
                     modifier = Modifier
                         .testTag("$TAG_BATCH_FIELD-${f.name}")
-                        .semantics { contentDescription = "批量设置字段 ${f.label}" },
+                        .semantics { contentDescription = fCd },
                 )
             }
         }
@@ -615,7 +707,7 @@ private fun BatchSection(
             OutlinedTextField(
                 value = text,
                 onValueChange = { text = it },
-                label = { Text("批量值") },
+                label = { Text(valueLabel) },
                 singleLine = true,
                 modifier = Modifier
                     .weight(1f)
@@ -626,17 +718,23 @@ private fun BatchSection(
                 enabled = text.isNotEmpty(),
                 modifier = Modifier
                     .testTag(TAG_BATCH_APPLY)
-                    .semantics { contentDescription = "应用批量设置" },
-            ) { Text("应用") }
+                    .semantics { contentDescription = applyCd },
+            ) { Text(stringResource(R.string.meta_batch_apply)) }
         }
         Row(verticalAlignment = Alignment.CenterVertically) {
             FilterChip(
                 selected = force,
                 onClick = { force = !force },
-                label = { Text(if (force) "强制覆盖逐项例外" else "尊重逐项例外") },
+                label = {
+                    Text(
+                        stringResource(
+                            if (force) R.string.meta_batch_force_on else R.string.meta_batch_force_off,
+                        ),
+                    )
+                },
                 modifier = Modifier
                     .testTag(TAG_BATCH_FORCE)
-                    .semantics { contentDescription = "强制覆盖逐项例外" },
+                    .semantics { contentDescription = forceCd },
             )
         }
         if (message != null) {

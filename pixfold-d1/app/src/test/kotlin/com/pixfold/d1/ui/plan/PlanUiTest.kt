@@ -1,5 +1,6 @@
 package com.pixfold.d1.ui.plan
 
+import android.content.Context
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -13,11 +14,12 @@ import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.test.core.app.ApplicationProvider
+import com.pixfold.d1.R
+import com.pixfold.d1.TestText
 import com.pixfold.d1.domain.mock.MockDataB
 import com.pixfold.d1.domain.plan.ConfirmFlowState
-import com.pixfold.d1.domain.plan.GENERAL_CONFIRM_OK
 import com.pixfold.d1.domain.plan.describe
-import com.pixfold.d1.domain.plan.DANGER_DIALOG_TITLE
 import com.pixfold.d1.domain.plan.DangerAction
 import com.pixfold.d1.domain.plan.OutputConflictPolicy
 import com.pixfold.d1.domain.plan.SourcePolicy
@@ -32,6 +34,9 @@ import com.pixfold.d1.domain.plan.performUndo
 import com.pixfold.d1.domain.plan.planCountsOf
 import com.pixfold.d1.domain.plan.startConfirmFlow
 import com.pixfold.d1.domain.plan.undoRecordOf
+import com.pixfold.d1.domain.text.Msg
+import com.pixfold.d1.domain.text.TextKey
+import com.pixfold.d1.ui.text.resolveText
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -55,6 +60,14 @@ class PlanUiTest {
 
     private val library = MockDataB.library
 
+    /**
+     * 期望值一律经 [resolveText] 算出 —— 那是**界面用的同一条解析路径**。
+     *
+     * 若在测试里手写中文字面量,①换语言就红(与裁决 `test_strategy=B` 相悖),
+     * ②等于把实现复制一份,两边同时写错时测试照样绿。
+     */
+    private val context: Context get() = ApplicationProvider.getApplicationContext()
+
     // ================= 第 15 项:计划清单 =================
 
     @Test
@@ -65,7 +78,7 @@ class PlanUiTest {
         // 每行都有 describe() 契约的第一条
         val first = plans.first()
         rule.onNodeWithTag(planLineTag(0, 0))
-            .assertTextEquals("· " + first.describe().first())
+            .assertTextEquals("· " + resolveText(context, first.describe().first()))
 
         // 跳过行带原因(op-102 有输出冲突)
         val skipIndex = plans.indexOfFirst { it.skipped }
@@ -78,8 +91,10 @@ class PlanUiTest {
         val plans = buildPackagePlans(library.volumes, conflictPolicy = OutputConflictPolicy.Skip)
         rule.setContent { PlanListStub(plans) }
         val counts = planCountsOf(plans)
-        rule.onNodeWithTag(TAG_PLAN_SUMMARY)
-            .assertTextEquals("共 ${counts.total} 卷 · 将执行 ${counts.runnable} 卷 · 跳过 ${counts.skipped} 卷")
+        // 与 PlanHeader 同形:标题 + 仅当有跳过时才追加的那一段
+        val expected = TestText.plural(R.plurals.plan_summary_title, counts.total, counts.total, counts.runnable) +
+            context.getString(R.string.plan_summary_skipped, counts.skipped)
+        rule.onNodeWithTag(TAG_PLAN_SUMMARY).assertTextEquals(expected)
     }
 
     // ================= 第 16 项:两次确认 =================
@@ -94,7 +109,7 @@ class PlanUiTest {
         rule.onNodeWithTag(TAG_PLAN_CONFIRM).performClick()
         rule.onNodeWithTag(TAG_CONFIRM_GENERAL).assertIsDisplayed()
         // 只有一步:直接显示「执行」按钮,且没有"第 N 步"进度(单步无需进度)
-        rule.onNodeWithText(GENERAL_CONFIRM_OK).performClick()
+        rule.onNodeWithText(context.getString(R.string.domain_general_confirm_ok)).performClick()
         assertTrue(executed, "通用确认通过后应执行")
     }
 
@@ -113,13 +128,18 @@ class PlanUiTest {
 
         // 第 1 步:通用确认(含「删除（危险）」影响范围)
         rule.onNodeWithTag(TAG_CONFIRM_GENERAL).assertIsDisplayed()
-        rule.onNodeWithText("· 源目录：删除（危险）").assertIsDisplayed()
-        rule.onNodeWithText(GENERAL_CONFIRM_OK).performClick()
+        // 通用确认正文里必须标出破坏性影响范围(源目录将被删除)
+        val plans = buildPackagePlans(library.volumes, OutputConflictPolicy.Rename, SourcePolicy.Delete)
+        val dangers0 = effectiveDangerActions(plans)
+        val sourceLine = generalSummaryLines(plans, dangers0).single { it.key == TextKey.SummarySourceDirPrefix }
+        rule.onNodeWithText("· " + resolveText(context, sourceLine)).assertIsDisplayed()
+        rule.onNodeWithText(context.getString(R.string.domain_general_confirm_ok)).performClick()
 
         // 第 2 步:独立危险确认(标题固定 + 按钮专有)
         rule.onNodeWithTag(TAG_CONFIRM_DANGER).assertIsDisplayed()
-        rule.onNodeWithTag(TAG_CONFIRM_DANGER_TITLE).assertTextEquals(DANGER_DIALOG_TITLE)
-        rule.onNodeWithText(DangerAction.DeleteSourceDir.confirmButton).performClick()
+        rule.onNodeWithTag(TAG_CONFIRM_DANGER_TITLE)
+            .assertTextEquals(context.getString(R.string.domain_danger_dialog_title))
+        rule.onNodeWithText(resolveText(context, DangerAction.DeleteSourceDir.buttonKey)).performClick()
         assertTrue(executed, "两次确认都通过后才执行")
     }
 
@@ -131,8 +151,8 @@ class PlanUiTest {
         }
 
         rule.onNodeWithTag(TAG_PLAN_CONFIRM).performClick()
-        rule.onNodeWithText(GENERAL_CONFIRM_OK).performClick() // 走到危险步
-        rule.onNodeWithText("取消").performClick()              // 取消
+        rule.onNodeWithText(context.getString(R.string.domain_general_confirm_ok)).performClick() // 走到危险步
+        rule.onNodeWithText(context.getString(R.string.common_cancel)).performClick()             // 取消
 
         // 流程归零:重新点「确认打包」从通用确认开始(而不是接着上次的危险步)
         rule.onNodeWithTag(TAG_PLAN_CONFIRM).performClick()
@@ -167,11 +187,17 @@ class PlanUiTest {
 
         rule.setContent { ExecutionReportPage(report = report, undoMessage = null, onUndo = {}, onDone = {}) }
 
-        rule.onNodeWithTag(TAG_REPORT_SUMMARY)
-            .assertTextEquals("共 3 项：成功 1 · 跳过 1 · 失败 1")
-        rule.onNodeWithText("失败").assertExists()
-        rule.onNodeWithText("原因：没有任何页，无法打包").assertExists()
-        rule.onNodeWithText("原因：输出已存在 E:\\漫画库\\_output/海贼王 第102卷.cbz").assertExists()
+        rule.onNodeWithTag(TAG_REPORT_SUMMARY).assertTextEquals(resolveText(context, report.summary))
+        // 三类结果标签都在
+        for (outcome in com.pixfold.d1.domain.plan.ExecOutcome.entries) {
+            rule.onNodeWithText(resolveText(context, outcome.textKey)).assertExists()
+        }
+        // 两条失败/跳过原因都显示出来(且走的是界面同一条「原因：%1$s」拼接)
+        val reasons = report.entries.mapNotNull { it.reason }
+        assertTrue(reasons.size >= 2, "本条要覆盖至少两条带原因的行")
+        reasons.forEach { r ->
+            rule.onNodeWithText(context.getString(R.string.report_reason, resolveText(context, r))).assertExists()
+        }
     }
 
     @Test
@@ -181,7 +207,7 @@ class PlanUiTest {
         val report = executePackagePlans(plans)
         rule.setContent { ExecutionReportPage(report = report, undoMessage = null, onUndo = {}, onDone = {}) }
         rule.onNodeWithTag(TAG_REPORT_UNDO).assertIsNotEnabled()
-        rule.onNodeWithText("没有成功执行的操作，无需撤销").assertIsDisplayed()
+        rule.onNodeWithText(context.getString(R.string.report_nothing_to_undo)).assertIsDisplayed()
     }
 
     @Test
@@ -191,7 +217,7 @@ class PlanUiTest {
         rule.setContent {
             // undoMessage 必须是 **Compose 状态**,否则点撤销后界面不会重组,
             // 「显示在哪里」就无从断言(这正是本项目"状态持有器"约定要防的错)。
-            var message by remember { mutableStateOf<String?>(null) }
+            var message by remember { mutableStateOf<Msg?>(null) }
             ExecutionReportPage(
                 report = report,
                 undoMessage = message,
@@ -201,8 +227,11 @@ class PlanUiTest {
         }
         rule.onNodeWithTag(TAG_REPORT_UNDO).performClick()
         rule.onNodeWithTag(TAG_REPORT_UNDO_MESSAGE).assertIsDisplayed()
-        // 不能出现"已撤销"的假结论
-        rule.onNodeWithText("已撤销").assertDoesNotExist()
+        // 不能出现"已撤销"的假结论 —— 撤销在 D1 是 mock,只报"已记录 N 项逆向操作"
+        rule.onNodeWithText(context.getString(R.string.report_done)).assertExists()
+        val undoMsg = resolveText(context, performUndo(undoRecordOf(report)).message)
+        rule.onNodeWithTag(TAG_REPORT_UNDO_MESSAGE).assertTextEquals(undoMsg)
+        assertTrue("已撤销" !in undoMsg, "D1 不得谎称已撤销，实际：$undoMsg")
     }
 
     @Test
@@ -211,7 +240,7 @@ class PlanUiTest {
         val aot1 = library.volumes.first { it.id == "aot-1" }
         val report = executePackagePlans(buildPackagePlans(listOf(aot1)))
         rule.setContent { ExecutionReportPage(report = report, undoMessage = null, onUndo = {}, onDone = { done = true }) }
-        rule.onNodeWithText("完成").performClick()
+        rule.onNodeWithText(context.getString(R.string.report_done)).performClick()
         assertTrue(done)
     }
 

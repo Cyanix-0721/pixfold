@@ -1,5 +1,6 @@
 package com.pixfold.d1.ui.preview
 
+import android.content.Context
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.semantics.getOrNull
 import androidx.compose.ui.test.assertIsEnabled
@@ -10,6 +11,8 @@ import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.test.doubleClick
+import androidx.test.core.app.ApplicationProvider
+import com.pixfold.d1.R
 import com.pixfold.d1.domain.model.SourceItem
 import org.junit.Rule
 import org.junit.Test
@@ -27,6 +30,13 @@ class ImagePreviewTest {
     @get:Rule
     val rule = createComposeRule()
 
+    /** 期望值走 `R.string` 解析,而不是手写中文字面量(换语言时本文件不该红)。 */
+    private val context: Context get() = ApplicationProvider.getApplicationContext()
+
+    private fun pageLabel(index: Int, count: Int) = context.getString(R.string.preview_page_label, index, count)
+
+    private fun zoomCd(scale: Float) = context.getString(R.string.preview_zoom_cd, zoomAmount(scale))
+
     private val items: List<SourceItem> = (1..3).map {
         SourceItem(
             id = "p$it", collectionId = "c", dir = "", baseName = "img$it", ext = "jpg",
@@ -37,7 +47,7 @@ class ImagePreviewTest {
     @Test
     fun `shows one based page label on open`() {
         rule.setContent { ImagePreview(items, initialIndex = 0, onClose = {}) }
-        rule.onNodeWithTag(TAG_PREVIEW_PAGE_LABEL).assertTextEquals("第 1 / 3 页")
+        rule.onNodeWithTag(TAG_PREVIEW_PAGE_LABEL).assertTextEquals(pageLabel(1, 3))
     }
 
     @Test
@@ -45,15 +55,15 @@ class ImagePreviewTest {
         rule.setContent { ImagePreview(items, initialIndex = 0, onClose = {}) }
         rule.onNodeWithTag(TAG_PREVIEW_NEXT).performClick()
         // 关键:断言**界面文本真的变了** —— 只断言内部 index 会放过"数据对、界面不动"
-        rule.onNodeWithTag(TAG_PREVIEW_PAGE_LABEL).assertTextEquals("第 2 / 3 页")
+        rule.onNodeWithTag(TAG_PREVIEW_PAGE_LABEL).assertTextEquals(pageLabel(2, 3))
     }
 
     @Test
     fun `previous button actually updates the visible label`() {
         rule.setContent { ImagePreview(items, initialIndex = 2, onClose = {}) }
-        rule.onNodeWithTag(TAG_PREVIEW_PAGE_LABEL).assertTextEquals("第 3 / 3 页")
+        rule.onNodeWithTag(TAG_PREVIEW_PAGE_LABEL).assertTextEquals(pageLabel(3, 3))
         rule.onNodeWithTag(TAG_PREVIEW_PREV).performClick()
-        rule.onNodeWithTag(TAG_PREVIEW_PAGE_LABEL).assertTextEquals("第 2 / 3 页")
+        rule.onNodeWithTag(TAG_PREVIEW_PAGE_LABEL).assertTextEquals(pageLabel(2, 3))
     }
 
     @Test
@@ -84,13 +94,13 @@ class ImagePreviewTest {
 
         val before = rule.onNodeWithTag(TAG_PREVIEW_IMAGE)
             .fetchSemanticsNode().config.getOrNull(SemanticsProperties.StateDescription)
-        assertEquals(zoomDescription(MIN_SCALE), before, "初始应为未缩放")
+        assertEquals(zoomCd(MIN_SCALE), before, "初始应为未缩放")
 
         rule.onNodeWithTag(TAG_PREVIEW_IMAGE).performTouchInput { doubleClick() }
 
         val after = rule.onNodeWithTag(TAG_PREVIEW_IMAGE)
             .fetchSemanticsNode().config.getOrNull(SemanticsProperties.StateDescription)
-        assertEquals(zoomDescription(2f), after, "双击应放大到 2 倍")
+        assertEquals(zoomCd(2f), after, "双击应放大到 2 倍")
     }
 
     @Test
@@ -101,6 +111,6 @@ class ImagePreviewTest {
 
         val after = rule.onNodeWithTag(TAG_PREVIEW_IMAGE)
             .fetchSemanticsNode().config.getOrNull(SemanticsProperties.StateDescription)
-        assertEquals(zoomDescription(MIN_SCALE), after, "翻页后应复位缩放")
+        assertEquals(zoomCd(MIN_SCALE), after, "翻页后应复位缩放")
     }
 }

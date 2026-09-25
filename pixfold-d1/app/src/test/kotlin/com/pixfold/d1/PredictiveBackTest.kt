@@ -1,5 +1,7 @@
 package com.pixfold.d1
 
+import com.pixfold.d1.TestText
+
 import androidx.activity.BackEventCompat
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -87,7 +89,7 @@ class PredictiveBackTest {
     }
 
     private fun openNamingStep() {
-        rule.onNodeWithText("工作流 A · 图片整理与命名").performClick()
+        rule.onNodeWithText(TestText.of(R.string.home_workflow_a)).performClick()
         rule.onNodeWithTag(TAG_STEP_NAMING).performClick()
         rule.waitForIdle()
         rule.onNodeWithTag(TAG_STEP_BACK).assertIsDisplayed()
@@ -136,7 +138,7 @@ class PredictiveBackTest {
     @Test
     fun `a completed predictive gesture walks workflow B from the pack step to metadata`() {
         rule.setContent { PixFoldApp() }
-        rule.onNodeWithText("工作流 B · CBZ 制作").performClick()
+        rule.onNodeWithText(TestText.of(R.string.home_workflow_b)).performClick()
         rule.onNodeWithTag(TAG_B_STEP_PACK).performClick()
         rule.onNodeWithTag(TAG_PACK_PAGE).assertIsDisplayed()
 

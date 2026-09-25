@@ -18,6 +18,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
@@ -25,6 +27,7 @@ import com.pixfold.d1.R
 import com.pixfold.d1.domain.model.SortField
 import com.pixfold.d1.domain.model.SortKey
 import com.pixfold.d1.domain.model.SortRule
+import com.pixfold.d1.ui.text.textOf
 
 const val TAG_RULE_LEVEL_PREFIX = "rule-level-"
 const val TAG_RULE_ADD = "rule-add"
@@ -77,6 +80,10 @@ fun SortRuleEditor(
     // 无草稿:直接以传入规则为唯一事实来源,任何变动立刻上报(单一数据源,避免双份状态不同步)
     val draft = rule.keys
     fun emit(keys: List<SortKey>) = onRuleChange(SortRule(keys))
+    // 字段名取自领域 `TextKey`,在 UI 层现场解析。
+    val ascendingLabel = stringResource(R.string.a_sort_ascending)
+    val descendingLabel = stringResource(R.string.a_sort_descending)
+    val addCd = stringResource(R.string.a_sort_add_cd)
 
     Column(
         modifier = modifier
@@ -92,7 +99,7 @@ fun SortRuleEditor(
         ) {
             Column {
                 Text(
-                    text = "排序规则（${draft.size}/${SortRule.MAX_LEVELS} 级）",
+                    text = pluralStringResource(R.plurals.a_sort_levels, draft.size, draft.size, SortRule.MAX_LEVELS),
                     style = MaterialTheme.typography.labelMedium,
                     color = MaterialTheme.colorScheme.onBackground,
                 )
@@ -110,8 +117,8 @@ fun SortRuleEditor(
                     enabled = draft.size < SortRule.MAX_LEVELS,
                     modifier = Modifier
                         .testTag(TAG_RULE_ADD)
-                        .semantics { contentDescription = "添加排序级" },
-                ) { Text("添加") }
+                        .semantics { contentDescription = addCd },
+                ) { Text(stringResource(R.string.a_sort_add)) }
 
             }
         }
@@ -125,14 +132,23 @@ fun SortRuleEditor(
                 horizontalArrangement = Arrangement.spacedBy(4.dp),
             ) {
                 Text(
-                    text = "第${index + 1}级",
+                    text = stringResource(R.string.a_sort_level, index + 1),
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
+                // 要进 semantics{},故先在组合上下文里解析
+                val removeCd = stringResource(R.string.a_sort_remove_cd, index + 1)
 
                 SortField.entries.forEach { field ->
                     val selected = key.field == field
-                    val direction = if (key.ascending) "升序" else "降序"
+                    // 字段名与方向都要进 semantics{},故先在组合上下文里解析成局部变量
+                    val fieldLabel = textOf(field.textKey)
+                    val direction = if (key.ascending) ascendingLabel else descendingLabel
+                    val levelCd = if (selected) {
+                        stringResource(R.string.a_sort_level_cd, index + 1, fieldLabel, direction)
+                    } else {
+                        stringResource(R.string.a_sort_level_cd_bare, index + 1, fieldLabel)
+                    }
 
                     FilterChip(
                         selected = selected,
@@ -147,7 +163,7 @@ fun SortRuleEditor(
                                 }
                             })
                         },
-                        label = { Text(field.label) },
+                        label = { Text(fieldLabel) },
                         // 方向三角只挂在**选中**字段之后(用户指定)
                         trailingIcon = if (selected) {
                             {
@@ -174,11 +190,7 @@ fun SortRuleEditor(
                         modifier = Modifier
                             .testTag(fieldTag(index, field))
                             .semantics {
-                                contentDescription = if (selected) {
-                                    "第${index + 1}级 ${field.label} $direction"
-                                } else {
-                                    "第${index + 1}级 ${field.label}"
-                                }
+                                contentDescription = levelCd
                             },
                     )
                 }
@@ -189,8 +201,8 @@ fun SortRuleEditor(
                     enabled = draft.size > 1,
                     modifier = Modifier
                         .testTag(ruleRemoveTag(index))
-                        .semantics { contentDescription = "删除第${index + 1}级" },
-                ) { Text("删除") }
+                        .semantics { contentDescription = removeCd },
+                ) { Text(stringResource(R.string.a_sort_remove)) }
             }
         }
     }

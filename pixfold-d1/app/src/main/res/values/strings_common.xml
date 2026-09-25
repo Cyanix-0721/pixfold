@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  跨页面共用文案(中文,默认)。命名规则见 `values/strings_plan.xml` 的文件头。
+-->
+<resources>
+
+    <!-- ============ 通用动作 ============ -->
+    <string name="common_back">返回</string>
+    <string name="common_close">关闭</string>
+
+    <!-- ============ 首页(HomeScreen) ============ -->
+    <string name="home_settings_cd">设置</string>
+    <string name="home_workflow_a">工作流 A · 图片整理与命名</string>
+    <string name="home_workflow_b">工作流 B · CBZ 制作</string>
+
+    <!-- ============ 回到顶部(ScrollToTopButton) ============ -->
+    <string name="common_scroll_to_top">回到顶部</string>
+
+    <!-- ============ 固定位置(PinToggle) ============ -->
+    <string name="pin_toggle_pinned">%1$s 已固定</string>
+    <string name="pin_toggle_unpinned">%1$s 固定位置</string>
+
+    <!-- ============ 大图预览(ImagePreview / PreviewState) ============ -->
+    <string name="preview_no_images">没有可预览的图片</string>
+    <string name="preview_close_cd">关闭预览</string>
+    <string name="preview_hint">双击放大 · 双指拖动平移</string>
+    <string name="preview_previous">上一页</string>
+    <string name="preview_next">下一页</string>
+    <string name="preview_page_label">第 %1$d / %2$d 页</string>
+    <string name="preview_zoom_cd">缩放 %1$s</string>
+
+</resources>

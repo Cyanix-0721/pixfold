@@ -19,9 +19,11 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
+import com.pixfold.d1.R
 import com.pixfold.d1.domain.model.ImageCollection
 import com.pixfold.d1.domain.model.NamingState
 import com.pixfold.d1.domain.naming.RenameOp
@@ -39,6 +41,7 @@ import com.pixfold.d1.ui.plan.PlanHeader
 import com.pixfold.d1.ui.plan.planLineTag
 import com.pixfold.d1.ui.plan.planRowTag
 import com.pixfold.d1.ui.plan.planSkipTag
+import com.pixfold.d1.ui.text.textOfOrNull
 
 const val TAG_A_PLAN_PAGE = "a-plan-page"
 const val TAG_A_PLAN_LIST = "a-plan-list"
@@ -73,6 +76,10 @@ fun RenamePlanPage(
 ) {
     val plan = buildLibraryRenamePlan(collections, orders, namingState)
     val dangers = workflowADangerActions(cleanEmptyDirs)
+    // 要进 semantics{} / 作为参数传给子组件,故先在组合上下文里解析
+    val cleanToggleCd = stringResource(R.string.a_plan_clean_empty_cd)
+    val backCd = stringResource(R.string.a_plan_back_cd)
+    val confirmCd = stringResource(R.string.a_plan_confirm_cd)
 
     Column(
         modifier = modifier
@@ -101,14 +108,24 @@ fun RenamePlanPage(
                         FilterChip(
                             selected = cleanEmptyDirs,
                             onClick = { onCleanEmptyDirsChange(!cleanEmptyDirs) },
-                            label = { Text(if (cleanEmptyDirs) "清理空目录：开（危险）" else "清理空目录：关（默认）") },
+                            label = {
+                                Text(
+                                    stringResource(
+                                        if (cleanEmptyDirs) {
+                                            R.string.a_plan_clean_empty_on
+                                        } else {
+                                            R.string.a_plan_clean_empty_off
+                                        },
+                                    ),
+                                )
+                            },
                             modifier = Modifier
                                 .testTag(TAG_A_PLAN_CLEAN_TOGGLE)
-                                .semantics { contentDescription = "清理空目录开关" },
+                                .semantics { contentDescription = cleanToggleCd },
                         )
                     }
                     Text(
-                        text = "默认关闭；勾选后仍需在确认对话框中再次确认",
+                        text = stringResource(R.string.a_plan_clean_empty_hint),
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.padding(horizontal = 12.dp),
@@ -134,8 +151,8 @@ fun RenamePlanPage(
                         onClick = back,
                         modifier = Modifier
                             .testTag(TAG_STEP_BACK)
-                            .semantics { contentDescription = "返回步骤2" },
-                    ) { Text("← 返回命名结构") }
+                            .semantics { contentDescription = backCd },
+                    ) { Text(stringResource(R.string.a_plan_back)) }
                 }
             },
             trailing = {
@@ -143,8 +160,8 @@ fun RenamePlanPage(
                     onClick = onStartConfirm,
                     modifier = Modifier
                         .testTag(TAG_A_PLAN_CONFIRM)
-                        .semantics { contentDescription = "确认执行" },
-                ) { Text("确认执行") }
+                        .semantics { contentDescription = confirmCd },
+                ) { Text(stringResource(R.string.a_plan_confirm)) }
             },
         )
     }
@@ -164,6 +181,8 @@ fun RenamePlanPage(
 
 @Composable
 private fun RenamePlanRow(op: RenameOp, index: Int, collectionName: String?) {
+    // `reason` 是领域层的 `Msg`(语言无关),在此现场解析
+    val reason = textOfOrNull(op.reason)
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -185,7 +204,11 @@ private fun RenamePlanRow(op: RenameOp, index: Int, collectionName: String?) {
                 modifier = Modifier.weight(1f),
             )
             Text(
-                text = if (op.isSkipped) "将跳过" else "将重命名",
+                text = if (op.isSkipped) {
+                    stringResource(R.string.a_plan_status_skip)
+                } else {
+                    stringResource(R.string.a_plan_status_rename)
+                },
                 style = MaterialTheme.typography.labelSmall,
                 color = if (op.isSkipped) {
                     MaterialTheme.colorScheme.error
@@ -200,9 +223,9 @@ private fun RenamePlanRow(op: RenameOp, index: Int, collectionName: String?) {
             color = MaterialTheme.colorScheme.onBackground,
             modifier = Modifier.testTag(planLineTag(index, 0)),
         )
-        if (op.isSkipped) {
+        if (op.isSkipped && reason != null) {
             Text(
-                text = "⛔ ${op.reason.orEmpty()}",
+                text = stringResource(R.string.a_plan_skip_reason, reason),
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.error,
                 modifier = Modifier.testTag(planSkipTag(index)),

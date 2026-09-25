@@ -1,0 +1,148 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  工作流 A 页面文案(中文,默认)。
+
+  ⚠️ 与 `values-en/strings_workflowa.xml` 必须同步增删 —— 缺一边会让 lint 的
+  `MissingTranslation` / `ExtraTranslation` 在 `warningsAsErrors = true` 下硬失败。
+  `translatable="false"` 的条目在英文文件里不出现。
+
+  命名:`a_sort_*` = 步骤 1 排序规则编辑器、`a_*` = 步骤 1/2/3 页面、
+  `a_step_*` = 工作流 A 步骤容器。
+-->
+<resources
+    xmlns:tools="http://schemas.android.com/tools">
+
+    <!-- ============ 步骤 1 · 排序与预览(SortAndPreviewPage) ============ -->
+    <string name="a_rule_scope_custom">本组独立规则</string>
+    <string name="a_rule_scope_default">批次默认规则</string>
+    <string name="a_collection_chip">%1$s（%2$d）</string>
+    <string name="a_collection_cd">集合 %1$s</string>
+    <plurals name="a_image_count">
+        <item quantity="one">共 %1$d 张</item>
+        <item quantity="other">共 %1$d 张</item>
+    </plurals>
+    <plurals name="a_manual_count">
+        <item quantity="one">已手动调整 %1$d 处</item>
+        <item quantity="other">已手动调整 %1$d 处</item>
+    </plurals>
+    <string name="a_reset_manual_cd">重置人工调整</string>
+    <string name="a_reset_manual">重置人工调整（%1$d 处）</string>
+    <string name="a_custom_rule">本组独立</string>
+    <string name="a_custom_rule_cd">本组独立规则</string>
+    <string name="a_next">下一步</string>
+    <string name="a_next_cd">下一步 命名结构</string>
+    <string name="a_rule_summary">排序规则：%1$s</string>
+    <string name="a_rule_summary_collapse_cd">收起排序规则</string>
+    <string name="a_rule_summary_expand_cd">展开排序规则</string>
+    <string name="a_view_grid">网格</string>
+    <string name="a_view_list">列表</string>
+    <string name="a_view_cd">%1$s 视图</string>
+
+    <!-- ============ 步骤 1 · 排序规则编辑器(SortRuleEditor) ============ -->
+    <plurals name="a_sort_levels">
+        <item quantity="one">排序规则（%1$d/%2$d 级）</item>
+        <item quantity="other">排序规则（%1$d/%2$d 级）</item>
+    </plurals>
+    <string name="a_sort_add">添加</string>
+    <string name="a_sort_add_cd">添加排序级</string>
+    <string name="a_sort_level">第%1$d级</string>
+    <string name="a_sort_ascending">升序</string>
+    <string name="a_sort_descending">降序</string>
+    <string name="a_sort_level_cd">第%1$d级 %2$s %3$s</string>
+    <string name="a_sort_level_cd_bare">第%1$d级 %2$s</string>
+    <string name="a_sort_remove">删除</string>
+    <string name="a_sort_remove_cd">删除第%1$d级</string>
+
+    <!-- ============ 步骤 2 · 命名结构(SchemeEditor) ============ -->
+    <plurals name="a_scheme_title">
+        <item quantity="one">命名结构（%1$d 个组件启用）</item>
+        <item quantity="other">命名结构（%1$d 个组件启用）</item>
+    </plurals>
+    <string name="a_scheme_add">添加组件</string>
+    <string name="a_scheme_add_cd">添加命名组件</string>
+    <string name="a_scheme_toggle_collapse_cd">收起命名结构</string>
+    <string name="a_scheme_toggle_expand_cd">展开命名结构</string>
+    <string name="a_scheme_root_dir">根目录名</string>
+    <string name="a_scheme_index_start">起始序号</string>
+    <string name="a_scheme_index_padding">补零位数</string>
+    <string name="a_scheme_root_override">根目录名：已手动指定（不再跟随集合）</string>
+    <string name="a_scheme_root_follow">根目录名：跟随当前集合</string>
+    <string name="a_scheme_root_follow_btn">跟随集合</string>
+    <string name="a_scheme_root_follow_cd">恢复根目录名跟随集合</string>
+    <string name="a_scheme_sanitize">自动清洗</string>
+    <string name="a_scheme_sanitize_cd">自动清洗非法字符</string>
+    <string name="a_scheme_sanitize_info_cd">自动清洗说明</string>
+    <string name="a_scheme_sanitize_title">自动清洗</string>
+    <string name="a_scheme_sanitize_body">开启后，文件名中的非法字符（\\ / : * ? \" &lt; &gt; | 以及控制字符）会被替换为「_」。\n\n注意：清洗只替换字符，「不会去重」—— 清洗后不同文件名可能变成同一个，仍会以「重名」提示。</string>
+    <string name="a_scheme_replace_label">替换为</string>
+    <string name="a_scheme_replace_cd">非法字符替换为</string>
+    <string name="a_scheme_replace_reset">默认</string>
+    <string name="a_scheme_replace_reset_cd">恢复默认替换字符</string>
+    <string name="a_scheme_replace_empty">留空 = 直接删除非法字符</string>
+    <string name="a_scheme_replace_hint">非法字符将被替换为该字符</string>
+    <string name="a_scheme_example">示例：%1$s → %2$s</string>
+    <string name="a_scheme_example_cd">清洗示例</string>
+    <string name="a_scheme_got_it">知道了</string>
+    <string name="a_scheme_got_it_cd">知道了</string>
+    <string name="a_scheme_comp_enable_cd">启用组件 %1$d</string>
+    <string name="a_scheme_comp_remove">删除</string>
+    <string name="a_scheme_comp_remove_cd">删除组件 %1$d</string>
+    <string name="a_scheme_comp_sep">分隔符</string>
+    <string name="a_scheme_comp_text">文本</string>
+    <string name="a_scheme_comp_up_cd">上移组件 %1$d</string>
+    <string name="a_scheme_comp_down_cd" tools:ignore="PluralsCandidate">下移组件 %1$d</string>
+    <string name="a_scheme_kind_label">组件</string>
+    <string name="a_scheme_case_label">大小写</string>
+    <string name="a_scheme_ext_label">扩展名</string>
+
+    <!-- ============ 步骤 2 · 建议表(ProposalTable) ============ -->
+    <plurals name="a_table_summary">
+        <item quantity="one">共 %1$d 项 · 冲突 %2$d · 警告 %3$d</item>
+        <item quantity="other">共 %1$d 项 · 冲突 %2$d · 警告 %3$d</item>
+    </plurals>
+    <string name="a_table_filter_all">全部</string>
+    <string name="a_table_filter_all_cd">显示全部</string>
+    <string name="a_table_filter_issues">仅问题（%1$d）</string>
+    <string name="a_table_filter_issues_cd">仅显示有冲突或警告的项</string>
+    <string name="a_table_new_name">新名称</string>
+    <string name="a_table_new_name_overridden">新名称（已覆盖）</string>
+    <string name="a_table_restore">恢复建议</string>
+    <string name="a_table_restore_cd">恢复建议值 %1$s</string>
+
+    <!-- ============ 步骤 2 · 命名页(NamingPage) ============ -->
+    <plurals name="a_naming_title">
+        <item quantity="one">命名结构 · %1$s（%2$d 张）</item>
+        <item quantity="other">命名结构 · %1$s（%2$d 张）</item>
+    </plurals>
+    <plurals name="a_naming_conflicts">
+        <item quantity="one">⚠️ 有 %1$d 项存在冲突，执行时将跳过（见下表红字）</item>
+        <item quantity="other">⚠️ 有 %1$d 项存在冲突，执行时将跳过（见下表红字）</item>
+    </plurals>
+    <string name="a_naming_empty_issues">没有冲突或警告项</string>
+    <string name="a_naming_empty_images">没有可命名的图片</string>
+    <string name="a_naming_back">← 返回排序</string>
+    <string name="a_naming_back_cd">返回步骤1</string>
+    <string name="a_naming_next">下一步：执行计划</string>
+    <string name="a_naming_next_cd">下一步 执行计划</string>
+
+    <!-- ============ 步骤 3 · 执行计划(RenamePlanPage) ============ -->
+    <string name="a_plan_clean_empty_on">清理空目录：开（危险）</string>
+    <string name="a_plan_clean_empty_off">清理空目录：关（默认）</string>
+    <string name="a_plan_clean_empty_cd">清理空目录开关</string>
+    <string name="a_plan_clean_empty_hint">默认关闭；勾选后仍需在确认对话框中再次确认</string>
+    <string name="a_plan_back">← 返回命名结构</string>
+    <string name="a_plan_back_cd">返回步骤2</string>
+    <string name="a_plan_confirm">确认执行</string>
+    <string name="a_plan_confirm_cd">确认执行</string>
+    <string name="a_plan_status_rename">将重命名</string>
+    <string name="a_plan_status_skip">将跳过</string>
+    <!-- 「⛔ 」是符号前缀,不属于文案,故留在资源里成键(与 plan_skip_reason_prefix 同形) -->
+    <string name="a_plan_skip_reason">⛔ %1$s</string>
+
+    <!-- ============ 步骤容器(WorkflowASteps) ============ -->
+    <string name="a_step_label_sort">步骤1 排序与预览</string>
+    <string name="a_step_label_naming">步骤2 命名结构</string>
+    <string name="a_step_label_plan">步骤3 执行计划</string>
+    <string name="a_step_empty">无可命名的集合</string>
+
+</resources>

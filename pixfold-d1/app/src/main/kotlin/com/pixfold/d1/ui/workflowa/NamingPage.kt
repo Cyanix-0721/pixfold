@@ -24,9 +24,12 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
+import com.pixfold.d1.R
 import com.pixfold.d1.domain.model.ImageCollection
 import com.pixfold.d1.domain.model.NamingScheme
 import com.pixfold.d1.domain.model.NamingState
@@ -39,6 +42,7 @@ import com.pixfold.d1.domain.naming.namingSummaryLine
 import com.pixfold.d1.domain.naming.setOverride
 import com.pixfold.d1.domain.sort.PageOrderState
 import com.pixfold.d1.ui.components.PageActionBar
+import com.pixfold.d1.ui.text.textOf
 
 const val TAG_NAMING_PAGE = "naming-page"
 const val TAG_NAMING_TITLE = "naming-title"
@@ -145,7 +149,7 @@ fun NamingPage(
     ) {
         // ---- 固定区(不随列表滚动):标题 + 折叠摘要栏 + 冲突提示 + 汇总 ----
         Text(
-            text = "命名结构 · ${collection.name}（${pageOrder.size} 张）",
+            text = pluralStringResource(R.plurals.a_naming_title, pageOrder.size, collection.name, pageOrder.size),
             style = MaterialTheme.typography.titleMedium,
             color = MaterialTheme.colorScheme.onBackground,
             modifier = Modifier
@@ -154,15 +158,16 @@ fun NamingPage(
         )
 
         SchemeSummaryBar(
-            // 摘要样本取**首个最终名**(含逐项覆盖),与建议表同源,结构上排除不一致
-            summary = namingSummaryLine(effective, proposals.firstOrNull()?.finalName),
+            // 摘要样本取**首个最终名**(含逐项覆盖),与建议表同源,结构上排除不一致。
+            // `namingSummaryLine` 返回领域层的 `Msg`(语言无关),在此现场解析。
+            summary = textOf(namingSummaryLine(effective, proposals.firstOrNull()?.finalName)),
             expanded = editorExpanded,
             onToggle = { editorExpanded = !editorExpanded },
         )
 
         if (skipped > 0) {
             Text(
-                text = "⚠️ 有 $skipped 项存在冲突，执行时将跳过（见下表红字）",
+                text = pluralStringResource(R.plurals.a_naming_conflicts, skipped, skipped),
                 style = MaterialTheme.typography.labelMedium,
                 color = MaterialTheme.colorScheme.error,
                 modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp),
@@ -203,7 +208,13 @@ fun NamingPage(
             if (shown.isEmpty()) {
                 item(key = "empty") {
                     Text(
-                        text = if (conflictOnly) "没有冲突或警告项" else "没有可命名的图片",
+                        text = stringResource(
+                            if (conflictOnly) {
+                                R.string.a_naming_empty_issues
+                            } else {
+                                R.string.a_naming_empty_images
+                            },
+                        ),
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.padding(horizontal = 12.dp, vertical = 12.dp),
@@ -226,6 +237,9 @@ fun NamingPage(
         if (onBack != null || onNext != null) {
             val back = onBack
             val next = onNext
+            // 要进 semantics{},故先在组合上下文里解析
+            val backCd = stringResource(R.string.a_naming_back_cd)
+            val nextCd = stringResource(R.string.a_naming_next_cd)
             PageActionBar(
                 leading = {
                     if (back != null) {
@@ -233,8 +247,8 @@ fun NamingPage(
                             onClick = back,
                             modifier = Modifier
                                 .testTag(TAG_STEP_BACK)
-                                .semantics { contentDescription = "返回步骤1" },
-                        ) { Text("← 返回排序") }
+                                .semantics { contentDescription = backCd },
+                        ) { Text(stringResource(R.string.a_naming_back)) }
                     }
                 },
                 trailing = {
@@ -243,8 +257,8 @@ fun NamingPage(
                             onClick = next,
                             modifier = Modifier
                                 .testTag(TAG_TO_PLAN)
-                                .semantics { contentDescription = "下一步 执行计划" },
-                        ) { Text("下一步：执行计划") }
+                                .semantics { contentDescription = nextCd },
+                        ) { Text(stringResource(R.string.a_naming_next)) }
                     }
                 },
             )

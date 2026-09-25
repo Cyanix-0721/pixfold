@@ -35,6 +35,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
@@ -53,6 +55,7 @@ import com.pixfold.d1.domain.workflowa.workflowAStateOf
 import com.pixfold.d1.ui.components.DragReorderGrid
 import com.pixfold.d1.ui.components.DragReorderList
 import com.pixfold.d1.ui.components.PageActionBar
+import com.pixfold.d1.ui.text.textOf
 
 const val TAG_GRID = "view-grid"
 const val TAG_LIST = "view-list"
@@ -70,9 +73,15 @@ const val TAG_RULE_SUMMARY_TOGGLE = "rule-summary-toggle"
 /** 集合选择按钮的 testTag。 */
 fun collectionTag(id: String) = "collection-$id"
 
-/** 当前集合的规则作用范围文案(批次默认 / 本组独立),供界面与测试共用(§5.4)。 */
-fun batchLabel(collectionId: String, isCustom: Boolean): String =
-    if (isCustom) "本组独立规则" else "批次默认规则"
+/**
+ * 当前集合的规则作用范围文案的资源 id(批次默认 / 本组独立),供界面与测试共用(§5.4)。
+ *
+ * ⚠️ 返回**资源 id 而非 String**:本函数会被测试在**非组合上下文**里调用(用来算出
+ * 期望文案),故不能是 `@Composable`。调用方负责解析 —— 界面用 `stringResource(...)`,
+ * 测试用 `context.getString(...)`;两边都以资源为唯一事实来源,不再各自拼字面量。
+ */
+fun batchLabelRes(isCustom: Boolean): Int =
+    if (isCustom) R.string.a_rule_scope_custom else R.string.a_rule_scope_default
 
 /**
  * 工作流 A · 步骤 1:排序与预览(验收第 1、3、4、5、6、7 项)。
@@ -106,7 +115,7 @@ fun batchLabel(collectionId: String, isCustom: Boolean): String =
  * 没有页面级滚动容器,把编辑器塞进去反而要再引入一层滚动。
  *
  * **`scopeLabel` 只在折叠态显示**:展开后 [SortRuleEditor] 自己的标题行已经显示同一个
- * 作用范围文案,再渲染一遍会让 `onNodeWithText(batchLabel(...))` 精确匹配命中两个节点。
+ * 作用范围文案,再渲染一遍会让 `onNodeWithText(batchLabelRes(...) 的解析结果)` 精确匹配命中两个节点。
  */
 @Composable
 fun SortAndPreviewPage(
@@ -146,6 +155,13 @@ fun SortAndPreviewPage(
     val order = activeCollection?.let { state.orders[it.id] } ?: return
     val isCustom = activeId in state.customRuleCollections
 
+    // 先进局部变量:多处要进 semantics{} 或作为 String 参数
+    val nextCd = stringResource(R.string.a_next_cd)
+    val resetManualCd = stringResource(R.string.a_reset_manual_cd)
+    val customRuleLabel = stringResource(R.string.a_custom_rule)
+    val customRuleCd = stringResource(R.string.a_custom_rule_cd)
+    val scopeText = stringResource(batchLabelRes(isCustom))
+
     Column(
         modifier = modifier
             .fillMaxSize()
@@ -163,6 +179,8 @@ fun SortAndPreviewPage(
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 collections.forEach { c ->
+                    // stringResource 不能进 semantics{} 的 lambda,先取出来
+                    val chipCd = stringResource(R.string.a_collection_cd, c.name)
                     FilterChip(
                         selected = c.id == activeId,
                         onClick = {
@@ -179,10 +197,12 @@ fun SortAndPreviewPage(
                                 scrollSignal++
                             }
                         },
-                        label = { Text("${c.name}（${c.images.size}）") },
+                        label = {
+                            Text(stringResource(R.string.a_collection_chip, c.name, c.images.size))
+                        },
                         modifier = Modifier
                             .testTag(collectionTag(c.id))
-                            .semantics { contentDescription = "集合 ${c.name}" },
+                            .semantics { contentDescription = chipCd },
                     )
                 }
             }
@@ -196,7 +216,7 @@ fun SortAndPreviewPage(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Text(
-                text = "共 ${order.order.size} 张",
+                text = pluralStringResource(R.plurals.a_image_count, order.order.size, order.order.size),
                 style = MaterialTheme.typography.labelLarge,
                 color = MaterialTheme.colorScheme.onBackground,
             )
@@ -204,7 +224,7 @@ fun SortAndPreviewPage(
                 // 人工调整标记 + 一键重置(验收第 5 项)
                 if (order.hasManual) {
                     Text(
-                        text = "已手动调整 ${order.manualCount} 处",
+                        text = pluralStringResource(R.plurals.a_manual_count, order.manualCount, order.manualCount),
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.primary,
                         modifier = Modifier.padding(end = 4.dp),
@@ -217,9 +237,9 @@ fun SortAndPreviewPage(
                     enabled = order.hasManual,
                     modifier = Modifier
                         .testTag(TAG_RESET_MANUAL)
-                        .semantics { contentDescription = "重置人工调整" },
+                        .semantics { contentDescription = resetManualCd },
                 ) {
-                    Text("重置人工调整（${order.manualCount} 处）")
+                    Text(stringResource(R.string.a_reset_manual, order.manualCount))
                 }
             }
         }
@@ -236,7 +256,7 @@ fun SortAndPreviewPage(
             Row(verticalAlignment = Alignment.CenterVertically) {
                 // "本组独立"开关(验收第 7 项后半:此前该能力在界面上不存在)
                 Text(
-                    text = "本组独立",
+                    text = customRuleLabel,
                     style = MaterialTheme.typography.labelMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -246,7 +266,7 @@ fun SortAndPreviewPage(
                     modifier = Modifier
                         .padding(start = 4.dp)
                         .testTag(TAG_CUSTOM_RULE_TOGGLE)
-                        .semantics { contentDescription = "本组独立规则" },
+                        .semantics { contentDescription = customRuleCd },
                 )
             }
         }
@@ -254,7 +274,7 @@ fun SortAndPreviewPage(
         // ---- 排序规则:摘要栏常驻,编辑器默认折叠(用户 2026-09-25 指定)----
         RuleSummaryBar(
             summary = ruleSummaryLine(state.effectiveRule(activeId)),
-            scopeLabel = if (ruleExpanded) null else batchLabel(activeId, isCustom),
+            scopeLabel = if (ruleExpanded) null else scopeText,
             expanded = ruleExpanded,
             onToggle = { ruleExpanded = !ruleExpanded },
         )
@@ -262,7 +282,7 @@ fun SortAndPreviewPage(
             // 作用范围随"本组独立"切换(验收第 7 项)
             SortRuleEditor(
                 rule = state.effectiveRule(activeId),
-                scopeLabel = batchLabel(activeId, isCustom),
+                scopeLabel = scopeText,
                 onRuleChange = { newRule ->
                     updateState(applyRuleToCollection(state, activeId, newRule))
                     // W4(用户 2026-09-17 指定):规则变更后**自动回顶**。
@@ -315,8 +335,8 @@ fun SortAndPreviewPage(
                         onClick = next,
                         modifier = Modifier
                             .testTag(TAG_NEXT_STEP)
-                            .semantics { contentDescription = "下一步 命名结构" },
-                    ) { Text("下一步") }
+                            .semantics { contentDescription = nextCd },
+                    ) { Text(stringResource(R.string.a_next)) }
                 },
             )
         }
@@ -329,13 +349,17 @@ fun SortAndPreviewPage(
  * 形如「排序规则：目录名 ↑ · 文件名(自然) ↑」—— 折叠的是**编辑入口**,
  * 不是事实本身(约束 2「建议 ≠ 事实」:当前规则必须始终可见可核对)。
  * 完全无键时不可能发生(`SortRule` 的 `init` 强制至少 1 级),故不处理空列表。
+ *
+ * `@Composable`:字段名要从 `TextKey` 现场解析(locale 可变),`map` 是 inline 故其
+ * lambda 内可调 `textOf`;`joinToString` 的 transform 是普通 lambda,故连接放在外面。
  */
+@Composable
 private fun ruleSummaryLine(rule: SortRule): String {
-    val body = rule.keys.joinToString(" · ") { key ->
+    val body = rule.keys.map { key ->
         val arrow = if (key.ascending) "↑" else "↓"
-        "${key.field.label} $arrow"
-    }
-    return "排序规则：$body"
+        "${textOf(key.field.textKey)} $arrow"
+    }.joinToString(" · ")
+    return stringResource(R.string.a_rule_summary, body)
 }
 
 /**
@@ -352,6 +376,9 @@ private fun RuleSummaryBar(
     expanded: Boolean,
     onToggle: () -> Unit,
 ) {
+    val toggleCd = stringResource(
+        if (expanded) R.string.a_rule_summary_collapse_cd else R.string.a_rule_summary_expand_cd,
+    )
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -366,7 +393,7 @@ private fun RuleSummaryBar(
                 .padding(horizontal = 12.dp)
                 .testTag(TAG_RULE_SUMMARY_TOGGLE)
                 .semantics {
-                    contentDescription = if (expanded) "收起排序规则" else "展开排序规则"
+                    contentDescription = toggleCd
                 },
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(4.dp),
@@ -405,18 +432,25 @@ private fun RuleSummaryBar(
 @Composable
 private fun ModeToggle(mode: ViewMode, onChange: (ViewMode) -> Unit) {
     val options = listOf(ViewMode.Grid, ViewMode.List)
+    // 两个视图名与各自的无障碍描述。**必须先解析成局部变量**:下面 `forEachIndexed`
+    // 的 lambda 不是 @Composable 上下文,里面调不了 stringResource。
+    // 显式写两套(而不是遍历 options 现算)是为了让新增 ViewMode 时在此处编译失败。
+    val gridLabel = stringResource(R.string.a_view_grid)
+    val listLabel = stringResource(R.string.a_view_list)
+    val gridCd = stringResource(R.string.a_view_cd, gridLabel)
+    val listCd = stringResource(R.string.a_view_cd, listLabel)
     SingleChoiceSegmentedButtonRow(modifier = Modifier.testTag(TAG_MODE_TOGGLE)) {
         options.forEachIndexed { index, option ->
-            val label = if (option == ViewMode.Grid) "网格" else "列表"
+            val isGrid = option == ViewMode.Grid
             SegmentedButton(
                 selected = mode == option,
                 onClick = { onChange(option) },
                 shape = SegmentedButtonDefaults.itemShape(index = index, count = options.size),
                 modifier = Modifier
-                    .testTag(if (option == ViewMode.Grid) TAG_MODE_GRID_OPTION else TAG_MODE_LIST_OPTION)
-                    .semantics { contentDescription = "$label 视图" },
+                    .testTag(if (isGrid) TAG_MODE_GRID_OPTION else TAG_MODE_LIST_OPTION)
+                    .semantics { contentDescription = if (isGrid) gridCd else listCd },
             ) {
-                Text(text = label)
+                Text(text = if (isGrid) gridLabel else listLabel)
             }
         }
     }
