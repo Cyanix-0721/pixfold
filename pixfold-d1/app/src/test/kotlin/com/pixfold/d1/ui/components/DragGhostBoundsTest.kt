@@ -22,7 +22,7 @@ import kotlin.test.assertTrue
 /**
  * 钉住一条**语义树读坐标的实测规律** —— 「浮层是否跟手」这类断言能不能成立全看它。
  *
- * ## 事实(2026-09-27 用一次性探针逐项实测)
+ * ## 事实(2026-09-25 用一次性探针逐项实测)
  *
  * | 变换挂在哪 | `onGloballyPositioned { boundsInRoot() }` | 语义树 `boundsInRoot` |
  * | --- | --- | --- |
