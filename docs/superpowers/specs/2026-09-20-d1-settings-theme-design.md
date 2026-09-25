@@ -592,18 +592,26 @@ Gradle / AGP / Compose BOM / compileSdk。**升级已完成并验证**（见 §1
 ### 9.2 资源组织
 
 ```
-res/values/strings.xml        —— 中文(默认)，仅 1 条 app_name(translatable="false")
-res/values/settings_strings.xml      / res/values-en/settings_strings.xml      —— 设置页 + 许可页
-res/values/domain_strings.xml        / res/values-en/domain_strings.xml        —— 领域层文案键
-res/values/strings_common.xml        / res/values-en/strings_common.xml        —— 通用
-res/values/strings_plan.xml          / res/values-en/strings_plan.xml          —— 计划/确认/执行报告
-res/values/strings_workflowa.xml     / res/values-en/strings_workflowa.xml     —— 工作流 A
-res/values/strings_workflowb.xml     / res/values-en/strings_workflowb.xml     —— 工作流 B
+res/values/strings.xml        —— 英文(默认/兜底)，仅 1 条 app_name(translatable="false")
+res/values/settings_strings.xml      / res/values-zh/settings_strings.xml      —— 设置页 + 许可页
+res/values/domain_strings.xml        / res/values-zh/domain_strings.xml        —— 领域层文案键
+res/values/strings_common.xml        / res/values-zh/strings_common.xml        —— 通用
+res/values/strings_plan.xml          / res/values-zh/strings_plan.xml          —— 计划/确认/执行报告
+res/values/strings_workflowa.xml     / res/values-zh/strings_workflowa.xml     —— 工作流 A
+res/values/strings_workflowb.xml     / res/values-zh/strings_workflowb.xml     —— 工作流 B
 res/xml/locales_config.xml    —— 声明 zh / en
 ```
 
 > **✅ 阶段 2 修正（2026-09-26）**：上面原写「英文：**仅设置页**（阶段 1）」。
-> 全量 i18n 完成后，**6 组资源全部有 `values-en/` 对照**，共 **370 个中文键 / 364 个英文键**。
+> 全量 i18n 完成后，**6 组资源全部有中英对照**，共 **370 个默认(英文)键 / 364 个中文键**
+> —— 差 6 个是 `translatable="false"`、只在默认文件里声明的键。
+
+> **⚠️ 兜底语言裁决与反转（2026-09-26）**：当日先裁决「中文兜底」（`values/` 装中文、
+> 英文放 `values-en/`），**随后被用户自己推翻为「英文兜底」**（逐字「那还是改成英文兜底，
+> 默认选项是跟随系统一般也用不上兜底就是了」）⇒ 上表是**反转后**的最终布局。
+> 反转同时带来两条新约束：中文侧 `<plurals>` **只写 `other`**（lint `UnusedQuantity`
+> 拒绝为 zh 写 `one`）、`translatable="false"` 的键只留在默认 `values/`。
+> 完整裁决与理由见 §15.7。
 
 **约束**：阶段 1 新增的所有设置页文案**一律走资源**，不新增硬编码中文
 （既有页面的硬编码留给阶段 2）。
@@ -694,7 +702,7 @@ to reset to the system locale），于是系统侧的选择被应用抹掉，界
 - 语言切换后设置页文案真的变（中 ↔ 英）
 - **完整界面文案与语言无关**（全量 i18n，2026-09-26）：界面断言不再写死任一种语言的中文串，
   一律经 `TestText`（`app/src/test/kotlin/com/pixfold/d1/TestText.kt`）从**同一份资源**解析期望值。
-  ⚠️ **Robolectric 默认 locale 实测是 `en_US`**，故实际解析出的是 `values-en/` 的英文
+  ⚠️ **Robolectric 默认 locale 实测是 `en_US`**，故实际解析出的是**默认槽位 `values/`** 的英文
   —— 这正是最初 66 条断言失败的总根因，也是「测试必须语言无关」的直接论据。
   `TestText` **只用于界面文案**：文件名词缀（`第01卷.cbz`）、语言码（`ja`）、mock 数据中文串
   是**数据**不是文案，保持字面量。
@@ -986,7 +994,7 @@ data class Msg(val key: TextKey, val args: List<Any> = emptyList())
 ### 15.5 测试策略与残留
 
 界面断言一律经 `TestText`(`app/src/test/kotlin/com/pixfold/d1/TestText.kt`)从**同一份资源**解析期望值。
-⚠️ **Robolectric 默认 locale 实测是 `en_US`** ⇒ 实际解析 `values-en/`,这是最初 66 条失败的总根因,
+⚠️ **Robolectric 默认 locale 实测是 `en_US`** ⇒ 实际解析**默认槽位 `values/`**(英文),这是最初 66 条失败的总根因,
 也是「测试必须语言无关」的直接论据。领域层测试改为断言 `Msg` 的**结构**(`keys()` / `line(key)` 辅助)。
 
 残留(全部**有意保留**,均不进用户可见界面):`app/main` **1 处**(`SchemeEditor.kt:365` 示例输入)、
@@ -1041,4 +1049,39 @@ locale(`en_US`)下验证过** —— 若某条断言误写成英文字面量而�
 > 位置参数被忽略,且因 `--locales` 未指定反而**把应用 locale 重置为空表**,现象酷似"命令没生效"。
 > 正确写法必须带旗标:`cmd locale set-app-locales <pkg> --user 0 --locales en`;
 > 复位成"跟随系统"则不带 `--locales`。
+
+### 15.7 资源兜底语言:英文(2026-09-26 用户裁决)
+
+**现状布局**:`values/` = **英文(默认/兜底)**、`values-zh/` = 中文(覆盖),
+**没有 `values-en/`**。因此:系统语言为中文时走 `values-zh/`;为英文或**日语/韩语/法语等
+第三语言时回退到英文**。
+
+**用户裁决逐字**:「那还是改成英文兜底，默认选项是跟随系统一般也用不上兜底就是了」。
+
+**沿革**:本裁决**推翻了同日的上一版**「中文兜底」裁决(逐字「中文兜底吧，毕竟主要就是我自用的」)。
+用户自己给出的反转理由:**默认选项是「跟随系统」,一般也用不上兜底** ⇒ 兜底几乎只在
+"系统语言既非中文也非英文"时可见,那种场合英文比中文更有用;附带效果是回到 Android
+惯例布局(英文进默认 `values/`)。
+
+> ⚠️ **`values-zh/` 里不能出现 `one` 档**(相对上一版裁决新增的约束):中文一旦放进
+> 带语言限定符的目录,lint 的 **`UnusedQuantity`** 就会指出「For language "zh" (Chinese)
+> the following quantities are not relevant: one」,在 `warningsAsErrors = true` 下**硬失败**。
+> 故中文侧 26 个 `<plurals>` **只写 `other`**,英文侧则 one/other 两档都要写。
+> (上一版裁决时中文在默认槽位,lint 不知道它是中文,故两边写同值也能过。)
+
+> ⚠️ **`translatable="false"` 的键只留在默认 `values/`**:5 个
+> `domain_meta_field_{title,series,writer,volume,language}` 与 `app_name`;
+> 它们**不得**出现在 `values-zh/`,否则 lint 报 `ExtraTranslation`。
+
+> ⚠️ **兜底方向本身四道闸门全都看不见** —— lint 只看键集合是否对齐,单测只看解析值
+> 是否等于同一份资源里的值,两者都区分不出"默认槽位装的是哪种语言"。把 `values/`
+> 与翻译目录对调,这些检查**全部照旧通过**而真机表现已反。故新增
+> `app/src/test/kotlin/com/pixfold/d1/ResourceFallbackTest.kt`(5 条)**直接钉住
+> "哪种 locale 取到哪份文案"** —— 它是全仓唯一刻意写死中英字面量的测试,与 §15.5
+> "语言无关"纪律不冲突:那一套保证换语言不失效,这一组反过来验证换语言**确实**换文案。
+
+**附带澄清一条易误读的因果链**:`applicationLocales = []` **不等于中文**,而是
+**"不覆盖,跟随系统"**。它显示中文仅因 `getprop persist.sys.locale` = `zh-CN`;
+系统若为英文,同一个 `[]` 会走默认 `values/`(英文)。故设备复位后的正确说法是
+「**复位为跟随系统,而系统恰好是中文**」,而非"复位为中文"。
 

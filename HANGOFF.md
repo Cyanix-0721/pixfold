@@ -1782,6 +1782,37 @@ mock 数据里的中文串是**数据**不是文案,保持字面量。
 mock 数据(`MockLibraryBData.kt` 40 处、`MockData.kt` 8 处)**按裁决保留中文**
 (演示数据,不随界面语言变)。
 
+**资源兜底语言:英文(用户裁决 2026-09-26,`User said: 「那还是改成英文兜底，默认选项是跟随系统一般也用不上兜底就是了」`)**
+
+资源目录布局为 `values/` = **英文(默认/兜底)**、`values-zh/` = 中文(覆盖),
+**没有 `values-en/`**。含义:系统语言为中文时走 `values-zh/`;为英文或
+**日语/韩语/法语等第三语言时回退到英文**。`app/src/main/res/xml/locales_config.xml`
+声明 `zh` 与 `en` 两种可选语言(供系统"应用语言"列表);`app/build.gradle.kts`
+**无** `resourceConfigurations` 过滤。
+
+> 💡 **沿革(勿再翻回去)**:本裁决**推翻了同日的上一版**裁决「中文兜底」
+> (`User said: 「中文兜底吧，毕竟主要就是我自用的」`)。用户自己给出的反转理由:
+> **默认选项是「跟随系统」,一般也用不上兜底** ⇒ 兜底几乎只在"系统语言既非中文
+> 也非英文"时可见,那种场合英文比中文更有用;附带效果是回到 Android 惯例布局
+> (英文进默认 `values/`)。
+
+> ⚠️ **`values-zh/` 里不能出现 `one` 档**(与上一版裁决不同的新增约束):
+> 中文一旦放进带语言限定符的目录,lint 的 **`UnusedQuantity`** 就会明确指出
+> 「For language "zh" (Chinese) the following quantities are not relevant: one」,
+> 在 `warningsAsErrors = true` 下直接**硬失败**。故中文侧 26 个 `<plurals>`
+> **只写 `other`**;英文侧(默认 `values/`)则 one/other 两档都要写。
+> (上一版裁决时中文在默认槽位,lint 不知道它是中文,故两边写同值也能过。)
+
+> ⚠️ **`translatable="false"` 的键只留在默认 `values/`**:5 个
+> `domain_meta_field_{title,series,writer,volume,language}`(ComicInfo.xml 标签名)
+> 与 `app_name`。它们是英文默认文件的一部分,**不得**出现在 `values-zh/`,
+> 否则 lint 报 `ExtraTranslation`。
+
+> 💡 **相关因果链(易被误解)**:`applicationLocales = []` **不等于中文**,而是
+> **"不覆盖,跟随系统"**。它显示中文是因为 `getprop persist.sys.locale` = `zh-CN`;
+> 若系统是英文,同一个 `[]` 会走默认 `values/`(英文)。故设备复位后的准确说法是
+> "**复位为跟随系统,而系统恰好是中文**"。
+
 **P7 走查增补项(用户 2026-09-17 提出,真机走查时逐条核对)**:
 
 > 与 §9《D1 验收清单》20 项**并列**的走查项:清单 20 项是 D1 出口判据(判据不变),

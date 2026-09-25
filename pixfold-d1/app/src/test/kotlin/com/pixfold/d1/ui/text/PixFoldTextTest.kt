@@ -22,7 +22,7 @@ import kotlin.test.assertTrue
  * (实测:变异 `pluralQuantityIndex()` 的下标后,全套 295 项里**没有一项失败**)。
  *
  * 期望值一律经 [TestText] 从**同一份资源**算出,故本组测试与语言无关
- * (Robolectric 默认 locale 是 `en_US`,资源解析出来的是 `values-en/` 的英文)。
+ * (Robolectric 默认 locale 是 `en_US`,而英文是资源的**默认槽位** `values/`)。
  *
  * ⚠️ **例外**:`plural key with quantity in second position ...` 一条必须钉死英文。
  * 它要断言"计数参数的下标是否登记正确",判据是"`one` 与 `other` 两个变体文本不同",
