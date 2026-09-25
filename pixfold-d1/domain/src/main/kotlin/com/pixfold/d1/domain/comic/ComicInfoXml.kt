@@ -2,6 +2,8 @@ package com.pixfold.d1.domain.comic
 
 import com.pixfold.d1.domain.model.ComicVolume
 import com.pixfold.d1.domain.model.SourceItem
+import com.pixfold.d1.domain.text.Msg
+import com.pixfold.d1.domain.text.TextKey
 
 /**
  * ComicInfo.xml 预览与页码重编号(规格 §8.5 / §8.6)。
@@ -77,12 +79,12 @@ fun renumberPages(volume: ComicVolume): List<RenumberedPage> {
  *
  * @param xml        ComicInfo.xml 预览文本
  * @param pages      页码列表预览(含重编号)
- * @param pageIssues 页码一致性问题的**可读原因**列表(空 = 一致)
+ * @param pageIssues 页码一致性问题的**可读原因**列表(空 = 一致);键 + 参数,渲染时才解析
  */
 data class ComicPreview(
     val xml: String,
     val pages: List<RenumberedPage>,
-    val pageIssues: List<String>,
+    val pageIssues: List<Msg>,
 ) {
     val consistent: Boolean get() = pageIssues.isEmpty()
 }
@@ -100,17 +102,20 @@ fun previewOf(volume: ComicVolume): ComicPreview = ComicPreview(
  * 原型阶段 XML 里没有逐页 `<Pages>` 段,故这里校验的是**页数的唯一来源**:
  * 页码预览的项数与卷的页序长度一致,且序号连续从 1 起。
  * 返回不一致的原因列表(空 = 一致),供 UI 与测试共用。
+ *
+ * 虽然这是"自检"性质,但 [PackPreviewPage] 会把它显示给用户(「⚠️ 页码与页序不一致：…」),
+ * 故这些原因**是用户文案**,与 `Suggestion.source` 的处置相反 —— 走 [Msg] 而非字面量。
  */
-fun validatePageConsistency(volume: ComicVolume): List<String> {
-    val issues = mutableListOf<String>()
+fun validatePageConsistency(volume: ComicVolume): List<Msg> {
+    val issues = mutableListOf<Msg>()
     val pages = renumberPages(volume)
     if (pages.size != volume.pageOrder.order.size) {
-        issues.add("页码项数与页序长度不一致（${pages.size} ≠ ${volume.pageOrder.order.size}）")
+        issues.add(Msg(TextKey.PageIssueCountMismatch, listOf(pages.size, volume.pageOrder.order.size)))
     }
     pages.forEachIndexed { i, p ->
         val expected = (i + 1).toString().padStart(if (pages.size >= 100) 4 else 3, '0')
         if (!p.fileName.startsWith("$expected.")) {
-            issues.add("第 ${i + 1} 项页码应为 $expected，实际 ${p.fileName}")
+            issues.add(Msg(TextKey.PageIssueWrongIndex, listOf(i + 1, expected, p.fileName)))
         }
     }
     return issues

@@ -4,6 +4,8 @@ import com.pixfold.d1.domain.model.NameProposal
 import com.pixfold.d1.domain.model.ProposalWarning
 import com.pixfold.d1.domain.model.ProposalWarningType
 import com.pixfold.d1.domain.model.TOO_LONG_THRESHOLD
+import com.pixfold.d1.domain.text.Msg
+import com.pixfold.d1.domain.text.TextKey
 
 /**
  * 冲突与警告检测(规格 §7)。
@@ -12,6 +14,9 @@ import com.pixfold.d1.domain.model.TOO_LONG_THRESHOLD
  *
  * 跳过语义(§6.4):**只有 [ProposalWarningType.Duplicate] 与 [ProposalWarningType.IllegalChar]
  * 会导致改名计划跳过**;CaseCollision / TooLong 仅警告,Overridden 纯信息性。
+ *
+ * **文案**:每条警告产出 [Msg](键 + 参数),不在此处解析成字符串 —— 见 `text/Msg.kt`。
+ * 参数里的数值都保持 `Int`(而非预先 `toString()`),以便英文侧用 `<plurals>` 正确变格。
  *
  * @param sanitize 为 true 时不会产生 IllegalChar 警告(已被清洗),
  *   但清洗后的名字**仍可能撞 Duplicate** —— 两者互补而非重复(§7)。
@@ -35,20 +40,21 @@ fun attachWarnings(
         if ((byExact[name]?.size ?: 0) > 1) {
             warnings += ProposalWarning(
                 ProposalWarningType.Duplicate,
-                "重名：有 ${byExact.getValue(name).size} 项同名「$name」，执行时将跳过",
+                Msg(TextKey.WarnDuplicate, listOf(byExact.getValue(name).size, name)),
             )
         }
 
         // 2) IllegalChar:仅当未开启自动清洗时产生
         if (!sanitize && containsIllegalChar(name)) {
-            val bad = name.filter { it.code < 0x20 }
-                .map { "控制字符" }
+            // 控制字符用 Msg(它是一句要翻译的说明),非法字符本身是字面字符。
+            // 收集成 List<Any> 后由渲染侧用空格 join —— 分隔符不属于文案,故不建键。
+            val parts: List<Any> = name.filter { it.code < 0x20 }
+                .map { Msg(TextKey.WarnIllegalCharControl) }
                 .plus(name.filter { it in com.pixfold.d1.domain.model.ILLEGAL_NAME_CHARS }.map { it.toString() })
                 .distinct()
-                .joinToString(" ")
             warnings += ProposalWarning(
                 ProposalWarningType.IllegalChar,
-                "非法字符：$bad（执行时将跳过；可开启自动清洗）",
+                Msg(TextKey.WarnIllegalChar, listOf(parts)),
             )
         }
 
@@ -58,7 +64,7 @@ fun attachWarnings(
         if (lowerGroup.size > 1 && lowerGroup.map { it.finalName }.distinct().size == lowerGroup.size) {
             warnings += ProposalWarning(
                 ProposalWarningType.CaseCollision,
-                "大小写冲突：与 ${lowerGroup.size - 1} 项仅大小写不同，在部分系统上会互相覆盖",
+                Msg(TextKey.WarnCaseCollision, listOf(lowerGroup.size - 1)),
             )
         }
 
@@ -66,13 +72,13 @@ fun attachWarnings(
         if (name.length > TOO_LONG_THRESHOLD) {
             warnings += ProposalWarning(
                 ProposalWarningType.TooLong,
-                "超长：${name.length} 字符，超过 $TOO_LONG_THRESHOLD 上限",
+                Msg(TextKey.WarnTooLong, listOf(name.length, TOO_LONG_THRESHOLD)),
             )
         }
 
         // 5) Overridden:信息性
         if (p.isOverridden) {
-            warnings += ProposalWarning(ProposalWarningType.Overridden, "人工覆盖：已手动指定名称")
+            warnings += ProposalWarning(ProposalWarningType.Overridden, Msg(TextKey.WarnOverridden))
         }
 
         if (warnings.isEmpty()) p else p.copy(warnings = warnings)

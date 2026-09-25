@@ -1,6 +1,8 @@
 package com.pixfold.d1.domain.plan
 
 import com.pixfold.d1.domain.naming.RenameOp
+import com.pixfold.d1.domain.text.Msg
+import com.pixfold.d1.domain.text.TextKey
 
 /**
  * 执行报告与撤销(规格 §9 / 验收第 17 项)。
@@ -16,10 +18,10 @@ import com.pixfold.d1.domain.naming.RenameOp
  */
 
 /** 单项执行结果。 */
-enum class ExecOutcome(val label: String) {
-    Succeeded("成功"),
-    Skipped("跳过"),
-    Failed("失败"),
+enum class ExecOutcome(val textKey: TextKey) {
+    Succeeded(TextKey.OutcomeSucceeded),
+    Skipped(TextKey.OutcomeSkipped),
+    Failed(TextKey.OutcomeFailed),
 }
 
 /**
@@ -27,12 +29,14 @@ enum class ExecOutcome(val label: String) {
  *
  * [createdPath] 仅在该项**真的产生了输出**时非空 —— 撤销只回滚这些,
  * 不会去动原本就没动过的东西。
+ *
+ * [reason] 是 [Msg](键 + 参数);[label] 是**文件名**,不是文案,故仍是 `String`。
  */
 data class ExecEntry(
     val id: String,
     val label: String,
     val outcome: ExecOutcome,
-    val reason: String? = null,
+    val reason: Msg? = null,
     val createdPath: String? = null,
 ) {
     init {
@@ -47,6 +51,8 @@ data class ExecEntry(
         // 单纯删掉一道判据只是把冗余换个地方藏起来;根因是**不变量没有被强制**,
         // 于是"跳过项却带着 createdPath"这种非法组合在类型上依然可构造。
         // 这里用 require 把它堵死:非法状态根本造不出来,于是使用点只留**一道**判据即可。
+        //
+        // ⚠️ 这两条消息是**开发者诊断**(面向堆栈),不是用户文案 ⇒ 保持中文字面量,不建键。
         require(outcome == ExecOutcome.Succeeded || createdPath == null) {
             "$outcome 项不应携带 createdPath（$createdPath）—— 只有成功执行才产生输出"
         }
@@ -67,18 +73,21 @@ data class ExecutionReport(val entries: List<ExecEntry>, val kind: ExecKind) {
     val skippedCount: Int get() = entries.count { it.outcome == ExecOutcome.Skipped }
     val failedCount: Int get() = entries.count { it.outcome == ExecOutcome.Failed }
 
-    /** 一句话结论(报告页顶部)。 */
-    val summaryLine: String
-        get() = "共 ${entries.size} 项：成功 $succeededCount · 跳过 $skippedCount · 失败 $failedCount"
+    /** 一句话结论(报告页顶部)。数值以 `Int` 传参以便英文侧用 `<plurals>` 变格。 */
+    val summary: Msg
+        get() = Msg(
+            TextKey.ExecSummary,
+            listOf(entries.size, succeededCount, skippedCount, failedCount),
+        )
 
     /** 是否有可撤销的动作(没有成功项就没什么可撤销的)。 */
     val canUndo: Boolean get() = succeededCount > 0
 }
 
 /** 报告属于哪条工作流(文案与撤销语义不同)。 */
-enum class ExecKind(val title: String) {
-    Rename("重命名执行报告"),
-    Package("打包执行报告"),
+enum class ExecKind(val titleKey: TextKey) {
+    Rename(TextKey.ExecKindRename),
+    Package(TextKey.ExecKindPackage),
 }
 
 /**
@@ -106,14 +115,14 @@ fun executePackagePlans(plans: List<VolumePackPlan>): ExecutionReport {
                 id = v.id,
                 label = v.cbzFileName,
                 outcome = ExecOutcome.Failed,
-                reason = "没有任何页，无法打包",
+                reason = Msg(TextKey.PackFailNoPages),
             )
 
             v.outputDir.isBlank() -> ExecEntry(
                 id = v.id,
                 label = v.cbzFileName,
                 outcome = ExecOutcome.Failed,
-                reason = "输出目录为空",
+                reason = Msg(TextKey.PackFailEmptyOutputDir),
             )
 
             else -> ExecEntry(
@@ -147,7 +156,7 @@ fun executeRenamePlan(ops: List<RenameOp>): ExecutionReport {
                 id = op.id,
                 label = op.proposal.image.fileName,
                 outcome = ExecOutcome.Failed,
-                reason = "新名称为空",
+                reason = Msg(TextKey.RenameFailEmptyName),
             )
 
             else -> ExecEntry(
@@ -200,7 +209,7 @@ fun undoRecordOf(report: ExecutionReport): UndoRecord? {
 }
 
 /** 撤销结果。D1 为 mock,故 [applied] 恒为 false,由 [message] 说明原因。 */
-data class UndoResult(val applied: Boolean, val message: String)
+data class UndoResult(val applied: Boolean, val message: Msg)
 
 /**
  * 执行撤销(D1:mock)。
@@ -212,10 +221,10 @@ data class UndoResult(val applied: Boolean, val message: String)
  */
 fun performUndo(record: UndoRecord?): UndoResult {
     if (record == null || record.ops.isEmpty()) {
-        return UndoResult(applied = false, message = "没有可撤销的操作")
+        return UndoResult(applied = false, message = Msg(TextKey.UndoNothing))
     }
     return UndoResult(
         applied = false,
-        message = "已记录 ${record.opCount} 项逆向操作；正式版将基于 UndoRecord 逐项回滚（原型不触碰真实文件系统）",
+        message = Msg(TextKey.UndoRecorded, listOf(record.opCount)),
     )
 }

@@ -2,6 +2,8 @@ package com.pixfold.d1.domain.plan
 
 import com.pixfold.d1.domain.comic.langIso
 import com.pixfold.d1.domain.model.ComicVolume
+import com.pixfold.d1.domain.text.Msg
+import com.pixfold.d1.domain.text.TextKey
 
 /**
  * 工作流 B 的**打包计划**(规格 §9.1,验收第 15 项)。
@@ -12,16 +14,16 @@ import com.pixfold.d1.domain.model.ComicVolume
  */
 
 /** 输出已存在时的策略(归档语义:默认 [Rename])。 */
-enum class OutputConflictPolicy(val label: String) {
-    Rename("自动重命名（加序号）"),
-    Skip("跳过该卷"),
-    Overwrite("覆盖已有文件"),
+enum class OutputConflictPolicy(val textKey: TextKey) {
+    Rename(TextKey.ConflictAutoRename),
+    Skip(TextKey.ConflictSkipVolume),
+    Overwrite(TextKey.ConflictOverwrite),
 }
 
 /** 源目录处置策略(归档语义:默认 [Keep];[Delete] 是**危险动作**)。 */
-enum class SourcePolicy(val label: String) {
-    Keep("保留源目录（默认）"),
-    Delete("打包后删除源目录（危险）"),
+enum class SourcePolicy(val textKey: TextKey) {
+    Keep(TextKey.SourceKeep),
+    Delete(TextKey.SourceDelete),
 }
 
 /**
@@ -29,13 +31,15 @@ enum class SourcePolicy(val label: String) {
  *
  * [renumbered] 是**生成计划时的快照**(归档语义:不是惰性求值)——
  * 否则用户在执行前改了页序,计划上写的张数就会与实际执行的不一致。
+ *
+ * [skipReason] 是 [Msg](键 + 参数),不是成品字符串 —— 见 `text/Msg.kt`。
  */
 data class VolumePackPlan(
     val volume: ComicVolume,
     val outputDisplay: String,
     val pageCount: Int,
     val skipped: Boolean,
-    val skipReason: String?,
+    val skipReason: Msg?,
     val conflictPolicy: OutputConflictPolicy,
     val sourcePolicy: SourcePolicy,
 ) {
@@ -55,21 +59,25 @@ data class VolumePackPlan(
  * **为什么把文案放在领域层**:这是"计划必须可解释"(约束 5)的载体。
  * 若文案散在 UI 里,测试就只能断言"有个按钮",而无法断言"计划说清了要做什么"。
  * 归档原型把同一份契约放在 `VolumePackPlan.describe()`,此处沿用其文本。
+ *
+ * 返回 [Msg] 列表 —— 数值以 `Int` 传参以便英文侧用 `<plurals>` 变格。
  */
-fun VolumePackPlan.describe(): List<String> {
+fun VolumePackPlan.describe(): List<Msg> {
     if (skipped) {
-        return listOf("跳过：输出已存在 $outputPath")
+        return listOf(Msg(TextKey.PackSkipOutputExists, listOf(outputPath)))
     }
     val v = volume
-    val number = v.volume?.toString() ?: "未设置"
-    val writer = v.writer.ifEmpty { "空" }
-    val lang = langIso(v.language, v.otherLangCode) ?: "不写入"
+    // 参数可以是**普通字符串**(真实值,不翻译)或 **Msg**(占位词「未设置/空/不写入」,要翻译)。
+    // 这样「未设置」这类占位词不会以中文字面量被冻进计划里。
+    val number: Any = v.volume?.toString() ?: Msg(TextKey.PackValueUnset)
+    val writer: Any = if (v.writer.isEmpty()) Msg(TextKey.PackValueEmpty) else v.writer
+    val lang: Any = langIso(v.language, v.otherLangCode) ?: Msg(TextKey.PackValueNotWritten)
     return buildList {
-        add("创建 CBZ → $outputDisplay")
-        add("写入 ComicInfo.xml（Title=${v.title}，Series=${v.series}，Number=$number，Writer=$writer，LanguageISO=$lang）")
-        add("按页序打包 $pageCount 张并重命名为页码（0001 起）")
+        add(Msg(TextKey.PackCreateCbz, listOf(outputDisplay)))
+        add(Msg(TextKey.PackWriteComicInfo, listOf(v.title, v.series, number, writer, lang)))
+        add(Msg(TextKey.PackPackPages, listOf(pageCount)))
         if (sourcePolicy == SourcePolicy.Delete) {
-            add("打包后删除源目录：${v.dirPath}")
+            add(Msg(TextKey.PackDeleteSourceDir, listOf(v.dirPath)))
         }
     }
 }
@@ -117,7 +125,11 @@ fun buildPackagePlans(
         outputDisplay = outputDisplayOf(v.cbzFileName, conflictPolicy, v.outputExists),
         pageCount = v.pageCount,
         skipped = skipped,
-        skipReason = if (skipped) "输出已存在 ${v.outputDir}/${v.cbzFileName}" else null,
+        skipReason = if (skipped) {
+            Msg(TextKey.PackSkipOutputExists, listOf("${v.outputDir}/${v.cbzFileName}"))
+        } else {
+            null
+        },
         conflictPolicy = conflictPolicy,
         sourcePolicy = sourcePolicy,
     )

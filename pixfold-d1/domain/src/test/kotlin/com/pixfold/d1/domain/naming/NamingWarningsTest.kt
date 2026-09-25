@@ -7,6 +7,7 @@ import com.pixfold.d1.domain.model.NamingScheme
 import com.pixfold.d1.domain.model.ProposalWarningType
 import com.pixfold.d1.domain.model.SourceItem
 import com.pixfold.d1.domain.model.TOO_LONG_THRESHOLD
+import com.pixfold.d1.domain.text.TextKey
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -292,7 +293,10 @@ class NamingWarningsTest {
         val dup = listOf(item("a", base = "same"), item("b", base = "same"))
         val plan = buildRenamePlan(buildProposals(dup, scheme(components = origOnly)))
         val reason = plan.first().reason!!
-        assertTrue(reason.contains("重名"), "reason 取第一个冲突警告的 message,且人类可读")
+        // reason 现为 Msg;此处断言它取的是**重名**那一类(键),而非成品文案。
+        assertEquals(TextKey.WarnDuplicate, reason.key, "reason 取第一个冲突警告的 message")
+        assertEquals(2, reason.args[0], "参数应是同名的项数")
+        assertEquals("same.jpg", reason.args[1], "参数应是冲突的那个名字")
     }
 
     @Test

@@ -1,5 +1,8 @@
 package com.pixfold.d1.domain.model
 
+import com.pixfold.d1.domain.text.Msg
+import com.pixfold.d1.domain.text.TextKey
+
 /**
  * 命名结构与逐项覆盖(规格 §4.4 / §6)。
  *
@@ -7,6 +10,9 @@ package com.pixfold.d1.domain.model
  * `Map<SourceItem.id, 完整文件名>`(见 §6.3)。改组件/分隔符/补零只影响
  * `proposedName`,被覆盖项逐字不变 —— 这是"改结构后覆盖不丢失"的机制本身,
  * 而不是靠 UI 小心维护。存储位置在 `NamingState`,不在本文件。
+ *
+ * **文案约定(阶段 2 全量 i18n)**:本文件的枚举一律只携带 [TextKey],
+ * 不携带译文;运行时拼装的文案一律产出 [Msg]。理由见 `text/Msg.kt`。
  */
 
 /** 非法字符集:9 个 Windows 非法字符(规格 §7)。控制字符(码点 < 0x20)另行判定。 */
@@ -15,27 +21,27 @@ const val ILLEGAL_NAME_CHARS = "\\/:*?\"<>|"
 /** 超长阈值:UTF-16 码元数,中文按 1 计(规格 §7)。 */
 const val TOO_LONG_THRESHOLD = 180
 
-enum class NameComponentKind(val label: String) {
-    Prefix("自定义前缀"),
-    RootDir("根目录名"),
-    RelDir("相对目录片段"),
-    DirIndex("目录序号"),
-    ImageIndex("图片序号"),
-    OrigName("原文件名"),
-    CustomText("自定义文本"),
+enum class NameComponentKind(val textKey: TextKey) {
+    Prefix(TextKey.NameKindPrefix),
+    RootDir(TextKey.NameKindRootDir),
+    RelDir(TextKey.NameKindRelDir),
+    DirIndex(TextKey.NameKindDirIndex),
+    ImageIndex(TextKey.NameKindImageIndex),
+    OrigName(TextKey.NameKindOrigName),
+    CustomText(TextKey.NameKindCustomText),
 }
 
-enum class CasePolicy(val label: String) {
-    Keep("保持原样"),
-    Lower("转小写"),
-    Upper("转大写"),
+enum class CasePolicy(val textKey: TextKey) {
+    Keep(TextKey.CasePolicyKeep),
+    Lower(TextKey.CasePolicyLower),
+    Upper(TextKey.CasePolicyUpper),
 }
 
-enum class ExtPolicy(val label: String) {
-    Keep("保留原样"),
-    Lower("统一小写"),
-    Upper("统一大写"),
-    Strip("去除扩展名"),
+enum class ExtPolicy(val textKey: TextKey) {
+    Keep(TextKey.ExtPolicyKeep),
+    Lower(TextKey.ExtPolicyLower),
+    Upper(TextKey.ExtPolicyUpper),
+    Strip(TextKey.ExtPolicyStrip),
 }
 
 /**
@@ -79,15 +85,21 @@ data class NamingScheme(
     }
 }
 
-enum class ProposalWarningType(val label: String) {
-    Duplicate("重名"),
-    IllegalChar("非法字符"),
-    CaseCollision("大小写冲突"),
-    TooLong("超长"),
-    Overridden("人工覆盖"),
+enum class ProposalWarningType(val textKey: TextKey) {
+    Duplicate(TextKey.WarnTypeDuplicate),
+    IllegalChar(TextKey.WarnTypeIllegalChar),
+    CaseCollision(TextKey.WarnTypeCaseCollision),
+    TooLong(TextKey.WarnTypeTooLong),
+    Overridden(TextKey.WarnTypeOverridden),
 }
 
-data class ProposalWarning(val type: ProposalWarningType, val message: String)
+/**
+ * 一条建议警告。
+ *
+ * [message] 是**未解析**的文案(键 + 参数),不是成品字符串 —— 见 `text/Msg.kt` 的说明。
+ * UI 用 `pixFoldText(w.message)` 渲染。
+ */
+data class ProposalWarning(val type: ProposalWarningType, val message: Msg)
 
 /**
  * 单张图片的命名建议。

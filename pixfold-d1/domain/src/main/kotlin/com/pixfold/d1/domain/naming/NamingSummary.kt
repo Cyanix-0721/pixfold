@@ -1,6 +1,8 @@
 package com.pixfold.d1.domain.naming
 
 import com.pixfold.d1.domain.model.NamingScheme
+import com.pixfold.d1.domain.text.Msg
+import com.pixfold.d1.domain.text.TextKey
 
 /**
  * 命名结构编辑器**折叠时那一行摘要**的文案(纯函数,便于单测)。
@@ -15,8 +17,12 @@ import com.pixfold.d1.domain.model.NamingScheme
  * @param sample 首个建议名(含逐项覆盖,即 `NameProposal.finalName`);
  *   集合为空(没有可命名的图片)时为 null,此时只报组件数。
  */
-fun namingSummaryLine(scheme: NamingScheme, sample: String?): String {
+fun namingSummaryLine(scheme: NamingScheme, sample: String?): Msg {
     val enabled = scheme.components.count { it.enabled }
     val head = sample?.takeIf { it.isNotBlank() }
-    return if (head == null) "$enabled 个组件启用" else "$head · $enabled 个组件启用"
+    return if (head == null) {
+        Msg(TextKey.NamingSummaryEnabled, listOf(enabled))
+    } else {
+        Msg(TextKey.NamingSummaryWithHead, listOf(head, enabled))
+    }
 }

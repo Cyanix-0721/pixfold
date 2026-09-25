@@ -8,6 +8,8 @@ import com.pixfold.d1.domain.model.MetaValue
 import com.pixfold.d1.domain.model.SourceItem
 import com.pixfold.d1.domain.model.Suggestion
 import com.pixfold.d1.domain.sort.moveItemTo
+import com.pixfold.d1.domain.text.Msg
+import com.pixfold.d1.domain.text.TextKey
 import com.pixfold.d1.domain.sort.pageOrderOf
 import kotlin.test.Test
 import kotlin.test.assertContains
@@ -40,7 +42,7 @@ class ComicMetadataTest {
         // aot-2 的建议语言是 ja(低置信) —— 但当前值不得自动采纳。
         assertEquals("ja", aot2.langSug.value, "前提:该卷确实有语言建议")
         assertEquals(LangChoice.Unset, aot2.language, "语言默认必须是「未设置」,不能采纳建议")
-        assertTrue("语言未确认" in aot2.pendingIssues, "未设置语言必须进待确认项")
+        assertTrue(Msg(TextKey.PendingLanguage) in aot2.pendingIssues, "未设置语言必须进待确认项")
     }
 
     @Test
@@ -59,17 +61,17 @@ class ComicMetadataTest {
     fun `volume without a parsed number keeps a null suggestion and is pending`() {
         assertEquals(null, aot0.volumeSug.value)
         assertEquals(null, aot0.volume)
-        assertEquals(listOf("语言未确认", "卷号缺失"), aot0.pendingIssues)
+        assertEquals(listOf(Msg(TextKey.PendingLanguage), Msg(TextKey.PendingVolume)), aot0.pendingIssues)
     }
 
     // ================= L15 pendingIssues 顺序与内容 =================
 
     @Test
     fun `pendingIssues uses the fixed order language then volume`() {
-        assertEquals(listOf("语言未确认", "卷号缺失"), aot0.pendingIssues)
+        assertEquals(listOf(Msg(TextKey.PendingLanguage), Msg(TextKey.PendingVolume)), aot0.pendingIssues)
 
         val noLangOnly = op101 // 语言建议为 null -> 仍待确认;卷号有值
-        assertEquals(listOf("语言未确认"), noLangOnly.pendingIssues)
+        assertEquals(listOf(Msg(TextKey.PendingLanguage)), noLangOnly.pendingIssues)
 
         // 两项都确认后清空
         val confirmed = op102.copy(language = LangChoice.Zh)
@@ -284,7 +286,7 @@ class ComicMetadataTest {
         val result = batchApply(library.volumes, MetaField.Language, MetaValue.Language(LangChoice.Zh))
         assertEquals(5, result.appliedCount)
         assertTrue(result.volumes.all { it.language == LangChoice.Zh })
-        assertTrue(result.volumes.none { it.pendingIssues.contains("语言未确认") })
+        assertTrue(result.volumes.none { Msg(TextKey.PendingLanguage) in it.pendingIssues })
     }
 
     // ================= 覆盖标记的写入与清除 =================
@@ -311,7 +313,7 @@ class ComicMetadataTest {
         val restored = useSuggestion(picked, MetaField.Language)
         assertEquals(LangChoice.Unset, restored.language)
         assertEquals("", restored.otherLangCode)
-        assertEquals("语言未确认", restored.pendingIssues.first())
+        assertEquals(Msg(TextKey.PendingLanguage), restored.pendingIssues.first())
     }
 
     @Test
@@ -357,10 +359,15 @@ class ComicMetadataTest {
     }
 
     @Test
-    fun `empty series falls into the unnamed group`() {
+    fun `empty series falls into the unnamed group keyed by the empty string`() {
+        // 兜底组的键是**空串**而非「（未命名系列）」:分组键参与 testTag 与相等性判断,
+        // 若把译文当键,切换语言就会把同一批卷"换"成另一个分组。
+        // 译文只在 UI 渲染时补上(见 ui/workflowb/LibraryPage.kt)。
         val renamed = replaceVolume(library.volumes, aot0.copy(series = ""))
         val groups = com.pixfold.d1.domain.model.groupVolumesBySeries(renamed)
-        assertContains(groups.map { it.first }, com.pixfold.d1.domain.model.UNNAMED_SERIES)
+        assertContains(groups.map { it.first }, "")
+        // 且这个空串键必须真的承载了那一卷,而不只是"有个空组"
+        assertTrue(groups.first { it.first.isEmpty() }.second.any { it.id == aot0.id })
     }
 
     @Test
