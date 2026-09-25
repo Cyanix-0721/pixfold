@@ -48,7 +48,7 @@ class NaturalOrderTest {
         assertTrue(naturalCompare("img", "img1") < 0)
     }
 
-    // ========== 中文数字归一化(用户裁决 2026-09-26:只认 一~九 与 十) ==========
+    // ========== 中文数字归一化(用户裁决 2026-09-25:只认 一~九 与 十) ==========
 
     @Test
     fun `chinese numerals sort by value not by code point`() {

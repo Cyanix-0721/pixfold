@@ -6,7 +6,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
 /**
- * 可操作控件不得靠横向滚动藏在视口外(2026-09-27 真机实测缺陷的源码结构守卫)。
+ * 可操作控件不得靠横向滚动藏在视口外(2026-09-25 真机实测缺陷的源码结构守卫)。
  *
  * ## 为什么只能用"读源码"这种方式守护
  *
@@ -63,7 +63,7 @@ class ChipRowWrappingTest {
             assertEquals(
                 emptyList(),
                 hit,
-                "$rel 又用回了横向滚动容器;可操作控件会落在视口外(2026-09-27 真机实测缺陷)",
+                "$rel 又用回了横向滚动容器;可操作控件会落在视口外(2026-09-25 真机实测缺陷)",
             )
         }
     }

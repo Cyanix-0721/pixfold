@@ -23,7 +23,7 @@
 5. 构建走 Windows 原生：经 `cmd.exe /c gradlew.bat` 调用，不在 WSL 内跑 Gradle。
 6. compileSdk / minSdk / targetSdk = 36 / 24 / 36；namespace 与 applicationId = `com.pixfold.d1`。
    > **⚠️ 2026-09-22 更新**：本行是 09-16 的取值。`compileSdk` 已升到 37、`minSdk` 已由 24 提到 **30**，
-   > 并于 **2026-09-26 再提到 `34`**（见 `docs/notes/d1-toolchain-evidence.md` §9 / §9.8 与
+   > 并于 **2026-09-25 再提到 `34`**（见 `docs/notes/d1-toolchain-evidence.md` §9 / §9.8 与
    > `HANGOFF.md` §12.6）。当前锚点 = **37 / 34 / 36**。原文保留作设计记录。
 7. `local.properties`、`build/`、`.gradle/`、`.kotlin/` 不入库。
 8. `domain/` 不得 import 任何 `android.*` / `androidx.*`。

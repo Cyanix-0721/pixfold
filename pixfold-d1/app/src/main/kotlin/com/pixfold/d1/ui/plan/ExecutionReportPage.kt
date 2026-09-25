@@ -115,7 +115,7 @@ fun ExecutionReportPage(
                 val undoLabel = stringResource(R.string.report_undo)
                 // 撤销是**破坏性 / 回退类**动作,用「危险动作」配色着底
                 // (用户 2026-09-25:「步骤3的撤销按钮背景改红色」;
-                //  2026-09-26 收紧为「表示这是个危险性质的按钮」)。
+                //  2026-09-25 收紧为「表示这是个危险性质的按钮」)。
                 // 深浅两种模式要取 error 族的**不同档位**:浅色 `error`(#B3261E 深红)、
                 // 深色 `errorContainer`(#8C1D18 深红)—— 深色的 `error` 是 #F2B8B5 淡粉,
                 // 当底色不像危险动作。完整理由见 `dangerActionButtonColors()` 的 KDoc。

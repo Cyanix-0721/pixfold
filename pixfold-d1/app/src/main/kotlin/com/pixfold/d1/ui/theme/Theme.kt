@@ -19,7 +19,7 @@ import com.pixfold.d1.domain.settings.ThemeMode
  *
  * 配色来源按优先级:
  *  1. **动态取色**(强调色 = 跟随系统)→ 种子色取自系统壁纸(`dynamic*ColorScheme` 是
- *     API 31+,而本项目 minSdk 已于 2026-09-26 提到 **34**,故不再需要版本分支);
+ *     API 31+,而本项目 minSdk 已于 2026-09-25 提到 **34**,故不再需要版本分支);
  *  2. 否则 → 取所选**预设种子色**。
  *
  * 种子色再经**色彩风格**(TonalSpot / Vibrant / …)与**色彩标准**(2021 / 2025)

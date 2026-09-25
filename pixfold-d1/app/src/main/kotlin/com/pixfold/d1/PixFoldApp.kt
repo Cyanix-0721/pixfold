@@ -182,11 +182,11 @@ fun PixFoldApp(store: SettingsStore? = null) {
  * **此前漏了这一步**(真机实测:选 English 后界面仍是中文),属真实缺陷。
  *
  * **版本说明**:`LocaleManager` / `LocaleConfig` 均为 API 33+。本项目 minSdk
- * 已于 2026-09-26 提到 **34**,故此处**不再需要版本分支** —— 早先那句
+ * 已于 2026-09-25 提到 **34**,故此处**不再需要版本分支** —— 早先那句
  * `if (Build.VERSION.SDK_INT < TIRAMISU) return@LaunchedEffect` 已删除
  * (留着会被 lint 判 `ObsoleteSdkInt` 而本项目 `warningsAsErrors=true`)。
  *
- * **为什么"启动首帧遇到 System 必须不写入"**(2026-09-26 修复的真实缺陷):
+ * **为什么"启动首帧遇到 System 必须不写入"**(2026-09-25 修复的真实缺陷):
  * AOSP 对空表的定义**不是"未设置"**,而是一次**主动写入** ——
  * 原文:"Pass a `LocaleList.getEmptyLocaleList()` to reset to the system locale."
  * (`android.app.LocaleManager#setApplicationLocales`)。而应用内 `language` 的

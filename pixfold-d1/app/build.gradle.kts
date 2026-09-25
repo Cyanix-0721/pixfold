@@ -15,7 +15,7 @@ android {
 
     defaultConfig {
         applicationId = "com.pixfold.d1"
-        // 2026-09-26 由 30 提到 34(用户裁决,替换 2026-09-22 的 24→30)。
+        // 2026-09-25 由 30 提到 34(用户裁决,替换 2026-09-22 的 24→30)。
         // 理由:应用内语言依赖的 `LocaleManager`/`LocaleConfig` 是 API 33+,
         // 而 33 与 34 的代码清理成本完全相同(都删那 3 处版本守卫),
         // 34 还能拿到 HDR gainmap(`Gainmap`/`Bitmap.getGainmap`)供 D3/D4 图片管线用。

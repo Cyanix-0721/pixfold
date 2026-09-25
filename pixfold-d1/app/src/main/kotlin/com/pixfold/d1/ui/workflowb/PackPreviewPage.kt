@@ -107,7 +107,7 @@ fun PackPreviewPage(
             .windowInsetsPadding(contentInsets)
             .testTag(TAG_PACK_PAGE),
     ) {
-        // 2026-09-27:改 FlowRow。5 卷时第 4、5 卷芯片会落在视口外
+        // 2026-09-25:改 FlowRow。5 卷时第 4、5 卷芯片会落在视口外
         // (与工作流 B 卷切换行同源缺陷,见 MetadataPage.kt VolumeSelector 注释)。
         FlowRow(
             modifier = Modifier
@@ -280,7 +280,7 @@ fun PackPreviewPage(
                                 style = MaterialTheme.typography.labelMedium,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
-                            // 2026-09-27:改 FlowRow(同源缺陷,与卷芯片行一并处理)
+                            // 2026-09-25:改 FlowRow(同源缺陷,与卷芯片行一并处理)
                             FlowRow(
                                 modifier = Modifier.fillMaxWidth(),
                                 horizontalArrangement = Arrangement.spacedBy(6.dp),
@@ -301,7 +301,7 @@ fun PackPreviewPage(
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 modifier = Modifier.padding(top = 4.dp),
                             )
-                            // 2026-09-27:改 FlowRow(同源缺陷)
+                            // 2026-09-25:改 FlowRow(同源缺陷)
                             FlowRow(
                                 modifier = Modifier.fillMaxWidth(),
                                 horizontalArrangement = Arrangement.spacedBy(6.dp),

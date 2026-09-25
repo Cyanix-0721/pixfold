@@ -166,7 +166,7 @@ data class BatchApplyResult(
  *
  * - 只作用于 `included == true` 的卷(未勾选的卷不参与打包,也不该被批量改写);
  * - **跳过** [ComicVolume.overridden] 中已含该字段的卷,除非 [force];
- * - 写入后**清除该字段自己的逐项例外标记**(用户裁决 2026-09-26,见下);
+ * - 写入后**清除该字段自己的逐项例外标记**(用户裁决 2026-09-25,见下);
  * - 返回[实际生效][BatchApplyResult.appliedCount]与[被跳过][BatchApplyResult.skippedCount]数量
  *   —— UI 据此提示 `已设置到 N 卷`,而不是笼统说"已应用"。
  *

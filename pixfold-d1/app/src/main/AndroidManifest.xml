@@ -13,7 +13,7 @@
            否则系统在根级直接执行"退出应用"。
       真机实测(2026-09-18):未处理返回时,在"步骤2 命名结构"按返回会**直接退出应用**。
 
-      **2026-09-26 注**:此处原先还有 `tools:targetApi="33"`,用于在 minSdk<33 时
+      **2026-09-25 注**:此处原先还有 `tools:targetApi="33"`,用于在 minSdk<33 时
       压掉 lint 的 `UnusedAttribute`。minSdk 提到 **34** 后该属性对系统仍然有效
       (34 ≥ 33),lint 不再需要这层豁免,故连同 `xmlns:tools` 一并删除。
     -->
@@ -21,7 +21,7 @@
       android:icon="@mipmap/ic_launcher" —— 自适应图标(三层:background / foreground /
       monochrome),由系统按厂商遮罩裁形、Android 13+ 用 monochrome 层做"主题化图标"
       (跟随壁纸取色)。资源只有一档 `mipmap-anydpi/`(无 `-v26`):自适应图标是 API 26 引入,
-      而本项目 minSdk 已于 2026-09-26 提到 **34**,不存在需要旧版回退的系统。
+      而本项目 minSdk 已于 2026-09-25 提到 **34**,不存在需要旧版回退的系统。
       图形本身仍是原型占位(三条块),不是最终视觉设计。
     -->
     <application
