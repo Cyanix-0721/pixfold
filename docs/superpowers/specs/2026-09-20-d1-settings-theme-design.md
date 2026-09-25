@@ -570,23 +570,72 @@ Gradle / AGP / Compose BOM / compileSdk。**升级已完成并验证**（见 §1
 
 - manifest 增加 `<locale-config>`（`res/xml/locales_config.xml`）声明 `zh` / `en`，
   使系统"每应用语言"设置与我们对齐。
-- 因阶段 1 已持久化语言选择（§3.3），**两条路径都以设置值为准**，不产生分叉。
+- ~~因阶段 1 已持久化语言选择（§3.3），**两条路径都以设置值为准**，不产生分叉。~~
+  → **此口径是错的（2026-09-25 修正）**：系统侧「设置 → 应用 → 语言」是**独立的写入口**，
+  不能假定「设置值为默认 `System`」就等于「用户没做过选择」。详见 §9.4。
 
 ### 9.2 资源组织
 
 ```
 res/values/strings.xml        —— 中文(默认)
-res/values-en/strings.xml     —— 英文(阶段 1 仅设置页 + 首页)
+res/values/settings_strings.xml —— 中文:设置页文案(实际落盘位置)
+res/values-en/settings_strings.xml —— 英文:**仅设置页**(阶段 1)
 res/xml/locales_config.xml    —— 声明 zh / en
 ```
+
+> **修正（2026-09-25）**：此处原写 `res/values-en/strings.xml`，**实测不存在**；
+> `res/values/strings.xml` 全文只有 1 条 `app_name`（`translatable="false"`）。
+> 阶段 1 实际翻译的只有设置页 —— 见 §9.3。
 
 **约束**：阶段 1 新增的所有设置页文案**一律走资源**，不新增硬编码中文
 （既有页面的硬编码留给阶段 2）。
 
 ### 9.3 已知不完整（如实标注）
 
-切换 English 后，**工作流 A/B 页面仍显示中文**。设置页内以说明行如实告知：
+切换 English 后，**工作流 A/B / 首页等页面仍显示中文**。设置页内以说明行如实告知：
 `其他页面的多语言将在后续版本补全`。
+
+实测覆盖缺口（2026-09-25，`grep -c stringResource`）：
+
+| 范围 | 命中文件数 | 说明 |
+| --- | --- | --- |
+| `app/src/main/kotlin/.../ui/settings/SettingsScreen.kt` | 49 | 已资源化 |
+| `app/src/main/kotlin/.../ui/settings/LicensesScreen.kt` | 9 | 已资源化 |
+| **其余 30 个 UI 文件** | **0** | 全硬编码，含 `HomeScreen.kt` 与整个 `ui/workflowa/`、`ui/workflowb/` |
+
+`ui/` 下非 settings 目录共 **44 行硬编码中文**（如 `HomeScreen.kt:81-82` 的工作流入口标题）。
+⇒ 即使 per-app locale 完全正确，**可见效果也仅限设置页与许可页**。
+本次范围经用户裁决 = **只修语言同步 bug**，不铺开 i18n。
+
+### 9.4 语言同步的真实语义（2026-09-25 补充，真机核对中修出的第 5 个真实缺陷）
+
+**缺陷现象**（用户报告）：在系统设置里把本应用语言设为英文，应用内仍是中文。
+
+**根因**：`ApplyAppLanguage` 把「存储值为默认 `System`」当成了「无需处理」，于是算出
+`want = LocaleList.getEmptyLocaleList()`；而它只用 `if (manager.applicationLocales != want)`
+去重，只在"值相同"时跳过 —— 系统侧已是 `[en]`，`[en] != []` ⇒ **每次启动都写一次空表**。
+AOSP 对空表的定义是**一次主动写入**（原文：Pass a `LocaleList.getEmptyLocaleList()`
+to reset to the system locale），于是系统侧的选择被应用抹掉，界面回退中文。
+
+**双向性**：反向同样成立 —— 应用内选英文后，再从系统侧选简体中文，也会被应用覆盖。
+
+**为什么不能"回读并让两者一致"**：平台**没有**语言变化监听 API（`LocaleManager` 的完整方法集
+只有 `set/getApplicationLocales`、`set/getSystemLocales`、`set/getOverrideLocaleConfig`），
+应用无从得知系统侧何时被改。故唯一正确姿势是**不乱写**。
+
+**判据必须是「变化」而非「值」**：
+
+| 场景 | 期望行为 |
+| --- | --- |
+| 存储值 = `System`，启动 | **不写**（默认态不代表用户意图） |
+| 存储值 = `Chinese`/`English`，启动 | **必须写**（用户显式选择必须赢过系统侧） |
+| 用户在应用内改选任意值（含改回 `System`） | **必须写**，改回 `System` 时写空表以真正退回系统语言 |
+
+故**不能**把 `System` 一律跳过 —— 用户主动切回「跟随系统」时仍需写空表才能生效。
+实现见 `PixFoldApp.kt` 的 `isFirstComposition` 首帧判定。
+
+**覆盖**：`AppLanguageTest` 3 条守卫（①系统侧选择存活 ②应用内选择仍写入 ③存储里显式值必须赢）；
+3 轮变异检验证明守卫非空转；真机 before/after 六条路径全部复现/通过。
 
 ## 10. 测试与自证策略
 
@@ -611,6 +660,11 @@ res/xml/locales_config.xml    —— 声明 zh / en
 - 恢复默认：二次确认 → 重置 → 界面回到默认（按钮在底部，需 `performScrollToNode`）
 - 许可页：本项目与三方清单均渲染
 - 语言切换后设置页文案真的变（中 ↔ 英）
+- **per-app locale 真的写进系统**（`AppLanguageTest`，2026-09-25 补）：用 Robolectric 自带的
+  `ShadowLocaleManager` 直接读 `LocaleManager.applicationLocales`，断言
+  ①系统侧已选 `[en]` 时启动应用**不覆盖**它（`AppLanguageTest.kt:72`，本缺陷的回归守卫）
+  ②应用内改选英语时**确实写入** `[en]`
+  ③存储里是显式 `English` 时启动**必须写入**（防"乱清"改成"存了不生效"）
 
 ### 10.4 真机（第三层）
 
@@ -625,6 +679,17 @@ res/xml/locales_config.xml    —— 声明 zh / en
 关键断言需做变异验证（去掉实现后测试必须失败），至少覆盖：
 主题三态解析、`accent` 派生 `monetEnabled`、纯黑生效、恢复默认真的重置、
 语言切换真的换文案。
+
+**语言同步修复的变异验证（2026-09-25 补,3 组全部捕获,已还原）**：
+
+| 变异 | 结果 |
+| --- | --- |
+| 去掉 `if (isStartup && language == AppLanguage.System) return@LaunchedEffect`（= 退回缺陷版） | ✅ 仅「系统侧选择存活」失败 |
+| 把跳过条件放宽成 `if (isStartup) return@LaunchedEffect`（首帧一律不写） | ✅ 仅「存储里显式值必须赢」失败 |
+| 删掉 `manager.setApplicationLocales(want)` | ✅ 2 项失败（应用内写入 + 显式值必须赢） |
+
+> **判据要点**：三条守卫必须**各自可被单独打掉** —— 只测「系统侧不再被清」会漏掉
+> 「干脆不写」这种假修复（MUT2/MUT3 正是为此而设）。
 
 **「色彩标准」开关的变异验证（2026-09-21 补,3 组全部捕获）**：
 

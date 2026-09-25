@@ -1288,7 +1288,7 @@ Manifest 显式 `enableOnBackInvokedCallback="true"`(targetSdk 33+ 默认,写明
 | **开源许可页** | ✅ AboutLibraries 真实数据渲染(三件套 + Activity 等,均 Apache-2.0)+ 许可更正块 |
 | **语言切 English** | ✅ 用户真机确认设置页变英文(首页仍中文 —— 阶段 2 才补全,页面内已如实标注) |
 
-**真机核对中修掉的真实缺陷(4 个)**:
+**真机核对中修掉的真实缺陷(5 个)**:
 
 1. **许可页一进即崩**(真缺陷):`LibrariesContainer`(本身是 LazyColumn)被嵌进
    `Column(verticalScroll)` → 无界高度 → `IllegalStateException`。
@@ -1299,6 +1299,20 @@ Manifest 显式 `enableOnBackInvokedCallback="true"`(targetSdk 33+ 默认,写明
 4. **English 选了界面不变**(真缺陷):`grep LocaleManager|setApplicationLocales` **零命中** ——
    设置页只做了"存",**从未应用** per-app locale。→ 新增 `ApplyAppLanguage`
    (`LocaleManager.setApplicationLocales`,API 33+)。
+5. **系统侧给应用设为英文后,应用内仍是中文**(真缺陷,第 4 条修复的**反向过冲**):
+   `ApplyAppLanguage` 在存储值为默认 `System` 时算出 `want = LocaleList.getEmptyLocaleList()`,
+   而 `if (manager.applicationLocales != want)` 只在"值不同"时跳过 —— 系统侧 `[en] != []`
+   ⇒ **每次启动都写一次空表**。而 AOSP 明确定义空表是「**重置为系统语言**」
+   (原文:Pass a `LocaleList.getEmptyLocaleList()` to reset to the system locale),
+   于是系统侧的选择被应用**主动抹掉**,界面回退中文。双向同病:应用内选英文后再从系统侧选简体,同样被覆盖。
+   → **判据必须是「变化」而非「值」**:只在设置值**发生跳变**时写,启动首帧对默认 `System` 不写;
+   但用户主动从英文切回「跟随系统」仍须写空表(否则退不回系统语言)。
+   实现 = `PixFoldApp.kt` 的 `isFirstComposition` + `if (isStartup && language == AppLanguage.System) return@LaunchedEffect`。
+   **离线性**:平台**没有**语言变化监听 API(`LocaleManager` 全部方法只有 set/get applicationLocales、
+   set/get systemLocales、set/get overrideLocaleConfig),故无法"回读并让两者一致",只能靠不乱写。
+   补 `AppLanguageTest`(3 条守卫:系统侧选择存活 / 应用内选择仍写入 / 存储里显式值必须赢),
+   并做 3 轮变异检验证明守卫非空转(MUT1 退回缺陷版 ⇒ 仅守卫①红;MUT2 首帧一律不写 ⇒ 仅守卫③红;
+   MUT3 删掉 `setApplicationLocales` ⇒ 守卫②③红)。真机 before/after 六条路径全部复现/通过。
 
 **另一处 UX 修正**:强调色里的 `Default` 与「跟随系统」语义撞车(用户提问),
 → 改名 **「靛蓝」Indigo**(它本就是内置靛蓝种子 `0xFF3F51B5`)。

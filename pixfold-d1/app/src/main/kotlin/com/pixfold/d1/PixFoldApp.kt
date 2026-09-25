@@ -184,14 +184,36 @@ fun PixFoldApp(store: SettingsStore? = null) {
  * 已于 2026-09-26 提到 **34**,故此处**不再需要版本分支** —— 早先那句
  * `if (Build.VERSION.SDK_INT < TIRAMISU) return@LaunchedEffect` 已删除
  * (留着会被 lint 判 `ObsoleteSdkInt` 而本项目 `warningsAsErrors=true`)。
+ *
+ * **为什么"启动首帧遇到 System 必须不写入"**(2026-09-26 修复的真实缺陷):
+ * AOSP 对空表的定义**不是"未设置"**,而是一次**主动写入** ——
+ * 原文:"Pass a `LocaleList.getEmptyLocaleList()` to reset to the system locale."
+ * (`android.app.LocaleManager#setApplicationLocales`)。而应用内 `language` 的
+ * 默认值就是 [AppLanguage.System],于是"应用启动"本身会写入空表,把用户在
+ * **系统"设置 → 应用 → 语言"**里的选择一并清掉 —— 用户实报:系统侧选了 English,
+ * 界面仍是中文。注意这是**双向**的:反过来也一样会被改回去。
+ *
+ * 平台侧**没有**语言变化监听 API(`LocaleManager` 全部方法只有
+ * set/get applicationLocales、set/get systemLocales、set/get overrideLocaleConfig),
+ * 因此不能靠"监听系统侧变化"兜底,只能靠**启动时不乱写**。
+ *
+ * 判据是"**变化**"而不是"值":用户从英文**主动切回**"跟随系统"时,必须写入空表
+ * 才能真的退回系统语言 —— 所以不能简单地把 `System` 一律跳过。
  */
 @Composable
 private fun ApplyAppLanguage(language: AppLanguage) {
     val context = LocalContext.current
+    // 首帧的 `language` 来自存储,是"当前值"而非"用户刚改动";之后再触发即是真的变化。
+    var isFirstComposition by remember { mutableStateOf(true) }
     LaunchedEffect(language) {
+        val isStartup = isFirstComposition
+        isFirstComposition = false
+        // 启动首帧 + 存储里是默认的 System ⇒ 不写入,保住系统侧的选择(见上方 KDoc)。
+        if (isStartup && language == AppLanguage.System) return@LaunchedEffect
+
         val manager = context.getSystemService(LocaleManager::class.java) ?: return@LaunchedEffect
         val tag = when (language) {
-            AppLanguage.System -> null          // 空 LocaleList = 跟随系统
+            AppLanguage.System -> null          // 空 LocaleList = 退回跟随系统
             AppLanguage.Chinese -> "zh"
             AppLanguage.English -> "en"
         }
