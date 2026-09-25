@@ -35,7 +35,7 @@
 | --- | --- | --- |
 | **预测性返回开关** | 无运行时 API（见 §2.1） | **用户裁决：不做**，默认开启；不加只读说明 |
 | **2021/2025 色彩标准切换** | 需 `material-color-utilities` 的色调板算法（见 §2.2） | HANGOFF §11 待确认 |
-| **全量 i18n**（两条工作流页面英文化） | 领域层 99 处文案 + 测试 826 处中文断言需重构（见 §2.3） | **阶段 2** 独立推进 |
+| **全量 i18n**（两条工作流页面英文化） | 领域层 99 处文案 + 测试的中文断言需重构（见 §2.3） | **✅ 阶段 2 已完成（2026-09-26）**，见 `HANGOFF.md` §9.1 与本节 §2.3 末的实测口径 |
 | `minSdk` 调整 | 版本锚点变更，牵动 lint 配置与既有注释 | 不碰；本阶段用 `Build.VERSION` 分支。**⚠️ 2026-09-22 更新**：本阶段之后用户单独裁决把 `minSdk` 由 24 提到 **30**（见 `docs/notes/d1-toolchain-evidence.md` §9）；两处 `Build.VERSION` 分支（`Theme.kt:48`、`PixFoldApp.kt:192`）**保持不变**，因为 30 仍低于它们所需的 31 / 33。**⚠️ 2026-09-26 再更新**：`minSdk` 又提到 **34**（提交 `f3cfb08`，见 §9.8），34 ≥ 31 / 33 ⇒ **两处版本分支已删除**（`Theme.kt` 的 `Build.VERSION.SDK_INT >= S`、`PixFoldApp.kt` 的 `SDK_INT < TIRAMISU`），`ObsoleteSdkInt` 随之消失 |
 | SAF / 权限的**实际生效** | D1 不连真实文件系统 | 本阶段只持久化偏好值 |
 
@@ -104,6 +104,21 @@ HCT/色调板算法。官方实现为 Google 独立库，社区版为 `materialk
 **测试与被测代码同时改动，会让"文案对了但逻辑错了"极难被发现**。
 
 **故拆为阶段 2**；阶段 1 的语言切换只覆盖**设置页自身**（全新代码，直接走资源，不触碰既有契约）。
+
+> **✅ 阶段 2 已完成（2026-09-26）**。实施记录见 `HANGOFF.md` §9.1「✅ 全量 i18n（2026-09-26）」。
+> 上表为**当时的估计**，实测口径如下（差异来自统计方式，非范围变化）：
+>
+> | 项 | 2026-09-20 估计 | 实测（2026-09-26） |
+> | --- | --- | --- |
+> | `domain/` 面向用户的文案 | 99 处 | **99 处**（一致） |
+> | `app/` 源码硬编码中文 | 176 处 / 18 文件 | **215 处 / 192 条 / 19 文件**（按「用户可见文案」逐条计数） |
+> | `domain/` 测试逐字断言中文 | 385 处 | **385 处**（一致） |
+> | `app/` 测试逐字断言中文 | 441 处 | **490 处** |
+>
+> **架构结论**：领域层不再持有文案，改为产出「文案键 `TextKey` + 参数 `Msg`」，
+> 由界面层在渲染时按当前语言解析（原语见 `domain/src/main/kotlin/com/pixfold/d1/domain/text/`）。
+> 这条路线**同时解决了**"测试与被测代码同时改动难以发现逻辑错误"的顾虑：
+> 领域层测试现在断言 `Msg` 的**结构**（键 + 参数），不碰任何自然语言。
 
 ### 2.4 其他已核实事实
 
@@ -577,20 +592,26 @@ Gradle / AGP / Compose BOM / compileSdk。**升级已完成并验证**（见 §1
 ### 9.2 资源组织
 
 ```
-res/values/strings.xml        —— 中文(默认)
-res/values/settings_strings.xml —— 中文:设置页文案(实际落盘位置)
-res/values-en/settings_strings.xml —— 英文:**仅设置页**(阶段 1)
+res/values/strings.xml        —— 中文(默认)，仅 1 条 app_name(translatable="false")
+res/values/settings_strings.xml      / res/values-en/settings_strings.xml      —— 设置页 + 许可页
+res/values/domain_strings.xml        / res/values-en/domain_strings.xml        —— 领域层文案键
+res/values/strings_common.xml        / res/values-en/strings_common.xml        —— 通用
+res/values/strings_plan.xml          / res/values-en/strings_plan.xml          —— 计划/确认/执行报告
+res/values/strings_workflowa.xml     / res/values-en/strings_workflowa.xml     —— 工作流 A
+res/values/strings_workflowb.xml     / res/values-en/strings_workflowb.xml     —— 工作流 B
 res/xml/locales_config.xml    —— 声明 zh / en
 ```
 
-> **修正（2026-09-25）**：此处原写 `res/values-en/strings.xml`，**实测不存在**；
-> `res/values/strings.xml` 全文只有 1 条 `app_name`（`translatable="false"`）。
-> 阶段 1 实际翻译的只有设置页 —— 见 §9.3。
+> **✅ 阶段 2 修正（2026-09-26）**：上面原写「英文：**仅设置页**（阶段 1）」。
+> 全量 i18n 完成后，**6 组资源全部有 `values-en/` 对照**，共 **370 个中文键 / 364 个英文键**。
 
 **约束**：阶段 1 新增的所有设置页文案**一律走资源**，不新增硬编码中文
 （既有页面的硬编码留给阶段 2）。
 
 ### 9.3 已知不完整（如实标注）
+
+> **✅ 阶段 2 已消解（2026-09-26）**：本节描述的是阶段 1 结束时的状态，**已被全量 i18n 取代**。
+> 保留原文以存证当时的实测口径。
 
 切换 English 后，**工作流 A/B / 首页等页面仍显示中文**。设置页内以说明行如实告知：
 `其他页面的多语言将在后续版本补全`。
@@ -606,6 +627,17 @@ res/xml/locales_config.xml    —— 声明 zh / en
 `ui/` 下非 settings 目录共 **44 行硬编码中文**（如 `HomeScreen.kt:81-82` 的工作流入口标题）。
 ⇒ 即使 per-app locale 完全正确，**可见效果也仅限设置页与许可页**。
 本次范围经用户裁决 = **只修语言同步 bug**，不铺开 i18n。
+
+**阶段 2 完成后的实测残留**（2026-09-26，CJK 正则逐行扫描）：
+
+| 范围 | 残留 | 说明 |
+| --- | --- | --- |
+| `app/main` | **1 处 / 1 文件** | `SchemeEditor.kt:365` 的 `SANITIZE_EXAMPLE_INPUT = "封:面?.jpg"` —— **示例数据**，非文案 |
+| `domain/main`（非 mock） | **5 处 / 3 文件** | `Sort.kt:30-31`、`Execution.kt:57/60` 的 `require{}` 诊断消息；`MetaEdit.kt` 的 `第N卷.cbz` **文件名模板** |
+| `domain/main`（mock） | **48 处 / 2 文件** | `MockLibraryBData.kt` 40 处 + `MockData.kt` 8 处，**按裁决保留中文**（演示数据不随界面语言变） |
+
+⇒ 三类残留**都是有意保留的**（文件名 / 开发者诊断 / 演示数据），
+不是遗漏。判据：它们都**不进用户可见的界面文案**。
 
 ### 9.4 语言同步的真实语义（2026-09-25 补充，真机核对中修出的第 5 个真实缺陷）
 
@@ -660,6 +692,21 @@ to reset to the system locale），于是系统侧的选择被应用抹掉，界
 - 恢复默认：二次确认 → 重置 → 界面回到默认（按钮在底部，需 `performScrollToNode`）
 - 许可页：本项目与三方清单均渲染
 - 语言切换后设置页文案真的变（中 ↔ 英）
+- **完整界面文案与语言无关**（全量 i18n，2026-09-26）：界面断言不再写死任一种语言的中文串，
+  一律经 `TestText`（`app/src/test/kotlin/com/pixfold/d1/TestText.kt`）从**同一份资源**解析期望值。
+  ⚠️ **Robolectric 默认 locale 实测是 `en_US`**，故实际解析出的是 `values-en/` 的英文
+  —— 这正是最初 66 条断言失败的总根因，也是「测试必须语言无关」的直接论据。
+  `TestText` **只用于界面文案**：文件名词缀（`第01卷.cbz`）、语言码（`ja`）、mock 数据中文串
+  是**数据**不是文案，保持字面量。
+  **✅ 「语言无关」已独立验证（2026-09-26）**：把整套 `app` 测试的 qualifiers 强制为
+  `zh-rCN` 复跑，**304 项里 303 项通过** —— 唯一的失败是 `PixFoldTextTest` 那条以
+  「`one` 变体 ≠ `other` 变体」为判据的用例（**中文侧 26 个 `<plurals>` 的 one/other 全部同值**，
+  中文下该判据恒真、断言退化成恒真式），已为它显式钉死 `qualifiers = "en"`。
+  ⚠️ 顺序坑：locale 限定符必须排在 `w400dp` 之类**之前**，否则 `QualifierParser` 抛异常。
+- **文案解析层本身**（`ui/text/PixFoldTextTest.kt`，2026-09-26 新建，**8 条用例**）：
+  直接断言 `Msg`/`TextKey` → 最终字符串的解析行为，覆盖嵌套 `Msg`、列表参数的分隔符选择、
+  复数量词下标（含数量不在首位的 `NamingSummaryWithHead`）、以及"带数字但不是计数语义的键不做变体选择"。理由见 §10.5。
+  ⚠️ **其中 7 条与语言无关，第 8 条（复数量词下标）刻意钉死英文** —— 它的判据依赖单复数变化，见上。
 - **per-app locale 真的写进系统**（`AppLanguageTest`，2026-09-25 补）：用 Robolectric 自带的
   `ShadowLocaleManager` 直接读 `LocaleManager.applicationLocales`，断言
   ①系统侧已选 `[en]` 时启动应用**不覆盖**它（`AppLanguageTest.kt:72`，本缺陷的回归守卫）
@@ -679,6 +726,26 @@ to reset to the system locale），于是系统侧的选择被应用抹掉，界
 关键断言需做变异验证（去掉实现后测试必须失败），至少覆盖：
 主题三态解析、`accent` 派生 `monetEnabled`、纯黑生效、恢复默认真的重置、
 语言切换真的换文案。
+
+**全量 i18n 的变异验证（2026-09-26 补，新增 `PixFoldTextTest` 8 条用例，5 组全部捕获）**：
+
+解析层 `ui/text/PixFoldText.kt` 此前**零直接覆盖**（所有既有测试都经页面间接使用它）。
+实测证据：把 `pluralQuantityIndex()` 的 `NamingSummaryWithHead -> 1` 改成 `-> 0` 后，
+**原 295 项测试无一失败** ⇒ 该分支的登记错误**原本完全没有守护**。补测后：
+
+| 变异 | 结果 |
+| --- | --- |
+| `NamingSummaryWithHead` 下标 1 → 0（**原本逃逸**） | ✅ `PixFoldTextTest` 1 项失败：`Expected <x.jpg · 1 component enabled>, actual <x.jpg · 1 components enabled>` |
+| 非法字符分隔符键 → 通用列表分隔符 | ✅ 3 项失败（解析层 2 + `NamingPageTest` 1） |
+| 资源里 `\u0020` → 裸空格（复现 AAPT2 trim 缺陷） | ✅ 2 项失败：`该键必须编译出单个空格(AAPT2 会 trim 裸空白,故资源里写 \u0020). Expected < >, actual <>` |
+| `a_table_summary` 的 quantity 固定为 `1` | ✅ `NamingPageTest` 5 项失败 |
+| `a_naming_title` 的两个 varargs 互换 | ✅ 31 项失败（`IllegalFormatConversionException: d != java.lang.String`） |
+
+> **判据要点**：页面级**间接覆盖不能替代**对公共解析层的直接断言。
+> 一个键登记错，在页面上只表现为"少个空格 / 选错变体"，间接断言几乎抓不到；
+> 而参数错位却会横扫所有组合该页面的测试类 —— 两种失败模式的归因难度截然不同。
+> 反过来说，第三条变异（`\u0020` → 裸空格）证明**资源文件本身也需要断言**：
+> 编译期被静默 trim 的空白，只有把"编译结果"本身作为断言对象才能发现。
 
 **语言同步修复的变异验证（2026-09-25 补,3 组全部捕获,已还原）**：
 
@@ -840,3 +907,138 @@ domain **224** + app **273** 全绿、`lintDebug` 零告警。
    `docs/notes/d1-navigation-compose-migration.md`(含 F1–F13 源码级事实表、§7 实施结果与 §7.8 分层转场)。
 
 **未决策**:D1 范围 vs MVP(设置阶段超出 D1 的六项交付,归属待用户定调)。
+
+---
+
+## 15. 阶段 2:全量 i18n(2026-09-26 已完成)
+
+**用户裁决**:「只做全量 i18n,不动其他功能」。**分支**:`d1/settings-impl`(未合回 `dev`)。
+**验证**:`app` **304** + `domain` **230** 全绿、`lintDebug` **零告警**、`assembleDebug` 成功。
+
+### 15.1 架构:领域层不持有文案
+
+```kotlin
+// domain/src/main/kotlin/com/pixfold/d1/domain/text/Msg.kt
+data class Msg(val key: TextKey, val args: List<Any> = emptyList())
+```
+
+`TextKey` 是扁平枚举(**104 个成员**),住在 `domain/text/TextKey.kt`。
+13 个枚举的 **53 个文案字段**全部换成键:
+
+| 枚举 | 原字段 | 现形态 |
+| --- | --- | --- |
+| `SortField`(6) | `label` | `val textKey: TextKey` |
+| `LangChoice`(6) | `label` | `val textKey` |
+| `MetaField`(7,其中 5 个本就是英文) | `label` | `val textKey` |
+| `NameComponentKind`(7) / `CasePolicy`(3) / `ExtPolicy`(4) | `label` | `val textKey` |
+| `ProposalWarningType`(5) | `label` | `val textKey`(消息体外提为 `ProposalWarning(val type, val message: Msg)`) |
+| `OpStatus`(2) / `ExecOutcome`(3) / `ExecKind`(2) | `label`/`title` | `val textKey` / `val titleKey` |
+| `OutputConflictPolicy`(3) / `SourcePolicy`(2) | `label` | `val textKey` |
+| `DangerAction`(3 成员 × 3 字段) | `title`/`body`/`button` | `val labelKey` / `val bodyKey` / `val buttonKey` |
+
+**为什么选「键 + 参数」而不是另两条路**:
+- **B. 向领域层注入 `TextResolver`** —— 仍要同样的 53 字段手术,且其 ~60 个方法会在每次文案变更时
+  波及编译;更关键的是**没解决冻结问题**。
+- **C. 领域层继续产出中文** —— 在「测试全部语言无关」的裁决下不成立:
+  ~170 条断言会退化成恒真式,且 `DangerAction` 的确认文案**永远无法翻译**。
+- **A(选它)的决定性理由**:**语言不该在建计划的那一刻被冻住**。
+  若 `Msg` 存成品字符串,切语言后**已经显示出来的对象仍是旧语言**,须重新扫描才更新。
+  领域层无 `Context` 是直接约束,但**不是**决定性理由。
+
+**关键取舍**:`Suggestion.source` 保持 `String`;`groupVolumesBySeries` 的分组键保持
+**语言无关的 `String`**(未命名 = 空串,界面映射为 `TextKey.UnnamedSeries`)——
+若用翻译后的键,**切语言会把同一系列拆成两组**,且该键要喂 `testTag`;
+`ExecEntry.label` 保持 `String`(它是**文件名**,8 处构造点全传 `cbzFileName`/`finalName`);
+`defaultCbzName()` 与 `require{}` 消息保持中文(磁盘文件名 / 开发者诊断)。
+
+### 15.2 解析发生在渲染时
+
+`app/src/main/kotlin/com/pixfold/d1/ui/text/PixFoldText.kt`:
+- `@Composable fun textOf(msg: Msg): String` / `textOf(key: TextKey, vararg args)` / `textOfOrNull(msg: Msg?)`
+- **非 Composable** 版 `resolveText(context, msg|key, args)`(测试与 Composable 共用**同一实现**)
+- 私有 `resId(key)` 是**唯一**的键→资源 id 映射(穷尽 `when`,无 `else`,新增键必然编译失败)
+- 私有 `pluralQuantityIndex(key)` 登记**数量不在首位**的计数键(目前仅 `NamingSummaryWithHead` 返回 1)
+
+⚠️ 两条编码规则(踩过坑):
+① `stringResource`/`textOf` 是 `@Composable`,**不能**在 `semantics {}`、`onClick` 等非组合 lambda 内调用 —— 先提到 `val`;
+② `List.map { }` 的变换体若需要 `@Composable`,**必须内联**(`joinToString` 的 transform 是普通 lambda,不行)。
+
+### 15.3 资源与 `<plurals>` 的硬规则
+
+6 组中英对照资源,**370 个中文键 / 364 个英文键**;**26 个 `<plurals>`** 两侧类型严格一致。
+
+1. **资源类型不能跨语言不同** —— 计数键必须中英**同时**用 `<plurals>`,
+   否则 lint `MissingTranslation`/`ExtraTranslation` 硬失败。中文侧 one/other **故意同值**(中文无变格)。
+2. **`pluralStringResource(id, count, ...)` 的 `count` 单独传 quantity**;`%1$d` 恰为 quantity 时
+   形态是 `pluralStringResource(R.plurals.k, n, n, ...rest)`(**n 传两次**)。
+
+**AAPT2 会 trim 资源首尾空白**(实测确证):`<string name="k"> </string>` 编译出来是**空串**
+(`len=0`),英文列表渲染成 `A,B`(应为 `A, B`)。**存活写法 `\u0020`**(实测 `len=1 hex=[32]`)。
+全量普查后修掉 **14 处**(中英两侧)。⚠️ 该缺陷**只在切换英文后可见**,中文侧用 `、` 不受影响。
+
+### 15.4 lint 零告警(`warningsAsErrors = true` ⇒ 必须归零)
+
+29 条 error 全部消解:真阳性 `PluralsCandidate` **18 键改 `<plurals>`**(抑制会掩盖该规则要抓的缺陷);
+假阳性 3 键(`should`/`down`/`skipped` 不是名词)`tools:ignore`;
+`UnusedResources` 4 条删死键;`TypographyDashes` 2 键(`ISO 639-1` 是标准专名)`tools:ignore`。
+**本次首次引入 `xmlns:tools`**(仓库此前无任何豁免先例)。
+
+### 15.5 测试策略与残留
+
+界面断言一律经 `TestText`(`app/src/test/kotlin/com/pixfold/d1/TestText.kt`)从**同一份资源**解析期望值。
+⚠️ **Robolectric 默认 locale 实测是 `en_US`** ⇒ 实际解析 `values-en/`,这是最初 66 条失败的总根因,
+也是「测试必须语言无关」的直接论据。领域层测试改为断言 `Msg` 的**结构**(`keys()` / `line(key)` 辅助)。
+
+残留(全部**有意保留**,均不进用户可见界面):`app/main` **1 处**(`SchemeEditor.kt:365` 示例输入)、
+`domain/main` 非 mock **5 处**(`require{}` + `第N卷.cbz`)、mock **48 处**(按裁决保留中文)。
+
+新增 `PixFoldTextTest`(**8 条**,专测解析层)—— 解析层此前**零直接覆盖**。
+实测:把 `pluralQuantityIndex()` 的 `NamingSummaryWithHead -> 1` 改成 `-> 0`,
+**原 295 项测试无一失败**;补测后该变异立即被捕获。变异明细见 §10.5。
+
+**✅ 「语言无关」的独立验证(2026-09-26)**:上述语言无关性此前**只在 Robolectric 默认
+locale(`en_US`)下验证过** —— 若某条断言误写成英文字面量而非经 `TestText` 读资源,
+它在 `en_US` 下照样通过、换语言即失效。故临时把 40 处 `@Config` 的 qualifiers 改为
+`zh-rCN` 复跑。**第一轮**结果:**304 项里 303 项通过**,唯一失败的是「复数量词下标」那条 ——
+它原本以「`one` 变体 ≠ `other` 变体」为判据,而**中文侧 26 个 `<plurals>` 的 one/other
+全部同值**(中文没有复数变化),中文下该判据恒真、断言退化成恒真式 ⇒ 它其实
+**借英文的复数变化才成立**,已为它显式钉死 `@Config(qualifiers = "en")` 并写明原因。
+**钉死之后第二轮**(保留钉死位、其余 31 个文件仍强制 `zh-rCN`)结果:**304 项全部通过、
+0 失败** —— 这同时证明了两件事:其余 303 条确实与语言无关(在 `en_US` 与 `zh-rCN` 下
+都通过),而那条钉死确实生效(否则它会在中文下失败)。实验已完整回滚
+(残余 `zh-rCN` = 0;**仅保留那一处刻意的 `qualifiers = "en"`**;`git diff --numstat`
+聚合 `ins=1874 del=739` 与实验前逐字一致)。
+
+> ⚠️ **两条可复用的推论**:①**资源限定符有顺序要求**,locale 必须排在 `w400dp` 之类之前,
+> 否则 `QualifierParser` 抛 `IllegalArgumentException`(第一轮 227 项失败即此因,
+> 属实验脚手架 bug,不是测试缺陷);②本仓库所有中英计数键的**中文侧 one/other 同值**,
+> 故**凡以「单复数变化」为判据的断言都必须钉死英文**(或钉死某个真有复数形式的语言),
+> 反之以「中文侧差异」为判据的断言在中文下必然是恒真式。
+
+### 15.6 英文真机冒烟走查(2026-09-26)
+
+离线四道闸门全绿**不等于**英文界面正确 —— Robolectric 的 `en_US` 只证明解析层用对了资源,
+不证明资源内容本身合理、也不证明页面里每处文案都被替换。故用户授权安装后,
+把应用内 locale 切到 `en` 逐页 dump,覆盖 A 全流程(排序 → 命名 → 执行计划 → 普通确认框 →
+危险确认框 → 报告)与 B 全流程(库 → 元数据 → 打包)共 **10 个界面**,全部渲染正确
+(逐步摘录见 HANGOFF §9.1「✅ 全量 i18n」节的走查表)。
+
+三条只有真机能确认的结论:
+
+1. **英文复数变体确实生效** —— `30 images` / `5 volumes` / `56 items` / `16 pages` /
+   `2 components enabled` 全取 `other` 形,`1 component enabled` 取 `one` 形。
+   离线单测只断言"解析层用对了下标",**变体文本本身对错只能看真机**。
+2. **中文数据串按预期保留** —— `旅行照片` / `进击的巨人` / `谏山创` /
+   `目录层级 L2（系列层）` / `第01卷` 在英文界面下原样出现,符合 `scope_mock = A`
+   与「文件名词缀 / 来源说明是数据而非文案」的裁决。
+3. **`\u0020` 修法在真机成立** —— ` · current`、` / `、`To confirm: ` 三处均带空格。
+
+顺带消除一条旧限制:本文档与 HANGOFF 此前记「主界面 30 个 UI 文件 `stringResource`
+命中数为 0、`ui/` 非 settings 目录 44 行硬编码中文」(属阶段 1 的已知不完整)——
+**全量 i18n 后已不成立**,首页本身就是英文的(`HomeScreen.kt` 已改)。
+
+> ⚠️ **操作坑(可复用)**:`cmd locale set-app-locales <pkg> --user 0 en` **静默无效** ——
+> 位置参数被忽略,且因 `--locales` 未指定反而**把应用 locale 重置为空表**,现象酷似"命令没生效"。
+> 正确写法必须带旗标:`cmd locale set-app-locales <pkg> --user 0 --locales en`;
+> 复位成"跟随系统"则不带 `--locales`。
+
