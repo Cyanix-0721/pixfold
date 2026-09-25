@@ -120,4 +120,37 @@ class DragReorderListTest {
 
         assertEquals(listOf("i1"), pinned, "列表行必须有可点图钉入口")
     }
+
+    // ---------------- 跟手浮层(HANGOFF §11 第 9 条) ----------------
+
+    @Test
+    fun `list ghost follows the pointer while dragging`() {
+        setList(items(9), onMove = { _, _ -> })
+
+        val row = rule.onNodeWithText("img1.jpg").fetchSemanticsNode().boundsInRoot
+        val from = row.center - row.topLeft
+
+        rule.onNodeWithText("img1.jpg").performTouchInput {
+            down(from)
+            advanceEventTime(700)
+            moveBy(Offset(0f, -20f))
+        }
+
+        val pointer = row.center + Offset(0f, -20f)
+        val ghost = rule.onNodeWithTag(TAG_DRAG_GHOST).fetchSemanticsNode().boundsInRoot
+        assertTrue(
+            kotlin.math.abs(ghost.center.x - pointer.x) <= 2f &&
+                kotlin.math.abs(ghost.center.y - pointer.y) <= 2f,
+            "列表浮层中心应贴住指针:pointer=$pointer ghostCenter=${ghost.center}",
+        )
+    }
+
+    @Test
+    fun `list ghost is gone after release`() {
+        setList(items(9), onMove = { _, _ -> })
+
+        dragRow("img1.jpg", "img3.jpg")
+
+        rule.onNodeWithTag(TAG_DRAG_GHOST).assertDoesNotExist()
+    }
 }

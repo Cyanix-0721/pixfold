@@ -1,10 +1,7 @@
 package com.pixfold.d1.ui.components
 
 import androidx.compose.foundation.clickable
-import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.draw.alpha
-import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
 import androidx.compose.foundation.background
 import androidx.compose.ui.graphics.Color
 import androidx.compose.material3.Surface
@@ -39,35 +36,12 @@ fun ThumbRow(
     onPin: (() -> Unit)? = null,
     isDragging: Boolean = false,
     isHovered: Boolean = false,
-    onDragStart: ((Offset) -> Unit)? = null,
-    onDrag: ((Offset) -> Unit)? = null,
-    onDragEnd: (() -> Unit)? = null,
-    onDragCancel: (() -> Unit)? = null,
 ) {
     Row(
         modifier = modifier
             .fillMaxWidth()
             .testTag(TAG_LIST_ROW)
             .alpha(if (isDragging) 0.35f else 1f)
-            .then(
-                // 拖拽与点击共存:长按超时才启动拖拽,短按仍走 clickable。
-                // 仅在提供回调时挂 pointerInput(纯展示用途不受影响)。
-                if (onDragStart != null) {
-                    Modifier.pointerInput(item.id) {
-                        detectDragGesturesAfterLongPress(
-                            onDragStart = { offset -> onDragStart(offset) },
-                            onDrag = { change, _ ->
-                                change.consume()
-                                onDrag?.invoke(change.position)
-                            },
-                            onDragEnd = { onDragEnd?.invoke() },
-                            onDragCancel = { onDragCancel?.invoke() },
-                        )
-                    }
-                } else {
-                    Modifier
-                },
-            )
             .heightIn(min = 56.dp)
             .background(
                 if (isHovered) MaterialTheme.colorScheme.primaryContainer else Color.Transparent,

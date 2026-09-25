@@ -1,7 +1,6 @@
 package com.pixfold.d1.ui.components
 
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.aspectRatio
@@ -21,10 +20,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
-import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.boundsInRoot
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.testTag
@@ -48,9 +45,10 @@ private val HoverBorder = Color(0xCC3F51B5)
  *
  * 图钉入口必须**可点**(走查反馈④的静默缺口:只有状态角标、没有可点入口)。
  *
- * @param dragPositionInRoot 当前拖拽指针的**根坐标**(由父级解析目标格并回传高亮态);
- *   为 null 表示未在拖拽。
- * @param hoveredTarget 父级解析出的目标下标(用于高亮);null 表示无目标。
+ * **手势不在这里**:长按拖拽的 `pointerInput` 挂在**不滚动的容器**上
+ * (见 [DragReorderGrid] 的 KDoc —— LazyGrid 会在卡片滚出视口时销毁它,
+ * 挂在卡片上的手势会随之被取消,跨视口拖拽永远失败)。
+ * 本组件只负责**呈现**拖拽态([isDragging] / [isHovered])。
  */
 @Composable
 fun DraggableThumbCard(
@@ -60,10 +58,6 @@ fun DraggableThumbCard(
     isDragging: Boolean,
     onClick: () -> Unit,
     onPin: () -> Unit,
-    onDragStart: (Offset) -> Unit,
-    onDrag: (Offset) -> Unit,
-    onDragEnd: () -> Unit,
-    onDragCancel: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     Box(modifier = modifier.fillMaxWidth()) {
@@ -72,17 +66,6 @@ fun DraggableThumbCard(
                 .fillMaxWidth()
                 .testTag(TAG_GRID_CARD)
                 .alpha(if (isDragging) 0.35f else 1f)
-                .pointerInput(item.id) {
-                    detectDragGesturesAfterLongPress(
-                        onDragStart = { offset -> onDragStart(offset) },
-                        onDrag = { change, _ ->
-                            change.consume()
-                            onDrag(change.position)
-                        },
-                        onDragEnd = { onDragEnd() },
-                        onDragCancel = { onDragCancel() },
-                    )
-                }
                 .semantics { contentDescription = item.fileName },
             colors = if (isHovered) {
                 CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer)

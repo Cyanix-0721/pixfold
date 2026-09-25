@@ -165,7 +165,7 @@
 | `scan` | 扫描件 | `ch01/page_01..06`、`ch02/page_01..06`（**跨目录同名 baseName**）、`ch02/封:面?.png`（非法字符 `:` `?`）、`ch02/Page1.JPG`（大小写冲突对） | 重名、非法字符、大小写冲突 |
 | `misc` | 杂图 | 根目录 `img1..img12` | 自然序 vs 字典序（字典序 1,10,11,12,2…；自然序正确） |
 
-**⚠️ 新栈(`pixfold-d1/domain/…/mock/MockData.kt`)比归档原型多一组 `cn`**(2026-09-27 加):
+**⚠️ 新栈(`pixfold-d1/domain/…/mock/MockData.kt`)比归档原型多一组 `cn`**(2026-09-25 加):
 
 | 集合 id | name / rootDirName | 图片构成 | 覆盖的异常 |
 | --- | --- | --- | --- |
@@ -265,7 +265,7 @@ return (a.length - i).compareTo(b.length - j)              # 短者在前
 > | 超长数字段 | `int.parse` 无上限(会溢出/抛错,原型未防护) | 比**有效长度 → 字典序**(不转数值)⇒ 30 位 vs 31 位不再溢出(`very long digit runs do not overflow`) |
 > | **中文数字** | **不识别**(落进非数字分支逐字比码点) | **`一`~`九` 与 `十` 归一化成阿拉伯数字**,在**分词阶段**完成 |
 >
-> 中文数字归一化的范围与理由(用户裁决 2026-09-27):只认 `一`~`九`、`十`,
+> 中文数字归一化的范围与理由(用户裁决 2026-09-25):只认 `一`~`九`、`十`,
 > 覆盖 `十`(10)/`十X`(11-19)/`X十`(20-90)/`X十Y`(21-99)/`X`(1-9);
 > `百`/`千`/`万`/`〇` 与连续罗列(`一二`、`十十`)不归一化,原样回退按码点比。
 > **必须落在分词阶段**:`compareNaturalTokens` 还会被**预计算过记号序列**的调用方
@@ -440,6 +440,12 @@ buildProposals({ required List<MockImage> order, required NamingScheme scheme,
   → 所以第 1 张 = `indexStart + 0`；`indexStart=1, padding=3` → `001`。
 - **序号本身不做去重/冲突处理**：如果两个组件组合导致序号不唯一，交给 §5 的重名检测兜底。
 - `dirIndex` 的"集合内去重目录排序"是**字典序排序后编号**，不是首次出现顺序 —— 换序不会改变目录编号。
+- **只有这一种序号口径**：`imageIndex` 是全仓唯一的序号来源，取值链是
+  `indexStart + 页序下标`；归档原型（Flutter）与新栈（`NamingEval.kt` 的 `componentText()`）
+  **实现逐字一致**，都没有"沿用原文件名解析出的原始序号"这一模式。
+  ⇒ `HANGOFF.md` §11 第 14 条所列的备选方案（`IMG_1_xxx` 里的 `1`）在**两代原型中都没有先例**
+  （与 `scripts/batch_rename_images.py` 的结论一致 —— 该脚本的命名阶段根本没有序号组件；
+  见 `docs/notes/scripts-behavior-matrix.md` §12.1）。
 
 ### 4.4 逐项覆盖（override）的存储与"改结构不丢失"
 

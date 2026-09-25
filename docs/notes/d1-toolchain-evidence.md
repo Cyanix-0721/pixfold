@@ -28,7 +28,7 @@
 | Compose 编译器插件 | **2.2.10** | **必须与 AGP 内置 KGP 版本一致**,见 §3.2 |
 | Compose BOM | **2026.02.01** | 与 §12.6 一致 |
 | JDK | **temurin-17.0.20+101** | mise 管理的 Windows 侧 JDK;`JAVA_HOME` 指向它 |
-| compileSdk / minSdk / targetSdk | **36 / 34 / 36** | 与 §12.6 目标值一致。**注**:本行是 §2 探针期的快照,`minSdk` 已于 2026-09-26 由 24→30→**34**,以 §9 与 §12.6 为准;`compileSdk` 亦已升到 **37** |
+| compileSdk / minSdk / targetSdk | **36 / 34 / 36** | 与 §12.6 目标值一致。**注**:本行是 §2 探针期的快照,`minSdk` 已于 2026-09-25 由 24→30→**34**,以 §9 与 §12.6 为准;`compileSdk` 亦已升到 **37** |
 | Robolectric | **4.17** | 离线 UI 断言用 |
 | AndroidX test ext junit | **1.3.0** | |
 
@@ -105,7 +105,15 @@ cmd.exe /c "D:\\Programing\\Personal\\pixfold\\.probe-agp\\run-gradle.bat :app:l
 
 ## 6. 待确认 / 未验证
 
-- **真机实证**:当前无设备,`adb devices` 为空 → D1 验收清单中依赖真机的条目**尚未验证**(见计划文档)。
+> ⚠️ **本节是 2026-09-16 换机前的时点记录,其中「真机实证」一条已被后续事实取代。**
+> 保留原文是为了留下"当时确实没有设备"的取证链,不表示现在仍缺设备。
+> 真机现状以 `HANGOFF.md` §9 / §9.1 与 `docs/notes/d1-ui-friction-inventory.md` 为准。
+
+- ~~**真机实证**:当前无设备,`adb devices` 为空 → D1 验收清单中依赖真机的条目**尚未验证**(见计划文档)。~~
+  → **已不成立(2026-09-19 起)**:真机 PJX110 / Android 16 已接入无线调试
+  (`adb connect 192.168.43.1:4444`),D1 验收清单 20 项已**全部真机通过**;
+  此后每轮交互或数据改动都按「领域单测 → UI 断言 → 真机核对」三层自证交付。
+  规约见 `AGENTS.md` §7。
 - **模拟器**:无 AVD 且 WHPX/AEHD 未就绪(§12.2),不作为替代路径。
 - **首次依赖下载**:本次依赖多来自缓存/直连;全新机器上首次解析耗时未测(SLAYER 走透明代理,§12.5 已确认无需配代理)。
 
@@ -196,7 +204,7 @@ MotionScheme$Companion:
 | compileSdk | 36 | **37** | 新依赖链要求(见 8.3) |
 | targetSdk | 36 | **36(不变)** | 刻意锁定,与真机 Android 16 对齐 |
 | minSdk | 24 | **30** | **2026-09-22 用户裁决**(见 §9);此前 24 是脚手架期的随手取值,新栈未用 `java.time` 故 desugaring 理由从未真正成立 |
-| minSdk(再升) | 30 | **34** | **2026-09-26 用户裁决**(见 §9.8);33 与 34 的清理成本相同(都删同 3 处版本守卫),取 34 额外拿到 HDR gainmap |
+| minSdk(再升) | 30 | **34** | **2026-09-25 用户裁决**(见 §9.8);33 与 34 的清理成本相同(都删同 3 处版本守卫),取 34 额外拿到 HDR gainmap |
 | Robolectric | 4.17 | 4.17(已最新) | — |
 | AboutLibraries | — | **15.2.0** | 新增(core + compose-m3 + 插件) |
 
@@ -268,7 +276,7 @@ Windows 侧的 wrapper **一直在正常下载**(缓存目录里已有 108MB 的
 ## 9. minSdk 由 24 提到 30(2026-09-22)
 
 > **⚠️ 本节 9.1–9.7 记录的是 2026-09-22 的裁决与当时的实测。**
-> **2026-09-26 用户再次裁决把 `minSdk` 由 30 提到 `34`**(提交 `f3cfb08`),
+> **2026-09-25 用户再次裁决把 `minSdk` 由 30 提到 `34`**(提交 `f3cfb08`),
 > 本节内所有「当前 minSdk = 30」的结论**均已过期**,以 **§9.8** 为准。
 > 保留原文作为当时的取证记录。
 
@@ -295,12 +303,12 @@ Windows 侧的 wrapper **一直在正常下载**(缓存目录里已有 108MB 的
 | `java/nio/file/Files` | **26** | D2a 归档 | ✅ |
 | `android/graphics/ImageDecoder` | **28** | D3/D4 图片解码 | ✅ |
 | `android/app/NotificationChannel` | **26** | D4 进度通知 | ✅ |
-| `android/app/LocaleManager` | **33** | 应用内语言 | ❌ —— 但**已有 `Build.VERSION` 分支**(`PixFoldApp.kt:192`);**2026-09-26 后 minSdk=34 ⇒ ✅ 且分支已删**(见 §9.8) |
+| `android/app/LocaleManager` | **33** | 应用内语言 | ❌ —— 但**已有 `Build.VERSION` 分支**(`PixFoldApp.kt:192`);**2026-09-25 后 minSdk=34 ⇒ ✅ 且分支已删**(见 §9.8) |
 | `android/provider/DocumentsContract` | 19 | SAF | ✅(任意版本) |
 | `java/util/zip/ZipOutputStream` / `ZipFile` / `ZipEntry` | **1** | CBZ 打包 | ✅(任意版本) |
 
 ⇒ **minSdk=30 已覆盖 roadmap 所需全部 API**;CBZ 打包与 SAF 在任意 minSdk 都可行。
-(**2026-09-26 更新**:minSdk 已提到 **34**,本表 `LocaleManager` 一行的 ❌ 随之变为 ✅ 且版本分支已删 —— 见 §9.8。)
+(**2026-09-25 更新**:minSdk 已提到 **34**,本表 `LocaleManager` 一行的 ❌ 随之变为 ✅ 且版本分支已删 —— 见 §9.8。)
 主源码只有 2 处 `Build.VERSION` 分支(上表 `Theme.kt:48` / `PixFoldApp.kt:192`),
 无 `@RequiresApi` / `@TargetApi`,Manifest 不申请任何权限。
 
@@ -345,7 +353,7 @@ material-color-utilities → 21;aboutlibraries-compose / -compose-m3 → 21。
    (删掉 API 24/25 回退档)**已经到手**。
 
 ⇒ 维持 Java 17 + minSdk 30。若日后工具链整体迁到 Java 21,可再评估 36。
-(**2026-09-26 更新**:minSdk 实际定为 **34** —— 上面第 3 条「29 个测试文件 `@Config(sdk=[34])` 须全改 `[36]`」
+(**2026-09-25 更新**:minSdk 实际定为 **34** —— 上面第 3 条「29 个测试文件 `@Config(sdk=[34])` 须全改 `[36]`」
 是 **minSdk=36 的代价**,与 34 无关;34 与既有 `@Config(sdk=[34])` 完全一致,**零测试改动**。见 §9.8。)
 
 ### 9.6 一条测试教训(顺带发现)
@@ -408,7 +416,7 @@ packaging {
 之前的加载路径(首次启动略慢)。**本项目不采用** —— 自用侧载、不经 Play 分发,多出的传输量
 无实际代价;且该开关**只影响 APK,AAB 不受影响**。
 
-### 9.8 minSdk 由 30 再提到 34(2026-09-26)
+### 9.8 minSdk 由 30 再提到 34(2026-09-25)
 
 **起因**:用户看到本节 `:292` 表格里 `LocaleManager`=33 那一行仍带 ❌,问
 「这个应用内语言，再把minSDK升到33吧,minSDK34有什么新的功能可以用吗要不直接切34」。

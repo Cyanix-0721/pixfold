@@ -159,8 +159,12 @@ fun NamingPage(
 
         SchemeSummaryBar(
             // 摘要样本取**首个最终名**(含逐项覆盖),与建议表同源,结构上排除不一致。
-            // `namingSummaryLine` 返回领域层的 `Msg`(语言无关),在此现场解析。
-            summary = textOf(namingSummaryLine(effective, proposals.firstOrNull()?.finalName)),
+            // `namingSummaryLine` 返回领域层的 `List<Msg>`(语言无关),在此现场解析并连接;
+            // 手工调整段**自带段首分隔符**,故连接符用空串(见 `domain_naming_summary_manual`)。
+            // `map` 必须内联:`joinToString` 的 transform 是普通 lambda,里面调不了 @Composable。
+            summary = namingSummaryLine(effective, proposals.firstOrNull()?.finalName, order.manualCount)
+                .map { textOf(it) }
+                .joinToString(""),
             expanded = editorExpanded,
             onToggle = { editorExpanded = !editorExpanded },
         )

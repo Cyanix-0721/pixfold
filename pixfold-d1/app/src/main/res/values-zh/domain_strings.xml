@@ -179,6 +179,11 @@
     <plurals name="domain_naming_summary_with_head">
         <item quantity="other">%1$s · %2$d 个组件启用</item>
     </plurals>
+    <!-- 手工调整披露段(HANGOFF §11 第 10 条);中文侧只写 other(lint UnusedQuantity)
+         ⚠️ 前导空格用 `\u0020` —— AAPT2 会 trim 字面量首尾空白(与 domain_list_separator 同坑)。 -->
+    <plurals name="domain_naming_summary_manual">
+        <item quantity="other">\u0020· 含 %1$d 处手工调整</item>
+    </plurals>
 
     <!-- ============ 重命名影响范围(renameSummaryLines) ============ -->
     <!-- 复数键 -->

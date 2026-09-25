@@ -10,7 +10,7 @@
 
   ⚠️ English is the default (`values/`) and Chinese lives in `values-zh/`: until the user
   picks a language the app follows the system, so a device in any third language falls
-  back to the strings below. (User decision 2026-09-26.)
+  back to the strings below. (User decision 2026-09-25.)
 
   ⚠️ Maintenance: a new `TextKey` member must be added to BOTH this file and
   `values-zh/domain_strings.xml`, or lint `MissingTranslation` / `ExtraTranslation`
@@ -189,6 +189,14 @@
     <plurals name="domain_naming_summary_with_head">
         <item quantity="one">%1$s · %2$d component enabled</item>
         <item quantity="other">%1$s · %2$d components enabled</item>
+    </plurals>
+    <!-- 手工调整披露段(HANGOFF §11 第 10 条)。段首自带分隔符,与上一键留白习惯一致。
+         ⚠️ 前导空格必须写成 `\u0020`:AAPT2 会 trim 资源字面量的首尾空白,
+         `<item> · %1$d …</item>` 会编译成 `· %1$d …`(缺空格),拼接后读作 `enabled· 1 manual adjustment`。
+         与 `domain_list_separator` 同一坑,已由 `NamingPageTest` 的逐字期望值守护。 -->
+    <plurals name="domain_naming_summary_manual">
+        <item quantity="one">\u0020· %1$d manual adjustment</item>
+        <item quantity="other">\u0020· %1$d manual adjustments</item>
     </plurals>
 
     <!-- ============ Rename summary (renameSummaryLines) ============ -->

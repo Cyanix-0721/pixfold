@@ -534,6 +534,56 @@ Image="{index}" Type="Story" ImageSize="{size}" [ImageWidth="{w}"] [ImageHeight=
 
 ---
 
+## 12. 「序号」与「顺序」在两脚本中的真实来源（HANGOFF §11 第 9/10/14 条的事实依据）
+
+> 本节为 2026-09-25 复读源码所得，用于给 §11 第 9/10/14 条的裁决提供**源码级事实**。
+> 结论一律标注函数名 + 行号。
+
+### 12.1 重命名脚本：**命名阶段根本不写序号**
+
+- `generate_new_filename()`（L175-219）的组件是**固定拼接**，无占位符、无序号段：
+  `[prefix, root_name] + path_parts + [name_part]`（L210-217）；`name_part` 与 `ext_part` 原样取自
+  `original_filename`（L198-199）。⇒ 脚本的「顺序」**完全由排序结果承载**（§4.2 的 8 档排序），
+  不写进文件名。
+- 序号**只在冲突时才出现**：`_handle_numeric_suffix()`（L265-304）把最后一段换成空缺数字
+  （L301 `formatted_number = str(counter).zfill(num_digits)`，`num_digits = len(last_part)`）。
+  即 `001` 冲突时可能变成 `002` —— **这是冲突改写，不是顺序语义**。
+- 原始序号**不解析**：全脚本对 `basename` 的唯一处理是 `Path(...).suffix`（L199）；
+  `natural_key()`（L67-69）只用于排序，不产出任何"提取出的序号"。
+
+### 12.2 打包脚本：序号 = **排序后的列表下标 + 1**（位置序号）
+
+- `create_cbz()`（L653-660）：`digits = max(3, len(str(len(images))))`（L655），
+  `arcname = f"{str(i + 1).zfill(digits)}{img.suffix.lower()}"`（L659）。
+- 入参 `images` 的顺序来自 `get_image_files(folder)` + `images.sort(key=lambda f: natural_key(f.name))`
+  （L1164-1165，注释 L1163「固定按名称升序（自然排序），命名已由重命名脚本保证顺序」）
+  ⇒ **序号是位置序号，且用户不可覆盖**（§6.2、§7 D13）。
+- 打包脚本能解析的「数字」只有**卷号**：`detect_volume()`（L351-383）用 `_VOLUME_RE`
+  （`\s*(?:#\s*|[Vv][Oo][Ll]\.?\s*)?(\d+(?:\.\d+)?)\s*$`，L318）取末尾卷号、`_EMBEDDED_VOLUME_RE`
+  取内嵌卷号（L321）；`infer_volumes()`（L415-455）与 `renumber_series_volumes()`（L386-412）
+  做的都是**系列卷号**的推断与重编号，与**页序号**无关。
+
+### 12.3 由此得到的三条事实（直接对应 §11 第 9/10/14 条）
+
+| 事实 | 依据 | 对应条目 |
+| --- | --- | --- |
+| 两脚本**都没有**「沿用原文件名解析出的原始序号」这一能力；重命名脚本连序号组件都没有，打包脚本的序号是位置序号 | §12.1、§12.2 | **第 14 条**的"备选方案"**在归档原型里没有先例**，属新设计，不是"补回曾有的能力" |
+| 脚本无交互重排（CLI），「落地方式」在脚本里**没有对应物** | 两脚本全为"扫描 → 打印 → 一次确认 → 执行"（§10 共同点 8） | **第 9 条**没有脚本依据，唯一依据是 `HANGOFF.md` §12.5 的两条实测结论（防抖动） |
+| 顺序在脚本中是**权威且单一**的：排序结果 → 落盘顺序 → 页码；中间没有任何"人工层" | §12.1、§12.2 | **第 10 条**的"人工拖拽"在脚本里不存在对应概念 |
+
+### 12.4 与 D1 的对照（供裁决时引用；**不含结论**）
+
+- D1 的 `NameComponentKind.ImageIndex` 取 `(scheme.indexStart + position).toString().padStart(indexPadding, '0')`，
+  `position` = **0-based 页序下标**（`pixfold-d1/domain/src/main/kotlin/com/pixfold/d1/domain/naming/NamingEval.kt` 的
+  `componentText()`，注释「`position` 是**页序下标(0-based)**;序号 = indexStart + position」）
+  —— **与打包脚本的位置序号语义一致**；差别只在脚本硬编码 `1` 起点与 `max(3, len(str(n)))` 宽度，
+  D1 把它做成了可配的 `indexStart` / `indexPadding`。
+- D1 另有人工层 `PageOrderState.manualIds`（`pixfold-d1/domain/src/main/kotlin/com/pixfold/d1/domain/sort/PageOrder.kt`，
+  `applyRule` 清空、`moveItemTo` 记录），这是脚本**没有**的一层；`ImageIndex` 因此会随拖拽改变
+  —— 这正是第 10/14 条要裁决的点。
+
+---
+
 ## 附：本次精读覆盖范围
 
 | 文件 | 总行数 | 已读范围 | 状态 |

@@ -10,7 +10,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertNotEquals
 
 /**
- * 资源兜底语言的行为(用户裁决 2026-09-26:「改成英文兜底,默认选项是跟随系统一般也用不上兜底」)。
+ * 资源兜底语言的行为(用户裁决 2026-09-25:「改成英文兜底,默认选项是跟随系统一般也用不上兜底」)。
  *
  * ## 为什么要专门测这个
  *
@@ -78,5 +78,37 @@ class ResourceFallbackTest {
         val two = context.resources.getQuantityString(R.plurals.a_image_count, 2, 1)
         assertEquals("共 1 张", one)
         assertEquals(one, two)
+    }
+
+    @Config(sdk = [34], qualifiers = "zh-rCN")
+    @Test
+    fun manual_adjustment_segment_keeps_its_leading_space() {
+        // ⚠️ **AAPT2 会 trim 资源字面量的首尾空白**:`<item> · %1$d …</item>` 编译后前导空格消失,
+        // 拼接出来读作 `…2 个组件启用· 1 处手工调整`(缺空格)。
+        // 这正是本项目在 `domain_list_separator` 上踩过的同一个坑,存活写法是 `\u0020`。
+        //
+        // 为什么必须写死字面量、不能经 `TestText` 从同一份资源取期望值:**那样期望值与实际值
+        // 一起被 trim,断言恒真**(本轮就是先按那种写法写完、四道闸门全绿,直到变异验证打印出
+        // 实际报文才暴露)。披露段是否以空格开头是"渲染出来的样子",只能逐字钉死。
+        val manual = context.resources.getQuantityString(R.plurals.domain_naming_summary_manual, 3, 3)
+        assertEquals("\u0020· 含 3 处手工调整", manual)
+
+        val withHead = context.resources.getQuantityString(
+            R.plurals.domain_naming_summary_with_head, 2, "x.jpg", 2,
+        )
+        assertEquals("x.jpg · 2 个组件启用\u0020· 含 3 处手工调整", withHead + manual)
+    }
+
+    @Config(sdk = [34])
+    @Test
+    fun manual_adjustment_segment_in_the_english_default_keeps_its_leading_space() {
+        // 英文侧同一坑(与中文断言分开,因为两边的复数形态与用词都不同)。
+        //
+        // ⚠️ 这里**不能**用 `qualifiers = "ja"` 来"测英文兜底":兜底取的是**文案**(默认槽位
+        // 是英文,没错),但复数**变体**按 locale 的 CLDR 规则选 —— 日语只有 `other`,
+        // 于是 quantity=1 仍取 `other`,拿到 "adjustments"(本断言第一次就是这么写错的)。
+        // 默认 locale 是 en_US(⇒ `one` 形),故不写 qualifiers。
+        val manual = context.resources.getQuantityString(R.plurals.domain_naming_summary_manual, 1, 1)
+        assertEquals("\u0020· 1 manual adjustment", manual)
     }
 }

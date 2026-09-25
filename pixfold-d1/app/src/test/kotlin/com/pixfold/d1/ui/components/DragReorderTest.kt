@@ -3,7 +3,9 @@ package com.pixfold.d1.ui.components
 import androidx.compose.foundation.layout.size
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
@@ -154,5 +156,85 @@ class DragReorderTest {
         rule.onNodeWithTag(pinTag("i1")).performClick()
 
         assertEquals(listOf("i1"), pinned, "网格卡片必须有可点图钉入口")
+    }
+
+    // ---------------- 跟手浮层(HANGOFF §11 第 9 条,2026-09-25 用户裁决) ----------------
+
+    @Test
+    fun `no ghost before any drag starts`() {
+        // 浮层只在拖动中出现 —— 静止时不得常驻(否则它会盖住真实卡片)
+        setGrid(items(9), onMove = { _, _ -> })
+
+        rule.onNodeWithTag(TAG_DRAG_GHOST).assertDoesNotExist()
+    }
+
+    @Test
+    fun `ghost follows the pointer while dragging`() {
+        val list = items(9)
+        setGrid(list, onMove = { _, _ -> })
+
+        val card = rule.onNodeWithText("img1.jpg").fetchSemanticsNode().boundsInRoot
+        val from = card.center - card.topLeft
+
+        rule.onNodeWithText("img1.jpg").performTouchInput {
+            down(from)
+            advanceEventTime(700)    // 长按阈值
+            moveBy(Offset(0f, -20f)) // 越过 slop,进入拖拽
+        }
+
+        // 拖动中:手里必须有东西(补缺口前这里只有源卡的 0.35 alpha,没有任何跟手物)
+        rule.onNodeWithTag(TAG_DRAG_GHOST).assertExists()
+
+        // **真正要守的是"跟手"**:浮层中心贴着指针。若只断言"存在",
+        // 把 graphicsLayer 的 translation 去掉(浮层钉在容器左上角)照样通过。
+        val pointer = card.center + Offset(0f, -20f)
+        val ghost = rule.onNodeWithTag(TAG_DRAG_GHOST).fetchSemanticsNode().boundsInRoot
+        assertTrue(
+            kotlin.math.abs(ghost.center.x - pointer.x) <= 2f &&
+                kotlin.math.abs(ghost.center.y - pointer.y) <= 2f,
+            "浮层中心应贴住指针:pointer=$pointer ghostCenter=${ghost.center}",
+        )
+    }
+
+    @Test
+    fun `ghost is gone after release`() {
+        val list = items(9)
+        setGrid(list, onMove = { _, _ -> })
+
+        val card = rule.onNodeWithText("img1.jpg").fetchSemanticsNode().boundsInRoot
+        val from = card.center - card.topLeft
+        val to = rule.onNodeWithText("img3.jpg").fetchSemanticsNode().boundsInRoot.center - card.topLeft
+
+        rule.onNodeWithText("img1.jpg").performTouchInput {
+            down(from)
+            advanceEventTime(700)
+            moveBy(Offset(0f, -20f))
+            moveTo(to)
+            up()
+        }
+
+        rule.onNodeWithTag(TAG_DRAG_GHOST).assertDoesNotExist()
+    }
+
+    @Test
+    fun `ghost does not duplicate the dragged file name in the semantics tree`() {
+        // 浮层是纯装饰:内容被 clearAndSetSemantics 屏蔽。若漏了这一步,
+        // 拖动中 `onNodeWithText("img1.jpg")` 会匹配到两个节点 —— 所有
+        // 按文本定位的既有断言都会在拖拽态下变成"匹配到多个节点"而报错。
+        val list = items(9)
+        setGrid(list, onMove = { _, _ -> })
+
+        val card = rule.onNodeWithText("img1.jpg").fetchSemanticsNode().boundsInRoot
+        val from = card.center - card.topLeft
+
+        rule.onNodeWithText("img1.jpg").performTouchInput {
+            down(from)
+            advanceEventTime(700)
+            moveBy(Offset(0f, -20f))
+        }
+
+        rule.onAllNodesWithText("img1.jpg").assertCountEquals(1)
+        // 同时确认浮层确实在(否则这条在"浮层根本没出现"时也会绿)
+        rule.onNodeWithTag(TAG_DRAG_GHOST).assertExists()
     }
 }

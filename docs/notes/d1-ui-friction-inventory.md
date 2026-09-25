@@ -369,7 +369,7 @@ User said（逐字）：「底栏高度可以稍微低一点，而且有的按�
 撤销是**破坏性 / 回退类**动作，按 Material 语义着 `error` 底色。禁用态交给 `buttonColors` 的默认
 `disabled*` 角色（灰化），**不用 `errorContainer`** —— 那在浅色主题下是粉底，危险语义被削弱。
 
-> ⚠️ **上面这句只对浅色成立，2026-09-26 已被用户驳回并修正** —— 真机是**深色**，
+> ⚠️ **上面这句只对浅色成立，2026-09-25 已被用户驳回并修正** —— 真机是**深色**，
 > 深色下 `error` 是**淡粉** `#F2B8B5`，正是用户说的"不像危险动作"。
 > 修正方案见 **§2d**（浅色走 `error`、深色走 `errorContainer`，两档各取所长）。
 
@@ -429,7 +429,7 @@ User said（逐字）：「底栏高度可以稍微低一点，而且有的按�
 
 ---
 
-## 2d. ✅ P1 续·撤销按钮深色不像危险动作 —— 2026-09-26 已修（提交 `1c95db9`，同提交携带中间态 `Theme.kt`）
+## 2d. ✅ P1 续·撤销按钮深色不像危险动作 —— 2026-09-25 已修（提交 `1c95db9`，同提交携带中间态 `Theme.kt`）
 
 **来源：用户真机走查后收紧措辞**
 
@@ -635,7 +635,9 @@ fun dangerActionButtonColors(): ButtonColors {
 | **P2** | 4 | B 侧策略与计划的因果距离 | 可用性 |
 | **P2** | 5 | 危险动作触发路径长 | 第 2 项的派生 |
 | **P2** | 10 | 深色下卡片是 material3 基线紫灰，与种子派生背景**色相错配** | **违反约束 7（配色未走语义派生）** |
-| **P1** | 12 | 芯片行横向滚动把靠后的可操作控件**挤出视口**（7 处同源） | **违反约束 3/7 + §0 布局约定** | **✅ 2026-09-27 已修** |
+| **P1** | 12 | 芯片行横向滚动把靠后的可操作控件**挤出视口**（7 处同源） | **违反约束 3/7 + §0 布局约定** | **✅ 2026-09-25 已修** |
+| **P1** | 13 | 拖拽**无跟手浮层** + 命名页对手工调整**沉默**（§11 第 9/10 条） | 反馈缺失 / 操作逻辑不一致 | **✅ 2026-09-25 已修** |
+| **P1** | 14 | 拖拽**无法跨视口** —— 30 张图时从第 1 张拖到第 30 张**物理上不可能** | **功能性缺陷（目标不可达）** | **✅ 2026-09-25 已修**（真机核对 2026-09-26 通过） |
 | **P3** | 6/7 | 容器重复；MetadataPage 637 行 | 结构性 |
 
 **建议顺序**：~~**P0 先做**~~（**✅ 2026-09-24 已完成**），
@@ -796,9 +798,9 @@ P2/P3 视情况。第 2 项修复**真机核对已通过**（2026-09-25，与 §
 
 ---
 
-## 12. ✅ P1：芯片行横向滚动把靠后的可操作控件挤出视口（7 处同源）—— 2026-09-27 已修
+## 12. ✅ P1：芯片行横向滚动把靠后的可操作控件挤出视口（7 处同源）—— 2026-09-25 已修
 
-**来源：第 13/15 条真机核对途中用 `dumpui.bat` 量坐标时发现（2026-09-27）**
+**来源：第 13/15 条真机核对途中用 `dumpui.bat` 量坐标时发现（2026-09-25）**
 
 **现象**：工作流 A 步骤 1 的集合芯片行，361dp 下第 4 个集合**完全落在视口外**
 （`旅行照片（30）[98,413][452,483]` / `扫描件（14）[592,413][897,483]` /
@@ -821,7 +823,7 @@ P2/P3 视情况。第 2 项修复**真机核对已通过**（2026-09-25，与 §
 | B 打包页卷芯片 | **3/5** | 5/5 |
 | B 打包页冲突 / 源策略芯片 | 贴边 | 正常 |
 
-**✅ 用户裁决（2026-09-27）：改成 `FlowRow` 自动换行**（未采纳"保留横向滚动只加提示"）。
+**✅ 用户裁决（2026-09-25）：改成 `FlowRow` 自动换行**（未采纳"保留横向滚动只加提示"）。
 
 **实现**：7 处 `Row + horizontalScroll(rememberScrollState())` → `FlowRow`，
 分布在 4 个文件 —— `ui/workflowa/SortAndPreviewPage.kt`（集合行，1 处）、
@@ -849,6 +851,166 @@ P2/P3 视情况。第 2 项修复**真机核对已通过**（2026-09-25，与 §
 
 **四道闸门**：`app 313`（311 → +2 守卫）/ `domain 242` 全绿、lint `No issues found.`、
 APK **33,691,473 B**（未变，纯布局改动）；真机 7 处逐一复核通过。
+
+---
+
+## 13. ✅ 拖拽无跟手浮层 + 命名页对手工调整沉默（§11 第 9/10 条）—— 2026-09-25 已修
+
+**来源：为 `HANGOFF.md` §11 第 9/10/14 条做准备时的代码核实（2026-09-25）**，
+两条都是**用户裁决后实施**（裁决逐字：「维持松手落地，另补「跟手浮层」」/「摘要行加一行被动披露（推荐）」）。
+
+### 13.1 第 9 条：拖拽期间没有任何东西跟着手指
+
+**现象**：拖动卡片时**源卡只 `.alpha(0.35f)` 留在原地**，反馈全靠目标格高亮 ——
+用户手里"没有东西"。`grep 'translation|graphicsLayer|offset|ghost|overlay'` 在
+`ui/components/DragReorderGrid.kt` + `DraggableThumbCard.kt` 的命中只有 `pointerInRoot` 与 `onDrag: (Offset) -> Unit`。
+
+**实现**：新建 `app/src/main/kotlin/com/pixfold/d1/ui/components/DragGhost.kt`
+—— 以指针为中心（`translationX = pointerInRoot.x - containerInRoot.x - size.width / 2f`）、
+`scaleX/Y = 1.05f`、`alpha = 0.92f`、`elevation = 8.dp`、
+`containerColor = surfaceContainerHigh`；`DragGhostStyle { Card, Row }` 两分支对应网格/列表。
+接入 `DragReorderGrid.kt`（+19/−1）与 `DragReorderList.kt`（+20/−1），各新增
+`containerInRoot` 状态 + `Box(modifier.onGloballyPositioned { containerInRoot = it.boundsInRoot().topLeft })`。
+**浮层只画不参与命中判定**（`clearAndSetSemantics { }`），故与"松手落地"不冲突。
+
+⚠️ **`testTag` 必须挂在 `graphicsLayer` 节点的子节点上** —— 实测规律（`DragGhostBoundsTest` 钉死）：
+
+| 变换挂在哪 | `onGloballyPositioned { boundsInRoot() }` | 语义树 `boundsInRoot` |
+| --- | --- | --- |
+| **本节点**：`padding`/`offset`/`graphicsLayer` | ✅ 反映 | ❌ **不反映** |
+| **祖先节点**：`graphicsLayer`（平移与缩放） | ✅ 反映 | ✅ **反映** |
+
+挂错位置 ⇒ 读到的 bounds 是**布局前**位置 ⇒ "浮层是否跟手"的断言**恒真、变异杀不死**。
+（反向验证：`TransitionStyleTest` 能观察到根级 `scaleOut` 的缩放，正因为那个图层挂在页面容器的**祖先**上。）
+
+### 13.2 第 10 条：第 2 步对人工调整完全沉默
+
+**现象**：第 1 步**已有**同口径提示（`SortAndPreviewPage.kt` 的「已人工调整 N 处」+ 重置按钮），
+第 2 步 `grep 'manual'` 在 `NamingPage.kt` / `WorkflowASteps.kt` **零命中** ——
+而命名序号**跟随页序**，上一步拖过几张会改变这里的建议名，翻页后就被藏起来。
+
+**实现**：`domain/.../naming/NamingSummary.kt` 的 `namingSummaryLine(scheme, sample, manualCount = 0)`
+改返回 `List<Msg>`，`manualCount > 0` 时追加 `TextKey.NamingSummaryManual` 段；
+`NamingPage.kt:165` 传入 `order.manualCount`（`PageOrderState.manualCount` = `manualIds.size`）。
+摘要变为 `旅行照片_001.jpg · 2 个组件启用 · 含 3 处手工调整`；**归零时与改动前逐字一致**。
+
+### 13.3 🚨 顺带刨出的真实缺陷：披露段的前导空格被 AAPT2 trim
+
+拼接后读作 `…2 个组件启用· 3 处手工调整` —— **缺空格**。
+这是本仓库在 `domain_list_separator` 上踩过的**同一个坑**。修法 = 存活写法 `\u0020`
+（英文两档 + 中文 `other` 档都改）。
+
+⚠️ **最关键教训**：我最初按"语言无关"纪律用 `TestText` 从**同一份资源**取期望值写断言 —
+— 期望值与实际值**一起被 trim** ⇒ **断言恒真 ⇒ 四道闸门全绿**。
+缺陷只在**变异验证打印实际报文**时才暴露（`Expected < · 1 manual adjustment>, actual <· 1 manual adjustment>`）。
+⇒ 已在 `app/src/test/kotlin/com/pixfold/d1/ResourceFallbackTest.kt`（全仓唯一刻意写死中英字面量处）
+加 2 条逐字断言：`manual_adjustment_segment_keeps_its_leading_space`（`zh-rCN`）与
+`manual_adjustment_segment_in_the_english_default_keeps_its_leading_space`（不写 qualifiers）。
+⚠️ 第二条**第一版写成 `qualifiers = "ja"` 而失败**：兜底取的是**文案**（默认槽位英文，对），
+但复数**变体**按 locale 的 CLDR 规则选 —— 日语只有 `other`，故 quantity=1 仍取 `other`。
+**默认 locale 是 en_US（⇒ `one` 形），故不写 qualifiers。**
+
+### 13.4 验证
+
+**四道闸门**：`app 326`（324 → +2 空格守卫）/ `domain 246` 全绿、lint `No issues found.`、
+APK **34,210,577 B** ⚠️ **陈旧值** —— 该字节数取自未重打包的旧文件（Gradle 当时报
+`:app:packageDebug UP-TO-DATE`），真值 **33,246,968 B**（见 §14.4）。
+
+**变异验证 9 组全捕获、逃逸 0**（脚本 `app/build/mut_ghost_summary.py`，不跟踪）：
+G1 位移置零 / **G2 tag 挪回图层节点**（反向守卫 tag 位置修正）/ G3 不渲染浮层 /
+G4 不屏蔽语义（文件名重复）/ S1 接线断开 / S2 永不产出段 / S3 数量恒 0 /
+**S4/S5 前导空格退回裸空格**（这两条正是 13.3 那两条字面量断言的杀伤力证明）。
+
+**真机核对已通过（2026-09-25，PJX110 / Android 16 / 361dp×794dp，用户授权后执行）**：
+- 第 9 条 —— **用户亲测**，逐字「**我自己试了，网格和列表效果都可以**」。
+- 第 10 条 —— agent 读数：拖过 4 张后进第 2 步，摘要栏实测
+  `旅行照片_001.jpg · 2 个组件启用 · 含 4 处手工调整`（节点 `[42,525][1124,595]`）；
+  点「重置人工调整」（回到 `0 处`）后再进第 2 步，摘要变回 `旅行照片_001.jpg · 2 个组件启用`
+  —— **披露段消失**，两个方向都对。
+
+设备已复位（`/data/local/tmp` 内 `.png`/`.xml` 计数 = 0、`svc power stayon false`、`am force-stop`）。
+
+---
+
+## 14. ✅ 拖拽无法跨视口（§11 第 18 条）—— 2026-09-25 已修，2026-09-26 真机核对通过
+
+**来源：为第 9 条排查拖拽实现时发现的代码缺陷（2026-09-25）**（登记为 `HANGOFF.md` §11 第 18 条）。
+用户原话（逐字）：「拖拽不会带动网格/列表滚动，极端点可能会有首页被自动排序到末尾的情况所以需要拖拽调整」
+—— ⇒ 这不是观感打磨，而是**排序回退手段不可用**：自动排序把首页挤到末尾后，用户没法定点拖回来。
+
+### 14.1 ⚠️ 初判根因是错的（本节最重要的订正）
+
+初记写的根因是「`DraggableThumbCard` / `ThumbRow` 的 `onDrag` 里 `change.consume()` 阻断了
+LazyGrid/LazyColumn 接收手势」。**探针实测这个判断不成立** ——
+`change.consume()` 只阻止 Lazy **自己**滚动，并不杀死手势。
+
+**实测真因**：拖拽手势挂在**卡片**上（`pointerInput(item.id)`），而卡片是 Lazy 的**子项**。
+一旦滚得够远，被拖的那张卡离开视口，`LazyGrid` / `LazyColumn` 把它**销毁**，
+挂在它身上的 `pointerInput` 随之被取消，**`onDragEnd` 永不触发** ⇒ 跨视口拖拽物理上不可能。
+
+> 探针读法：按触边事件数读活性（不松手，看浮层还在不在）——
+> 4 次触边仍活、16 次触边后浮层消失 = 手势已死。
+> 另有一项旁证：`repeat(10)` 触边时落点上报仍在，`repeat(30)` 时变成 `moved=[]`。
+
+第二条根因（初记正确）：全组件**没有任何边缘自动滚动**
+—— `grep 'scrollBy|animateScroll|translation|dragAmount'` 在 `ui/components/` 与
+`SortAndPreviewPage.kt` 的命中只有回顶按钮的 `animateScrollToItem(0)`。
+
+### 14.2 修法（两步缺一不可）
+
+1. **把手势从卡片上移到不滚动的容器 `Box`**（`DragReorderGrid.kt` / `DragReorderList.kt`），
+   卡片只负责显示；命中判定改由容器拿 `slotBounds` 反查（新增 `findContainedSlotAt`）。
+   ⇒ 被拖的卡即使滚出视口被销毁，**手势仍然活在容器上**。
+2. **拖动期间把滚动权交给程序**：Lazy 加 `userScrollEnabled = draggingIndex == null`，
+   滚动改由 `EdgeAutoScroll.kt` 的 `edgeAutoScrollStep(...)` + `scrollBy`
+   **按每个 `onDrag` 事件驱动**。
+
+> **为什么必须"交出滚动权"**（探针实测）：不交时 Lazy 在 Main 阶段先接到事件、
+> 立刻转成 `cancel`（手势长度 2）；交出后手势完整走完（`events=12`，收尾是 `end`）。
+> 期间两种滚动机制互斥，故不会叠加成双倍速度。
+
+`EdgeAutoScroll.kt`（新建，84 行）参数：边缘带宽 `EDGE_SCROLL_ZONE_DP = 72f`、
+基础步长 `EDGE_SCROLL_BASE_STEP_DP = 14f`、连续触边加速上限 `EDGE_SCROLL_MAX_MULTIPLIER = 4`。
+近上缘返回负值、近下缘返回正值，`步长 = 14dp × density × 深度 × (1 + burst).coerceIn(1, 4)`。
+
+### 14.3 为什么是事件驱动而不是帧循环/定时器
+
+帧循环在本仓库**离线不可驱动，且会挂死测试套**（实测）：
+无条件 `while(true){ withFrameNanos{} }` ⇒ `setContent`/`waitForIdle` 永不返回
+（`java.lang.InterruptedException at Builders.kt:94`）；`autoAdvance = true` ⇒
+`OutOfMemoryError: Java heap space`；`advanceTimeByFrame()` 不恢复续体，
+`advanceTimeBy` 也不驱动 `kotlinx.coroutines.delay`。
+
+**代价（有意取舍）**：指针在边缘**完全静止**时不继续滚动。
+真机手指会抖，叠加触边加速后长距离仍然可达。
+归档 Flutter 原型同样用长按起拖「避免与滚动冲突」，同向。
+
+### 14.4 自证
+
+- `EdgeAutoScrollTest` **14 条**：8 条纯函数 + 6 条端到端
+  （网格下缘 / 网格回滚到顶 / 列表下缘 / **滚动之后起拖应落在手指下的卡上** /
+  **源卡滚出视口后浮层仍活** / **长按空白处不得起拖**）。
+- 变异 **11 组全捕获、逃逸 0**（脚本 `pixfold-d1/app/build/mut_edge_scroll.py`，不跟踪）：
+  G-A 自动滚动恒为 0 / G-B 边缘方向反 / G-C 算出步长但不接线 / G-D 网格侧不交出滚动权 /
+  G-E 起拖兜底到最近格 / G-F 去掉加速 / G-G 去掉加速上限 / G-H 不清理过期格坐标 /
+  G-I 列表侧不交出滚动权 / G-J 列表侧不接线 / G-K 浮层尺寸改为实时取。
+- **首轮 G-H 与 G-K 是真逃逸** —— 既有测试**全部在"滚动之前"起拖**，
+  故「滚动后起拖的身份」与「源卡滚出后的浮层尺寸」两条性质**无断言覆盖**；
+  补上面对应的 2 条端到端测试后归零。
+  另一条 G-E 首轮逃逸是**判据选错**：只断言"松手后的上报"会被
+  「目标格 == 起始格 ⇒ 不提交」掩盖 ⇒ 改断言**浮层是否出现**才有杀伤力。
+- **四道闸门**：`app 340` / `domain 246` 全绿、lint `No issues found.`、APK **33,246,968 B**。
+
+### 14.5 真机核对（2026-09-26 通过）
+
+用户亲测，逐字「**效果可以**」。
+
+> ⚠️ 本轮核对期间发现**用户正在手机上操作** —— agent 注入的一次上滑返回了**列表态且换了集合**，
+> 一次普通上滑做不到。⇒ **立即停止全部 adb 输入注入**，只做清理，避免与用户手势打架。
+
+✅ **离线守卫的边界**：Robolectric 无真实布局，「滚动可达性」本身仍属"放得下"类结论
+（见 §0 布局约定与 §12 同款教训）；**但本轮缺陷的因果机制是手势被取消、浮层消失**，
+这一层是可离线的（`ghost survives after the source card scrolls out of view` 正是它的守卫）。
 
 ---
 

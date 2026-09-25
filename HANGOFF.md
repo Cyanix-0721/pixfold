@@ -232,7 +232,7 @@ UndoRecord      可撤销操作所需的逆向信息
 
 用户应该可以先对整个系列设置默认值，再对某一卷或某一张图片覆盖。逐项覆盖不能破坏批量配置，也不能在刷新扫描后无提示丢失。
 
-**分工(2026-09-27 明确,见 §11 第 15 条)**:"批次统一"由**批量设置**承担,"逐项例外"由**逐卷手工编辑**承担。
+**分工(2026-09-25 明确,见 §11 第 15 条)**:"批次统一"由**批量设置**承担,"逐项例外"由**逐卷手工编辑**承担。
 批量写入**清除该字段**的例外标记(于是批量可反复覆盖),手工编辑**建立**该字段的例外标记(于是手工改过的卷
 仍受保护)。二者共用同一个 `overridden: Set<MetaField>` 值域,靠"谁写的"区分,语义无歧义。
 
@@ -532,7 +532,7 @@ Android 第一版应优先保证“选目录 → 预览 → 手工确认 → 生
 | 10 | 冲突与警告可见:重名、非法字符、大小写冲突、超长            | §9/§10      | ✅      | **真机核对**:重名(禁用序号后 `共 14 项 · 冲突 14`,行内「重名：有 14 项同名…」)、跨目录重名(`扫描件_page_01.png` ×2)、非法字符(`扫描件_封:面?.png` + 「非法字符：: ?」)、超长(领域层 180 边界,⚠️ 未在真机复现,见备注);警告**分级配色**(会导致跳过=error 色 / 仅警告=次级色)+「仅问题」筛选 |
 | 11 | 逐卷元数据 title/series/writer/volume 可改,建议值带来源    | §4/§6.1     | ✅      | 领域单测 + UI 断言 + **真机核对通过**。真机实证:六字段(Title/Series/Writer/Number/LanguageISO/CBZ 文件名/输出目录)全部可编辑并真的落值(手工把 Series 改为 `BATCHSERIES-MANUAL-`、Writer 追加 `MANUALW` 均生效);**每个建议值与其来源同屏可见**,如「建议：1（目录名「第01卷」解析）」「建议：ja（卷内文件名含日文片段（低置信））」「建议：[作者]谏山创(原作:某人)(电子版)（目录层级 L2 段命名）」;另有「清理建议：谏山创（清理规则：去作者前缀 / 括号原作 / 尾部标签）」与逐字段「恢复建议」/「一键清理」 |
 | 12 | 语言默认"未设置"必须人工确认;支持逐卷不同,写入/不写入可选 | §4          | ✅      | 领域单测 + UI 断言 + **真机核对通过**。真机实证:初值为「未设置（需确认）」+ `errorText 语言默认未设置，需人工确认`,而建议 `ja` **可见却不被采纳**(两者同屏并存);下拉展开后**五个选项齐全**:`未设置（需确认）` / `zh · 中文` / `ja · 日文` / `其他 ISO 639-1` / `未知` / **`不写入标签`**(独立选项,对应 `LangChoice.Skip`);选 `ja` 后字段变为 `ja · 日文`、顶部「已覆盖 0 个字段」→**「已覆盖 1 个字段」**、且「待确认：语言未确认」提示消失 |
-| 13 | 批量设置不覆盖逐项例外(被手工改过的字段保持)               | §6.3        | ✅      | 领域单测(跳过/强制/未勾选**三态** + 生效计数)+ UI 断言 + **真机核对通过**。真机实证:批量设 **Writer**(该字段无例外)→ 提示 **`已设置到 5 卷`**;批量设 **Series**(5 卷均已带该字段例外)→ 提示 **`已设置到 0 卷（跳过 5 卷逐项例外）`**,且卷内 Series 值**逐字未变**。`尊重逐项例外` 开关可见。⚠️ 真机取到的是 `5/0` 与 `0/5` 两个**端点**,规格示例的"4 生效 / 1 跳过"**混合态**仅由领域单测钉死(`assertEquals(4, result.appliedCount, "5 卷中应有 4 卷被批量改写")`),不计入真机范围。**⚠️ 2026-09-27 语义细化(§11 第 15 条)**:例外改由**只有逐卷手工编辑**建立,批量写入**清除本字段**的例外标记 ⇒ 同一字段可反复批量覆盖;判据本身不变(手工改过的卷仍受保护) |
+| 13 | 批量设置不覆盖逐项例外(被手工改过的字段保持)               | §6.3        | ✅      | 领域单测(跳过/强制/未勾选**三态** + 生效计数)+ UI 断言 + **真机核对通过**。真机实证:批量设 **Writer**(该字段无例外)→ 提示 **`已设置到 5 卷`**;批量设 **Series**(5 卷均已带该字段例外)→ 提示 **`已设置到 0 卷（跳过 5 卷逐项例外）`**,且卷内 Series 值**逐字未变**。`尊重逐项例外` 开关可见。⚠️ 真机取到的是 `5/0` 与 `0/5` 两个**端点**,规格示例的"4 生效 / 1 跳过"**混合态**仅由领域单测钉死(`assertEquals(4, result.appliedCount, "5 卷中应有 4 卷被批量改写")`),不计入真机范围。**⚠️ 2026-09-25 语义细化(§11 第 15 条)**:例外改由**只有逐卷手工编辑**建立,批量写入**清除本字段**的例外标记 ⇒ 同一字段可反复批量覆盖;判据本身不变(手工改过的卷仍受保护) |
 | 14 | ComicInfo.xml 预览与页码列表预览(含重编号)一致             | §9/§10      | ✅      | 领域单测 + UI 断言 + **真机核对通过**。真机实证(同一页步骤3):XML 预览原文为 `<?xml version="1.0" encoding="utf-8"?>` + `ComicInfo` 双 xmlns + **2 空格缩进** + `${Title/Series/Number/Writer/LanguageISO}` 固定字段序;页码预览标题「按当前页序重编号，共 16 项」、明细 **16 行全部可见**(`001.jpg`..`016.jpg` 对应原路径 `← 第01卷_p001.jpg`..`p016.jpg`,**一一对应**)、副标题「序号从 001 起，扩展名统一小写」。**一致性**改为人工确认 `ja` 并批量改 Writer 后重进步骤3,XML 同步变为 `<Writer>NEWBATCH</Writer>` 与 `<LanguageISO>ja</LanguageISO>` —— 两份预览同源求值成立 |
 | 15 | 执行计划预览:操作清单 + 冲突/跳过原因                      | §6.4        | ✅      | 领域单测(`describe()` **文案契约**按序 + 快照语义)+ UI 断言 + **真机核对**。真机实证(A 侧 `共 56 卷 · 将执行 56 卷`,整库遍历):每卷 3 条文案「创建 CBZ → …」「写入 ComicInfo.xml（Title=…）」,并在 Delete 策略下多一条「打包后删除源目录：…」;B 侧 Skip 策略下 `共 5 卷 · 将执行 4 卷 · 跳过 1 卷`,跳过行**同时**给出操作清单「· 跳过：输出已存在 …」与原因行「⛔ 输出已存在 …」;Rename 策略真机产出 `海贼王 第102卷 (1).cbz`(最后一点前插序号) |
 | 16 | 危险动作默认关闭,且需独立二次确认(删源/清理空目录)         | §2/§6.4     | ✅      | 领域单测(`ConfirmFlowTest` 逐帧断言"恰好两次""先通用后危险""取消归零")+ UI 断言 + **真机核对**。真机实证:默认**零危险动作**(`无危险动作：源文件保留，不删除任何文件`);勾选后卡片立刻红色警告;点「确认执行」→ **第 1 次通用确认**(标题`确认执行？`+影响范围`· 将处理 5 卷`/`· 源目录：删除（危险）`)→「执行」→ **第 2 次独立危险确认**(标题`⚠️ 危险操作独立确认`+正文`你选择了「打包后删除源目录」。删除不可恢复，确认继续？`+按钮`确认删除源目录`)——**文案与 §9.2 逐字一致**;A 侧清理空目录同样两次(`你勾选了「移动后清理空目录」…`) |
@@ -743,7 +743,7 @@ APK 安装启动成功、点击与横竖屏切换无崩溃(同 PID 未重启)。
 Manifest 显式 `enableOnBackInvokedCallback="true"`(targetSdk 33+ 默认,写明意图);
 该属性触发 lint `UnusedAttribute`(minSdk 低于 33 时),以 `tools:targetApi="33"` 标注。
 **2026-09-22 注**:minSdk 已由 24 提到 30(见 §12.6),该注解**仍然必要**(30 < 33),故保留。
-**2026-09-26 更新**:minSdk 已由 30 再提到 **34**(见 §12.6)⇒ 34 ≥ 33,该 `tools:targetApi="33"`
+**2026-09-25 更新**:minSdk 已由 30 再提到 **34**(见 §12.6)⇒ 34 ≥ 33,该 `tools:targetApi="33"`
 注解与 `xmlns:tools` 声明**一并删除**。`enableOnBackInvokedCallback="true"` 本身保留不变。
 
 > **⚠️ 如实记录的范围与局限**:
@@ -1201,7 +1201,7 @@ Manifest 显式 `enableOnBackInvokedCallback="true"`(targetSdk 33+ 默认,写明
 > **教训**:①`DpRect` **没有 `center`**(与 `androidx.compose.ui.geometry.Rect` 不同),
 > 写 `bounds.center.y` 编译失败,须自己算 `(top + bottom) / 2`;
 > ②像素取样取在文字字形上会把「有没有底色」与「文字反色差异」混在一起,取左边缘内 4dp 才稳定。
-> **✅ 真机核对已完成(2026-09-26,PJX110 / Android 16 / 1264×2780 / 560dpi = 361dp×794dp)**:
+> **✅ 真机核对已完成(2026-09-25,PJX110 / Android 16 / 1264×2780 / 560dpi = 361dp×794dp)**:
 > 底栏分隔线 y=2566(`(84,68,69)`),按钮**触控框** 2591–2759 = 168px = **48dp**(`minimumInteractiveComponentSize()`),
 > 按钮**可视填充** 2605–2745 = 140px = **40dp**,⇒ 底栏 = 1 + 6 + 48 + 6 ≈ **61dp**,与 Robolectric
 > 探针 `bar height = 61.142883 dp` 一致;最下一个非黑像素 y=2744,距屏底 36px,整个按钮落在手势区内**不被遮挡**。
@@ -1211,7 +1211,7 @@ Manifest 显式 `enableOnBackInvokedCallback="true"`(targetSdk 33+ 默认,写明
 > 详见 `docs/notes/d1-ui-friction-inventory.md` §2c。**本轮的 ①②③ 与 4 条像素守卫已提交 `1c95db9`**
 > (同提交还含下述「撤销按钮深色不像危险动作」的修正)。
 
-**撤销按钮深色不像危险动作(P1 续,2026-09-26 已修)**:
+**撤销按钮深色不像危险动作(P1 续,2026-09-25 已修)**:
 
 > **来源**:用户真机走查后**收紧措辞** —— User said(逐字)「撤销本次执行的按钮背景改成
 > 红色表示这是个危险性质的按钮」。上一轮的 V3 在浅色下确实读到 `#B3261E` 深红、守卫也绿,
@@ -1271,7 +1271,7 @@ Manifest 显式 `enableOnBackInvokedCallback="true"`(targetSdk 33+ 默认,写明
 > `dev` 自身另有 14 个未推送提交,均未 push —— push 由用户处理)。
 > **工作区干净**。启动图标主题化 + minSdk 24→30 **已提交**(`2ba10f8`,见本章
 > 「✅ 启动图标 MD 主题化 + minSdk 提到 30」)。规格:`docs/superpowers/specs/2026-09-20-d1-settings-theme-design.md`。
-> **最新验证(2026-09-26 复跑,`minSdk=34` 终态)**:`domain:test` **229** +
+> **最新验证(2026-09-25 复跑,`minSdk=34` 终态)**:`domain:test` **229** +
 > `app:testDebugUnitTest` **292** 全绿、`app:lintDebug` **`No issues found.`**、
 > `assembleDebug` 成功(APK **33,046,763 B**)。(数字演进:224/278 @09-22 →
 > 229/280 @09-24 P0 → 229/282 @09-25 底栏化 → 229/287 @09-25 底栏分槽 →
@@ -1610,8 +1610,8 @@ minSdk 本身的完整实测(功能面 / 依赖面 / lint 逐档代价 / 为何�
 > **阶段 2 = 全量 i18n**(领域层 99 处文案 + 测试中文断言)。
 > 阶段 1 的语言切换**只覆盖设置页自身**(用户裁决 c)。
 >
-> → **阶段 2 已完成(2026-09-26)**。规模口径修正与实施记录见下方
-> 「✅ 全量 i18n(2026-09-26)」;规格 §2.3 的「测试 826 处」为早期估计,
+> → **阶段 2 已完成(2026-09-25)**。规模口径修正与实施记录见下方
+> 「✅ 全量 i18n(2026-09-25)」;规格 §2.3 的「测试 826 处」为早期估计,
 > 实测为 **875 处**(`domain` 385 + `app` 490,统计口径见该节)。
 >
 > **三项实测确认的边界**(⚠️ **2026-09-21 复核:其中 ①② 均已被后续实现推翻,保留原文以存证 —— 见下**):
@@ -1636,7 +1636,7 @@ minSdk 本身的完整实测(功能面 / 依赖面 / lint 逐档代价 / 为何�
 
 ---
 
-#### ✅ 全量 i18n(2026-09-26)
+#### ✅ 全量 i18n(2026-09-25)
 
 > **分支**:`d1/settings-impl`。**用户裁决**:「只做全量 i18n,不动其他功能」。
 > **验证**:`app` **304** + `domain` **230** 全绿、`lintDebug` **零告警**、`assembleDebug` 成功。
@@ -1725,7 +1725,7 @@ mock 数据里的中文串是**数据**不是文案,保持字面量。
 > 一个键登记错,在页面上只表现为"少个空格/选错变体",间接断言几乎抓不到;
 > 而参数错位却又会横扫所有组合该页面的测试类 —— 两种失败模式的归因难度截然不同。
 
-**「测试语言无关」的独立验证:把整套 `app` 测试强制切到中文复跑(2026-09-26)**:
+**「测试语言无关」的独立验证:把整套 `app` 测试强制切到中文复跑(2026-09-25)**:
 "语言无关"此前**只在 Robolectric 默认 locale(`en_US`)下验证过** —— 若某条断言误写成
 英文字面量而非经 `TestText` 读资源,它在 `en_US` 下照样通过、换中文即失效,
 该子目标就**未被真正验证**。故临时把 40 处 `@Config` 的 qualifiers 改为 `zh-rCN` 复跑
@@ -1749,7 +1749,7 @@ mock 数据里的中文串是**数据**不是文案,保持字面量。
 > 故**任何以"单复数变化"为判据的断言都必须钉死英文**(或钉死某个真正有复数形式的语言);
 > 反之,**用"中文侧差异"当判据的断言在中文下必然是恒真式**。
 
-**英文真机冒烟走查(2026-09-26,用户授权安装后由 agent 走查)**:
+**英文真机冒烟走查(2026-09-25,用户授权安装后由 agent 走查)**:
 把应用内 locale 切到 `en` 后逐页 dump,覆盖 A 全流程(排序→命名→执行计划→确认框→报告)
 与 B 全流程(库→元数据→打包)共 10 个界面:
 
@@ -1786,7 +1786,7 @@ mock 数据里的中文串是**数据**不是文案,保持字面量。
 mock 数据(`MockLibraryBData.kt` 40 处、`MockData.kt` 8 处)**按裁决保留中文**
 (演示数据,不随界面语言变)。
 
-**资源兜底语言:英文(用户裁决 2026-09-26,`User said: 「那还是改成英文兜底，默认选项是跟随系统一般也用不上兜底就是了」`)**
+**资源兜底语言:英文(用户裁决 2026-09-25,`User said: 「那还是改成英文兜底，默认选项是跟随系统一般也用不上兜底就是了」`)**
 
 资源目录布局为 `values/` = **英文(默认/兜底)**、`values-zh/` = 中文(覆盖),
 **没有 `values-en/`**。含义:系统语言为中文时走 `values-zh/`;为英文或
@@ -1985,7 +1985,7 @@ mock 数据(`MockLibraryBData.kt` 40 处、`MockData.kt` 8 处)**按裁决保留
 > **教训**:滚动可见性要用**"是否能往回滚"**判断,而不是"是否还能往下滚" ——
 > 后者在端点处的取值与直觉相反。
 
-#### ✅ §11 第 13/15 条:中文数字自然排序 + 批量不再是逐项例外(2026-09-27)
+#### ✅ §11 第 13/15 条:中文数字自然排序 + 批量不再是逐项例外(2026-09-25)
 
 用户指定修复 §11 遗留的第 13、15 条(`User said: 「> HANGOFF.md §11 第 13 条 —— 第十话 排在 第二话 前（自然排序不支持中文数字） / > HANGOFF.md §11 第 15 条 —— 同字段批量设两次，第二次 applied=0/skipped=5 / 修这2个」`)。
 分支 **`d1/friction-sort-batch`**(自 `dev` = `7a6f678` 开出),提交 **`27f3a13`**(23 files,+686/−64),
@@ -2044,7 +2044,7 @@ if (written === v) v else written.copy(overridden = v.overridden - field)
 **四道闸门**:`app 311`(309 → +2)/ `domain 240`(230 → +10)全绿、lint `No issues found.`、
 APK **33,691,473 B**。
 
-**✅ 真机核对已通过(2026-09-27,PJX110 / Android 16 / 361dp×794dp,用户授权后执行)**:
+**✅ 真机核对已通过(2026-09-25,PJX110 / Android 16 / 361dp×794dp,用户授权后执行)**:
 - **第 13 条**:点 `章节` 芯片 → `共 16 张`,网格顺序 `第一话`…`第九话`;
   滚动后 `第10话 / 第十话 / 第十一话 / 第十二话 / 第十三话 / 第二十话 / 第21话`
   —— **与单测期望逐字一致**。
@@ -2071,6 +2071,138 @@ APK **33,691,473 B**。
 
 **四道闸门(含芯片行修复 + 2 条结构守卫)**:`app 313`(+2)/ `domain 242` 全绿、
 lint `No issues found.`、APK **33,691,473 B**;真机 7 处逐一复核通过,设备已复位。
+
+#### ✅ §11 第 9/10/14 条:拖拽跟手浮层 + 命名摘要披露手工调整(2026-09-25)
+
+**背景**:第 13/15 条收口后,§11 仅余第 9/10/14 条三条"要不要改"的裁决项。
+先把两代归档脚本与全仓源码读透(事实依据落 `docs/notes/scripts-behavior-matrix.md` §12 与
+`docs/notes/d1-archive-domain-semantics.md` §4.3),再交用户裁决 —— **用户四项裁决**
+(逐字选项):第 14 条「维持现状:序号 = 第 1 步整理后的页序」、第 10 条「摘要行加一行被动披露」、
+第 9 条「维持松手落地,另补「跟手浮层」」、新缺口「记为新条目并排在 P1」。
+
+**① 第 14 条 = 维持现状(只做文档收口,无代码改动)**
+全仓**只有一种序号口径**:`NamingEval.kt` 的 `componentText()` 里
+`ImageIndex -> (scheme.indexStart + position).toString().padStart(scheme.indexPadding, '0')`,
+`position` 是**页序下标(0-based)**;`SourceItem` **没有任何解析出的序号字段**。
+**"沿用原文件名解析出的原始序号"在两代原型中都没有先例** —— 归档原型(Flutter)与新栈实现**逐字一致**;
+两份 Python 归档脚本同样没有:`scripts/batch_rename_images.py` 的命名阶段是**固定拼接**
+`[prefix, root_name] + path_parts + [name_part]`,**根本不存在序号组件**(序号只在文件名冲突时
+由 `_handle_numeric_suffix()` 生成);`scripts/batch_pack_cbz.py` 的序号 = **排序后的列表下标 + 1**。
+主动不做的实质理由 = §6 已定口径(逐字):「自然序是主路径 …… **工具不为 `IMG_10` 这类歧义命名兜底**」;
+再引入 `OrigIndex` 会造出**第二套序号权威**。
+
+**② 第 9 条 = 维持松手落地 + 补跟手浮层**
+"实时让位"不做(拖动中指针微动会反复触发重排 → 顺序来回换位,§12.5 结论 2 的 2026-09-16 实测;
+且这是**交互契约**而非实现细节)。**浮层是真缺口** —— 改前拖动中**没有任何东西跟着手指**,
+源卡只 `.alpha(0.35f)` 留在原地。
+新增 `app/src/main/kotlin/com/pixfold/d1/ui/components/DragGhost.kt`(以指针为中心、`1.05×`、
+`alpha 0.92`、`elevation 8dp`、`surfaceContainerHigh`),接入 `DragReorderGrid.kt`(+19/−1)与
+`DragReorderList.kt`(+20/−1);**浮层只画不参与命中判定**,故与"松手落地"不冲突。
+归档原型有先例:`childWhenDragging` 用 `Opacity(0.35)` + 外层 `LayoutBuilder` 传浮层尺寸。
+
+⚠️ **`testTag` 必须挂在 `graphicsLayer` 节点的子节点上** —— 探针实测规律(已固化为
+`DragGhostBoundsTest`,2 条)：
+
+| 变换挂在哪 | `onGloballyPositioned { boundsInRoot() }` | 语义树 `boundsInRoot` |
+| --- | --- | --- |
+| **本节点**：`padding` / `offset` / `graphicsLayer` | ✅ 反映 | ❌ **不反映** |
+| **祖先节点**：`graphicsLayer`(平移与缩放) | ✅ 反映 | ✅ **反映** |
+
+挂错位置 ⇒ bounds 是**布局前**位置 ⇒ "是否跟手"的断言**恒真、变异杀不死**。
+(**反向验证**:`TransitionStyleTest` 能观察到根级 `scaleOut` 的缩放,正因为那个图层挂在页面容器的**祖先**上。)
+
+**③ 第 10 条 = 摘要行加一行被动披露**
+根因是不对称:第 1 步**已有**同口径提示(`a_manual_count`「已人工调整 N 处」+ 重置按钮),
+第 2 步 `grep 'manual'` 却**零命中** —— 而命名序号跟随页序,上一步拖过几张会改变这里的建议名。
+`NamingSummary.kt` 的 `namingSummaryLine(scheme, sample, manualCount = 0)` 改返回 `List<Msg>`,
+`manualCount > 0` 时追加 `TextKey.NamingSummaryManual` 段;`NamingPage.kt:165` 传入 `order.manualCount`。
+摘要变为 `旅行照片_001.jpg · 2 个组件启用 · 含 3 处手工调整`;**归零时与改动前逐字一致**。
+
+**④ 🚨 顺带刨出的真实缺陷:披露段的前导空格被 AAPT2 trim**
+拼接后读作 `…2 个组件启用· 3 处手工调整`(**缺空格**)。这是本仓库在 `domain_list_separator` 上
+踩过的**同一个坑**;修法 = 存活写法 `\u0020`。
+⚠️ **最关键教训**:我最初按"语言无关"纪律用 `TestText` 从**同一份资源**取期望值写断言 ——
+期望值与实际值**一起被 trim** ⇒ **断言恒真 ⇒ 四道闸门全绿**;缺陷只在**变异验证打印实际报文**时
+才暴露(`Expected < · 1 manual adjustment>, actual <· 1 manual adjustment>`)。
+⇒ 在 `ResourceFallbackTest.kt`(全仓唯一刻意写死中英字面量处)加 2 条逐字断言。
+⚠️ 其中英文那条**第一版写成 `qualifiers = "ja"` 而失败** —— 兜底取的是**文案**(默认槽位英文,对),
+但复数**变体**按 locale 的 CLDR 规则选;日语只有 `other`,故 quantity=1 仍取 `other`。
+**默认 locale 是 en_US(⇒ `one` 形),故不写 qualifiers。**
+
+**⑤ 同轮新发现:第 18 条「拖拽无法跨视口」** —— 30 张图时从第 1 张拖到第 30 张**物理上不可能**。
+初判根因是 `change.consume()` 阻断 Lazy 接手势;**探针实测不成立** —— 真因是手势挂在 Lazy 的
+子项(卡片)上,源卡滚出视口被销毁 ⇒ `pointerInput` 取消 ⇒ `onDragEnd` 永不触发。
+**已修**(手势上移到容器 + 拖动期间 `userScrollEnabled = false` + 边缘按比例 `scrollBy`),
+2026-09-26 真机核对通过(用户逐字「效果可以」)。⇒ 详见下方
+「✅ §11 第 18 条:拖拽跨视口滚动」小节。
+
+**四道闸门**:`app 326`(324 → +2 空格守卫)/ `domain 246` 全绿、lint `No issues found.`、
+APK **34,210,577 B** ⚠️ **该值是陈旧文件**(详见下一小节末尾的订正块,真值 **33,246,968 B**)。
+
+**变异验证 9 组全捕获、逃逸 0**(脚本 `app/build/mut_ghost_summary.py`,不跟踪):
+G1 位移置零 / **G2 tag 挪回图层节点**(反向守卫 tag 位置修正)/ G3 不渲染浮层 /
+G4 不屏蔽语义(文件名重复)/ S1 接线断开 / S2 永不产出段 / S3 数量恒 0 /
+**S4/S5 前导空格退回裸空格**(这两条正是 ④ 那两条字面量断言的杀伤力证明)。
+
+**✅ 真机核对已通过(2026-09-25,PJX110 / Android 16 / 361dp×794dp,用户授权后执行)**:
+- 第 9 条 —— **用户亲测**,逐字「**我自己试了,网格和列表效果都可以**」。
+- 第 10 条 —— agent 读数:拖过 4 张后进第 2 步,摘要栏实测
+  `旅行照片_001.jpg · 2 个组件启用 · 含 4 处手工调整`(节点 `[42,525][1124,595]`);
+  点「重置人工调整」(回到 `0 处`)后再进第 2 步,摘要变回 `旅行照片_001.jpg · 2 个组件启用`
+  —— **披露段消失**,两个方向都对。
+
+设备已复位(`/data/local/tmp` 内 `.png`/`.xml` 计数 = 0、`svc power stayon false`、`am force-stop`)。
+
+#### ✅ §11 第 18 条:拖拽跨视口滚动(2026-09-25 实现 / 2026-09-26 真机核对通过)
+
+**触发** —— 第 9/10/14 条那轮真机核对时用户顺势提出,逐字:
+「拖拽不会带动网格/列表滚动,极端点可能会有首页被自动排序到末尾的情况所以需要拖拽调整」
+⇒ 这不是观感打磨,而是**排序回退手段不可用**的功能缺陷(自动排序把首页挤到末尾后,
+用户无法把它拖回来)。
+
+**根因纠正(探针实测)** —— 见 §11 第 18 条正文。一句话:**手势挂在 Lazy 的子项(卡片)上,
+源卡滚出视口后被销毁 ⇒ `pointerInput` 被取消 ⇒ `onDragEnd` 永不触发**。
+`change.consume()` 是**清白的**(它只阻止 Lazy 自己滚动)。
+
+**实现**:
+- `ui/components/EdgeAutoScroll.kt`(新建,84 行):纯函数
+  `edgeAutoScrollStep(pointerYInRoot, containerTopInRoot, containerHeight, density, burst): Float`。
+  近上缘返回负值(内容向下滚)、近下缘返回正值;`深度 = 距该边距离 / 边缘带宽`(`coerceIn(0f, 1f)`)、
+  `步长 = 14dp × density × 深度 × (1 + burst).coerceIn(1, 4)`。常量
+  `EDGE_SCROLL_ZONE_DP = 72f` / `EDGE_SCROLL_BASE_STEP_DP = 14f` / `EDGE_SCROLL_MAX_MULTIPLIER = 4`。
+- `DragReorderGrid.kt` / `DragReorderList.kt`:手势上移到不滚动的容器 `Box`;
+  Lazy 加 `userScrollEnabled = draggingIndex == null`;`onDrag` 里算步长,非零则 `edgeBurst++`
+  并 `scope.launch { state.scrollBy(step) }`,归零则 `edgeBurst = 0`;`onDragEnd`/`onDragCancel` 复位。
+- 浮层尺寸在**起拖时定格**(`sizeInRoot = dragSize`)。
+
+**四道闸门**:`app 340`(326 → **+14**,即 `EdgeAutoScrollTest` 新增 14 条)/ `domain 246` 全绿、lint `No issues found.`、APK **33,246,968 B**。
+
+> ⚠️ **APK 字节数订正**:上一小节记的 `34,210,577 B` 是**陈旧文件** —— mtime 早于本轮,
+> 且 Gradle 当时报 `:app:packageDebug UP-TO-DATE`,即那个值正是第 18 条开工**之前**的旧包。
+> 处理:`rm -f app/build/outputs/apk/debug/app-debug.apk` 后强重建 ⇒ **33,246,968 B**;
+> 连做两次 rm + rebuild 尺寸一致(确定)。并解 zip 合并全部 dex 验证新代码确实在内:
+> `EdgeAutoScrollKt -> 2` / `edgeAutoScrollStep -> 1` / `DragGhostKt -> 25` /
+> `DragGhostStyle -> 6` / `TAG_DRAG_GHOST -> 1` / `view-grid -> 2`。
+> ⇒ **此后一律以 33,246,968 B 为准,不得再引用 34,210,577。**
+
+**变异验证 11 组全捕获、逃逸 0**(脚本 `app/build/mut_edge_scroll.py`,不跟踪):
+G-A 自动滚动恒为 0 / G-B 边缘方向反 / G-C 算出步长但不接线 / G-D 网格侧不交出滚动权 /
+G-E 起拖兜底到最近格 / G-F 去掉加速 / G-G 去掉加速上限 / G-H 不清理过期格坐标 /
+G-I 列表侧不交出滚动权 / G-J 列表侧不接线 / G-K 浮层尺寸改为实时取。
+
+> **首轮 G-H 与 G-K 是真逃逸** —— 既有测试**全部在"滚动之前"起拖**,故
+> 「滚动后起拖的身份」与「源卡滚出后的浮层尺寸」两条性质**无断言覆盖**。
+> 补 2 条端到端测试(`dragging starts on the card under the finger after scrolling` /
+> `ghost survives after the source card scrolls out of view`)后归零。
+> (另一条 G-E 首轮逃逸是**判据选错**:只断言"松手后的上报"会被
+> 「目标格 == 起始格 ⇒ 不提交」掩盖;改断言**浮层是否出现**才有的杀伤力。)
+
+**✅ 真机核对已通过(2026-09-26,PJX110 / Android 16 / 361dp×794dp,用户授权后执行)**:
+用户亲测,逐字「**效果可以**」。
+
+> ⚠️ 本轮核对期间发现**用户正在手机上操作** —— agent 注入的一次上滑返回了**列表态且换了集合**,
+> 一次普通上滑做不到。⇒ **立即停止全部 adb 输入注入**,只做清理,避免与用户手势打架。
+> 设备已复位(`/data/local/tmp` 内 `.png`/`.xml` 计数 = 0、`svc power stayon false`、`am force-stop`)。
 
 ### D2：平台能力验证
 
@@ -2196,11 +2328,33 @@ lint `No issues found.`、APK **33,691,473 B**;真机 7 处逐一复核通过,�
 6. 删除是否只允许移动到回收站/系统废纸篓，而不是直接删除？
 7. 是否需要把一次完整工作流保存为项目文件，以便稍后继续？
 8. Android 首版是否先限制为单一授权目录，暂不支持跨目录批处理？
-9. **拖拽落地方式**：D1 现实现为"松手落地"（拖动中仅高亮目标格，避免悬停实时重排的 hit test 抖动导致顺序来回换位）；是否需要"拖动中实时让位"的观感？（2026-09-10 实现取舍，等走查反馈）
-10. **排序与命名的联动边界**：图片序号取自第 1 步当前顺序（含人工调整），人工拖拽后是否要同步刷新命名建议的提示强度？（2026-09-10 记录）
+9. ~~**拖拽落地方式**：是否需要"拖动中实时让位"的观感？~~ —— **已定(2026-09-25)**:**维持"松手落地"**,
+    并**另补「跟手浮层」**。用户裁决(逐字选项):「维持松手落地，另补「跟手浮层」」。
+    ① **实时让位不做**:拖动中指针微动会反复触发重排 → 顺序来回换位,用户看到的是"拖了但没变"
+    (§12.5 结论 2 的 2026-09-16 实测);且这是**交互契约**而非实现细节(`main` 侧 `reorderable.dart` 同款结论)。
+    ② **浮层是真缺口**:改前拖动中**没有任何东西跟着手指** —— 源卡只 `.alpha(0.35f)` 留在原地,
+    反馈全靠目标格高亮。新增 `ui/components/DragGhost.kt`(以指针为中心、1.05× 放大、投影、alpha 0.92),
+    网格与列表各接一处;**浮层只画不参与命中判定**,故与"松手落地"不冲突。
+    ③ 归档原型有先例:`childWhenDragging` 用 `Opacity(0.35)` + 外层 `LayoutBuilder` 传浮层尺寸
+    (默认回退 `150×190`),见 `docs/notes/d1-archive-domain-semantics.md` §3.4。
+    **真机核对已通过(2026-09-25,PJX110 / Android 16,用户亲测)**:用户逐字「**我自己试了，网格和列表效果都可以**」。
+    (2026-09-10 记录;2026-09-25 裁决并实施)
+10. ~~**排序与命名的联动边界**：人工拖拽后是否要同步刷新命名建议的提示强度？~~ —— **已定(2026-09-25)**:
+    **加一行被动披露**(不弹窗、不加第二入口,符合 §2 约束 3「预览是主工作区,不是日志」)。
+    根因是**不对称**:第 1 步**已有**同口径提示(`a_manual_count`「已人工调整 N 处」+ 重置按钮),
+    第 2 步却**完全沉默** —— 而命名序号**跟随页序**,上一步拖过几张会改变这里的建议名,翻页后就被藏起来。
+    实现:`namingSummaryLine(scheme, sample, manualCount = 0)` 改返回 `List<Msg>`,
+    `manualCount > 0` 时追加 `TextKey.NamingSummaryManual` 段;摘要变为
+    `旅行照片_001.jpg · 2 个组件启用 · 含 3 处手工调整`。**归零时摘要与改动前逐字一致**。
+    ⚠️ 该段的前导空格**必须写成 `\u0020`** —— AAPT2 会 trim 裸空格(本仓库在 `domain_list_separator` 上
+    踩过的同一个坑),退回裸空格后拼接读作 `…2 个组件启用· 3 处手工调整`。
+    **真机核对已通过(2026-09-25,PJX110 / Android 16,agent 读数)**:
+    拖过 4 张后进第 2 步,摘要栏实测 `旅行照片_001.jpg · 2 个组件启用 · 含 4 处手工调整`(节点 `[42,525][1124,595]`);
+    点「重置人工调整」(回到 `0 处`)后再进第 2 步,摘要变回 `旅行照片_001.jpg · 2 个组件启用` —— **披露段消失**。
+    (2026-09-10 记录;2026-09-25 裁决并实施,自证见 §9.1「§11 第 9/10/14 条」轮)
 11. ~~电脑端归档的处理路径~~ —— **已定(2026-09-10)**:绝大多数操作在手机完成,只有手机存储空间不足时才转到电脑;电脑端不做 GUI,用现有 Python 脚本手工处理即可。详见 §7。
 12. **空间不足的提示阈值与引导方式**:Android 端不追求 4GB 级可靠写入,但须做到“提前预检 → 明确拒绝 → 引导到电脑”。具体阈值(按预估输出的百分比?绝对值?)与提示形态待 D2b 真机验证后定。(2026-09-10 更新)
-13. ~~**自然排序是否需要支持中文数字**~~ —— **已定(2026-09-27)**:需要,且**范围限定为 `一`~`九` 与 `十`**。
+13. ~~**自然排序是否需要支持中文数字**~~ —— **已定(2026-09-25)**:需要,且**范围限定为 `一`~`九` 与 `十`**。
    归一做在**分词阶段**(`tokenizeNatural`),理由:`compareNaturalTokens` 还会被预计算过记号序列的
    调用方(`SortItems`)用到,分词是两边的唯一共同入口。覆盖 `十`(10)/`十X`(11-19)/`X十`(20-90)/
    `X十Y`(21-99)/`X`(1-9);`百`/`千`/`万`/`〇` 与连续罗列(`一二`、`十十`)**不归一化**,原样回退按码点比。
@@ -2210,8 +2364,21 @@ lint `No issues found.`、APK **33,691,473 B**;真机 7 处逐一复核通过,�
    的实际顺序为 `第一话 第七话 第三话 第九话 第二话 第五话 第八话 第六话 第十一话 第十三话 第十二话 第十话 第四话`
    (即按 `一 七 三 九 二 五 八 六 十 四` 的码点序),其中 `第十一话` 排到了 `第十话` 之前。
    (2026-09-10 记录;**2026-09-13 自归档分支补回**;实现与自证见 §9.1「§11 第 13/15 条」轮)
-14. **命名建议的“序号”取哪个**:现取“第 1 步整理后的当前顺序”(拖拽会改变序号);是否需要提供“沿用原文件名解析出的原始序号”(如 `IMG_1_xxx` 里的 `1`)作为可选项?直接决定“拖拽后序号是否变”。(2026-09-10 记录;**2026-09-13 自归档分支补回**,原随 Flutter 提交被丢弃,与实现栈无关)
-15. ~~**[P5 真机核对中发现,2026-09-19] 批量设置是否应被视为"逐项例外"?**~~ —— **已定(2026-09-27)**:
+14. ~~**命名建议的"序号"取哪个**~~ —— **已定(2026-09-25)**:**维持现状**,
+    序号 = "第 1 步整理后的当前顺序"(拖拽会改变序号)。用户裁决(逐字选项):「维持现状：序号 = 第 1 步整理后的页序（推荐）」。
+    ① **全仓只有一种序号口径**:`NamingEval.kt` 的 `componentText()` 里
+    `ImageIndex -> (scheme.indexStart + position).toString().padStart(scheme.indexPadding, '0')`,
+    `position` 是**页序下标(0-based)**;`SourceItem` **没有任何解析出的序号字段**。
+    ② **"沿用原文件名解析出的原始序号"在两代原型中都没有先例** ——
+    归档原型(Flutter)与新栈实现**逐字一致**;两份 Python 归档脚本同样没有:
+    `scripts/batch_rename_images.py` 的命名阶段组件是**固定拼接**
+    `[prefix, root_name] + path_parts + [name_part]`,**根本不存在序号组件**(序号只在文件名冲突时
+    由 `_handle_numeric_suffix()` 生成);`scripts/batch_pack_cbz.py` 的序号 = **排序后的列表下标 + 1**。
+    ③ **主动不做**的实质理由 = `HANGOFF.md` §6 已定口径(逐字):「自然序是主路径 ——
+    用户以 `IMG_1_xxx` 这类规范命名在源头保证顺序,**工具不为 `IMG_10` 这类歧义命名兜底**」;
+    再加一个 `OrigIndex` 组件会引入**第二套序号权威**,与页序序号并存必然产生"该信哪个"的困惑。
+    (2026-09-10 记录;**2026-09-13 自归档分支补回**;2026-09-25 裁决维持现状)
+15. ~~**[P5 真机核对中发现,2026-09-19] 批量设置是否应被视为"逐项例外"?**~~ —— **已定(2026-09-25)**:
    采用**备选语义(批量≠例外)**。批量写入后**清除该字段的逐项例外标记**,故同一字段可反复批量覆盖;
    **只有逐卷手工编辑**才构成例外,手工改过的卷仍受批量保护(除非切「强制覆盖逐项例外」)。
    这是 §2 约束 4「批次统一 + **逐项**例外」的字面分工:批量管"批次统一",手工管"逐项"。
@@ -2314,6 +2481,45 @@ lint `No issues found.`、APK **33,691,473 B**;真机 7 处逐一复核通过,�
        `surfaceDim` / `*Fixed*` **不受种子色影响**(恒为 material3 基线值)——
        非靛蓝强调色下会出现"表面是强调色中性色、卡片却是基线紫灰"的色相错配。
        详见 §9.1「第 1 步」与 `docs/notes/d1-ui-friction-inventory.md` 第 10 节。
+
+18. ~~**[第 9/10/14 条那轮真机核对中新发现] 拖拽无法跨视口 —— 30 张图时从第 1 张拖到第 30 张物理上不可能。**~~
+    —— **已修(2026-09-25 实现;2026-09-26 真机核对通过)**。
+
+    **⚠️ 初判根因是错的,实测定为另一条。** 初记写的是"① `DraggableThumbCard` / `ThumbRow` 的
+    `onDrag` 里 `change.consume()` 阻断了 LazyGrid/LazyColumn 接收手势",探针实测**不成立**
+    —— `change.consume()` 只阻止 Lazy **自己**滚动,并不杀死手势。真因是:
+
+    ① **拖拽手势挂在卡片上(`pointerInput(item.id)`),而卡片是 Lazy 的子项** —— 一旦滚得够远,
+       被拖的那张卡离开视口,`LazyGrid` / `LazyColumn` 把它销毁,挂在它身上的 `pointerInput`
+       随之被取消,`onDragEnd` **永不触发** ⇒ 跨视口拖拽**物理上不可能**。
+       (探针按触边事件数读活性:4 次触边仍活、16 次触边后浮层消失 = 手势已死。)
+    ② 全组件**没有任何边缘自动滚动**(`scrollBy` / `animateScroll` 零命中),也没有"拖到边缘就翻页"的替代路径。
+
+    **修法(两步缺一不可)**:
+    - **把手势从卡片上移到不滚动的容器 `Box`**(`DragReorderGrid.kt` / `DragReorderList.kt`),
+      卡片只负责显示;命中判定由容器拿 `slotBounds` 反查(`findContainedSlotAt`)。
+      这样被拖的卡即使滚出视口被销毁,**手势依然活在容器上**。
+    - **拖动期间把滚动权交给程序**:Lazy 加 `userScrollEnabled = draggingIndex == null`
+      (探针实测:不交出滚动权时 Lazy 在 Main 阶段先接到事件、立刻转成 `cancel`,手势长度 2;
+      交出后手势完整走完,`events=12`、收尾是 `end`),滚动改由 `EdgeAutoScroll.kt` 的
+      `edgeAutoScrollStep(...)` + `scrollBy` **按每个 `onDrag` 事件驱动**。
+      边缘带宽 72dp / 基础步长 14dp / 连续触边加速上限 4×。
+
+    **为什么是事件驱动而不是帧循环/定时器**:帧循环在本仓库**离线不可驱动**且会挂死测试套
+    (无条件 `while(true){ withFrameNanos{} }` ⇒ `setContent`/`waitForIdle` 永不返回,
+    `java.lang.InterruptedException at Builders.kt:94`;`autoAdvance = true` ⇒
+    `OutOfMemoryError: Java heap space`;`advanceTimeByFrame()` 不恢复续体)。**代价(有意取舍)**:
+    指针在边缘完全静止时不继续滚动 —— 真机手指会抖,叠加加速后长距离仍可达。
+    归档 Flutter 原型同样用长按起拖「避免与滚动冲突」,同向。
+
+    **判据(真机可证伪)**:点开 `旅行照片`(30 张,10 行、可视约 5 行),按住第 1 张往屏幕下缘拖 ——
+    列表**跟着滚**,能在**一次手势内**拖到第 30 张并提交落点。
+    **✅ 2026-09-26 真机核对通过** —— 用户亲测,逐字「**效果可以**」。
+
+    **自证**:`EdgeAutoScrollTest` **14 条**(8 条纯函数 + 6 条端到端,含"滚动后起拖应落在手指下的卡上"
+    与"源卡滚出视口后浮层仍活");变异 **11 组全捕获、逃逸 0**
+    (脚本 `app/build/mut_edge_scroll.py`)。实现与闸门读数见 §9.1「✅ §11 第 18 条」小节。
+    (原记入 `docs/notes/d1-ui-friction-inventory.md` §14 —— **注:旧文写的是 §13,是错的,已订正**)
 
 ## 12. 开发环境实况与 Android 验证准备(2026-09-07 由 s_handoff.md 并入)
 
@@ -2540,9 +2746,9 @@ mise ls                  # 看 mise 管的工具版本
 | Git / VS Code / Android Studio | 2.55.0.windows.5 / 1.138.0 / 2026.1.4.7 |
 | JDK | temurin-17.0.20+101(mise;Android/Gradle 构建所需);另有 Studio 内置 **JBR 25.0.3** 可用(完整 JDK) |
 | Gradle / AGP / Kotlin / Compose BOM | **9.7.1 / 9.4.1 / 2.4.20 / 2026.09.00** —— **2026-09-20 主动升级到当时最新 stable**(用户决策:"尽量都用新的稳定版本",考虑后期维护)。原值 9.6.0 / 9.4.0 / 2.2.10 / 2026.02.01 来自 Studio 2026.1.4 模板。**升级动因**:引入 AboutLibraries 15.2.0 需 Kotlin ≥ 2.4.10。**升级经探针实测**(临时分支验证后弃用):编译通过 + **既有 461 项测试全绿** + assembleDebug + lint 零告警。证据见 `docs/notes/d1-toolchain-evidence.md` §8 |
-| compileSdk / minSdk / targetSdk | **37** / **34** / **36** —— `compileSdk` 于 2026-09-20 由 36 升到 37 (新依赖链 AboutLibraries → Compose 1.12.1 要求;`platforms;android-37.0` 本机已装)。**`targetSdk` 仍锁 36**(与真机 Android 16 对齐,§12.6 策略不变)—— 二者分离:`compileSdk` 只决定"用哪个 SDK 编译",`targetSdk` 决定运行时行为契约。故 `OldTargetApi` 的 lint 豁免理由继续成立。**`minSdk` 于 2026-09-26 由 30 再提到 34**(见下一行) |
+| compileSdk / minSdk / targetSdk | **37** / **34** / **36** —— `compileSdk` 于 2026-09-20 由 36 升到 37 (新依赖链 AboutLibraries → Compose 1.12.1 要求;`platforms;android-37.0` 本机已装)。**`targetSdk` 仍锁 36**(与真机 Android 16 对齐,§12.6 策略不变)—— 二者分离:`compileSdk` 只决定"用哪个 SDK 编译",`targetSdk` 决定运行时行为契约。故 `OldTargetApi` 的 lint 豁免理由继续成立。**`minSdk` 于 2026-09-25 由 30 再提到 34**(见下一行) |
 | minSdk 由 24 提到 **30** | **2026-09-22 用户裁决**。起因:用户问"为什么要做 API 24/25 回退,我的安卓手机最低安卓 16"。**功能面实测**(查 `android-36/data/api-versions.xml` 类级 `since`):roadmap 所需 API 在 minSdk=30 已全部到手 —— `java/nio/file/Files`=26(D2a 归档)、`android/graphics/ImageDecoder`=28(D3/D4 解码)、`android/app/NotificationChannel`=26(D4 进度通知);`LocaleManager`=33 未到手但**已有 `Build.VERSION` 分支**(`Theme.kt:48`、`PixFoldApp.kt:192`);`ZipOutputStream`/`ZipFile`/`ZipEntry` 全部 since=1、SAF `DocumentsContract`=19 ⇒ **CBZ 打包与 SAF 在任意 minSdk 都可行**。**依赖面实测**:activity-compose 1.13.0→23、material3/material3-ripple/navigation-compose 2.10.2→24、material-color-utilities→21、aboutlibraries-compose/-m3→21 ⇒ **无任何依赖阻止 minSdk=30**。**连带改动**:①`mipmap-anydpi-v26/` 必须删、三层 `<adaptive-icon>` 移入 `mipmap-anydpi/`(否则 lint 报 `UnnecessaryQualifier` 而本项目 `warningsAsErrors=true` 直接失败);②原先给 API 24/25 兜底的 48dp 普通 vector 回退档及其源码结构用例**一并删除**。**Java 工具链不动**(`JavaVersion.VERSION_17` + `:domain` 的 `jvmToolchain(17)`)。**已否决的 minSdk=36**:虽可删尽三处版本分支并与真机完全对齐,但 Robolectric 的 SDK 36 sandbox 硬性要求 **Java 21**(逐字 `Failed to create a Robolectric sandbox: Android SDK 36 requires Java 21 (have Java 17)`),且 29 个测试文件的 `@Config(sdk=[34])` 需全部改 `[36]`,代价不成比例。**连带现象(非缺陷)**:minSdk≥28 时 AGP **故意不压缩 dex**,debug APK 由 13 MB 变为 33 MB —— AGP 的 `DexPackaging` DSL 源码逐字「If null, dex files will be uncompressed when minSdk >= 28」,用意是 ART 可直接 mmap 加载、省安装期解压。逐档实测 26→13,040,830 B(全 DEFLATED)、28/29/30→33.2 MB(全 STORED);加 `packaging { dex { useLegacyPackaging = true } }` 可回到 13,007,710 B,但**用户裁决保持默认**。详见 `docs/notes/d1-toolchain-evidence.md` §9.7 |
-| minSdk 由 30 提到 **34** | **2026-09-26 用户裁决**(用户问「minSDK34有什么新的功能可以用吗要不直接切34」)。**起因**:`docs/notes/d1-toolchain-evidence.md:292` 记录应用内语言依赖 `LocaleManager`/`LocaleConfig`(API 33+),minSdk=30 时需要 `Build.VERSION` 分支兜底。**33 与 34 的代码清理成本完全相同** —— 两者都要求删掉同一批 3 处 `ObsoleteSdkInt` 守卫:`AndroidManifest.xml` 的 `tools:targetApi="33"`、`PixFoldApp.kt` 的 `SDK_INT < TIRAMISU`、`Theme.kt` 的 `SDK_INT >= S`。⇒ 既然成本一样,取 34 可额外拿到 **HDR gainmap**(`android/graphics/Gainmap`、`Bitmap.getGainmap()/hasGainmap()/setGainmap()`),供 D3/D4 图片管线用。**连带删除**:`AndroidManifest.xml` 的 `xmlns:tools` 与 `tools:targetApi`、`PixFoldApp.kt` 的 `import android.os.Build` + 版本守卫、`Theme.kt` 的 `import android.os.Build` + 版本守卫(`settings.monetEnabled && Build.VERSION.SDK_INT >= S` → `if (settings.monetEnabled)`)。⚠️ **纠正一处早先的错判**:上一行里"29 个测试文件的 `@Config(sdk=[34])` 必须全改 `[36]`"是 **minSdk=36 的代价**;minSdk=34 与测试用的 `@Config(sdk=[34])` **完全一致,零测试改动**(实测 `app` 292 / `domain` 229 全绿、无一条用例需改)。**未受影响**:`compileSdk=37`/`targetSdk=36`/Java 17 全部不动。**最小真机验证**:APK 由 33,549,783 B → **33,046,763 B**(−503,020 B,dex 压缩策略随 minSdk 档位变化)。详见 `docs/notes/d1-toolchain-evidence.md` §9(以 30→34 为准) |
+| minSdk 由 30 提到 **34** | **2026-09-25 用户裁决**(用户问「minSDK34有什么新的功能可以用吗要不直接切34」)。**起因**:`docs/notes/d1-toolchain-evidence.md:292` 记录应用内语言依赖 `LocaleManager`/`LocaleConfig`(API 33+),minSdk=30 时需要 `Build.VERSION` 分支兜底。**33 与 34 的代码清理成本完全相同** —— 两者都要求删掉同一批 3 处 `ObsoleteSdkInt` 守卫:`AndroidManifest.xml` 的 `tools:targetApi="33"`、`PixFoldApp.kt` 的 `SDK_INT < TIRAMISU`、`Theme.kt` 的 `SDK_INT >= S`。⇒ 既然成本一样,取 34 可额外拿到 **HDR gainmap**(`android/graphics/Gainmap`、`Bitmap.getGainmap()/hasGainmap()/setGainmap()`),供 D3/D4 图片管线用。**连带删除**:`AndroidManifest.xml` 的 `xmlns:tools` 与 `tools:targetApi`、`PixFoldApp.kt` 的 `import android.os.Build` + 版本守卫、`Theme.kt` 的 `import android.os.Build` + 版本守卫(`settings.monetEnabled && Build.VERSION.SDK_INT >= S` → `if (settings.monetEnabled)`)。⚠️ **纠正一处早先的错判**:上一行里"29 个测试文件的 `@Config(sdk=[34])` 必须全改 `[36]`"是 **minSdk=36 的代价**;minSdk=34 与测试用的 `@Config(sdk=[34])` **完全一致,零测试改动**(实测 `app` 292 / `domain` 229 全绿、无一条用例需改)。**未受影响**:`compileSdk=37`/`targetSdk=36`/Java 17 全部不动。**最小真机验证**:APK 由 33,549,783 B → **33,046,763 B**(−503,020 B,dex 压缩策略随 minSdk 档位变化)。详见 `docs/notes/d1-toolchain-evidence.md` §9(以 30→34 为准) |
 | **16 KB 页大小支持** | ✅ **已达标,零配置**(2026-09-24 核查)。权威判定 = SDK 自带 `zipalign -c -P 16 -v 4 app-debug.apk` → `Verification successful`、`exit=0`,4 条 `lib/**/*.so` 偏移 `% 16384` 全为 **0**;**ELF 侧** `readelf -lW` 的 3 个 `LOAD` 段 `Align` 全为 **`0x4000`**;4 条 `.so` 在 APK 内均 **STORED 未压缩**(对齐的前提)。**未做任何配置** —— AGP ≥ 8.5.1 会自动做(官方逐字「align them on a 16 KB zip-aligned boundary」),本项目 AGP **9.4.1** 远高于门槛;`gradle.properties` 与 `app/build.gradle.kts` 内**无** `packaging`/`useLegacyPackaging`/`alignment` 任何配置(已 grep 确认)。**唯一 `.so` 来源** = 传递依赖 `androidx.graphics:graphics-path:1.0.1`(经 `androidx.compose.ui:ui-graphics-android:1.12.1`),本项目**无** `jniLibs/`、**无** `externalNativeBuild`/`ndkVersion`/`cmake`。⚠️ **教训**:按 ZIP 结构自算 data 偏移会得出**错误结论**(arm64-v8a 自算 `% 16384 = 1536` 看似未对齐),因为没计入 AGP 注入的 alignment extra field ⇒ **对齐判定只认 `zipalign -c -P 16`**。Play 对该项的强制要求(2025-11-01 起)**不适用**(本项目不上架,`HANGOFF.md:1719`),但零成本达标,如实登记。详见 `docs/notes/d1-toolchain-evidence.md` §10 |
 | Android platform | `platforms;android-36`(**已装**,与真机 Android 16 对齐);`android-37.0` 也在(模板默认带的) |
 | Android SDK 根 | `C:\Users\Administrator\AppData\Local\Android\Sdk` |

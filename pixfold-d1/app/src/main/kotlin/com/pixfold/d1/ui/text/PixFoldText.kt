@@ -137,6 +137,7 @@ private fun TextKey.pluralQuantityIndex(): Int? = when (this) {
     TextKey.WarnDuplicate,
     TextKey.WarnTooLong,
     TextKey.NamingSummaryEnabled,
+    TextKey.NamingSummaryManual,
     TextKey.RenameSummary,
     -> 0
 
@@ -293,6 +294,7 @@ private fun TextKey.resId(): Int = when (this) {
     // 命名结构摘要
     TextKey.NamingSummaryEnabled -> R.plurals.domain_naming_summary_enabled
     TextKey.NamingSummaryWithHead -> R.plurals.domain_naming_summary_with_head
+    TextKey.NamingSummaryManual -> R.plurals.domain_naming_summary_manual
 
     // 重命名影响范围
     TextKey.RenameSummary -> R.plurals.domain_rename_summary

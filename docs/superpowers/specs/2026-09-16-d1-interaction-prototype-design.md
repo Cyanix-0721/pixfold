@@ -54,7 +54,7 @@ D1 六项交付(HANGOFF §9 D1):图片列表/缩略图预览、拖拽排序、�
 6. **compileSdk / minSdk / targetSdk = 36 / 24 / 36**;`namespace`/`applicationId` = `com.pixfold.d1`。
    > **⚠️ 2026-09-22 更新**:本行记录的是 09-16 的取值。`compileSdk` 于 09-20 升到 **37**,
    > **`minSdk` 于 09-22 由 24 提到 30**(用户裁决,理由与实测见
-   > `docs/notes/d1-toolchain-evidence.md` §9 与 `HANGOFF.md` §12.6);**2026-09-26 又由 30 提到
+   > `docs/notes/d1-toolchain-evidence.md` §9 与 `HANGOFF.md` §12.6);**2026-09-25 又由 30 提到
    > `34`**(见 §9.8)。当前版本锚点 = **37 / 34 / 36**,以 `docs/notes/d1-toolchain-evidence.md`
    > 与 `HANGOFF.md` §12.6 为准;保留原文作为当时的设计记录。
 7. **`local.properties` 不入库**(含机器相关 `sdk.dir`);`build/`、`.gradle/`、`.kotlin/` 不入库。
@@ -772,10 +772,22 @@ class WorkflowAStateHolder(initial: WorkflowAState) {
 | **Kotlin `Regex.split` 陷阱** | 自然排序静默失效 | P1 必修 + L3 单测钉死 |
 | Robolectric 首跑较慢(~65s/次) | 反馈循环变慢 | 领域层用第 1 层快速迭代;UI 层按阶段批量跑 |
 
-**未决**(需用户后续确认,不阻塞 P1):HANGOFF §11 第 9/10/14 条(拖拽落地方式是否要实时让位、
-排序与命名联动强度、命名序号取哪个)。
+**未决**(需用户后续确认,不阻塞 P1):~~HANGOFF §11 第 9/10/14 条~~
 
-> **第 13 条(中文数字自然排序)已于 2026-09-27 落定**:范围限定 `一`~`九` 与 `十`
+> **第 9/10/14 条已于 2026-09-25 全部落定**:第 9 条**维持"松手落地"**并补「跟手浮层」;
+> 第 10 条**加一行被动披露**(摘要栏显示「含 N 处手工调整」);
+> 第 14 条**维持现状**(序号 = 第 1 步整理后的页序,"沿用原文件名解析出的原始序号"在两代原型中
+> 都没有先例)。详见 HANGOFF §11 第 9/10/14 条与
+> `docs/notes/d1-ui-friction-inventory.md` §13。
+> **同轮新发现第 18 条**(拖拽无法跨视口,30 张图时第 1 张拖不到第 30 张)已登记,排 P1
+> —— **✅ 已于 2026-09-25 修复、2026-09-26 真机核对通过**(用户逐字「效果可以」)。
+> ⚠️ **初判根因是错的**:不是 `change.consume()` 阻断 Lazy 接手势(探针实测不成立),
+> 而是**手势挂在 Lazy 的子项(卡片)上**,源卡滚出视口被销毁 ⇒ `pointerInput` 取消 ⇒
+> `onDragEnd` 永不触发。修法 = 手势上移到不滚动的容器 + 拖动期间
+> `userScrollEnabled = draggingIndex == null` + 新建 `EdgeAutoScroll.kt` 按 `onDrag` 事件驱动
+> `scrollBy`。详见 HANGOFF §11 第 18 条与 `docs/notes/d1-ui-friction-inventory.md` §14。
+
+> **第 13 条(中文数字自然排序)已于 2026-09-25 落定**:范围限定 `一`~`九` 与 `十`
 > (`百`/`千`/`万`/`〇` 不归一化),归一化落在**分词阶段**(`compareNaturalTokens` 也会被
 > 预计算记号序列的调用方用到,分词是唯一共同入口)。
 > ⚠️ 落定时**发现原条目对症状的描述是错的** —— 实测 `第二话` 本就已排在 `第十话` 之前,

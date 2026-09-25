@@ -172,6 +172,13 @@ enum class TextKey {
     // ---------------- 命名结构摘要(namingSummaryLine) ----------------
     NamingSummaryEnabled,
     NamingSummaryWithHead,
+    /**
+     * 「含 N 处手工调整」段(HANGOFF §11 第 10 条);仅 `manualCount > 0` 时出现。
+     *
+     * 段首自带分隔符(` · `),与 [NamingSummaryWithHead] 里那个分隔符同源 ——
+     * 摘要的段间留白习惯是语言相关的,故整体走资源而不是在 UI 里拼 `" · "`。
+     */
+    NamingSummaryManual,
 
     // ---------------- 重命名影响范围(renameSummaryLines) ----------------
     RenameSummary,

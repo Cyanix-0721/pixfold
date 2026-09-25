@@ -1,5 +1,7 @@
 package com.pixfold.d1.ui.components
 
+import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
+import androidx.compose.foundation.gestures.scrollBy
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
@@ -8,11 +10,13 @@ import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.itemsIndexed
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import kotlinx.coroutines.launch
 import androidx.compose.ui.Alignment
 import androidx.compose.runtime.rememberCoroutineScope
@@ -21,8 +25,11 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.boundsInRoot
 import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
 import com.pixfold.d1.domain.model.SourceItem
@@ -40,6 +47,16 @@ const val TAG_GRID_CONTAINER = "view-grid"
  *
  * **松手落地**:拖动中只更新 [hoveredIndex] 用于高亮,[onMoveTo] 只在抬起时回调一次。
  * 这避免了"悬停实时重排 → 指针微动反复换位"(HANGOFF §12.5 结论 2)。
+ *
+ * **手势挂在容器上,不挂在卡片上**(HANGOFF §11 第 18 条)。这是跨视口拖拽的
+ * 必要前提:LazyGrid 会在卡片滚出视口时**销毁**它,挂在卡片上的 `pointerInput`
+ * 随之被取消 —— 实测滚到第 18 格时手势已死(`onDragEnd` 再也不回调),
+ * 于是"把被规则排到末尾的首图拖回来"永远失败。挂在容器上则手势与格子存活无关。
+ *
+ * 代价是容器(祖先)与 LazyGrid(后代)会争夺同一次手势。后代在 Main pass 先收到
+ * 事件,故拖动期间必须把 LazyGrid 自己的滚动关掉([LazyVerticalGrid] 的
+ * `userScrollEnabled = false`),否则它抢走手势并让拖拽以 cancel 结束。
+ * 滚动改由 [edgeAutoScrollStep] 程序化驱动 —— 两者恰好互斥,不会叠加成双倍滚动。
  */
 @Composable
 fun DragReorderGrid(
@@ -55,6 +72,13 @@ fun DragReorderGrid(
 ) {
     val gridState = rememberLazyGridState()
     val scope = rememberCoroutineScope()
+    val density = LocalDensity.current.density
+
+    // 手势块只随容器创建一次(`pointerInput(Unit)`),里面读到的参数会是**首帧**
+    // 的值 —— 重排后 items 变了却仍是旧列表,`onMoveTo` 也会是旧回调。
+    // 用 rememberUpdatedState 拿最新值,避免"拖了却按旧顺序找源项"。
+    val currentItems by rememberUpdatedState(items)
+    val currentOnMoveTo by rememberUpdatedState(onMoveTo)
 
     // 外部驱动的回顶(W4:排序规则变更后自动回顶,用户 2026-09-17 指定)。
     //
@@ -76,8 +100,80 @@ fun DragReorderGrid(
     var draggingIndex by remember { mutableStateOf<Int?>(null) }
     var pointerInRoot by remember { mutableStateOf(Offset.Zero) }
     var hoveredIndex by remember { mutableStateOf<Int?>(null) }
+    // 浮层的锚点:容器自身的左上角根坐标,用于把指针的根坐标换算成容器内局部坐标。
+    var containerInRoot by remember { mutableStateOf(Offset.Zero) }
+    // 边缘自动滚动需要的容器高度(px)与连续触边事件数。
+    // burst 每有一个"仍在边缘带内"的拖拽事件就 +1,用于加速;离开边缘带清零。
+    var containerHeight by remember { mutableStateOf(0f) }
+    var edgeBurst by remember { mutableStateOf(0) }
+    // 浮层尺寸在**起拖瞬间**定格:源卡一旦滚出视口就被销毁,
+    // 再去 slotBounds 里取它的尺寸会拿到过期值导致浮层变形或消失。
+    var dragSize by remember { mutableStateOf(Size.Zero) }
 
-    Box(modifier = modifier) {
+    Box(
+        modifier = modifier
+            .onGloballyPositioned {
+                containerInRoot = it.boundsInRoot().topLeft
+                containerHeight = it.size.height.toFloat()
+            }
+            .pointerInput(Unit) {
+                detectDragGesturesAfterLongPress(
+                    onDragStart = { local ->
+                        // 起点按**包含**判定(不许兜底到最近格):长按空白处不该起拖,
+                        // 否则"点空白/长按空白"会莫名抓住一张卡片。
+                        val root = containerInRoot + local
+                        val index = findContainedSlotAt(root, slotBounds)
+                        if (index != null) {
+                            draggingIndex = index
+                            pointerInRoot = root
+                            hoveredIndex = null
+                            dragSize = slotBounds[index]?.size ?: Size.Zero
+                            edgeBurst = 0
+                        }
+                    },
+                    onDrag = { change, _ ->
+                        val from = draggingIndex
+                        if (from != null) {
+                            change.consume()
+                            // change.position 已是**容器局部**坐标(手势挂在容器上),
+                            // 比原先"卡片左上角 + 卡片内偏移"的换算少一层易错源。
+                            pointerInRoot = containerInRoot + change.position
+                            hoveredIndex = findSlotAt(pointerInRoot, slotBounds)
+                            // 第 18 条:指针贴边时带动网格滚动,否则跨视口拖拽物理上不可能。
+                            val step = edgeAutoScrollStep(
+                                pointerYInRoot = pointerInRoot.y,
+                                containerTopInRoot = containerInRoot.y,
+                                containerHeight = containerHeight,
+                                density = density,
+                                burst = edgeBurst,
+                            )
+                            if (step == 0f) {
+                                edgeBurst = 0
+                            } else {
+                                edgeBurst++
+                                scope.launch { gridState.scrollBy(step) }
+                            }
+                        }
+                    },
+                    onDragEnd = {
+                        val from = draggingIndex
+                        val target = hoveredIndex
+                        draggingIndex = null
+                        hoveredIndex = null
+                        edgeBurst = 0
+                        // 松手才落地;拖到自己格/无目标 -> 不提交
+                        if (from != null && target != null && target != from) {
+                            currentOnMoveTo(currentItems[from].id, target)
+                        }
+                    },
+                    onDragCancel = {
+                        draggingIndex = null
+                        hoveredIndex = null
+                        edgeBurst = 0
+                    },
+                )
+            },
+    ) {
         LazyVerticalGrid(
             state = gridState,
             columns = GridCells.Fixed(columns),
@@ -85,8 +181,17 @@ fun DragReorderGrid(
                 .fillMaxSize()
                 .testTag(TAG_GRID_CONTAINER),
             contentPadding = PaddingValues(8.dp),
+            // 拖动期间交出滚动权(见上方 KDoc):否则 LazyGrid 作为后代先拿到事件,
+            // 会把拖拽抢成 cancel。程序化 scrollBy 不受此开关影响。
+            userScrollEnabled = draggingIndex == null,
         ) {
             itemsIndexed(items, key = { _, it -> it.id }) { index, item ->
+                // 让 slotBounds 只保留**当前已组合**的格:滚出视口的格被 Lazy 销毁后,
+                // 它的旧根坐标会与滚上来的新格几乎重合,拖拽起点会命中错误的格。
+                val latestIndex by rememberUpdatedState(index)
+                DisposableEffect(item.id) {
+                    onDispose { slotBounds.remove(latestIndex) }
+                }
                 Box(
                     modifier = Modifier
                         .padding(4.dp)
@@ -101,35 +206,22 @@ fun DragReorderGrid(
                         isDragging = draggingIndex == index,
                         onClick = { onClick(index) },
                         onPin = { onPin(item.id) },
-                        onDragStart = { localOffset ->
-                            draggingIndex = index
-                            // 本地坐标 -> 根坐标,便于与各格 bounds 比较
-                            val b = slotBounds[index]
-                            pointerInRoot = if (b != null) b.topLeft + localOffset else localOffset
-                            hoveredIndex = null
-                        },
-                        onDrag = { position ->
-                            val b = slotBounds[index]
-                            pointerInRoot = if (b != null) b.topLeft + position else position
-                            hoveredIndex = findSlotAt(pointerInRoot, slotBounds)
-                        },
-                        onDragEnd = {
-                            val from = draggingIndex
-                            val target = hoveredIndex
-                            draggingIndex = null
-                            hoveredIndex = null
-                            // 松手才落地;拖到自己格/无目标 -> 不提交
-                            if (from != null && target != null && target != from) {
-                                onMoveTo(items[from].id, target)
-                            }
-                        },
-                        onDragCancel = {
-                            draggingIndex = null
-                            hoveredIndex = null
-                        },
                     )
                 }
             }
+        }
+
+        // 跟手浮层(HANGOFF §11 第 9 条):拖动中手里的那张图跟着指针走。
+        // 只画不参与命中判定,故不与"松手落地"冲突。
+        val dragFrom = draggingIndex
+        if (dragFrom != null && currentItems.size > dragFrom) {
+            DragGhost(
+                item = currentItems[dragFrom],
+                pointerInRoot = pointerInRoot,
+                containerInRoot = containerInRoot,
+                sizeInRoot = dragSize,
+                style = DragGhostStyle.Card,
+            )
         }
 
         // W2:下滑后显示回顶按钮(右下角)。判据同时要求"下方还有内容"与"确实下滑过",
@@ -151,9 +243,13 @@ fun DragReorderGrid(
     }
 }
 
+/** 找出**包含**该点的格下标;不包含任何格时返回 null(拖拽起点判定用,不做兜底)。 */
+internal fun findContainedSlotAt(point: Offset, bounds: Map<Int, Rect>): Int? =
+    bounds.entries.firstOrNull { (_, r) -> r.contains(point) }?.key
+
 /** 在已知各格 bounds 中找出包含该点的下标;找不到则取**最近格中心**(容错)。 */
 internal fun findSlotAt(point: Offset, bounds: Map<Int, Rect>): Int? {
-    bounds.entries.firstOrNull { (_, r) -> r.contains(point) }?.let { return it.key }
+    findContainedSlotAt(point, bounds)?.let { return it }
     if (bounds.isEmpty()) return null
     return bounds.entries.minByOrNull { (_, r) ->
         val dx = point.x - r.center.x

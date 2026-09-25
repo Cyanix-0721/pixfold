@@ -690,4 +690,57 @@ class NamingPageTest {
         rule.onNodeWithTag(TAG_NAMING_TITLE)
             .assertTextEquals(TestText.plural(R.plurals.a_naming_title, 1, solo.name, 1))
     }
+
+    // ================= 手工调整披露(HANGOFF §11 第 10 条,2026-09-25 用户裁决) =================
+
+    /**
+     * 摘要在没有人工调整时,**逐字**与加这个功能之前一致。
+     *
+     * 这是本次改动对既有界面的唯一承诺:没拖过就看不出区别。
+     * 若有人把披露段写成"恒真"(例如默认 `manualCount = 1`),这条会立刻红。
+     */
+    @Test
+    fun `summary has no manual segment when nothing was dragged`() {
+        show()
+        val summary = TestText.plural(
+            R.plurals.domain_naming_summary_with_head, 2, "旅行照片_001.jpg", 2,
+        )
+        rule.onNodeWithText(summary).assertIsDisplayed()
+    }
+
+    /**
+     * 第 1 步拖过之后,第 2 步的摘要必须**主动带出**这件事。
+     *
+     * 守两层:①披露真的被接进了 `NamingPage`(把 `order.manualCount` 传进
+     * `namingSummaryLine` 这一根线断了就红 —— 领域单测抓不到,它只测函数本身);
+     * ②两段之间**连成了一个字符串**(`joinToString("")` 用错分隔符会得到
+     * `旅行照片_001.jpg · 2 个组件启用· 含 3 处手工调整`,首个空格消失)。
+     */
+    @Test
+    fun `summary discloses manual adjustments after a drag on step one`() {
+        val order = pageOrderOf(trip.images)
+        val moved = com.pixfold.d1.domain.sort.moveItemTo(order, trip.images.first().id, 5)
+        show(order = moved)
+
+        val expected = TestText.plural(
+            R.plurals.domain_naming_summary_with_head, 2, "旅行照片_001.jpg", 2,
+        ) + TestText.plural(R.plurals.domain_naming_summary_manual, 1, 1)
+        rule.onNodeWithText(expected).assertIsDisplayed()
+    }
+
+    /** 拖过 3 张时,数字必须是**页序状态里的真实计数**,不是硬编码的 1。 */
+    @Test
+    fun `manual segment reports the real number of dragged items`() {
+        var order = pageOrderOf(trip.images)
+        order = com.pixfold.d1.domain.sort.moveItemTo(order, trip.images[0].id, 9)
+        order = com.pixfold.d1.domain.sort.moveItemTo(order, trip.images[1].id, 8)
+        order = com.pixfold.d1.domain.sort.moveItemTo(order, trip.images[2].id, 7)
+        show(order = order)
+
+        assertEquals(3, order.manualCount, "测试前提:确实拖了 3 张")
+        val expected = TestText.plural(
+            R.plurals.domain_naming_summary_with_head, 2, "旅行照片_001.jpg", 2,
+        ) + TestText.plural(R.plurals.domain_naming_summary_manual, 3, 3)
+        rule.onNodeWithText(expected).assertIsDisplayed()
+    }
 }
