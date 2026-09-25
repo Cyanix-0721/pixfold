@@ -2,6 +2,7 @@ package com.pixfold.d1.ui.workflowb
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
@@ -11,8 +12,6 @@ import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.horizontalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.DropdownMenuItem
@@ -318,17 +317,23 @@ fun MetadataPage(
     }
 }
 
-/** 步骤 2/3 的卷切换行:让"当前卷"在切步骤后仍可换(选中项在领域状态里)。 */
+/**
+ * 步骤 2/3 的卷切换行:让"当前卷"在切步骤后仍可换(选中项在领域状态里)。
+ *
+ * 2026-09-27 真机实测缺陷:原为 `Row + horizontalScroll`。5 卷时第 4、5 卷芯片
+ * (`海贼王` 两卷)完全落在视口外 —— `进击的巨人 外传` 右边界已达 1219px(屏宽 1264),
+ * 只能靠横向滑动才够得着,而界面上没有任何提示说明这里能滑。
+ * 与集合芯片行同源,一并改 FlowRow 自动换行(见 `SortAndPreviewPage.kt` 同处注释)。
+ */
 @Composable
 private fun VolumeSelector(state: WorkflowBState, onSelect: (String) -> Unit) {
-    Row(
+    FlowRow(
         modifier = Modifier
             .fillMaxWidth()
-            .horizontalScroll(rememberScrollState())
             .padding(horizontal = 12.dp, vertical = 4.dp)
             .testTag(TAG_VOLUME_SELECTOR),
         horizontalArrangement = Arrangement.spacedBy(6.dp),
-        verticalAlignment = Alignment.CenterVertically,
+        verticalArrangement = Arrangement.spacedBy(4.dp),
     ) {
         state.volumes.forEach { v ->
             val chipCd = stringResource(R.string.meta_volume_chip_cd, v.id)
@@ -677,12 +682,12 @@ private fun BatchSection(
             style = MaterialTheme.typography.titleSmall,
             color = MaterialTheme.colorScheme.onBackground,
         )
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .horizontalScroll(rememberScrollState()),
+        // 批量字段芯片行:同样改 FlowRow(3 个字段在 361dp 下本就会挤到边缘,
+        // 与卷切换行/集合行同源缺陷)。
+        FlowRow(
+            modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(6.dp),
-            verticalAlignment = Alignment.CenterVertically,
+            verticalArrangement = Arrangement.spacedBy(4.dp),
         ) {
             // 只开放文本类字段给批量(Number/Language 的取值形态不同,留给逐卷编辑器,
             // 避免把"批量语言"做成能一键把整库设成同一个语言的静默覆盖入口)

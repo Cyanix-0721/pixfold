@@ -1,9 +1,9 @@
 package com.pixfold.d1.ui.workflowa
 
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
@@ -12,7 +12,6 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.windowInsetsPadding
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material3.Button
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
@@ -168,15 +167,25 @@ fun SortAndPreviewPage(
             .windowInsetsPadding(contentInsets),
     ) {
         // 集合切换:让"批次统一 + 逐项例外"在界面上可操作(验收第 7 项)
+        //
+        // 2026-09-27 真机实测缺陷:原实现是 Row + horizontalScroll,集合一多就溢出行外。
+        // 3 个集合时 `杂图` 的右边界恰好 = 屏宽 1264px,第 4 个集合**完全落在视口外**,
+        // 只能靠横向滑动才够得着(且界面上没有任何提示说明这里能滑)。
+        // 这违反 docs/notes/d1-ui-friction-inventory.md 已固化的布局约定
+        // 「361dp 下不给可操作控件加横向滚动」,也与 HANGOFF §9 第 1 条
+        // (组件卡片横向滚动 -> 靠后按钮落在视口外 -> 改两行卡片)的既有裁决同源。
+        // 改用 FlowRow 自动换行:集合再多也只是增高,不会有控件不可达。
+        //
+        // 注:Robolectric 不做真实文本测量(芯片标签宽度都算成 ~0),单测**证明不了**
+        // 换行是否真的发生,故此处没有对应的 UI 断言,只能靠真机坐标核对。
         if (collections.size > 1) {
-            Row(
+            FlowRow(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .horizontalScroll(rememberScrollState())
                     .padding(horizontal = 12.dp, vertical = 4.dp)
                     .testTag(TAG_COLLECTION_ROW),
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalAlignment = Alignment.CenterVertically,
+                verticalArrangement = Arrangement.spacedBy(4.dp),
             ) {
                 collections.forEach { c ->
                     // stringResource 不能进 semantics{} 的 lambda,先取出来

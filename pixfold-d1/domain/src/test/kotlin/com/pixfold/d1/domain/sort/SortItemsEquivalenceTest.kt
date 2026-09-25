@@ -64,6 +64,10 @@ class SortItemsEquivalenceTest {
         add(img("a10", "ch02", "Page_01.PNG", 10, 10))
         add(img("a11", "day1", "IMG_99999999999999999999.jpg", 5, 11)) // 超长数字
         add(img("a12", "day1", "IMG_00000000000000000001.jpg", 5, 12))
+        // 中文数字归一化(2026-09-26):两种实现都必须走同一条分词路径
+        add(img("a13", "ch03", "第十话.jpg", 4, 13))
+        add(img("a14", "ch03", "第2话.jpg", 4, 14))
+        add(img("a15", "ch03", "第二十一话.jpg", 4, 15))
         // 全等项(含 created=null)-> 触发 id 兜底
         add(img("b1", "x", "same.jpg", 7, 77, null))
         add(img("b2", "x", "same.jpg", 7, 77, null))

@@ -289,6 +289,82 @@ class ComicMetadataTest {
         assertTrue(result.volumes.none { Msg(TextKey.PendingLanguage) in it.pendingIssues })
     }
 
+    // ================= 批量设置不把自己变成逐项例外(用户裁决 2026-09-26) =================
+    //
+    // 语义分工:约束 4「批次统一 + **逐项**例外」—— 批量是面向批次的统一值,
+    // 只有**逐卷手工编辑**才算例外。故批量写入后该字段必须回到「批次统一」,
+    // 否则第二次批量会被自己写下的标记挡住(applied=0/skipped=5)。
+
+    @Test
+    fun `batch apply twice on the same field applies both times`() {
+        val first = batchApply(library.volumes, MetaField.Series, MetaValue.Text("第一次"))
+        assertEquals(5, first.appliedCount)
+        assertEquals(0, first.skippedCount)
+        assertTrue(
+            first.volumes.none { MetaField.Series in it.overridden },
+            "批量设置不得把字段记成逐项例外,否则第二次批量会被自己挡住",
+        )
+
+        val second = batchApply(first.volumes, MetaField.Series, MetaValue.Text("第二次"))
+        assertEquals(5, second.appliedCount, "同一字段批量设第二次必须照常生效")
+        assertEquals(0, second.skippedCount, "第二次不应有任何卷被跳过")
+        assertTrue(second.volumes.all { it.series == "第二次" }, "值必须被第二次改写")
+    }
+
+    @Test
+    fun `batch apply clears a stale per-item mark for the field it writes`() {
+        val volumes = replaceVolume(
+            library.volumes,
+            setMetaValue(aot2, MetaField.Series, MetaValue.Text("手工")),
+        )
+        val result = batchApply(volumes, MetaField.Series, MetaValue.Text("批量"), force = true)
+        val v = result.volumes.first { it.id == "aot-2" }
+        assertEquals("批量", v.series)
+        assertFalse(MetaField.Series in v.overridden, "批量写入后该字段应回到批次统一,不再是逐项例外")
+    }
+
+    @Test
+    fun `batch apply only clears the mark of the field it writes`() {
+        val volumes = replaceVolume(
+            library.volumes,
+            setMetaValue(aot2, MetaField.Writer, MetaValue.Text("某人")),
+        )
+        val result = batchApply(volumes, MetaField.Series, MetaValue.Text("批量"))
+        val v = result.volumes.first { it.id == "aot-2" }
+        assertTrue(MetaField.Writer in v.overridden, "没被批量写过的字段必须保住自己的逐项例外")
+        assertFalse(MetaField.Series in v.overridden)
+    }
+
+    @Test
+    fun `manual edit after a batch is still respected`() {
+        val batched = batchApply(library.volumes, MetaField.Series, MetaValue.Text("批量")).volumes
+        val edited = replaceVolume(
+            batched,
+            setMetaValue(batched.first { it.id == "aot-2" }, MetaField.Series, MetaValue.Text("后来手工")),
+        )
+        val again = batchApply(edited, MetaField.Series, MetaValue.Text("再批量"))
+        assertEquals(4, again.appliedCount, "批量之后的手工编辑必须重新构成逐项例外")
+        assertEquals(1, again.skippedCount)
+        val kept = again.volumes.first { it.id == "aot-2" }
+        assertEquals("后来手工", kept.series)
+        assertTrue(MetaField.Series in kept.overridden, "被跳过的卷必须原封不动,连标记也不能动")
+    }
+
+    @Test
+    fun `batch apply with a mismatched value type leaves the mark untouched`() {
+        // 类型不匹配时 setMetaValue 原样返回 —— 什么都没写,标记自然也不该被清。
+        // ⚠️ 必须 force=true:否则已被标记的字段会先被"跳过"分支拦住,永远走不到写入分支,
+        // 这条断言就只是重复了"跳过不动标记",抓不住实例守卫。
+        val volumes = replaceVolume(
+            library.volumes,
+            setMetaValue(aot2, MetaField.Volume, MetaValue.Number(9)),
+        )
+        val result = batchApply(volumes, MetaField.Volume, MetaValue.Text("不是数字"), force = true)
+        val v = result.volumes.first { it.id == "aot-2" }
+        assertEquals(9, v.volume, "类型不匹配不得改写值")
+        assertTrue(MetaField.Volume in v.overridden, "没写进去就不该动标记")
+    }
+
     // ================= 覆盖标记的写入与清除 =================
 
     @Test

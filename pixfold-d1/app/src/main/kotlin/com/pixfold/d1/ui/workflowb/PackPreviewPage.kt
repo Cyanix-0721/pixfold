@@ -1,8 +1,8 @@
 package com.pixfold.d1.ui.workflowb
 
-import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
@@ -12,7 +12,6 @@ import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material3.Button
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.FilterChip
@@ -108,14 +107,15 @@ fun PackPreviewPage(
             .windowInsetsPadding(contentInsets)
             .testTag(TAG_PACK_PAGE),
     ) {
-        Row(
+        // 2026-09-27:改 FlowRow。5 卷时第 4、5 卷芯片会落在视口外
+        // (与工作流 B 卷切换行同源缺陷,见 MetadataPage.kt VolumeSelector 注释)。
+        FlowRow(
             modifier = Modifier
                 .fillMaxWidth()
-                .horizontalScroll(rememberScrollState())
                 .padding(horizontal = 12.dp, vertical = 4.dp)
                 .testTag(TAG_PACK_VOLUME_SELECTOR),
             horizontalArrangement = Arrangement.spacedBy(6.dp),
-            verticalAlignment = Alignment.CenterVertically,
+            verticalArrangement = Arrangement.spacedBy(4.dp),
         ) {
             libraryState.volumes.forEach { v ->
                 val chipCd = stringResource(R.string.pack_volume_chip_cd, v.id)
@@ -280,11 +280,11 @@ fun PackPreviewPage(
                                 style = MaterialTheme.typography.labelMedium,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .horizontalScroll(rememberScrollState()),
+                            // 2026-09-27:改 FlowRow(同源缺陷,与卷芯片行一并处理)
+                            FlowRow(
+                                modifier = Modifier.fillMaxWidth(),
                                 horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                verticalArrangement = Arrangement.spacedBy(4.dp),
                             ) {
                                 OutputConflictPolicy.entries.forEach { p ->
                                     FilterChip(
@@ -301,11 +301,11 @@ fun PackPreviewPage(
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 modifier = Modifier.padding(top = 4.dp),
                             )
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .horizontalScroll(rememberScrollState()),
+                            // 2026-09-27:改 FlowRow(同源缺陷)
+                            FlowRow(
+                                modifier = Modifier.fillMaxWidth(),
                                 horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                verticalArrangement = Arrangement.spacedBy(4.dp),
                             ) {
                                 SourcePolicy.entries.forEach { p ->
                                     FilterChip(

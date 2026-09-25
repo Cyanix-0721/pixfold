@@ -1,13 +1,12 @@
 package com.pixfold.d1.ui.workflowa
 
-import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -124,12 +123,16 @@ fun SortRuleEditor(
         }
 
         draft.forEachIndexed { index, key ->
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .horizontalScroll(rememberScrollState()),
-                verticalAlignment = Alignment.CenterVertically,
+            // 2026-09-27 真机实测缺陷:原为 `Row + horizontalScroll`。361dp 下列宽只够放
+            // 3 个字段芯片(实测 `第1级 | 文件名(自然) | 文件名(字典) | 目录名` 已到 x1182),
+            // `扩展名`/`修改时间`/`大小` 三个芯片**完全落在视口外**,而这是 P3 的核心操作
+            // (多级排序规则),用户根本看不到自己还能按什么排。
+            // 改 FlowRow 自动换行:字段再多也只是增高,不会有芯片不可达。
+            FlowRow(
+                modifier = Modifier.fillMaxWidth(),
+                verticalArrangement = Arrangement.spacedBy(4.dp),
                 horizontalArrangement = Arrangement.spacedBy(4.dp),
+                itemVerticalAlignment = Alignment.CenterVertically,
             ) {
                 Text(
                     text = stringResource(R.string.a_sort_level, index + 1),

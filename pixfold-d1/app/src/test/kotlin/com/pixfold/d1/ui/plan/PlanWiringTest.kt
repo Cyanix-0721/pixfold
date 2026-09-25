@@ -100,7 +100,8 @@ class PlanWiringTest {
     @Test
     fun `workflow A plan lists every collection not just the active one`() {
         openWorkflowAPlanStep()
-        // 计划行数 = 全部集合的图片总数(trip 30 + scan 14 + misc 12 = 56)
+        // 计划行数 = 全部集合的图片总数(trip 30 + scan 14 + misc 12 + cn 16 = 72);
+        // 输入打乱且中阿混排的 cn 集合后,该总数不再只靠阿拉伯数字样本支撑。
         val total = MockData.workspaceA.collections.sumOf { it.images.size }
         assertTrue(total > 30, "mock 应有多个集合，实际总数 $total")
         // 首行可见即证明列表已渲染(逐行断言需滚动,LazyColumn 只暴露可见项)
