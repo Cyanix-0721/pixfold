@@ -16,6 +16,17 @@
     <!-- ============ 回到顶部(ScrollToTopButton) ============ -->
     <string name="common_scroll_to_top">回到顶部</string>
 
+    <!--
+      ============ 问题筛选(IssueFilterRow) ============
+      命名建议表 / 重命名计划页 / 执行报告页三处共用 —— 都是「长列表里只关心
+      需要我处理的那几条」的场合。
+    -->
+    <string name="common_filter_all">全部</string>
+    <string name="common_filter_all_cd">显示全部</string>
+    <string name="common_filter_issues">仅问题（%1$d）</string>
+    <string name="common_filter_issues_cd">仅显示需要注意的项</string>
+    <string name="common_filter_none">没有需要注意的项</string>
+
     <!-- ============ 固定位置(PinToggle) ============ -->
     <string name="pin_toggle_pinned">%1$s 已固定</string>
     <string name="pin_toggle_unpinned">%1$s 固定位置</string>

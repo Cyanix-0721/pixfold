@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.Button
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.FilterChip
@@ -17,6 +18,10 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
@@ -35,6 +40,7 @@ import com.pixfold.d1.domain.plan.buildConfirmSequence
 import com.pixfold.d1.domain.plan.renameSummaryLines
 import com.pixfold.d1.domain.plan.workflowADangerActions
 import com.pixfold.d1.domain.sort.PageOrderState
+import com.pixfold.d1.ui.components.IssueFilterRow
 import com.pixfold.d1.ui.components.PageActionBar
 import com.pixfold.d1.ui.plan.ConfirmDialog
 import com.pixfold.d1.ui.plan.PlanHeader
@@ -47,6 +53,9 @@ const val TAG_A_PLAN_PAGE = "a-plan-page"
 const val TAG_A_PLAN_LIST = "a-plan-list"
 const val TAG_A_PLAN_CONFIRM = "a-plan-confirm"
 const val TAG_A_PLAN_CLEAN_TOGGLE = "a-plan-clean-empty-dirs"
+const val TAG_A_PLAN_FILTER_ALL = "a-plan-filter-all"
+const val TAG_A_PLAN_FILTER_ISSUES = "a-plan-filter-issues"
+const val TAG_A_PLAN_FILTER_NONE = "a-plan-filter-none"
 
 /**
  * 工作流 A · 步骤 3:执行计划(验收第 15、16 项)。
@@ -74,12 +83,24 @@ fun RenamePlanPage(
     contentInsets: WindowInsets = WindowInsets.safeDrawing,
     onBack: (() -> Unit)? = null,
 ) {
-    val plan = buildLibraryRenamePlan(collections, orders, namingState)
+    // 计划是纯函数的结果,但本页**现在会因本地筛选状态而重组** —— 不再每次重组都重算。
+    val plan = remember(collections, orders, namingState) {
+        buildLibraryRenamePlan(collections, orders, namingState)
+    }
     val dangers = workflowADangerActions(cleanEmptyDirs)
     // 要进 semantics{} / 作为参数传给子组件,故先在组合上下文里解析
     val cleanToggleCd = stringResource(R.string.a_plan_clean_empty_cd)
     val backCd = stringResource(R.string.a_plan_back_cd)
     val confirmCd = stringResource(R.string.a_plan_confirm_cd)
+
+    // 筛选状态是**本页的**显示偏好,不上报(与 NamingPage 同样的状态提升约定)。
+    // 默认「全部」—— 计划页的首要用途是「执行前把整份计划看全」(验收第 15 项)。
+    var issuesOnly by remember { mutableStateOf(false) }
+
+    // ⚠️ 过滤后**必须保留原始下标**:`planRowTag(index)` 是「计划第几行」的契约,
+    // 报告行序也与计划行序对齐(见 `LibraryRenamePlan` KDoc),两者靠同一个序号核对。
+    // 若改用「可见序号」,筛掉前几行后报告第 5 行会对到计划第 3 行。
+    val shown = plan.ops.withIndex().filter { !issuesOnly || it.value.isSkipped }
 
     Column(
         modifier = modifier
@@ -87,6 +108,17 @@ fun RenamePlanPage(
             .windowInsetsPadding(contentInsets)
             .testTag(TAG_A_PLAN_PAGE),
     ) {
+        // 筛选条**常驻**(用户裁决 2026-09-26):56 行的计划滚到一半想改筛选时,
+        // 不该被迫先滚回顶部。它是本页唯一不随列表滚走的控件。
+        IssueFilterRow(
+            issueCount = plan.skipped,
+            issuesOnly = issuesOnly,
+            onIssuesOnlyChange = { issuesOnly = it },
+            modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp),
+            allTag = TAG_A_PLAN_FILTER_ALL,
+            issuesTag = TAG_A_PLAN_FILTER_ISSUES,
+        )
+
         LazyColumn(
             modifier = Modifier
                 .fillMaxWidth()
@@ -134,8 +166,28 @@ fun RenamePlanPage(
                 }
             }
 
-            items(plan.ops.size) { i ->
-                RenamePlanRow(plan.ops[i], i, plan.collectionNames[plan.ops[i].proposal.image.collectionId])
+            if (issuesOnly && shown.isEmpty()) {
+                // 筛选结果的空态:必须说清「不是没有计划,而是筛掉了」,
+                // 否则用户会以为计划丢了 —— 这正是「空表 = 重置」那类误判的同源风险。
+                // 只在**筛选**造成的空表时出现:计划本身为空是另一回事,不该借用这句话。
+                item(key = "filter-none") {
+                    Text(
+                        text = stringResource(R.string.common_filter_none),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier
+                            .padding(16.dp)
+                            .testTag(TAG_A_PLAN_FILTER_NONE),
+                    )
+                }
+            }
+
+            items(shown, key = { it.index }) { indexed ->
+                RenamePlanRow(
+                    indexed.value,
+                    indexed.index,
+                    plan.collectionNames[indexed.value.proposal.image.collectionId],
+                )
             }
         }
 

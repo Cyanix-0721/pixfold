@@ -101,10 +101,6 @@
         <item quantity="one">%1$d item · %2$d conflicts · %3$d warnings</item>
         <item quantity="other">%1$d items · %2$d conflicts · %3$d warnings</item>
     </plurals>
-    <string name="a_table_filter_all">All</string>
-    <string name="a_table_filter_all_cd">Show all</string>
-    <string name="a_table_filter_issues">Issues only (%1$d)</string>
-    <string name="a_table_filter_issues_cd">Show only items with conflicts or warnings</string>
     <string name="a_table_new_name">New name</string>
     <string name="a_table_new_name_overridden">New name (overridden)</string>
     <string name="a_table_restore">Use suggestion</string>

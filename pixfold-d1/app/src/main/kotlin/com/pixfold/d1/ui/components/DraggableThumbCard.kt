@@ -31,6 +31,14 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.pixfold.d1.domain.model.SourceItem
 
+/**
+ * 网格卡片 testTag。
+ *
+ * 曾定义在已删除的 `ThumbCard.kt`(早期静态卡片实现,被本文件取代后成了死代码)。
+ * 常量本身仍被生产代码与本文件的 `testTag` 及 6 个测试文件共用,故随实现一起搬到这里。
+ */
+const val TAG_GRID_CARD = "grid-card"
+
 /** 目标格高亮描边(拖动中)。 */
 private val HoverBorder = Color(0xCC3F51B5)
 

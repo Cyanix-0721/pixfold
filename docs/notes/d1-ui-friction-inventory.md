@@ -529,19 +529,135 @@ fun dangerActionButtonColors(): ButtonColors {
 
 ---
 
-## 3. P1：A 侧已有的筛选模式未推广到计划页/报告页
+## 3. ✅ P1：A 侧已有的筛选模式未推广到计划页/报告页 —— 2026-09-26 已修，真机核对通过
 
 **来源：代码核实**
 
-- 建议表**已有**「仅问题 / 全部」筛选（`ProposalTable.kt`：`TAG_FILTER_ALL` / `TAG_FILTER_CONFLICTS`）
-- 计划页（`RenamePlanPage.kt`）与报告页（`ExecutionReportPage.kt`）**都没有**
+**当时实况（2026-09-25 记）**：建议表**已有**「仅问题 / 全部」筛选
+（`ProposalTable.kt`：`TAG_FILTER_ALL` / `TAG_FILTER_CONFLICTS`）；
+计划页（`RenamePlanPage.kt`）与报告页（`ExecutionReportPage.kt`）**都没有**。
+**问题**：56 行里通常只有少数是「跳过 / 失败」，却要滚完全部 56 行；
+语义上「只显示需要我关注的」比「全量平铺」更贴合「预览是主工作区」。
+**注意**：报告页的「跳过 / 失败」筛选是**有语义价值的**（成功项通常无需逐条查看），
+但需确认用户是否要「看全量以求安心」。
 
-**问题**：56 行里通常只有少数是「跳过 / 失败」，却要滚完全部 56 行。
-语义上「只显示需要我关注的」比「全量平铺」更贴合"预览是主工作区"。
+### 3.1 用户裁决（两项，2026-09-26）
 
-**注意**：报告页的「跳过 / 失败」筛选是**有语义价值的**
-（成功项通常无需逐条查看），但需确认用户是否要"看全量以求安心"。
+- **筛选条位置 = 固定常驻**（不随列表滚走）。理由：与报告页头部一致，且解决
+  「想改筛选还得滚回顶部」；代价是常驻约 48dp 竖向空间（P0 曾因头部过高被投诉）。
+  未选「随头部滚动（改动最小）」。—— 落实结果见 §3.5 的常驻实测。
+- **改动范围 = 只改 A 侧计划页**。理由：台账写的是「计划页/报告页」，报告页本身
+  A/B 共用故自动覆盖；B 侧的计划列表嵌在 `PackPreviewPage.kt` 里（且它自己有 §4 待处理）。
+  ⇒ 本轮**不动** `PackPreviewPage.kt` 的内联计划。
 
+### 3.2 修法：抽出一个共享的筛选条，而不是抄三遍
+
+原实现把筛选条写死在 `ProposalTable.kt` 的 `ProposalSummary` 里。三处各写一遍必然漂移
+（`§12` 的芯片行溢出就是「7 处同源」的教训），故新建
+`pixfold-d1/app/src/main/kotlin/com/pixfold/d1/ui/components/IssueFilterRow.kt`：
+
+```kotlin
+@Composable fun IssueFilterRow(issueCount: Int, issuesOnly: Boolean,
+    onIssuesOnlyChange: (Boolean) -> Unit, modifier: Modifier = Modifier,
+    allTag: String, issuesTag: String)
+```
+
+无状态（筛选状态由各页持有，遵循项目「本地状态权威 + 每次变更上报」的约定）。
+`ProposalSummary` 改为复用该组件 —— `TAG_FILTER_ALL` / `TAG_FILTER_CONFLICTS` /
+`TAG_PROPOSAL_SUMMARY` 与 `a_table_summary` 复数键的文本契约**一字未动**
+（`NamingPageTest.kt:641` 与多处 `assertTextEquals` 钉着）。
+
+组件只负责画，**「N 是什么」与「筛完怎么保住行号」由调用方决定**：
+
+| 调用点 | N 的口径 | 就绪谓词 |
+| --- | --- | --- |
+| 命名页 `ProposalSummary` | `conflictCount + warningOnlyCount` | （既有逻辑，未动） |
+| 计划页 `RenamePlanPage.kt` | `plan.skipped` | `op.isSkipped` |
+| 报告页 `ExecutionReportPage.kt` | `report.skippedCount + report.failedCount` | `entry.outcome != ExecOutcome.Succeeded` |
+
+**行号必须保原始下标**：计划页与报告页都用 `withIndex()` 存 `(原始 index, 元素)`，
+再 `items(shown, key = { it.index }) { RenamePlanRow(it.value, it.index, ...) }`。
+理由不是审美 —— `planRowTag(index)` 是「计划第几行」的契约，报告行序又与计划行序靠
+同一序号核对（`Execution.kt` KDoc 明示 entries 不重排）。改用可见序号会出现
+「报告第 5 行对到计划第 3 行」。见 §3.4 的 P2/R2 变异。
+
+其余细节：
+
+- 筛选条置于各页 `Column` 内、`LazyColumn` **之外**（落实裁决 1）。
+  **整页仍然只有一个滚动容器** —— 这是硬约束，内层 `LazyColumn` 被挤到 0 高的坑真机踩过。
+- **筛空后的空态是必需的**：`if (issuesOnly && shown.isEmpty())` 才会渲染
+  `common_filter_none`（「没有需要注意的项」）。条件写成裸 `shown.isEmpty()` 会把
+  「计划本身为空」也当成筛选结果，故加了 `issuesOnly &&`。
+- **报告页默认必须是「全部」**：报告是「刚才到底跑了什么」的凭证，默认收窄会让用户
+  以为成功项根本没执行。`PlanUiTest.kt:175` 也遍历 `ExecOutcome.entries` 断言三类
+  都在场 —— 这条约束是硬的，不是口味。
+- 文案：新增 `common_filter_all` / `_all_cd` / `common_filter_issues`（`%1$d`）/
+  `_issues_cd` / `common_filter_none` 五键（en + zh，落 `strings_common.xml`）；
+  **删除** `strings_workflowa.xml` 里旧的 `a_table_filter_all` / `_all_cd` /
+  `a_table_filter_issues` / `_issues_cd` 四键 —— 留着必被 lint `UnusedResources`
+  在 `warningsAsErrors` 下判死。
+
+### 3.3 顺带清掉一处死代码（用户授权）
+
+`ui/components/ThumbCard.kt`（54 行）**全文零调用点**：它是 `cdd4932` 引入的静态网格卡片，
+被 `fe64adf` 自研拖拽排序时的 `DraggableThumbCard.kt` 取代，此后一直是死代码。
+但 `ThumbCard.kt:20` 的 `const val TAG_GRID_CARD = "grid-card"` **仍活着** ——
+被 `DraggableThumbCard.kt:67` 与 **6 个测试文件**共用。
+
+⇒ 处置：把常量搬到 `DraggableThumbCard.kt` 顶层（同包，6 个测试文件**零 import 变更**；
+其中 `ScrollToTopTest.kt` 本就在 `package com.pixfold.d1.ui.components` 内），再删整个文件。
+证据：清理后 `grep -rn "ThumbCard" app/src/main/ | grep -v DraggableThumbCard` 无输出；
+解包 APK 全部 22 个 dex 做字节子串计数 ⇒ `DraggableThumbCard` 43 次、`ThumbCard`
+**也恰好 43 次**（相等即证明后者的每次出现都是前者名字的子串，独立类已不存在）。
+md 里另有 3 处 `ThumbCard` 引用（`HANGOFF.md:2785`、`docs/notes/d1-archive-domain-semantics.md`
+的 Flutter 代际测试表、`docs/superpowers/plans/2026-09-16-d1-p2-grid-list-preview.md`），
+**均为历史记录，不改** —— 改它们等于篡改当时实况。
+
+### 3.4 自证
+
+- **测试**：新增 `pixfold-d1/app/src/test/kotlin/com/pixfold/d1/ui/plan/IssueFilterTest.kt`
+  （6 条）：计划页筛选 + 行号保持 + 筛空空态 + 筛选后底栏仍可达；报告页同样四件事；
+  以及命名页 `ProposalSummary` 复用共享组件后 `TAG_FILTER_CONFLICTS` 的 N 与回调仍对。
+  造跳过项的方式 = 两次 `setOverride` 造**同最终名**的两个跳过项，下标刻意取 **4 与 8**
+  —— 若实现误用可见序号，筛选后会变成 0 与 1，而 0/1 恰是「跳过项在开头」时的正确答案，
+  **只有错开位置才能区分两种实现**。
+- **四道闸门**：`app` **358**（+6，上一轮 352）/ `domain` **247** 全绿、
+  lint **0 errors, 0 warnings**（4 hints 是既有的 `AutoboxingStateCreation`）、
+  `assembleDebug` 成功 APK **33,316,124 B**。
+  ⚠️ 清理 `ThumbCard.kt` 后 APK 与清理前**逐字节相同** —— 死代码确实没进包。
+- **变异 11 条全部捕获、0 逃逸、0 跳过**（脚本 `pixfold-d1/app/build/mut_issue_filter.py`，不跟踪）：
+  C1「仅问题」点了不生效 / C2「全部」点了反进筛选 / P1 计划页谓词失效 /
+  **P2 计划页把可见序号当行号** / P3 计划页 N 改成总行数 / P4 计划页筛空不给说明 /
+  R1 报告页谓词失效 / **R2 报告页把可见序号当行号** / R3 报告页 N 漏掉失败项 /
+  R4 报告页筛空不给说明 / S1 命名页 N 漏掉「仅警告」项。
+  逐条都命中预期用例，两条「序号」变异报的都是 `could not find any node … (TestTag = 'plan-row-4')`
+  这类**位置**失败，正是它们存在的意义。
+
+### 3.5 真机核对（2026-09-26 通过，用户授权，PJX110 / Android 16 / 361dp×794dp）
+
+设备侧先造出「2 个跳过项」：命名页把第 1、2 项都覆盖成同名 `dup.jpg`。
+⚠️ 操作教训：`input tap` 进输入框后光标位置不定，`keyevent 123`(MOVE_END) + 连按 `67`(DEL)
+**不可靠**（实测光标在行首，DEL 是 no-op），`input text` 又是**追加**而非替换。
+正解 = **`input keycombination -t 120 113 29`（Ctrl+A）再 `input text`**，一次覆盖成功。
+
+逐条读数（`uiautomator dump`）：
+
+| # | 核对项 | 实测 |
+| --- | --- | --- |
+| ① | 计划页筛选条是否常驻在列表外 | `全部` `[42,392][254,504]` / `仅问题（2）` `[275,392][663,504]`，紧贴步骤页签下方、列表之上 ✅ |
+| ② | 默认是「全部」还是被收窄 | 默认 72 行全渲染（行 0/1 为 `将跳过`，行 2 起 `将重命名`）✅ |
+| ③ | 点「仅问题」是否只剩问题行 | 只剩 2 行（均为 `dup.jpg` + `⛔ 重名：有 2 项同名「dup.jpg」，执行时将跳过`），行 2 起全部消失 ✅ |
+| ④ | 筛选后汇总/开关/底栏是否被挤掉 | `共 72 卷 · 将执行 70 卷 · 跳过 2 卷`(y567)、`清理空目录开关`(y760)、`确认执行`(y2605)、`返回步骤2`(y2605) **全在原位** ✅ |
+| ⑤ | **常驻的决定性证据** | 列表 `swipe` 滚到 `扫描件/ch02/封:面?.png`、`杂图/img3.jpg` 后，筛选条 bounds **与滚动前逐像素相同**；`PlanHeader` 与清理空目录**已滚出视口**，筛选条未滚走 ✅ |
+| ⑥ | 点「全部」能否恢复 | 行 1~11 的 `将重命名` 全部回来，`将跳过` 仍在行 0/1 ✅ |
+| ⑦ | 无问题项时点「仅问题（0）」 | 列表清空 + `没有需要注意的项` `[56,1030][454,1100]`；`确认执行`(y2605) 与 `清理空目录开关`(y760) **未移** ✅ |
+| ⑧ | 报告页默认态 | `共 72 项：成功 70 · 跳过 2 · 失败 0`；筛选条 `全部` `[42,606][254,718]` / `仅问题（2）` `[275,606][663,718]`；先列 2 条 `跳过`，随后 `成功` 逐条 ✅（**成功项默认可见**） |
+| ⑨ | 报告页点「仅问题」 | 只剩 2 条 `跳过` 行，`撤销本次执行` / `完成` 底栏不变 ✅ |
+| ⑩ | 报告页点「全部」恢复 | 视口内回到 `跳过`×2 + `成功`×11 ✅ |
+| ⑪ | **`TAG_GRID_CARD` 搬家后网格是否还能用**（防回归） | 步骤 1 网格卡片照常渲染（`IMG_20260701_001.jpg` 等 + `固定位置` 图钉）；点第 1 张卡片 → 预览打开 `图片 IMG_20260701_001.jpg`、`第 1 / 30 页`、`将重命名为 dup.jpg` ✅ |
+
+调试产物已清理（设备 `/data/local/tmp` 的 .xml/.png 已删并复核、`/sdcard` 无残留），
+`svc power stayon` 已复位，应用已 force-stop。
 ---
 
 ## 4. P2：B 侧第 3 步「策略」与「计划结果」的因果距离
@@ -653,7 +769,7 @@ fun dangerActionButtonColors(): ButtonColors {
 | --- | --- | --- | --- |
 | **P0** | 1 | 命名页头部占 88%，预览不在首屏 | **违反约束 3** | **✅ 2026-09-24 已修** |
 | **P1** | 2 | 终局动作在做列表内，要滚 8–12 次；且与「下一步」按钮位置不一致 | 行为分裂 | **✅ 2026-09-25 已修**（连同 2b/2c/2d 一并提交 `1c95db9`） |
-| **P1** | 3 | 计划页/报告页缺筛选 | 一致性与可用性 |
+| **P1** | 3 | 计划页/报告页缺筛选 | 一致性与可用性 | **✅ 2026-09-26 已修**（真机 11 项核对通过） |
 | **P2** | 4 | B 侧策略与计划的因果距离 | 可用性 |
 | **P2** | 5 | 危险动作触发路径长 | 第 2 项的派生 |
 | **P2** | 10 | 深色下卡片是 material3 基线紫灰，与种子派生背景**色相错配** | **违反约束 7（配色未走语义派生）** |
@@ -664,7 +780,7 @@ fun dangerActionButtonColors(): ButtonColors {
 | **P3** | 6/7 | 容器重复；MetadataPage **754 行** | 结构性；**规模结论已给**（领域成本个位数 ms，见 §7，无需分页） |
 
 **建议顺序**：~~**P0 先做**~~（**✅ 2026-09-24 已完成**），
-~~再 P1（固定终局动作）~~（**✅ 2026-09-25 已完成**）；~~长列表筛选~~ 仍待办（§3），
+~~再 P1（固定终局动作）~~（**✅ 2026-09-25 已完成**）；~~长列表筛选~~（**✅ 2026-09-26 已完成**，见 §3），
 P2/P3 视情况。第 2 项修复**真机核对已通过**（2026-09-25，与 §2b 同轮，用户授权后执行）；
 离线全绿：282 + 229 + lint 零告警 + 6 组变异全捕获 —— 底栏是纯布局位移、不涉数据路径。
 **第 15 节（2026-09-26）**离线全绿：`app 352` / `domain 247` + lint 零告警 + **16 组变异全捕获**，
@@ -680,6 +796,10 @@ P2/P3 视情况。第 2 项修复**真机核对已通过**（2026-09-25，与 §
 > 属文档漂移，已于 2026-09-24 随 P0 收口一并订正。
 > 第 1 节（P0）则已完成全部离线自证 + 探针实测 + **真机核对（2026-09-24，用户授权后执行）**，
 > 首屏建议行 0 → 5 条、固定区 141dp、摘要栏吸顶与展开回顶均在真机复现。
+> **第 3 节（P1 筛选推广）已于 2026-09-26 完成**：离线 `app 358` / `domain 247` + lint 零告警
+> + **11 组变异全捕获**，真机 11 项逐条读数见 §3.5；
+> 同轮经用户授权清掉死代码 `ui/components/ThumbCard.kt`（常量 `TAG_GRID_CARD` 已迁入
+> `DraggableThumbCard.kt`，清理前后 APK **逐字节相同**）。
 > **第 2 节（P1 底栏化）已于 2026-09-25 完成离线自证**（282 + 229 全绿、lint 零告警、
 > 6 组变异全捕获），**真机核对已通过**（2026-09-25，与第 2b 节同轮，用户授权后执行）。
 > **第 2b / 2c 节（底栏分槽 + 步骤 1 头部伸缩 → 底栏视觉规格）同样已完成离线自证与真机核对**：
@@ -1188,6 +1308,9 @@ LazyGrid/LazyColumn 接收手势」。**探针实测这个判断不成立** —�
 | 第 15 节「页序 vs 声明序」 | 读源码：`SortAndPreviewPage.kt:312` 传的 `index` 取自 `order.order`，对照预览目的地的取图来源；反证用 `MockDataTest` 已断言的页序首项 |
 | 第 15 节「触摸目标是否真达标」 | 临时 Robolectric 探针 `TmpSizeProbe`：读 `fetchSemanticsNode().size.height`，同一文件内并列放「裸 / 加 `heightIn` / 显式 `size`」三种写法对比（用完即删） |
 | 第 15 节「漏上报是否可见」 | 靠**变异**而非阅读：把上报改成只写本地，看测试是否变红 —— 单页内不变红即说明该性质无断言覆盖 |
+| 第 3 节「筛选是否真按谓词筛」 | 真机 `uiautomator dump` 数 `将跳过` / `将重命名` / `成功` / `跳过` 行；并造出「2 个跳过项」以让 `仅问题（2）` 的 N 可核对 |
+| 第 3 节「筛选条是否真常驻」 | 同一页 `swipe` 滚动前后各 dump 一次，比对筛选条 `bounds` 是否逐像素相同；同时确认 `PlanHeader` 已滚出视口（对照组） |
+| 第 3 节「删掉的类是否真没进包」 | 解包 APK 全部 `classes*.dex` 做字节子串计数：`DraggableThumbCard` 与 `ThumbCard` 计数**相等**即证明后者仅为前者名字的子串 （`grep -c` 对二进制/多 dex 不可靠，返回 0） |
 
 
 **⚠️ 一条取证教训**：本清单初稿曾据 Robolectric 探针（`w400dp-h1000dp`）

@@ -16,6 +16,17 @@
     <!-- ============ Scroll to top (ScrollToTopButton) ============ -->
     <string name="common_scroll_to_top">Back to top</string>
 
+    <!--
+      ============ Issue filter (IssueFilterRow) ============
+      Shared by the naming table, the rename plan page and the execution report page —
+      the three places where a long list can be narrowed down to "what needs my attention".
+    -->
+    <string name="common_filter_all">All</string>
+    <string name="common_filter_all_cd">Show all</string>
+    <string name="common_filter_issues">Issues only (%1$d)</string>
+    <string name="common_filter_issues_cd">Show only items that need attention</string>
+    <string name="common_filter_none">Nothing needs attention</string>
+
     <!-- ============ Pin toggle (PinToggle) ============ -->
     <string name="pin_toggle_pinned">%1$s is pinned</string>
     <string name="pin_toggle_unpinned">Pin %1$s</string>

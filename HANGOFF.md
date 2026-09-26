@@ -2283,6 +2283,62 @@ UI 不重新实现。
 ⑤命名页改名 → 退回排序 → 开预览 → 回命名页,两个改名**都还在**、`警告 2` 保持。
 调试产物已清理(`/data/local/tmp/t*.xml` 与本地 `artifacts/t*.xml` 均已删),`stayon` 已复位,应用已 force-stop。
 
+#### ✅ 「仅问题/全部」筛选推广到计划页与报告页 + 死代码 ThumbCard 清理(2026-09-26)
+
+**触发** —— 台账 §3(P1)登记项。用户裁决,逐字:「**要**」(筛选要做),两项执行口径:
+①**筛选条位置 = 固定常驻**(不随列表滚走;理由是与报告页头部一致,且解决「想改筛选还得滚回顶部」,
+代价约 48dp 竖向空间);②**范围只改 A 侧计划页**(报告页本身 A/B 共用故自动覆盖,
+B 侧计划列表嵌在 `PackPreviewPage.kt` 内、自己有 §4 待处理,本轮不动)。
+同一轮用户另授权「**要,一起处理下**」把死代码 `ui/components/ThumbCard.kt` 一并清掉。
+
+**问题** —— 命名页的建议表早有「仅问题/全部」筛选,计划页与报告页都没有。
+72 行的计划里通常只有少数是「跳过/失败」,却要滚完全部才看得到。
+
+**修法(完整取证见 `docs/notes/d1-ui-friction-inventory.md` §3)**:
+
+1. **抽共享组件而非抄三遍** —— 新建 `ui/components/IssueFilterRow.kt`(无状态:
+   `issueCount` / `issuesOnly` / `onIssuesOnlyChange` / `allTag` / `issuesTag`)。
+   三处各写一遍必然漂移(§12「7 处同源」的教训)。`ProposalSummary` 改为复用,
+   **`TAG_FILTER_ALL` / `TAG_FILTER_CONFLICTS` / `TAG_PROPOSAL_SUMMARY` 与
+   `a_table_summary` 复数键的文本契约一字未动**(`NamingPageTest.kt:641` 与多处 `assertTextEquals` 钉着)。
+2. **N 的口径由调用方定**:计划页 = `plan.skipped`、报告页 = `skippedCount + failedCount`、
+   命名页 = `conflictCount + warningOnlyCount`。谓词:计划页 `op.isSkipped`、
+   报告页 `entry.outcome != ExecOutcome.Succeeded`。
+3. **筛完必须保住原始行号** —— 两页都用 `withIndex()` 存 `(原始 index, 元素)`。
+   `planRowTag(index)` 是「计划第几行」的契约,报告行序又与计划行序靠同一序号核对;
+   改用可见序号会出现「报告第 5 行对到计划第 3 行」。
+4. **筛选条在 `LazyColumn` 之外** —— 整页仍只有一个滚动容器(内层 `LazyColumn` 被挤到 0 高的坑真机踩过)。
+5. **筛空要有说明** —— 条件必须是 `issuesOnly && shown.isEmpty()`(裸 `shown.isEmpty()`
+   会把「计划本身为空」也当成筛选结果),文案新增 `common_filter_none`。
+6. **报告页默认必须是「全部」** —— 报告是「刚才到底跑了什么」的凭证,默认收窄会让用户
+   以为成功项根本没执行;`PlanUiTest.kt:175` 遍历 `ExecOutcome.entries` 断言三类都在场。
+7. 文案:新增 `common_filter_{all,all_cd,issues,issues_cd,none}` 五键(en+zh,落 `strings_common.xml`);
+   **删除** `strings_workflowa.xml` 旧的 `a_table_filter_*` 四键(留着必被 lint `UnusedResources`
+   在 `warningsAsErrors` 下判死)。
+
+**同轮清掉的死代码** —— `ui/components/ThumbCard.kt`(54 行)全文零调用点:
+`cdd4932` 引入的静态网格卡片,被 `fe64adf` 自研拖拽排序时的 `DraggableThumbCard.kt` 取代。
+但 `ThumbCard.kt:20` 的 `const val TAG_GRID_CARD = "grid-card"` **仍活着**(被
+`DraggableThumbCard.kt:67` 与 6 个测试文件共用)⇒ 常量先搬到 `DraggableThumbCard.kt` 顶层
+(同包,6 个测试文件**零 import 变更**),再删整个文件。**清理前后 APK 逐字节相同**,证明死代码确实没进包。
+
+**四道闸门**:`app 358`(+6)/ `domain 247` 全绿、lint `0 errors, 0 warnings`、
+`assembleDebug` 成功 APK **33,316,124 B**。
+**变异 11 组全捕获、0 逃逸、0 跳过**(脚本 `app/build/mut_issue_filter.py`,不跟踪):
+C1/C2(两枚芯片点击语义)、P1–P4(计划页谓词/序号/N 口径/空态)、
+R1–R4(报告页同上)、S1(命名页 N 漏掉仅警告项)。
+两条「序号」变异报的都是 `could not find any node … (TestTag = 'plan-row-4')` 这类**位置**失败,
+正是它们存在的意义。
+
+**✅ 真机核对已通过(2026-09-26,PJX110 / Android 16 / 361dp×794dp,用户授权后执行)**:
+先在命名页造出 2 个同名跳过项(`dup.jpg`),11 项逐条读数 ——
+①计划页筛选条常驻 `[42,392][254,504]`;②默认「全部」72 行;③点「仅问题(2)」只剩 2 条 `将跳过`;
+④汇总/清理开关/底栏**全在原位**;⑤**列表 `swipe` 滚到 `扫描件`/`杂图` 后筛选条 bounds 与滚动前
+逐像素相同,而 `PlanHeader` 已滚出视口**(常驻的决定性证据);⑥点「全部」恢复;⑦无问题项时
+出现 `没有需要注意的项` 且底栏未移;⑧报告页默认列出 2 条 `跳过` + 逐条 `成功`(**成功项默认可见**);
+⑨⑩报告页筛选与恢复;⑪**`TAG_GRID_CARD` 搬家后网格卡片照常点开预览**(防回归)。
+调试产物已清理(`/data/local/tmp` 与 `/sdcard` 均复核无残留),`stayon` 已复位,应用已 force-stop。
+
 ### D2：平台能力验证
 
 **目标**:优先 Android SAF。重点验证最容易推翻技术选型的能力,不先做完整业务。

@@ -10,11 +10,16 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.Button
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
@@ -27,6 +32,7 @@ import com.pixfold.d1.domain.plan.ExecEntry
 import com.pixfold.d1.domain.plan.ExecOutcome
 import com.pixfold.d1.domain.plan.ExecutionReport
 import com.pixfold.d1.domain.text.Msg
+import com.pixfold.d1.ui.components.IssueFilterRow
 import com.pixfold.d1.ui.components.PageActionBar
 import com.pixfold.d1.ui.text.textOf
 import com.pixfold.d1.ui.text.textOfOrNull
@@ -39,6 +45,9 @@ const val TAG_REPORT_UNDO = "report-undo"
 const val TAG_REPORT_DONE = "report-done"
 const val TAG_REPORT_UNDO_MESSAGE = "report-undo-message"
 const val TAG_REPORT_EMPTY = "report-empty"
+const val TAG_REPORT_FILTER_ALL = "report-filter-all"
+const val TAG_REPORT_FILTER_ISSUES = "report-filter-issues"
+const val TAG_REPORT_FILTER_NONE = "report-filter-none"
 
 /** 报告里第 i 行的 testTag。 */
 fun reportRowTag(index: Int) = "report-row-$index"
@@ -64,6 +73,20 @@ fun ExecutionReportPage(
     modifier: Modifier = Modifier,
     contentInsets: WindowInsets = WindowInsets.safeDrawing,
 ) {
+    // 筛选状态是**本页的**显示偏好。默认「全部」是硬约束而不是口味:
+    // 报告是「刚才到底跑了什么」的凭证,默认收窄会让用户以为成功项根本没执行
+    // (验收第 17 项要的是"成功/跳过/失败三类都看得见")。
+    var issuesOnly by remember { mutableStateOf(false) }
+
+    // 台账 §3:56 行的报告里通常只有少数是「跳过/失败」,却要滚完全部。
+    // 成功项无需逐条核对,所以「仅问题」= 非成功。
+    val issueCount = report.skippedCount + report.failedCount
+
+    // ⚠️ 过滤后**必须保留原始下标**:报告 KDoc 明示 entries 顺序 = 计划顺序,
+    // 「报告第 3 行」要能与「计划第 3 行」对得上。用 `withIndex()` 存原始下标,
+    // 只把可见序号当渲染顺序,两者不能混。
+    val shown = report.entries.withIndex().filter { !issuesOnly || it.value.outcome != ExecOutcome.Succeeded }
+
     Column(
         modifier = modifier
             .fillMaxSize()
@@ -85,6 +108,18 @@ fun ExecutionReportPage(
             HorizontalDivider(modifier = Modifier.padding(top = 4.dp))
         }
 
+        // 筛选条常驻(与计划页同一形态):报告 56 行,滚到一半想改筛选不该被迫滚回顶部。
+        if (report.entries.isNotEmpty()) {
+            IssueFilterRow(
+                issueCount = issueCount,
+                issuesOnly = issuesOnly,
+                onIssuesOnlyChange = { issuesOnly = it },
+                modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp),
+                allTag = TAG_REPORT_FILTER_ALL,
+                issuesTag = TAG_REPORT_FILTER_ISSUES,
+            )
+        }
+
         if (report.entries.isEmpty()) {
             Text(
                 text = stringResource(R.string.report_empty),
@@ -102,8 +137,21 @@ fun ExecutionReportPage(
                 .weight(1f)
                 .testTag(TAG_REPORT_LIST),
         ) {
-            items(report.entries.size) { i ->
-                ReportRow(report.entries[i], i)
+            if (issuesOnly && shown.isEmpty()) {
+                // 全绿时点「仅问题」会得到空列表。必须说清是**筛空了**而不是报告丢了。
+                item(key = "filter-none") {
+                    Text(
+                        text = stringResource(R.string.common_filter_none),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier
+                            .padding(16.dp)
+                            .testTag(TAG_REPORT_FILTER_NONE),
+                    )
+                }
+            }
+            items(shown, key = { it.index }) { indexed ->
+                ReportRow(indexed.value, indexed.index)
             }
         }
 

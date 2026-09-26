@@ -5,7 +5,6 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
@@ -23,6 +22,7 @@ import androidx.compose.ui.unit.dp
 import com.pixfold.d1.R
 import com.pixfold.d1.domain.model.NameProposal
 import com.pixfold.d1.domain.model.ProposalWarningType
+import com.pixfold.d1.ui.components.IssueFilterRow
 import com.pixfold.d1.ui.text.textOf
 
 /**
@@ -62,9 +62,7 @@ fun ProposalSummary(
     onConflictOnlyChange: (Boolean) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    // 要进 semantics{},故先在组合上下文里解析
-    val filterAllCd = stringResource(R.string.a_table_filter_all_cd)
-    val filterIssuesCd = stringResource(R.string.a_table_filter_issues_cd)
+    // 筛选条的文案与无障碍说明都在共享组件里解析(见 IssueFilterRow)
     Row(
         modifier = modifier
             .fillMaxWidth()
@@ -82,31 +80,13 @@ fun ProposalSummary(
             },
             modifier = Modifier.testTag(TAG_PROPOSAL_SUMMARY),
         )
-        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-            FilterChip(
-                selected = !conflictOnly,
-                onClick = { onConflictOnlyChange(false) },
-                label = { Text(stringResource(R.string.a_table_filter_all)) },
-                modifier = Modifier
-                    .testTag(TAG_FILTER_ALL)
-                    .semantics { contentDescription = filterAllCd },
-            )
-            FilterChip(
-                selected = conflictOnly,
-                onClick = { onConflictOnlyChange(true) },
-                label = {
-                    Text(
-                        stringResource(
-                            R.string.a_table_filter_issues,
-                            conflictCount + warningOnlyCount,
-                        ),
-                    )
-                },
-                modifier = Modifier
-                    .testTag(TAG_FILTER_CONFLICTS)
-                    .semantics { contentDescription = filterIssuesCd },
-            )
-        }
+        IssueFilterRow(
+            issueCount = conflictCount + warningOnlyCount,
+            issuesOnly = conflictOnly,
+            onIssuesOnlyChange = onConflictOnlyChange,
+            allTag = TAG_FILTER_ALL,
+            issuesTag = TAG_FILTER_CONFLICTS,
+        )
     }
 }
 

@@ -95,10 +95,6 @@
     <plurals name="a_table_summary">
         <item quantity="other">共 %1$d 项 · 冲突 %2$d · 警告 %3$d</item>
     </plurals>
-    <string name="a_table_filter_all">全部</string>
-    <string name="a_table_filter_all_cd">显示全部</string>
-    <string name="a_table_filter_issues">仅问题（%1$d）</string>
-    <string name="a_table_filter_issues_cd">仅显示有冲突或警告的项</string>
     <string name="a_table_new_name">新名称</string>
     <string name="a_table_new_name_overridden">新名称（已覆盖）</string>
     <string name="a_table_restore">恢复建议</string>
