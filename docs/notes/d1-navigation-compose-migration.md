@@ -5,7 +5,7 @@
 > `assembleDebug` / `lintDebug` 均通过)。**未提交、未 push**(push 一律由用户处理)。
 > **开工前 3 问已于 2026-09-22 全部裁决**(route 形式 = type-safe / 步骤容器 = 嵌套 NavHost /
 > 开关关闭语义 = 保留普通转场)—— 见 §4.1;另 3 项待实现中探针确定,见 §4.2。**§4.2 的 3 项均已实测收敛,结论见 §7.2**。
-> **工作分支**:`d1/settings-impl`(自 `dev` 起算 **18** 提交,**未合回 `dev`,未 push**)。
+> **工作分支**:`d1/settings-impl`(起草时自 `dev` 起算 **18** 提交;**该分支已于 2026-09-25 合回 `dev`** —— `7a6f678`,随后删除;此后提交均直接落在 `dev`。**未 push**)。
 > **相关**:`HANGOFF.md:1246`(被本迁移取代的「第 3 步」原始描述)、
 > `docs/superpowers/specs/2026-09-20-d1-settings-theme-design.md`(设置规格)。
 
@@ -206,7 +206,8 @@
 > 最终交付物与验收结果见 **§7**。保留本节是为了存证当时的判断与工作区实况。
 
 - **分支**:`d1/settings-impl`,HEAD `351acdf docs(d1): 回写预测性返回真机量化核对结论(含 A/B 对照)`,
-  领先 `dev` **18** 提交;**未 push**(push 一律由用户处理)。
+  领先 `dev` **18** 提交;**未 push**(push 一律由用户处理)。⚠️ **该分支与 `351acdf` 均已并入 `dev`**
+  (merge `7a6f678`,2026-09-25),本文写的是当时实况。
 - **验证基线**:`domain:test` **224** + `app:testDebugUnitTest` **273** 全绿;
   `assembleDebug` 成功;`lintDebug` 零告警。
 - **本轮另交付**:`pixfold-d1/adb.bat` 增加**存储守卫** ——
