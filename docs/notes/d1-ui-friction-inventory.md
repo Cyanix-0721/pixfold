@@ -633,6 +633,8 @@ md 里另有 3 处 `ThumbCard` 引用（`HANGOFF.md:2785`、`docs/notes/d1-archi
   逐条都命中预期用例，两条「序号」变异报的都是 `could not find any node … (TestTag = 'plan-row-4')`
   这类**位置**失败，正是它们存在的意义。
 
+**已提交** `e35ab9c`（15 files，+642/−106，直接提交到 `dev`、无独立分支，**未推送**）。
+
 ### 3.5 真机核对（2026-09-26 通过，用户授权，PJX110 / Android 16 / 361dp×794dp）
 
 设备侧先造出「2 个跳过项」：命名页把第 1、2 项都覆盖成同名 `dup.jpg`。
