@@ -599,7 +599,7 @@ fun dangerActionButtonColors(): ButtonColors {
 
 **来源：代码核实**
 
-`MetadataPage.kt` **637 行**（B 侧最大页面），一页内含：
+`MetadataPage.kt` **754 行**（B 侧最大页面；2026-09-26 复核，旧记 637 已过期），一页内含：
 
 - 卷切换 chips + 当前卷摘要
 - 7 个字段编辑器（Title / Series / Writer / Number / LanguageISO / CBZ 文件名 / 输出目录）
@@ -608,6 +608,28 @@ fun dangerActionButtonColors(): ButtonColors {
 - 批量设置（字段选择 + 批量值 + 应用 / 强制覆盖）
 
 **待实测**：真机上单页是否过长、是否需要分组或分区导航。
+
+**规模口径（用户 2026-09-26 给定，逐字）**：「一般都是**几十到两百张图片**，多的话**大几百张**，
+极端情况**两三千张**也有，建议如何处理」。注意 `MetadataPage` 只渲染 `state.activeVolume`
+（`MetadataPage.kt:124`），故**本页的规模变量是「卷数」而非「图片总数」** ——
+卷数一般是「一套漫画的册数」（几十量级），而每卷的图片数是几百量级，后者分摊在
+`LazyColumn` 的懒组合里、不进本页常驻区。
+
+**领域成本实测（探针 `domain/src/test/.../perf/RenamePlanPerfProbe.kt`，2026-09-26）**：
+用户口径下工作流 A 计划页每次重组的领域耗时（每张按 50MB 造数据）：
+
+| 场景 | n=200 | n=800 | n=3000 |
+| --- | --- | --- | --- |
+| `buildProposals`（单集合，40 目录） | 0.67ms | 1.55ms | 4.54ms |
+| `buildLibraryRenamePlan`（1 集合，计划页真实路径） | 0.36ms | 0.81ms | 3.83ms |
+
+最坏「n=3000 全同目录 + 大量重名（走 `attachWarnings` 重分支）」2.66ms；
+真实分片形态「20 集合 ×150 张 = 3000」**2.95ms**。
+⇒ **两三千张的领域成本是个位数毫秒**，无需为此做分页或虚拟化；
+真正的规模风险在**平台层**（缩略图生成、SAF 遍历）而非领域层，属 D2b 范围。
+
+⚠️ 探针**只打印不断言**，与既有 `SortPerfProbe.kt` 同类（该文件已跟踪）。
+**它计入 `domain` 的 `@Test` 总数**（每次 +1），故「domain 247」这个读数依赖本文件在版本控制中。
 
 ---
 
