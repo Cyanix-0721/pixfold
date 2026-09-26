@@ -18,6 +18,13 @@ import androidx.navigation.compose.rememberNavController
 import androidx.navigation.toRoute
 import com.pixfold.d1.domain.mock.MockData
 import com.pixfold.d1.domain.mock.MockDataB
+import com.pixfold.d1.domain.model.NamingScheme
+import com.pixfold.d1.domain.model.NamingState
+import com.pixfold.d1.domain.model.effectiveScheme
+import com.pixfold.d1.domain.naming.buildProposals
+import com.pixfold.d1.domain.naming.setOverride
+import com.pixfold.d1.domain.workflowa.WorkflowAState
+import com.pixfold.d1.domain.workflowa.workflowAStateOf
 import com.pixfold.d1.data.SharedPrefsSettingsStore
 import com.pixfold.d1.domain.settings.AppLanguage
 import com.pixfold.d1.domain.settings.PixFoldSettings
@@ -33,6 +40,7 @@ import com.pixfold.d1.nav.WorkflowARoute
 import com.pixfold.d1.nav.WorkflowBRoute
 import com.pixfold.d1.ui.HomeScreen
 import com.pixfold.d1.ui.preview.ImagePreview
+import com.pixfold.d1.ui.preview.PreviewRename
 import com.pixfold.d1.ui.settings.LicensesScreen
 import com.pixfold.d1.ui.settings.SettingsScreen
 import com.pixfold.d1.ui.theme.PixFoldTheme
@@ -89,6 +97,29 @@ fun PixFoldApp(store: SettingsStore? = null) {
             // 否则页码与图片会对不上(索引来自当前集合)。
             var activeCollectionId by remember { mutableStateOf(collections.first().id) }
 
+            // ---- 工作流 A 的两份共享状态提升到应用根(2026-09-25)----
+            //
+            // **为什么必须提上来**:预览页是**根导航的兄弟目的地**,与 `WorkflowASteps`
+            // 内的嵌套图不在同一棵树上,因此它够不到工作流内部的任何状态。而预览页需要两样东西:
+            //
+            //  1. **当前页序**(`PageOrderState.order`)—— 点击回传的 `index` 是**页序下标**
+            //     (见 `SortAndPreviewPage` 传 `items = order.order`),若预览按集合**声明序**
+            //     取图,只有"页序恰好等于声明序"时才碰巧正确。`cn` 集合的声明序是故意打乱的,
+            //     故修复前会点开另一张图(已由 `AppNavigationTest` 钉住)。
+            //  2. **命名状态**(`NamingState`)—— 预览页的重命名入口写回的就是它的
+            //     `overrides`,与命名页共用同一份,故两处改名结果必然一致。
+            //
+            // 默认值刻意与 `WorkflowASteps` 内部的兜底取值保持**同一表达式**,
+            // 否则"上层初始值"与"组件自持初值"会算出不同结果。
+            var workflowAState by remember { mutableStateOf(workflowAStateOf(collections)) }
+            var namingState by remember {
+                mutableStateOf(
+                    NamingState(
+                        NamingScheme(rootDirName = collections.firstOrNull()?.rootDirName.orEmpty()),
+                    ),
+                )
+            }
+
             // 返回手势/返回键:由 NavHost 自带的 handler 统一处理(它会随返回栈深度
             // 自动 enable/disable)。返回首页 = pop 掉 WorkflowA/B;首页(栈深 1)时
             // NavHost 不再注册 handler,交回系统退出应用 —— 与迁移前 `rootBack = null` 同义。
@@ -136,6 +167,14 @@ fun PixFoldApp(store: SettingsStore? = null) {
                             predictiveBackAnimation = settings.predictiveBackAnimation,
                             onOpenPreview = { index -> navController.navigate(PreviewRoute(index)) },
                             onActiveCollectionChange = { activeCollectionId = it },
+                            // ⚠️ 必须回传当前集合:打开预览会让本目的地离开组合,
+                            // 内部的 `remember { activeId }` 随之销毁;关闭预览回来是
+                            // 新的组合实例,不给种子就会退回首个集合(2026-09-25 修复)。
+                            initialActiveCollectionId = activeCollectionId,
+                            externalState = workflowAState,
+                            onStateChange = { workflowAState = it },
+                            initialNamingState = namingState,
+                            onNamingStateChange = { namingState = it },
                         )
                     }
                 }
@@ -144,14 +183,40 @@ fun PixFoldApp(store: SettingsStore? = null) {
                     // 预览是最内层:返回即关闭预览,回到工作流 A。
                     // (ImagePreview 内部也有自己的关闭按钮;二者语义一致。)
                     val route = entry.toRoute<PreviewRoute>()
-                    // 在目的地内容里读取,保证拿到**当前**集合的图(而非图建立时的快照)。
-                    val previewItems = collections.firstOrNull { it.id == activeCollectionId }?.images
-                        ?: collections.first().images
+                    val activeCollection = collections.firstOrNull { it.id == activeCollectionId }
+                        ?: collections.first()
+                    // ⚠️ 必须用**当前页序**,不能用 `collection.images`(声明序)。
+                    // 点击回传的 `route.index` 是页序下标(见 SortAndPreviewPage 传
+                    // `items = order.order`);两者只在"页序 == 声明序"时碰巧一致,
+                    // 而 `cn` 集合的声明序是故意打乱的 —— 用声明序会打开另一张图
+                    // (2026-09-25 修复,由 AppNavigationTest 钉住)。
+                    val pageOrder = workflowAState.orders[activeCollection.id]?.order
+                        ?: activeCollection.images
+                    // 预览的重命名要显示**当前生效的最终名**(覆盖优先于建议名),
+                    // 故与命名页用同一条求值链:`effectiveScheme` + `buildProposals`。
+                    // 挂 `remember`:两千张规模下这是全量重算,不能每次重组都跑一遍。
+                    val proposals = remember(pageOrder, namingState, activeCollection) {
+                        buildProposals(
+                            pageOrder,
+                            effectiveScheme(namingState, activeCollection),
+                            overrides = namingState.overrides,
+                        ).associateBy { it.image.id }
+                    }
                     DestinationSurface {
                         ImagePreview(
-                            items = previewItems,
+                            items = pageOrder,
                             initialIndex = route.index,
                             onClose = { navController.popBackStack() },
+                            // 重命名写回**命名页同一个** `namingState.overrides`
+                            // (键 = SourceItem.id,值 = 完整文件名,空值即撤销覆盖),
+                            // 故两处改名互相同步 —— 不是两份状态。
+                            rename = PreviewRename(
+                                overrides = namingState.overrides,
+                                finalNameOf = { item -> proposals[item.id]?.finalName ?: item.fileName },
+                                onRename = { item, name ->
+                                    namingState = setOverride(namingState, item.id, name)
+                                },
+                            ),
                         )
                     }
                 }

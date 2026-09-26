@@ -83,6 +83,12 @@ enum class WorkflowAStep(val labelRes: Int) {
  * "position = 当前页序中的下标")。若两页各自持有状态,命名的序号就会与用户排好的
  * 顺序脱节 —— 这是必须由上层持有、两页共享的**唯一**理由。
  *
+ * **状态可再上提一层**(2026-09-25):页序与命名状态经 [externalState] /
+ * [initialNamingState] 支持由**应用根**注入,[onStateChange] / [onNamingStateChange]
+ * 回传。原因是预览页是**根导航的兄弟目的地**,不在本组件的子树里 ——
+ * 它既要按**当前页序**取图(点击回传的是页序下标),又要写回同一份命名覆盖。
+ * 不传这两个参数时行为与从前完全一致(测试与单独使用场景不受影响)。
+ *
  * 用 M3 `TabRow` 而非自绘步骤条:直接获得 M3 的选中/未选中语义色、指示器与无障碍支持。
  *
  * ## 步骤切换 = 嵌套 NavHost(2026-09-22 迁移)
@@ -114,11 +120,42 @@ fun WorkflowASteps(
      * 但普通返回动画保留(即"关掉手势跟随,但不硬切")。
      */
     predictiveBackAnimation: Boolean = true,
+    /** 上层持有的批次状态(页序等);为 null 时本组件自持(单独使用/测试场景)。 */
+    externalState: WorkflowAState? = null,
+    /**
+     * 上层持有的「当前集合」;为 null 时本组件自持。
+     *
+     * **为什么这个种子也必须由上层给**:预览页是**根导航的兄弟目的地**,
+     * 打开预览会让 `WorkflowARoute` 这个目的地离开组合,它内部的
+     * `remember`(含 `activeId`)**随之销毁**;关闭预览回来是**新的组合实例**,
+     * 于是 `activeId` 会退回 `collections.first()` —— 表现就是
+     * 「在排序页切到 cn → 点开一张图 → 关闭后排序页又变回 trip」。
+     * 由上层传入当前值即可让新实例恢复到正确集合
+     * (2026-09-25 由端到端测试发现并修复)。
+     */
+    initialActiveCollectionId: String? = null,
+    /** 批次状态变化上报(仅上层持有状态时有意义)。 */
+    onStateChange: (WorkflowAState) -> Unit = {},
+    /** 上层持有的命名状态(结构 + 覆盖);为 null 时自持。 */
+    initialNamingState: NamingState? = null,
+    /** 命名状态变化上报(仅上层持有状态时有意义)。 */
+    onNamingStateChange: (NamingState) -> Unit = {},
 ) {
     // 跨步骤共享的唯一状态源。这些状态**必须留在嵌套 NavHost 之外** ——
     // 它们要跨步骤存活,而 NavHost 里每个 destination 都是独立作用域。
-    var state by remember { mutableStateOf(workflowAStateOf(collections)) }
-    var activeId by remember { mutableStateOf(collections.firstOrNull()?.id.orEmpty()) }
+    //
+    // 模式与 `SortAndPreviewPage` / `NamingPage` 一致:**本地状态权威,初值取自上层,
+    // 每次变更上报**。刻意不用 `externalState ?: local` —— 那样上层一旦传值,
+    // 就地编辑就永不显示(该踩坑记录见 `NamingPage` 的同名注释)。
+    var state by remember { mutableStateOf(externalState ?: workflowAStateOf(collections)) }
+    fun updateState(next: WorkflowAState) {
+        state = next
+        onStateChange(next)
+    }
+    // 初值取上层给的值(若给):预览往返会让本目的地整体重建,靠它恢复所选集合。
+    var activeId by remember {
+        mutableStateOf(initialActiveCollectionId ?: collections.firstOrNull()?.id.orEmpty())
+    }
     // 命名结构与覆盖是**批次级**(规格 §6.3:overrides 全局一份,不属于某个集合),
     // 故在此持有 —— 切集合、来回切 Tab 都不会丢失用户的覆盖。
     // 工作流 A 的危险动作(默认关闭)+ 确认流程 + 执行报告
@@ -130,10 +167,14 @@ fun WorkflowASteps(
 
     var namingState by remember {
         mutableStateOf(
-            NamingState(
+            initialNamingState ?: NamingState(
                 NamingScheme(rootDirName = collections.firstOrNull()?.rootDirName.orEmpty()),
             ),
         )
+    }
+    fun updateNamingState(next: NamingState) {
+        namingState = next
+        onNamingStateChange(next)
     }
 
     val activeCollection = collections.firstOrNull { it.id == activeId } ?: collections.firstOrNull()
@@ -199,9 +240,18 @@ fun WorkflowASteps(
                             contentInsets = innerInsets,
                             onOpenPreview = onOpenPreview,
                             initialCollectionId = activeId,
-                            onActiveCollectionChange = { activeId = it },
+                            // ⚠️ 必须**同时**更新本地 activeId **并转发**给外层。
+                            // 2026-09-25 修复的真实缺陷:此处原先只写 `{ activeId = it }`,
+                            // 于是本组件的 `onActiveCollectionChange` 参数**从未被调用** ——
+                            // 应用根的 `activeCollectionId` 永远停在首个集合,
+                            // 用户在排序页切到别的集合后预览仍显示旧集合的图
+                            // (与"预览用声明序取图"叠加,表现为既点错图又数错页码)。
+                            onActiveCollectionChange = {
+                                activeId = it
+                                onActiveCollectionChange(it)
+                            },
                             externalState = state,
-                            onStateChange = { state = it },
+                            onStateChange = { updateState(it) },
                             onNext = { navController.navigate(WorkflowANamingRoute) },
                             modifier = Modifier.weight(1f),
                         )
@@ -223,7 +273,7 @@ fun WorkflowASteps(
                                 order = order,
                                 contentInsets = innerInsets,
                                 initialState = namingState,
-                                onStateChange = { namingState = it },
+                                onStateChange = { updateNamingState(it) },
                                 onBack = { navController.popBackStack() },
                                 onNext = { navController.navigate(WorkflowAPlanRoute) },
                                 modifier = Modifier.weight(1f),

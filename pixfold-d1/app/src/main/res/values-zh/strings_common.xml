@@ -28,5 +28,12 @@
     <string name="preview_next">下一页</string>
     <string name="preview_page_label">第 %1$d / %2$d 页</string>
     <string name="preview_zoom_cd">缩放 %1$s</string>
+    <string name="preview_image_cd">图片 %1$s</string>
+    <string name="preview_rename">重命名</string>
+    <string name="preview_rename_title">重命名图片</string>
+    <string name="preview_rename_field">新文件名</string>
+    <string name="preview_rename_hint">留空即恢复建议名。</string>
+    <string name="preview_rename_save">保存</string>
+    <string name="preview_renamed">将重命名为 %1$s</string>
 
 </resources>

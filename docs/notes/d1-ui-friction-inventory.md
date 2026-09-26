@@ -638,12 +638,15 @@ fun dangerActionButtonColors(): ButtonColors {
 | **P1** | 12 | 芯片行横向滚动把靠后的可操作控件**挤出视口**（7 处同源） | **违反约束 3/7 + §0 布局约定** | **✅ 2026-09-25 已修** |
 | **P1** | 13 | 拖拽**无跟手浮层** + 命名页对手工调整**沉默**（§11 第 9/10 条） | 反馈缺失 / 操作逻辑不一致 | **✅ 2026-09-25 已修** |
 | **P1** | 14 | 拖拽**无法跨视口** —— 30 张图时从第 1 张拖到第 30 张**物理上不可能** | **功能性缺陷（目标不可达）** | **✅ 2026-09-25 已修**（真机核对 2026-09-26 通过） |
-| **P3** | 6/7 | 容器重复；MetadataPage 637 行 | 结构性 |
+| **P1** | 15 | 预览**取错图**（声明序 vs 页序）+ 预览往返**丢失所选集合** + 预览页缺改名入口 | **功能性缺陷（显示的不是点的那张）** | **✅ 2026-09-26 已修**（真机 5 项核对通过） |
+| **P3** | 6/7 | 容器重复；MetadataPage **754 行**（旧记 637 已过期） | 结构性 |
 
 **建议顺序**：~~**P0 先做**~~（**✅ 2026-09-24 已完成**），
 ~~再 P1（固定终局动作）~~（**✅ 2026-09-25 已完成**）；~~长列表筛选~~ 仍待办（§3），
 P2/P3 视情况。第 2 项修复**真机核对已通过**（2026-09-25，与 §2b 同轮，用户授权后执行）；
 离线全绿：282 + 229 + lint 零告警 + 6 组变异全捕获 —— 底栏是纯布局位移、不涉数据路径。
+**第 15 节（2026-09-26）**离线全绿：`app 352` / `domain 247` + lint 零告警 + **16 组变异全捕获**，
+真机 5 项逐条读数见 §15.8。
 
 > **流程约定**：以上均为**设计变更**（动页面结构），需先出设计方案交用户确认，
 > 再进入实现；实现后按「修复自证三层」（领域单测 → UI 断言 → 真机实证）交付。
@@ -1014,6 +1017,140 @@ LazyGrid/LazyColumn 接收手势」。**探针实测这个判断不成立** —�
 
 ---
 
+## 15. ✅ 预览取错图 / 预览往返丢失所选集合 / 预览页改名入口 —— 2026-09-26 已修，真机 5 项核对通过
+
+**来源**：用户提问（逐字）「是否没必要保留列表视图了，然后网格视图的图钉按钮改成展开一个小的选项框，图钉和重命名？」
+⇒ 排查「图钉能否藏进菜单」时**连带刨出三处真实缺陷**，并定下改名的落点。
+
+> 该提问本身的结论（已答复，未改动代码）：**列表视图应保留**（验收第 1、4 项要求双视图与列表拖拽；
+> 且列表是**唯一**显示 `relPath` + 体积的视图 —— 网格卡片只显示文件名，故 `ch01/page_01.png` 与
+> `ch02/page_01.png` 在网格里**字节级相同**，`ViewMode.kt:3` 的 KDoc 早写明这一分工）；
+> **图钉藏进菜单 = 净负收益**（图钉是二态控件，「入口可见 + 二态形状」正是走查反馈④ 的修法；
+> 长按已被拖拽占用、短按进预览，没有空闲手势；361dp 屏上三列卡片仅约 110dp 宽）。
+> 用户随后裁决（逐字）「**那就不做菜单，点开图片预览的是否加个重命名按钮吧**」⇒ 溢出菜单构想作废。
+
+### 15.1 缺陷 1：预览取图用「集合声明序」，而网格点击传的是「当前页序」
+
+`SortAndPreviewPage.kt:312 onClick = { index -> onOpenPreview(index) }`，这个 `index` 是
+`items = order.order` 里的**页序下标**；而 `PixFoldApp.kt` 的预览目的地却用
+`collections.firstOrNull { it.id == activeCollectionId }?.images`（**声明序**）取图。
+两套顺序**只在恰好相同时才对**，于是「点第 1 张，出来的是另一张」。
+
+**反证材料就在 mock 里**（无需真机即可复现）：
+`MockDataTest.kt:65-80` 断言 `cn` 集合**页序首项 = `第一话`**，而
+`MockData.kt:73-82 private fun chapters()` 的**声明序首项 = `第十二话`** ⇒ 逐项不同。
+
+> ⚠️ **为什么此前一直没被发现**：既有 `AppNavigationTest.kt` 全用 `trip` 集合，
+> 它的声明序**恰好等于**默认规则（`DirName` asc + `NaturalName` asc）的结果 ⇒ **巧合通过**。
+
+**修法**：预览改从提升后的 `WorkflowAState` 取当前页序 ——
+`val pageOrder = workflowAState.orders[activeCollection.id]?.order ?: activeCollection.images`。
+
+### 15.2 缺陷 2：`onActiveCollectionChange` 声明了却从未被调用
+
+`WorkflowASteps.kt:110` 接收 `onActiveCollectionChange`，但接线处只写成
+`{ activeId = it }` —— 只更新组件**本地**状态并**不转发** ⇒
+应用根里的 `activeCollectionId` 永远停在首个集合。
+
+**修法**：改成双写 `{ activeId = it; onActiveCollectionChange(it) }`。
+
+### 15.3 缺陷 3：预览往返后步骤容器被重建，所选集合退回首个
+
+**由新增的端到端测试首次跑红才暴露**（`No node found that matches TestTag =
+'proposal-name-cn-3' in scrollable container`，容器只报 30 行 = `trip` 集合）。
+根因：预览是**根导航的兄弟目的地**，打开预览会让 `WorkflowARoute` **离开组合**，
+其内部 `var activeId by remember { ... }` 随之销毁；关闭预览回来是**全新组合实例**，
+没有种子就退回 `collections.first()`。表现「排序页切到章节 → 点开一张图 → 关闭后变回旅行照片」。
+
+**修法**：`WorkflowASteps` 新增 `initialActiveCollectionId: String? = null`（带默认值，
+否则 4 个测试文件 16 处调用点全断），应用根传 `initialActiveCollectionId = activeCollectionId`。
+
+**同时把 `WorkflowAState` / `NamingState` 提升到应用根**（否则改名只在页内可见、
+换页即丢）。范式沿用仓库既有的「**本地状态权威 + 初值取自上层 + 每次变更上报**」
+（`SortAndPreviewPage.kt:135`），**刻意不用** `externalState ?: local` ——
+那样一旦上层传值，就地编辑就永不显示（`NamingPage.kt:108-116` 记有同款教训）。
+
+### 15.4 改名入口（用户裁决方向）
+
+落在预览顶栏，`PreviewRename(val overrides, val finalNameOf, val onRename)` **打包成一个非空值**，
+使「三个参数缺一个」不可表示；`ImagePreview(rename = null)` 是「本页不提供改名」的**唯一**表达。
+`ImagePreview` 的新参数**必须带默认值**（`ImagePreviewTest.kt` 有 9 处 `setContent`）。
+
+- 初值 = **当前最终名**（`finalNameOf`，覆盖优先于建议名）⇒ 用户是「改」而不是「重打一遍」。
+- 空串 = 撤销覆盖，语义**由领域层 `setOverride` 拥有**（`if (name.isNullOrEmpty()) overrides - id`），
+  UI 不重新实现（不 trim、不兜底）。
+- 新增 6 个字符串键（中英同步）：`preview_rename` / `preview_rename_title` /
+  `preview_rename_field` / `preview_rename_hint` / `preview_rename_save` / `preview_renamed`。
+
+### 15.5 ⚠️ 本轮最重要的订正：一条**空洞测试**与一个**错误的技术判断**
+
+我最初给预览的三个 `TextButton` 加了 `Modifier.heightIn(min = 48.dp)`，
+注释写「M3 `TextButton` 默认最小高度只有 **40dp**,不达标」，并据此写了
+`top bar buttons keep a 48dp minimum touch target`。
+
+**变异实测推翻了它**：T1/T2/T3 三条「删掉 `heightIn`」变异**全部逃逸**（失败 0 条）。
+探针实测（`TmpSizeProbe`，用完即删）：
+
+| 组合 | 实测高度 |
+| --- | --- |
+| 裸 `TextButton` | **52px** |
+| `TextButton` + `heightIn(min = 48.dp)` | **52px** |
+| `TextButton` + `Modifier.size(height = 20.dp)` | **20px** |
+| 裸 `Row` + `clickable` | **35px** |
+| `Row` + `heightIn(min = 48.dp)` + `clickable` | **48px** |
+
+⇒ **M3 的 `minimumInteractiveComponentSize` 早已把 `TextButton` 抬到 48dp+**，
+40dp 只是**视觉**高度；`heightIn` 加不加布局尺寸完全一样 ⇒ **冗余修饰符，已删**。
+（全仓无 `LocalMinimumInteractiveComponentSize` 覆盖，故该抬升确实生效。）
+
+**教训**：`heightIn` 挂在哪很关键 —— 它挂在**裸 `Row` + `clickable`** 上是**承载行为**的
+（35px → 48px），仓库现有 2 处（`SortAndPreviewPage.kt:400`、`SchemeEditor.kt:152`）
+**必须保留**；挂在 M3 按钮上是**装饰**。
+
+**订正后的守卫**：变异改成「**显式把按钮压到 20dp**」—— 这类改动才真会打破指标
+（M3 的最小交互尺寸不再生效）。T1/T2 现在各自捕获（报错逐字
+`preview-rename 触控高度应 ≥ 48dp,实际 20px(下限 48px)`），守卫**不再是空洞测试**。
+
+### 15.6 同时刨出的旁证：`PinToggle` 确实低于 48dp（**未裁决，本轮未动**）
+
+同一探针实测 `PinToggle(size = 32.dp)` → **32px**、`size = 40.dp` → **40px**。
+`PinToggle` 用 `Modifier.size(size)` **显式**定尺寸 ⇒ **不享有** M3 的最小交互尺寸抬升，
+所以 32/40dp **就是真实触摸目标**，确实低于 48dp 硬指标。
+另 `PinButtonTest.kt:113-119` 用例名写 48dp 而断言是 `assertTrue(w >= 40, ...)` ⇒
+**名实不符，48dp 从未被守护**。此项**用户未裁决，本轮刻意未改**。
+
+### 15.7 自证
+
+- **测试**：`ImagePreviewTest.kt` +8 条（含改名入口在有/无接线下的两态、初值、确认回传、
+  取消丢弃、反馈行的三条状态、48dp 守卫）；`AppNavigationTest.kt` 新增 2 条端到端 ——
+  ①预览改名 → 关闭 → 命名页看到新名（顺带钉住缺陷 1，页序首张 = `cn-3`）；
+  ②命名页改名 → **经预览往返（销毁重建步骤容器）** → 名字仍在。
+- **四道闸门**：`app 352` / `domain 247` 全绿、lint `0 errors, 0 warnings`、
+  `assembleDebug` 成功 APK **33,299,288 B**。
+- **变异 16 条全部捕获、0 逃逸、0 跳过**（脚本 `pixfold-d1/app/build/mut_preview_order_rename.py`，不跟踪）：
+  P1 预览退回声明序 / P2 改名丢弃写回 / F1 集合回调只写本地 / **F2 命名步骤不上报** /
+  R1–R7（不写回 / 写错张 / 初值用建议名 / 反馈行永不出现 / 反馈行恒显示 / 取消变提交 / 未接线也显示入口）/
+  A1–A2（往返后不恢复集合）/ T1–T2（显式压到 20dp）/ D1 空串当新名字。
+- ⚠️ **F2 首轮逃逸是真逃逸**：`NamingPage` 内部本就持有本地 `state`，漏上报在**单页内不可见**，
+  必须「离开再回来」才暴露 ⇒ 据此补了上面那条往返测试，二轮归零。
+
+### 15.8 真机核对（2026-09-26 通过，用户授权，PJX110 / Android 16 / 361dp×794dp）
+
+逐条读数（`uiautomator dump`）：
+
+| # | 核对项 | 实测 |
+| --- | --- | --- |
+| ① | 点第 1 张卡片，预览是不是那一张 | 卡片 `第一话.jpg` → 预览 `图片 第一话.jpg`、`第 1 / 16 页` ✅（修复前会显示声明序首张 `第十二话`） |
+| ② | 排序页切集合 → 开预览 → 关闭后集合是否退回 | 仍 `共 16 张` + `第一话/第二话/第三话` ✅（修复前退回「旅行照片（30）」） |
+| ③ | 预览里改名的反馈行 | `将重命名为 preview_edit.jpg` ✅ |
+| ④ | 改名传播到命名页 | `新名称（已覆盖）` = `preview_edit.jpg`，摘要栏同步，`恢复建议值 cn-3` ✅ |
+| ⑤ | 命名页改名 → 退回排序 → 开预览 → 再回命名页 | 两个改名（`preview_edit.jpg` / `naming_edit.jpg`）**都还在**、`警告 2` 保持 ✅ |
+
+调试产物已清理（设备 `/data/local/tmp/t*.xml` 与本地 `artifacts/t*.xml` 均已删），
+`svc power stayon` 已复位，应用已 force-stop。
+
+---
+
 ## 附：本文件的取证方式（可复现）
 
 | 结论 | 取法 |
@@ -1026,6 +1163,9 @@ LazyGrid/LazyColumn 接收手势」。**探针实测这个判断不成立** —�
 | 筛选器有无 | 检索 `TAG_FILTER_*` 的实际使用点 |
 | 第 10 节"角色不受种子影响" | 临时 JVM 探针：两组种子各生成 `ColorScheme`，用 **`toArgb()`** 逐角色比较；取值相同的即未从种子派生 |
 | 第 10 节色彩标准覆盖面 | 同一探针比较 `SPEC_2021` / `SPEC_2025` 的 48 个角色，计数变值角色 |
+| 第 15 节「页序 vs 声明序」 | 读源码：`SortAndPreviewPage.kt:312` 传的 `index` 取自 `order.order`，对照预览目的地的取图来源；反证用 `MockDataTest` 已断言的页序首项 |
+| 第 15 节「触摸目标是否真达标」 | 临时 Robolectric 探针 `TmpSizeProbe`：读 `fetchSemanticsNode().size.height`，同一文件内并列放「裸 / 加 `heightIn` / 显式 `size`」三种写法对比（用完即删） |
+| 第 15 节「漏上报是否可见」 | 靠**变异**而非阅读：把上报改成只写本地，看测试是否变红 —— 单页内不变红即说明该性质无断言覆盖 |
 
 
 **⚠️ 一条取证教训**：本清单初稿曾据 Robolectric 探针（`w400dp-h1000dp`）

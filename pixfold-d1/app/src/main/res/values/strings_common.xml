@@ -28,5 +28,12 @@
     <string name="preview_next">Next</string>
     <string name="preview_page_label">Page %1$d of %2$d</string>
     <string name="preview_zoom_cd">Zoom %1$s</string>
+    <string name="preview_image_cd">Image %1$s</string>
+    <string name="preview_rename">Rename</string>
+    <string name="preview_rename_title">Rename image</string>
+    <string name="preview_rename_field">New file name</string>
+    <string name="preview_rename_hint">Leave empty to restore the suggested name.</string>
+    <string name="preview_rename_save">Save</string>
+    <string name="preview_renamed">Will be renamed to %1$s</string>
 
 </resources>
