@@ -1,5 +1,6 @@
 package com.pixfold.d1.ui.workflowa
 
+import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createComposeRule
@@ -108,16 +109,7 @@ class SortAndPreviewPageTest {
         rule.setContent { SortAndPreviewPage(listOf(collection)) }
         rule.waitForIdle()
 
-        val rendered = rule.onAllNodesWithTag(TAG_GRID_CARD)
-            .fetchSemanticsNodes()
-            .map { node ->
-                val cfg = node.config
-                if (cfg.contains(SemanticsProperties.ContentDescription)) {
-                    cfg[SemanticsProperties.ContentDescription].firstOrNull() ?: ""
-                } else {
-                    ""
-                }
-            }
+        val rendered = renderedCardNames()
 
         assertEquals(
             listOf(
@@ -127,5 +119,42 @@ class SortAndPreviewPageTest {
             rendered,
             "网格必须按数值显示中文数字卷;修复前是逐字比码点的乱序",
         )
+    }
+
+    /**
+     * 按**渲染顺序**收集网格里所有卡片的名字。
+     *
+     * ⚠️ 不能只 `onAllNodesWithTag(TAG_GRID_CARD)` 一次就断言:那是 LazyGrid,只组合
+     * **可见窗口**内的项。2026-09-26 列数控件改为默认自适应后,默认 320dp 宽度下自适应
+     * 算出 2 列(旧实现写死 3 列),6 张卡从 2 行变 3 行、超出视口,于是"一次取全部"只拿到
+     * 前 4 张 —— 这条断言当场变红,但**排序并没有坏**,坏的是断言对布局的隐含假设。
+     *
+     * 故这里逐屏滚动收集(每屏按 boundsInRoot 的 (top,left) 排序),按首次出现顺序拼接,
+     * 使断言只依赖"展示顺序"这一真正的不变量,与列数/视口高矮解耦。
+     */
+    private fun renderedCardNames(): List<String> {
+        val grid = rule.onNodeWithTag(TAG_GRID).fetchSemanticsNode()
+        val scrollTo = grid.config[SemanticsActions.ScrollToIndex].action
+        val seen = LinkedHashSet<String>()
+        // 卡片数上界很小(6),逐屏滚到底即可;seen 保证不重复、且保持首次出现顺序
+        for (i in 0 until 8) {
+            runCatching { scrollTo?.invoke(i) }
+            rule.waitForIdle()
+            rule.onAllNodesWithTag(TAG_GRID_CARD)
+                .fetchSemanticsNodes()
+                .sortedWith(compareBy({ it.boundsInRoot.top }, { it.boundsInRoot.left }))
+                .forEach { node ->
+                    val cfg = node.config
+                    if (cfg.contains(SemanticsProperties.ContentDescription)) {
+                        cfg[SemanticsProperties.ContentDescription].firstOrNull()?.let(seen::add)
+                    }
+                }
+            if (seen.size >= CARD_COUNT) break
+        }
+        return seen.toList()
+    }
+
+    private companion object {
+        const val CARD_COUNT = 6
     }
 }

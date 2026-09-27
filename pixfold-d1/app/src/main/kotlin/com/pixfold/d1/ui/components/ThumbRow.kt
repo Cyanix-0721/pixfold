@@ -83,12 +83,17 @@ fun ThumbRow(
         }
 
         // 图钉入口必须可点(验收第 6 项);图形为自绘图钉(见 PinToggle 注释:不用五角星)
+        //
+        // 尺寸:吃 PinToggle 的默认 32dp,**不要**再传 size(用户 2026-09-26 指定
+        // 「PinToggle48太大了,32差不多了」)。此处曾写 `size = 40.dp`,导致网格 32dp /
+        // 列表 40dp 两个尺寸并存 —— 同一控件在两处视图里长得不一样。
+        // 触控目标不受影响:视觉 32dp 之外仍由 `Modifier.clickable` 撑到 48dp
+        // (真机实测语义框 168px = 48dp,视觉 112px = 32dp),理由与取证见台账 §16。
         if (onPin != null) {
             PinToggle(
                 isPinned = isPinned,
                 itemName = item.fileName,
                 onClick = onPin,
-                size = 40.dp,
                 modifier = Modifier.padding(end = 8.dp),
                 tag = pinTag(item.id),
             )

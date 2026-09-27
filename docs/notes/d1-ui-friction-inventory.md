@@ -1255,13 +1255,22 @@ LazyGrid/LazyColumn 接收手势」。**探针实测这个判断不成立** —�
 （M3 的最小交互尺寸不再生效）。T1/T2 现在各自捕获（报错逐字
 `preview-rename 触控高度应 ≥ 48dp,实际 20px(下限 48px)`），守卫**不再是空洞测试**。
 
-### 15.6 同时刨出的旁证：`PinToggle` 确实低于 48dp（**未裁决，本轮未动**）
+### 15.6 同时刨出的旁证：`PinToggle` 的尺寸问题 —— ⚠️ **本节的结论当时是错的，已于 §16 订正**
 
-同一探针实测 `PinToggle(size = 32.dp)` → **32px**、`size = 40.dp` → **40px**。
-`PinToggle` 用 `Modifier.size(size)` **显式**定尺寸 ⇒ **不享有** M3 的最小交互尺寸抬升，
-所以 32/40dp **就是真实触摸目标**，确实低于 48dp 硬指标。
-另 `PinButtonTest.kt:113-119` 用例名写 48dp 而断言是 `assertTrue(w >= 40, ...)` ⇒
-**名实不符，48dp 从未被守护**。此项**用户未裁决，本轮刻意未改**。
+同一探针实测 `PinToggle(size = 32.dp)` → **32px**、`size = 40.dp` → **40px**，当时据此写：
+「`PinToggle` 用 `Modifier.size(size)` **显式**定尺寸 ⇒ **不享有** M3 的最小交互尺寸抬升，
+所以 32/40dp **就是真实触摸目标**，确实低于 48dp 硬指标。」
+
+**⚠️ 2026-09-27 订正：上述推断是错的。** 探针读到的是 `fetchSemanticsNode().size`，
+它是 `Modifier.size(size)` 定下的**视觉**尺寸；而 M3 的 `minimumInteractiveComponentSize`
+并不挂在尺寸修饰符上，是 `Modifier.clickable` 内部的 `getExtendedTouchPadding`
+（`foundation/Clickable.kt:895-903`）在**测量阶段**把触控区撑到 48dp 的 ——
+它不进语义节点的 `size` 字段，故探针看不见它。**真机 dump 直接证伪**：
+九个图钉节点的 `bounds` 全部是 **168×168px = 48.0dp**（`PinToggle` 视觉方块另有 112px = 32dp）。
+⇒ 32/40dp 是**视觉**尺寸，触摸目标一直是 **48dp**，**约束 7 从未被违反**。
+
+`PinButtonTest.kt:113-119` 那条用例的问题仍在（用例名写 48dp 而断言 `>= 40`，
+且自己传 `size = 40.dp` ⇒ 自说自话），已随 §16 重写。
 
 ### 15.7 自证
 
@@ -1292,6 +1301,182 @@ LazyGrid/LazyColumn 接收手势」。**探针实测这个判断不成立** —�
 
 调试产物已清理（设备 `/data/local/tmp/t*.xml` 与本地 `artifacts/t*.xml` 均已删），
 `svc power stayon` 已复位，应用已 force-stop。
+
+---
+
+## 16. ✅ P1：五项交互修订（排序页滚动 / 图钉尺寸 / 去对勾 / 芯片文案 / 列数控件）—— 2026-09-27 已修，真机核对通过
+
+**来源：用户真机走查后的五条追加要求**（同一轮提出，逐字）：
+
+| # | 用户原话（逐字） | 落点 |
+| --- | --- | --- |
+| ① | 「排序规则展开时无法下滑」 | A 步骤 1 的排序规则编辑器 |
+| ② | 「PinToggle48太大了，32差不多了」 | `PinToggle` 图钉 |
+| ③ | 「网格/列表切换按钮选中有高亮所以不需要"✔"」 | `ModeToggle` |
+| ④ | 「集合按钮内的字没有居中，集合名（数量）后面还有一块空格的感觉」 | 集合芯片文案 |
+| ⑤ | 「网格视图加个列数按钮（默认选自适应）」 | 新增列数控件 |
+
+### 16.1 ① 展开后无法下滑：编辑器占满滚动容器（**初判根因与真相都在此**）
+
+`RuleSummaryBar` 折叠时，`SortRuleEditor` 原先是 `Column` 里 `weight(1f)` 网格**之外**的固定子项。
+折叠态编辑器只有折叠摘要行，网格拿到全部剩余高度；**展开态编辑器实测约 2900px，
+而屏高只有 2780px** ⇒ 编辑器吃光固定区、`weight(1f)` 网格被压到近 0 高度，
+`LazyGrid` 的滚动区间随之消失 ⇒ **页面看起来"无法下滑"**。
+
+**类 KDoc 里原先的估算被真机证伪**（原文逐字「编辑器高度有界（≈140dp → 最多 ≈220dp）」）——
+四级规则时编辑器远不止 220dp。该 KDoc 已标注"已被真机证伪"。
+
+**用户裁决**（逐字）：**A「编辑器并进列表的滚动区（推荐）」**。
+拒绝 B（给编辑器设高度上限）与 C（整页合成一个滚动区）。
+
+**修法**：把编辑器变成网格/列表**同一个 `LazyColumn`/`LazyGrid` 的 header item**
+（`DragReorderGrid` / `DragReorderList` 新增 `header: (@Composable () -> Unit)? = null` 参数，
+`header != null` 时在 `itemsIndexed` 之前插 `item(key = DRAG_HEADER_ITEM_KEY, span = { GridItemSpan(maxLineSpan) })`）。
+`RuleSummaryBar` **保持常驻在滚动容器之外**，仍作折叠开关。
+**代价（已在裁决描述里写明并接受）**：编辑器会随列表滚出视口 —— 与 P0 命名页同款行为。
+
+**⚠️ 前插锚定陷阱（本轮的技术核心）**：往视口**上方**插入内容时，
+`LazyList` 默认按**像素偏移**保持滚动位置 ⇒ 画面毫无反应（用户看到的是"点了没反应"）。
+LazyList 实为按 **key** 解析 `updateScrollPositionIfTheFirstItemWasMoved`，
+故占位项必须带**稳定 key**。折叠时**不移除** `scrollSignal`（否则画面会被硬拽回顶部，
+比"没反应"更糟）；**只在展开时** `scrollSignal++` 回顶。
+> ⚠️ header 绝不能并进 `items`/`itemsIndexed` —— 会让 `onClick(index)` 与 `slotBounds[index]` 整体错位一格。
+
+### 16.2 ② 图钉 32dp：**本条订正了 §15.6 的错误结论**
+
+`ThumbRow.kt` 原先给 `PinToggle` 多传了 `size = 40.dp`，**覆盖了组件默认值 32dp** ⇒
+网格与列表两个调用点（`ThumbRow.kt`、`DraggableThumbCard.kt`）都不一致。
+已删该实参，两处统一走组件默认 **`PinToggle(size: Dp = 32.dp)`**。
+
+**§15.6 当时写「32/40dp 就是真实触摸目标，确实低于 48dp 硬指标」—— 这是错的**（已在该节标注订正）：
+
+- 探针读的 `fetchSemanticsNode().size` 是 `Modifier.size(size)` 定下的**视觉**尺寸；
+- M3 的 `minimumInteractiveComponentSize`（默认 48dp）**不是**挂在尺寸修饰符上，
+  而是 `Modifier.clickable` 内部的 `getExtendedTouchPadding`
+  （`foundation/Clickable.kt:895-903`）在**测量阶段**把触控区撑到 48dp，它不进语义节点的 `size` 字段；
+- **真机 dump 直接证伪**：九个图钉节点的 `bounds` 全部 **168×168px = 48.0dp**（视觉方块另有 112px = 32dp）。
+
+⇒ **视觉 32dp 与触控 48dp 共存，约束 7 从未被违反**。用户「32 差不多了」的裁决**不违反 a11y 硬指标**，
+**勿改回 40dp**（那条实参是纯粹的不一致，不是尺寸需求）。
+
+### 16.3 ③ 去对勾：`SegmentedButton` 的 26dp 图标槽位
+
+`SegmentedButton.kt:221` 的 `icon` 参数默认值是 `{ SegmentedButtonDefaults.Icon(selected) }`。
+即便不画图标，`SegmentedButtonContentMeasurePolicy`（`:413-459`）仍**硬留
+`IconSize 18dp + IconSpacing 8dp = 26dp` 的槽位**，并在 `iconWidth == 0` 时
+用 `offsetX = -13dp` 把标签往左挪回半个槽位 ⇒ **标签始终被右推 13dp**。
+
+**修法**：两处 `SegmentedButton` 显式传 `icon = {}` ⇒ 槽位宽度归零、`offsetX = -13dp` 生效 ⇒ 标签居中，
+**总宽不变**（该 measure policy 只挪标签，不改容器宽）。只暴露 `contentPadding`，真正移除槽位须弃用 `SegmentedButton`。
+
+**⚠️ 本项在离线不可观测**：`Icons.Filled.Check` 的 `contentDescription = null` ⇒ 语义树无痕；
+且 `ModeToggleProbeTest` 实测 `onAllNodesWithText("Grid")` 拿到的节点 rectangle **与按钮完全相同**
+（Robolectric 不做真实文字测量）⇒ 标签居中与否也无法离线观测。
+**故守卫写成源码结构断言**（`functionBody()` 抽出函数体后断言 `contains("icon = {}")`
+且 `!contains("SegmentedButtonDefaults.Icon(")`，且必须先 `decommented()` 剥注释）。
+
+**真机取得了决定性像素证据**（同一节点同坐标对照，按钮区 `x42-266`，中心 = 154）：
+
+| | `text='网格'` 子节点 | 中心 | 与按钮中心差 |
+| --- | --- | --- | --- |
+| 修补前（09-26 筛选轮 `artifacts/a_step1.xml`） | x=150-250 | **200** | **+46px ≈ 13.1dp** |
+| 本轮（`artifacts/step1_reexp.xml`） | x=105-205 | **155** | **+1px** |
+
+⇒ 46px ≈ 13.1dp 的右推**正是那个 26dp 槽位的一半**，与源码推导逐像素吻合。
+按钮总宽仍 224px = 64dp（与改前相同）⇒ 去对勾未造成布局位移。
+
+### 16.4 ④ 集合芯片"文字不居中"：**根因是全角括号，不是内衬**
+
+真机像素实测（`artifacts/vfy1.xml` + 自写 PNG 解码器）：
+
+| | 容器 x 范围 | 宽 | 文字 x 范围 | 墨迹中心 | 容器中心 | 差 |
+| --- | --- | --- | --- | --- | --- | --- |
+| 修补前 `旅游照片（30）` | 42-508 | **466px** | — | 偏左 | — | — |
+| 本轮 `旅行照片 (30)` | 42-456 | **414px** | 98-400 | 247 | 249 | **−2px ≈ 0.6dp** |
+
+**code-level 根因**：`FilterChip` → 私有 `SelectableChip` → `AnimatingChipContent`（`Chip.kt:2020`），
+`ChipLayoutMeasurePolicy`（`:2281`）算 `width = leadingIconWidth + labelPlaceable.width + trailingIconWidth`，
+`widthOrZero` 对 null 图标返回 0 ⇒ **不为缺席的图标留位**（与 `SegmentedButton` 不同）；
+真实内衬是**对称**的 16dp/侧（`FilterChipPadding` 8dp `:2961` + `HorizontalElementsPadding` 8dp `:2955`）。
+真机逐点位核对：文字节点左右各 **56px = 16dp** 内衬 ⇒ **内衬完全对称，不是 padding 的锅**。
+真正原因是**全角 `（）` 的字形 advance box 是 1em**，墨迹却在字形中心 ⇒
+括号内侧留出半个字宽的空档，右侧看起来"多了一块空格"。
+
+**修法 = 纯文案改动**（没有任何公开 API 能改这个内衬）：`a_collection_chip` 由
+`%1$s（%2$d）` 改为 **`%1$s (%2$d)`**；同类问题一并修 `a_reset_manual` 为
+**`重置人工调整 (%1$d 处)`**。收益实测：芯片**收窄 52px ≈ 14.9dp**（正是两个全角字形省下的宽度）。
+
+**⚠️ 断言写法有坑**（两条都踩过）：①**必须只看那一行** —— 全文件断言会被 zh 资源别处
+**正当**的全角括号满足（如 `a_sort_levels` =「排序规则（%1$d/%2$d 级）」）；
+②**必须先剥 XML 注释** —— 注释里就写着「全角括号」字样，不剥会被自己的说明满足。
+
+### 16.5 ⑤ 列数控件（用户裁决 A：数字按钮组 自适应/2/3/4）
+
+**用户裁决**（逐字）**A「数字按钮组：自适应 2 3 4（推荐）」**。
+
+**放置位置经真机几何二次裁决**：原措辞是"贴切换行"，但真机实测模式行
+（`网格 视图` x42-266 + `列表 视图` x263-487 = 448px）右侧被"本组独立"开关
+（x851-1226）占住，**只剩 x487→851 = 364px ≈ 104dp 空隙，而四个按钮需要约 196–232dp**
+⇒ 用户重新裁决**A「单独一行，紧贴切换行下方（推荐）」**。实测一行高约 168px(48dp 触控)/140px 视觉，
+**仅网格模式渲染**、左对齐。拒绝 B（置于排序摘要栏下方）与 C（塞进切换行）。
+
+`DragReorderGrid` 的 `columns` 参数类型由 `Int` 改为 **`Int? = 3`**（保持 9 个既有测试调用点的默认行为不变）：
+`columns == null` ⇒ `GridCells.Adaptive(ADAPTIVE_COLUMN_MIN_WIDTH = 110.dp)`，否则 `GridCells.Fixed(columns)`。
+
+**状态放页面本地**（`var columns by remember { mutableStateOf<Int?>(null) }`），**刻意不进 `WorkflowAState`** ——
+它是**视图偏好**而非领域事实，与紧邻的 `mode` 同类。**默认 null（自适应）**。
+
+**⚠️ 一处观感变化必须披露**：`Adaptive(110.dp)` 在 **320dp 宽的测试默认视口下落到 2 列**
+（原 `Fixed(3)` 是 3 列）⇒ `SortAndPreviewPageTest` 的"中文数字排序"用例随之从"6 张排 2 行"变成"6 张排 3 行"
+而超出视口，被 `LazyGrid` 回收成 4 张。**这不是排序缺陷**，该用例已改为 `renderedCardNames()`
+逐屏 `ScrollToIndex` 收集（每屏按 `boundsInRoot` 的 `(top, left)` 排序、`LinkedHashSet` 保序去重）。
+**361dp 真机上自适应仍是 3 列**（345dp 可用 ÷ 110 = 3.13），与改前**逐像素相同**。
+
+### 16.6 自证
+
+- **四道闸门**：`app 373`（+21）/ `domain 247` 全绿、lint **0 errors / 0 warnings**（4 条既有
+  `AutoboxingStateCreation` Hint 不计）、`assembleDebug` 成功 APK **33,334,244 B**。
+- **变异 23 组全部捕获、0 逃逸、0 跳过**（脚本 `app/build/mut_polish.py`，不跟踪）——
+  ①6 组（编辑器退回容器外 / 网格不接线 / 列表不接线 / 展开不回顶 / 折叠也回顶 / header 丢 span / 列表 header 空实现）、
+  ③3 组（两处恢复对勾 + 反向）、④3 组（zh 两处退全角 + en 与 zh 不一致）、
+  ⑤8 组（默认列数 3 / `Adaptive` 退 `Fixed` / 110 改 130 与 80 / 列表模式也显示 / 档位去掉 4 /
+  onClick 空实现 / selected 恒 true）、②2 组（`ThumbRow` 退回 40dp / 默认值改 48dp）。
+- **⚠️ 两条变异脚本教训**：
+  ①**编译失败不是"捕获"** —— M9 首轮 `NO-XML`，根因是我按 `selected = mode == option` 臆造了
+  `SegmentedButtonDefaults.Icon(selected)`，而该 lambda 里根本没有 `selected` 这个名字
+  （只有 `index`/`option`/`isGrid`），逐字报 `Unresolved reference 'selected'.`。
+  改写成 `Icon(mode == option)` 后才真被断言抓住。
+  ②**还原必须整文件快照，不能"把新串换回旧串"** —— 多个变异的 `new` 串在文件**别处**也会出现
+  （如 `scrollSignal++` 有 3 处），按 `replace(new, old, 1)` 会改错那一处，
+  上一轮的 v26 变异就是这样把备份**污染成假阴性**。脚本另加**干跑锚点校验**
+  （逐个变异断言 `count(old) == 1`，不跑 Gradle），输出 `anchors ok | mutants=23`。
+
+### 16.7 真机核对（2026-09-27 通过，用户授权，PJX110 / Android 16 / 361dp×794dp）
+
+| # | 核对项 | 实测读数 |
+| --- | --- | --- |
+| ① | 展开后可一路滑到底 | `swipe` 后可见 `IMG_20260701_007…015`、`content-desc="第1级` 节点数 **0**（编辑器已滚出视口）、`回到顶部` 出现 ✅（修补前物理不可能） |
+| ① | 折叠不把用户拽回顶 | 在深处折叠 ⇒ 摘要行可见而其下仍是 `007/008/009`，滚动位置**原样保留** ✅ |
+| ① | 重新展开回顶 | 再点 ⇒ 回到展开态顶部（`添加排序级`/`排序规则（2/4 级）`/第1级芯片可见） ✅ |
+| ② | 图钉触控框 | 九个节点 `bounds` 全 **168×168px = 48dp** ✅（视觉 32dp 由离线单测断言） |
+| ③ | 去对勾 | 标签中心由 200 → **155**（按钮中心 154）；按钮总宽不变 ✅；对勾本体属观感项（`cd = null`），像素复核 `网格` delta=**+0**、`列表` delta=**−1** |
+| ④ | 芯片墨迹居中 | `旅行照片 (30)` 容器中心 249、墨迹中心 247 ⇒ **delta −2px**；容器由 466px 收窄到 **414px** ✅ |
+| ⑤ | 列数控件位置/交互 | 紧贴模式行下方、单独一行、左对齐；点 `2 列` 首行图钉 **2** 个、点 `4 列` **4** 个、点回 `自适应` **3** 个 ✅；列表模式该行**不出现** ✅ |
+| ⑤ | 默认自适应在 361dp | 三列卡片 `x42-417`/`x445-820`/`x848-1222`，与修补前 `a_step1.xml` **逐像素相同** ✅ |
+
+**⚠️ 两条真机观测限制**：
+①**`selected="true"` 在 uiautomator dump 里读不到** —— Compose 的 `SemanticsProperties.Selected`
+未被映射（整个 dump 里唯一的 `selected="true"` 是步骤页签）。
+⇒「默认选中自适应」**只能靠离线单测**（`column_control_defaults_to_adaptive` 里的 `isSelected(TAG_COLUMN_ADAPTIVE)`）守护，
+真机只能目视高亮色。
+②③ 的「对勾消失」本身与 ④ 的「墨迹居中」属观感项，dump 只能给坐标，曾建议用户目视确认。
+
+**操作教训**：`input tap` 后**必须重新 dump 确认状态真的变了**再解读 ——
+本轮首次点折叠开关未生效，接连两份 dump（`step1_exp.xml`/`step1_exp2.xml`）都是未生效的中间态，
+差点被当成"展开后没变化"的证据。
+
+调试产物已清理（设备 `/data/local/tmp` 的 `.xml`/`.png` 计数归 **0**），
+`svc power stayon false` 已复位（`mStayOn=false`），应用已 force-stop，`adb disconnect` 已断开。
 
 ---
 

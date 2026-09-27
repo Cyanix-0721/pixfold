@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.itemsIndexed
 import androidx.compose.runtime.Composable
@@ -31,11 +32,35 @@ import androidx.compose.ui.layout.boundsInRoot
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.pixfold.d1.domain.model.SourceItem
 
 /** 网格容器 tag;与工作流 A 页面的 TAG_GRID 取同一值,便于测试定位。 */
 const val TAG_GRID_CONTAINER = "view-grid"
+
+/**
+ * 滚动容器头部区块(排序规则编辑器)的 Lazy item key。
+ *
+ * 网格与列表共用同一个值:头部在两个视图之间切换时**不该被当成新项**。
+ * 取这个名字是为了绝不与 [SourceItem.id](形如 `trip-0`/`scan-12`)撞车。
+ *
+ * 这个 key 是「折叠时不回顶」的前提:LazyList 用 `updateScrollPositionIfTheFirstItemWasMoved`
+ * 按 **key** 修正锚点,折叠移除头部后,当前可见的那张图仍是同一张。
+ */
+const val DRAG_HEADER_ITEM_KEY = "drag-reorder-header"
+
+/**
+ * 自适应列数时每列的最小宽度(用户 2026-09-26 指定「默认选自适应」)。
+ *
+ * 取 110dp 的实测依据:PJX110 是 361dp 宽,可用宽 361 − 8×2(容器 contentPadding) = 345dp,
+ * `345 / 110 = 3.13` ⇒ 自适应恰好给出 **3 列**,与用户已认可的旧写死 `Fixed(3)` 观感一致
+ * (真机卡片实测 375px ≈ 107dp,3 列)。取更小的值(如 100dp)会在窄屏挤出 4 列,
+ * 取更大(如 120dp)会在常见手机上掉成 2 列 —— 都不是用户要的"默认和原来一样"。
+ *
+ * 这里用 `val` 而非 `const val`:`Dp` 是对象,不能作编译期常量。
+ */
+val ADAPTIVE_COLUMN_MIN_WIDTH: Dp = 110.dp
 
 
 
@@ -66,9 +91,10 @@ fun DragReorderGrid(
     isPinned: (String) -> Boolean,
     onClick: (Int) -> Unit,
     modifier: Modifier = Modifier,
-    columns: Int = 3,
+    columns: Int? = 3,
     onScrollToTopClick: (() -> Unit)? = null,
     scrollToTopSignal: Int = 0,
+    header: (@Composable () -> Unit)? = null,
 ) {
     val gridState = rememberLazyGridState()
     val scope = rememberCoroutineScope()
@@ -176,7 +202,13 @@ fun DragReorderGrid(
     ) {
         LazyVerticalGrid(
             state = gridState,
-            columns = GridCells.Fixed(columns),
+            // `columns == null` = 自适应(用户 2026-09-26 指定「默认选自适应」)。
+            // 页面传 null;组件默认仍为 3,以免动到既有组件测试的拖拽几何。
+            columns = if (columns == null) {
+                GridCells.Adaptive(ADAPTIVE_COLUMN_MIN_WIDTH)
+            } else {
+                GridCells.Fixed(columns)
+            },
             modifier = Modifier
                 .fillMaxSize()
                 .testTag(TAG_GRID_CONTAINER),
@@ -185,6 +217,15 @@ fun DragReorderGrid(
             // 会把拖拽抢成 cancel。程序化 scrollBy 不受此开关影响。
             userScrollEnabled = draggingIndex == null,
         ) {
+            // 头部区块(排序规则编辑器)。
+            //
+            // ⚠️ 它必须是**独立 item**,绝不能并进下面的 itemsIndexed —— 页面用
+            // `onClick(index)` / `slotBounds[index]` 传的是**逻辑索引**,多一个前导项
+            // 会让所有格子的索引与拖拽落点整体错位。
+            // `span = maxLineSpan` 让它横跨整行(否则只占第 1 列)。
+            if (header != null) {
+                item(key = DRAG_HEADER_ITEM_KEY, span = { GridItemSpan(maxLineSpan) }) { header() }
+            }
             itemsIndexed(items, key = { _, it -> it.id }) { index, item ->
                 // 让 slotBounds 只保留**当前已组合**的格:滚出视口的格被 Lazy 销毁后,
                 // 它的旧根坐标会与滚上来的新格几乎重合,拖拽起点会命中错误的格。

@@ -2341,6 +2341,104 @@ R1–R4(报告页同上)、S1(命名页 N 漏掉仅警告项)。
 ⑨⑩报告页筛选与恢复;⑪**`TAG_GRID_CARD` 搬家后网格卡片照常点开预览**(防回归)。
 调试产物已清理(`/data/local/tmp` 与 `/sdcard` 均复核无残留),`stayon` 已复位,应用已 force-stop。
 
+#### ✅ 五项交互修订（排序页滚动 / 图钉尺寸 / 去对勾 / 芯片文案 / 列数控件）(2026-09-27)
+
+**触发** —— 用户真机走查后同一轮提出的五条要求，逐字:「排序规则展开时无法下滑，PinToggle48太大了，
+32差不多了」/「网格/列表切换按钮选中有高亮所以不需要"✔"」/「集合按钮内的字没有居中，
+集合名（数量）后面还有一块空格的感觉；网格视图加个列数按钮（默认选自适应）」/「把上面几个一次性处理了」。
+
+**① 展开后无法下滑（初判根因与真相）**:`SortRuleEditor` 原先是 `Column` 里 `weight(1f)` 网格
+**之外**的固定子项;折叠态编辑器只剩摘要行、网格拿到全部剩余高度,但**展开态编辑器实测约 2900px,
+而屏高只有 2780px** ⇒ 编辑器吃光固定区、网格被压到近 0 高 ⇒ `LazyGrid` 滚动区间消失,
+页面看起来"无法下滑"。类 KDoc 原先写「编辑器高度有界(≈140dp → 最多 ≈220dp)」**被真机证伪**,已标注。
+**用户裁决逐字 = A「编辑器并进列表的滚动区(推荐)」**(拒绝 B 给编辑器设高度上限 / C 整页合成一个滚动区)。
+修法 = 编辑器改为网格/列表**同一个 Lazy 容器的 header item**(`DragReorderGrid`/`DragReorderList`
+新增 `header: (@Composable () -> Unit)? = null`;`header != null` 时在 `itemsIndexed` 前插
+`item(key = DRAG_HEADER_ITEM_KEY, span = { GridItemSpan(maxLineSpan) })`),
+`RuleSummaryBar` **保持常驻在滚动容器之外**仍作折叠开关;代价(裁决里已写明并接受)= 编辑器会随列表滚出视口。
+⚠️ **前插锚定陷阱(本轮技术核心)**:往视口**上方**插内容时 LazyList 默认按**像素偏移**保持位置 ⇒ 画面毫无反应;
+LazyList 实为按 **key** 解析 `updateScrollPositionIfTheFirstItemWasMoved`,故占位项必须带**稳定 key**;
+**只在展开时** `scrollSignal++` 回顶,**折叠时不动**(否则把深处用户硬拽回顶,比"没反应"更糟)。
+⚠️ header **绝不能并进 `items`/`itemsIndexed`** —— 会让 `onClick(index)`/`slotBounds[index]` 整体错位一格。
+
+**② 图钉 32dp —— 本条订正了上一轮的一个错误结论**:`ThumbRow.kt` 原先给 `PinToggle` 多传
+`size = 40.dp` **覆盖了组件默认 32dp**,两个调用点不一致;已删该实参,统一走
+`PinToggle(size: Dp = 32.dp)`。**上一轮写的「32/40dp 就是真实触摸目标,确实低于 48dp 硬指标」是错的**:
+探针读的 `fetchSemanticsNode().size` 是 `Modifier.size` 定下的**视觉**尺寸,而 M3 的
+`minimumInteractiveComponentSize` **不挂在尺寸修饰符上**,是 `Modifier.clickable` 内部的
+`getExtendedTouchPadding`(`foundation/Clickable.kt:895-903`)在**测量阶段**把触控区撑到 48dp,
+它不进语义节点的 `size` 字段。**真机 dump 直接证伪**:九个图钉节点 `bounds` 全部
+**168×168px = 48.0dp**(视觉方块另有 112px = 32dp)⇒ **视觉 32dp 与触控 48dp 共存,约束 7 从未被违反**,
+用户「32 差不多了」**不违反 a11y 硬指标,勿改回 40dp**。
+
+**③ 去对勾**:`SegmentedButton.kt:221` 的 `icon` 默认值是 `{ SegmentedButtonDefaults.Icon(selected) }`;
+即便不画图标,`SegmentedButtonContentMeasurePolicy`(`:413-459`)仍**硬留
+`IconSize 18dp + IconSpacing 8dp = 26dp` 的槽位**,并在 `iconWidth == 0` 时用 `offsetX = -13dp`
+把标签挪回半个槽位 ⇒ **标签始终被右推 13dp**。修法 = 两处 `SegmentedButton` 显式传 `icon = {}`
+⇒ 槽位归零、`offsetX` 生效 ⇒ 标签居中,**总宽不变**。⚠️ 只暴露 `contentPadding`,
+真移除槽位须弃用 `SegmentedButton`。⚠️ **本项离线不可观测**(`Icons.Filled.Check` 的
+`contentDescription = null` ⇒ 语义树无痕;探针实测 `onAllNodesWithText("Grid")` 拿到的节点 rectangle
+**与按钮完全相同**,Robolectric 不做真实文字测量),故守卫写成**源码结构断言**
+(`functionBody()` 抽函数体 + `decommented()` 剥注释)。
+**真机取得决定性像素证据**(同一节点同坐标,按钮区 `x42-266`、中心 154):`text='网格'` 子节点
+**修补前 x=150-250(中心 200,右推 46px ≈ 13.1dp)→ 本轮 x=105-205(中心 155)** ——
+46px 正是那个 26dp 槽位的一半,与源码推导逐像素吻合;按钮总宽仍 224px(与改前相同)⇒ 未造成布局位移。
+
+**④ 芯片"文字不居中":根因是全角括号,不是内衬**。code-level:`FilterChip` →
+`SelectableChip` → `AnimatingChipContent`(`Chip.kt:2020`),`ChipLayoutMeasurePolicy`(`:2281`)
+算 `width = leadingIconWidth + labelPlaceable.width + trailingIconWidth`,`widthOrZero` 对 null 图标
+返回 0 ⇒ **不为缺席的图标留位**(与 `SegmentedButton` 不同);真实内衬**对称** 16dp/侧
+(`FilterChipPadding` 8dp `:2961` + `HorizontalElementsPadding` 8dp `:2955`),真机逐点位核对
+文字节点左右各 **56px = 16dp**。真因是**全角 `（）` 的字形 advance box 是 1em** 而墨迹在字形中心 ⇒
+右侧像"多了一块空格"。**修法 = 纯文案改动**(无任何公开 API 能改该内衬):`a_collection_chip`
+由 `%1$s（%2$d）` 改为 **`%1$s (%2$d)`**,同类一并修 `a_reset_manual` 为 **`重置人工调整 (%1$d 处)`**。
+收益实测:芯片**收窄 52px ≈ 14.9dp**。⚠️ 断言两条坑:①**只看那一行**(全文件断言会被 zh 别处
+**正当**的全角括号满足,如 `a_sort_levels` =「排序规则（%1$d/%2$d 级）」);②**必须先剥 XML 注释**
+(注释里就写着「全角括号」字样,不剥会被自己的说明满足)。
+
+**⑤ 列数控件**。**用户裁决逐字 = A「数字按钮组：自适应 2 3 4(推荐)」**;
+**放置位置经真机几何二次裁决** —— 原措辞"贴切换行",但真机实测模式行(`网格 视图` x42-266 +
+`列表 视图` x263-487 = 448px)右侧被"本组独立"开关(x851-1226)占住,
+**只剩 x487→851 = 364px ≈ 104dp,而四个按钮需要约 196–232dp** ⇒ 重新裁决
+**A「单独一行,紧贴切换行下方(推荐)」**(拒绝 B 置于排序摘要栏下方 / C 塞进切换行),
+实测一行高约 168px(48dp 触控)/140px 视觉,**仅网格模式渲染**、左对齐。
+`DragReorderGrid` 的 `columns` 由 `Int` 改为 **`Int? = 3`**(保持 9 个既有测试调用点的默认行为不变):
+`null` ⇒ `GridCells.Adaptive(ADAPTIVE_COLUMN_MIN_WIDTH = 110.dp)`,否则 `GridCells.Fixed(columns)`。
+**状态放页面本地**(`var columns by remember { mutableStateOf<Int?>(null) }`)、**刻意不进 `WorkflowAState`**
+—— 它是**视图偏好**而非领域事实,与紧邻的 `mode` 同类;默认 null(自适应)。
+⚠️ **一处观感变化必须披露**:`Adaptive(110.dp)` 在 **320dp 测试默认视口下落到 2 列**(原 `Fixed(3)` 是 3 列)
+⇒ `SortAndPreviewPageTest` 的中文数字排序用例从"6 张排 2 行"变"3 行"而超视口被 `LazyGrid` 回收成 4 张,
+**这不是排序缺陷**,该用例已改为 `renderedCardNames()` 逐屏 `ScrollToIndex` 收集;
+**361dp 真机上自适应仍是 3 列**(345dp ÷ 110 = 3.13),与改前**逐像素相同**。
+
+**四道闸门**:`app 373`(+21)/ `domain 247` 全绿、lint **0 errors / 0 warnings**
+(4 条既有 `AutoboxingStateCreation` Hint 不计)、`assembleDebug` 成功 APK **33,334,244 B**。
+**变异 23 组全部捕获、0 逃逸、0 跳过**(脚本 `app/build/mut_polish.py`,不跟踪)。
+⚠️ 两条脚本教训:①**编译失败不是"捕获"** —— M9 首轮 `NO-XML`,根因是我按 `selected = mode == option`
+臆造了 `SegmentedButtonDefaults.Icon(selected)`,而该 lambda 里没有 `selected` 这个名字,
+逐字报 `Unresolved reference 'selected'.`,改写成 `Icon(mode == option)` 后才真被抓住;
+②**还原必须整文件快照,不能"把新串换回旧串"** —— 多个变异的 `new` 串在文件**别处**也会出现
+(如 `scrollSignal++` 有 3 处),`replace(new, old, 1)` 会改错那一处,上一轮的 v26 就是这样把备份
+**污染成假阴性**;脚本另加**干跑锚点校验**(逐个断言 `count(old) == 1`,不跑 Gradle)输出 `anchors ok | mutants=23`。
+
+**✅ 真机核对已通过(2026-09-27,PJX110 / Android 16 / 361dp×794dp,用户授权后执行)**:
+①展开后 `swipe` 可一路滑到底(可见 `IMG_20260701_007…015`、`content-desc="第1级` 节点数 **0**
+= 编辑器已滚出视口、`回到顶部` 出现;修补前物理不可能);在深处折叠**不把用户拽回顶**;
+再展开**回顶**。②九个图钉节点 `bounds` 全 **168×168px = 48dp**。
+③标签中心 200 → **155**(按钮中心 154),按钮总宽不变;像素复核 `网格` delta=**+0**、`列表` delta=**−1**。
+④`旅行照片 (30)` 容器中心 249 / 墨迹中心 247 ⇒ **delta −2px**,容器由 466px 收窄到 **414px**。
+⑤列数行紧贴模式行下方、单独一行、左对齐;点 `2 列` 首行图钉 **2** 个、点 `4 列` **4** 个、
+点回 `自适应` **3** 个;列表模式该行**不出现**;默认自适应在 361dp 下三列卡片
+`x42-417`/`x445-820`/`x848-1222`,与修补前 `a_step1.xml` **逐像素相同**。
+⚠️ 两条观测限制:①**`selected="true"` 在 uiautomator dump 里读不到**(Compose 的
+`SemanticsProperties.Selected` 未被映射)⇒「默认选中自适应」**只能靠离线单测**守护,真机只能目视高亮色;
+②③的对勾本体与 ④ 的"墨迹居中"属观感项,dump 只能给坐标。
+⚠️ **操作教训**:`input tap` 后**必须重新 dump 确认状态真的变了**再解读 —— 本轮首次点折叠开关未生效,
+接连两份 dump 都是未生效的中间态,差点被当成"展开后没变化"的证据。
+调试产物已清理(`/data/local/tmp` 的 `.xml`/`.png` 计数归 **0**),`svc power stayon false` 已复位
+(`mStayOn=false`),应用已 force-stop,`adb disconnect` 已断开。
+详见 `docs/notes/d1-ui-friction-inventory.md` §16。
+
 ### D2：平台能力验证
 
 **目标**:优先 Android SAF。重点验证最容易推翻技术选型的能力,不先做完整业务。

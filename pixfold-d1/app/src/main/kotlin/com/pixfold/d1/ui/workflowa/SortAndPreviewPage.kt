@@ -69,6 +69,22 @@ const val TAG_NEXT_STEP = "next-step"
 const val TAG_RULE_SUMMARY_BAR = "rule-summary-bar"
 const val TAG_RULE_SUMMARY_TOGGLE = "rule-summary-toggle"
 
+/**
+ * 网格列数控件的行 tag(用户 2026-09-26 裁决:「网格视图加个列数按钮(默认选自适应)」)。
+ *
+ * 该控件**单独占一行**、紧贴网格/列表切换行下方、仅网格模式显示 —— 不是最初裁决描述里
+ * 的"放在切换行内"。原因是真机实测 361dp 下切换行只剩 104dp 空隙,而 4 个按钮即便去掉
+ * 选中勾也需约 200dp 以上,塞进去必然溢到视口外(正是 2026-09-25 已实测过的缺陷类型)。
+ * 该偏离已向用户确认,用户选「单独一行,紧贴切换行下方」。
+ */
+const val TAG_COLUMN_ROW = "column-row"
+
+/** 「自适应」那一档的 testTag;数字档用 [columnTag]。 */
+const val TAG_COLUMN_ADAPTIVE = "column-adaptive"
+
+/** 数字档列数按钮的 testTag。 */
+fun columnTag(n: Int) = "column-$n"
+
 /** 集合选择按钮的 testTag。 */
 fun collectionTag(id: String) = "collection-$id"
 
@@ -108,10 +124,13 @@ fun batchLabelRes(isCustom: Boolean): Int =
  * (它们是"看什么、看多少、怎么看"的导航信息,折叠了用户就不知道自己看的是哪一批图);
  * 默认**折叠**,进页面就把高度让给网格。
  *
- * **为什么编辑器是固定区块而不是插进滚动容器**(与 `NamingPage` 不同):排序级数上限
- * `SortRule.MAX_LEVELS` = 4,编辑器高度**有界**(约 140dp → 最多约 220dp),
- * 不会像命名结构那样随组件数无限增长;而本页的网格/列表**自带 Lazy**、
- * 没有页面级滚动容器,把编辑器塞进去反而要再引入一层滚动。
+ * **编辑器并进滚动容器的头部**(2026-09-26 修正):排序级数上限
+ * `SortRule.MAX_LEVELS` = 4 曾被当作"高度有界"的理由,据此把它留作固定区块。
+ * 该前提**已被真机证伪** —— 4 级时编辑器约 2900px,而屏高只有 2780px;更早一步,
+ * 它作为非加权子项会把 `weight(1f)` 的网格/列表挤到 0 高,而它自身不在任何滚动容器内,
+ * 于是"展开后整页滑不动"(用户 2026-09-26 报告)。现改为把编辑器交给网格/列表**唯一**
+ * 的滚动容器(见 [DragReorderGrid]/[DragReorderList] 的 `header` 参数),展开后可一路滑到底。
+ * 摘要栏仍在容器外常驻,滚到深处也能一键折叠。
  *
  * **`scopeLabel` 只在折叠态显示**:展开后 [SortRuleEditor] 自己的标题行已经显示同一个
  * 作用范围文案,再渲染一遍会让 `onNodeWithText(batchLabelRes(...) 的解析结果)` 精确匹配命中两个节点。
@@ -147,6 +166,16 @@ fun SortAndPreviewPage(
     // (直接把 SortRuleEditor 当 root 组合)就得先展开才能点字段,徒增一处耦合。
     // `rememberSaveable` 让它扛住进程重建(与 NamingPage 的 editorExpanded 同一模式)。
     var ruleExpanded by rememberSaveable { mutableStateOf(false) }
+    // 网格列数(用户 2026-09-26 裁决:「网格视图加个列数按钮(默认选自适应)」)。
+    //
+    // `null` = 自适应(交 [DragReorderGrid] 用 `GridCells.Adaptive` 按可用宽自动定列);
+    // 2/3/4 = 固定列数。默认自适应 —— 361dp 下自适应算出来正好 3 列,与旧写死 `Fixed(3)`
+    // 观感一致,故"默认自适应"对老用户不会突然换样子。
+    //
+    // 它属于**视图偏好**,与 `mode` 同层,**不进** `externalState`(那是领域状态:
+    // 页序/固定/规则)。这里用 `remember` 而非 `rememberSaveable`,与紧邻的 `mode` 保持一致
+    // —— 同一性质的两个设置没有理由一个扛旋转、一个不扛。
+    var columns by remember { mutableStateOf<Int?>(null) }
     // 初始集合也要通知上层,避免预览与当前集合不一致
     androidx.compose.runtime.LaunchedEffect(activeId) { onActiveCollectionChange(activeId) }
 
@@ -280,25 +309,54 @@ fun SortAndPreviewPage(
             }
         }
 
+        // 列数控件**单独占一行**,紧贴切换行下方,仅网格模式显示。
+        // (不是最初裁决描述里的"放在切换行内" —— 361dp 下切换行只剩 104dp 空隙,
+        //  而 4 个按钮即便去掉选中勾也需约 200dp。该偏离已向用户确认,用户选"单独一行"。)
+        if (mode == ViewMode.Grid) {
+            ColumnToggle(columns = columns, onChange = { columns = it })
+        }
+
         // ---- 排序规则:摘要栏常驻,编辑器默认折叠(用户 2026-09-25 指定)----
         RuleSummaryBar(
             summary = ruleSummaryLine(state.effectiveRule(activeId)),
             scopeLabel = if (ruleExpanded) null else scopeText,
             expanded = ruleExpanded,
-            onToggle = { ruleExpanded = !ruleExpanded },
+            onToggle = {
+                val expanding = !ruleExpanded
+                ruleExpanded = expanding
+                // 前插锚定陷阱(P0 命名页 KDoc 已记录同一坑):展开是在视口**上方**插入内容,
+                // LazyList 会锚定"当前首个可见项" ⇒ 画面看起来毫无反应。
+                // 只在**展开**时回顶;折叠时不回 —— 用户很可能滚到深处才折叠,
+                // 此时把他拽回顶部比"没反应"更糟(且折叠后可见项本就由 key 锚定保持不变)。
+                if (expanding) scrollSignal++
+            },
         )
-        if (ruleExpanded) {
-            // 作用范围随"本组独立"切换(验收第 7 项)
-            SortRuleEditor(
-                rule = state.effectiveRule(activeId),
-                scopeLabel = scopeText,
-                onRuleChange = { newRule ->
-                    updateState(applyRuleToCollection(state, activeId, newRule))
-                    // W4(用户 2026-09-17 指定):规则变更后**自动回顶**。
-                    // 因为重排会让"当前位置"失去意义(用户看到的是中段而非新首项)。
-                    scrollSignal++
-                },
-            )
+
+        // 排序规则编辑器**并进网格/列表这个唯一滚动容器**的头部(用户 2026-09-26 裁决 A)。
+        //
+        // 此前它是 Column 里的固定(非加权)子项,高度无上限:展开后把 `weight(1f)` 的
+        // 网格/列表挤到 0 高,而编辑器自身不在任何滚动容器内 ⇒ 内容超出屏高后既不能由
+        // 列表滚、也不能自己滚(4 级时编辑器约 2900px > 屏高 2780px)。
+        // 并进滚动容器后,展开态可以一路滑到底;代价是上滑时编辑器会滚出视口
+        // (用户已知悉,同 P0 命名页形态)。
+        //
+        // 摘要栏**留在容器外**:滚到深处仍能一键折叠,且不参与滚动。
+        val ruleEditorHeader: (@Composable () -> Unit)? = if (ruleExpanded) {
+            {
+                // 作用范围随"本组独立"切换(验收第 7 项)
+                SortRuleEditor(
+                    rule = state.effectiveRule(activeId),
+                    scopeLabel = scopeText,
+                    onRuleChange = { newRule ->
+                        updateState(applyRuleToCollection(state, activeId, newRule))
+                        // W4(用户 2026-09-17 指定):规则变更后**自动回顶**。
+                        // 因为重排会让"当前位置"失去意义(用户看到的是中段而非新首项)。
+                        scrollSignal++
+                    },
+                )
+            }
+        } else {
+            null
         }
 
         when (mode) {
@@ -316,7 +374,9 @@ fun SortAndPreviewPage(
                 modifier = Modifier
                     .fillMaxWidth()
                     .weight(1f),
+                columns = columns,
                 scrollToTopSignal = scrollSignal,
+                header = ruleEditorHeader,
             )
 
             ViewMode.List -> DragReorderList(
@@ -331,6 +391,7 @@ fun SortAndPreviewPage(
                     .fillMaxWidth()
                     .weight(1f),
                 scrollToTopSignal = scrollSignal,
+                header = ruleEditorHeader,
             )
         }
 
@@ -455,11 +516,74 @@ private fun ModeToggle(mode: ViewMode, onChange: (ViewMode) -> Unit) {
                 selected = mode == option,
                 onClick = { onChange(option) },
                 shape = SegmentedButtonDefaults.itemShape(index = index, count = options.size),
+                // 去掉选中态的对勾(用户 2026-09-26:「网格/列表切换按钮选中有高亮所以不需要"✔"」)。
+                //
+                // `SegmentedButton` 的 `icon` 默认是 `SegmentedButtonDefaults.Icon(selected)`,
+                // 选中时画 `Icons.Filled.Check`。传空 lambda 后:
+                //  - 对勾消失(material3 1.4.0 `SegmentedButton.kt` 的测量里 icon 宽度算成 0);
+                //  - **总宽度不变** —— 那个 26dp(IconSize 18 + IconSpacing 8)槽位是硬编码的,
+                //    任何参数都去不掉(只有 contentPadding 可调);
+                //  - 标签因此被 `offsetX = -13dp` 重新居中(此前有图标时它被右推 26dp)。
+                // 选中态仍有容器高亮色,故"选中/未选中"依旧一眼可辨。
+                icon = {},
                 modifier = Modifier
                     .testTag(if (isGrid) TAG_MODE_GRID_OPTION else TAG_MODE_LIST_OPTION)
                     .semantics { contentDescription = if (isGrid) gridCd else listCd },
             ) {
                 Text(text = if (isGrid) gridLabel else listLabel)
+            }
+        }
+    }
+}
+
+/**
+ * 网格列数控件(用户 2026-09-26 裁决:「网格视图加个列数按钮(默认选自适应)」)。
+ *
+ * 数字按钮组:`自适应 / 2 / 3 / 4`。选中的一档由容器高亮表示 —— 与上方的网格/列表
+ * 切换同一族控件、同一套视觉语言(故同样传 `icon = {}` 去掉对勾)。
+ *
+ * **为什么单独占一行**:361dp 下切换行只剩 104dp 空隙,4 个按钮即便去掉对勾也需约 200dp,
+ * 塞进去必然溢到视口外。该偏离已向用户确认(用户选「单独一行,紧贴切换行下方」)。
+ *
+ * `columns == null` 表示自适应;`GridCells.Adaptive` 的实际列数由
+ * [com.pixfold.d1.ui.components.DragReorderGrid] 按可用宽算出(361dp 下为 3 列)。
+ */
+@Composable
+private fun ColumnToggle(columns: Int?, onChange: (Int?) -> Unit) {
+    // 先解析文案:下方 lambda 非 @Composable 上下文
+    val label = stringResource(R.string.a_cols_label)
+    val adaptiveLabel = stringResource(R.string.a_cols_adaptive)
+    val adaptiveCd = stringResource(R.string.a_cols_adaptive_cd)
+    val options = listOf<Int?>(null, 2, 3, 4)
+    val optionCds = options.map { n ->
+        if (n == null) adaptiveCd else stringResource(R.string.a_cols_cd, n)
+    }
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(start = 12.dp, end = 12.dp, bottom = 4.dp)
+            .testTag(TAG_COLUMN_ROW),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(
+            text = label,
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(end = 8.dp),
+        )
+        SingleChoiceSegmentedButtonRow {
+            options.forEachIndexed { index, option ->
+                SegmentedButton(
+                    selected = columns == option,
+                    onClick = { onChange(option) },
+                    shape = SegmentedButtonDefaults.itemShape(index = index, count = options.size),
+                    icon = {},
+                    modifier = Modifier
+                        .testTag(if (option == null) TAG_COLUMN_ADAPTIVE else columnTag(option))
+                        .semantics { contentDescription = optionCds[index] },
+                ) {
+                    Text(text = if (option == null) adaptiveLabel else option.toString())
+                }
             }
         }
     }

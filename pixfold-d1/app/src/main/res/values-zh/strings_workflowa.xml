@@ -15,7 +15,16 @@
     <!-- ============ 步骤 1 · 排序与预览(SortAndPreviewPage) ============ -->
     <string name="a_rule_scope_custom">本组独立规则</string>
     <string name="a_rule_scope_default">批次默认规则</string>
-    <string name="a_collection_chip">%1$s（%2$d）</string>
+    <!--
+      2026-09-26 用户裁决:「集合按钮内的字没有居中,集合名(数量)后面还有一块空格的感觉」。
+      根因不是 padding(真机实测左右内衬各 56px = 16dp,**完全对称**),而是**全角括号的字形
+      度量**:`（`/`）` 是 1em 宽的方块字形,墨迹只占 em 框的一侧,于是「旅行照片(30)」
+      整体看上去右偏 + 尾部留白(同一根因的两个说法)。
+      改成与 en 同一形态的半角括号 —— 字形紧贴文字,计数不再"飘"在右边。
+      ⚠️ 全仓没有测试断言这个字面量(grep 只命中两份资源 + SortAndPreviewPage.kt 一处调用),
+      但它是**数据格式**不是文案,改动须同步 `ChipFormatTest` 的守护断言。
+    -->
+    <string name="a_collection_chip">%1$s (%2$d)</string>
     <string name="a_collection_cd">集合 %1$s</string>
     <plurals name="a_image_count">
         <item quantity="other">共 %1$d 张</item>
@@ -24,7 +33,9 @@
         <item quantity="other">已手动调整 %1$d 处</item>
     </plurals>
     <string name="a_reset_manual_cd">重置人工调整</string>
-    <string name="a_reset_manual">重置人工调整（%1$d 处）</string>
+    <!-- 同一处全角括号字形缺陷的邻居(见上条 a_collection_chip 注释):「重置人工调整(0 处)」
+         尾部的全角 `）` 同样只占 em 框一侧。一并改为半角,避免同一行出现两种括号形态。 -->
+    <string name="a_reset_manual">重置人工调整 (%1$d 处)</string>
     <string name="a_custom_rule">本组独立</string>
     <string name="a_custom_rule_cd">本组独立规则</string>
     <string name="a_next">下一步</string>
@@ -35,6 +46,11 @@
     <string name="a_view_grid">网格</string>
     <string name="a_view_list">列表</string>
     <string name="a_view_cd">%1$s 视图</string>
+    <!-- 网格列数控件(2026-09-26 用户裁决:「网格视图加个列数按钮(默认选自适应)」)。 -->
+    <string name="a_cols_label">列数</string>
+    <string name="a_cols_adaptive">自适应</string>
+    <string name="a_cols_cd">%1$d 列</string>
+    <string name="a_cols_adaptive_cd">自适应列数</string>
 
     <!-- ============ 步骤 1 · 排序规则编辑器(SortRuleEditor) ============ -->
     <plurals name="a_sort_levels">

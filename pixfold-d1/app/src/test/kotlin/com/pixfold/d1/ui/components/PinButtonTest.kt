@@ -3,14 +3,15 @@ package com.pixfold.d1.ui.components
 import com.pixfold.d1.TestText
 
 import com.pixfold.d1.R
+import com.pixfold.d1.domain.model.SourceItem
 
+import androidx.compose.ui.Modifier
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
-import androidx.compose.ui.unit.dp
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -111,11 +112,39 @@ class PinButtonTest {
         )
     }
 
+    /**
+     * 列表行里的图钉**视觉尺寸** = 32dp(用户 2026-09-26:「PinToggle48太大了,32差不多了」)。
+     *
+     * ## 为什么这里断言的是 32 而不是 48
+     *
+     * 用户说的"48"是**触控目标**的尺寸,不是看到的方块:真机 dump 实测网格图钉的语义节点
+     * 是 168×168px = 48dp(560dpi),而它的视觉方块只有 112px = 32dp。多出来的 16dp/侧
+     * 来自 `Modifier.clickable` 自己向外撑的扩展触控区
+     * (foundation `Clickable.kt` 的 `getExtendedTouchPadding`:向外补齐到
+     * `ViewConfiguration.minimumTouchTargetSize`)。⇒ **32dp 视觉 + 48dp 触控同时成立**,
+     * 用户的裁决不违反无障碍规范。
+     *
+     * ## 为什么断言挂在 ThumbRow 上
+     *
+     * 这里原本挂着一条名叫"48dp minimum touch target"却断言 `w >= 40` 的用例
+     * —— 名字与断言不符,而且它自己传 `size = 40.dp`,即便把生产代码从 40 改回 48
+     * 也照样绿。缺陷的真身是 `ThumbRow` 调用 `PinToggle` 时多传了一个 `size = 40.dp`
+     * 覆盖掉组件默认值,所以必须**从 ThumbRow 这一侧**观察才能锁住。
+     *
+     * ⚠️ Robolectric 不做真实绘制,但**会**做真实布局:此处的 `size.width` 就是
+     * `Modifier.size(size)` 的结果,故能精确断到 32。
+     */
     @Test
-    fun `pin button keeps a 48dp minimum touch target when used at list size`() {
-        rule.setContent { PinToggle(isPinned = false, itemName = "a.jpg", onClick = {}, size = 40.dp) }
-        val node = rule.onNodeWithTag(TAG_PIN_TOGGLE).fetchSemanticsNode()
-        val w = node.size.width
-        assertTrue(w >= 40, "触控尺寸不应小于设计值,实际=$w")
+    fun `pin inside a list row renders at 32dp`() {
+        val item = SourceItem(
+            id = "i1", collectionId = "c", dir = "day1", baseName = "img1", ext = "jpg",
+            sizeBytes = 1, modifiedEpochMillis = 0, createdEpochMillis = 0, seed = 1,
+        )
+        rule.setContent {
+            ThumbRow(item = item, onClick = {}, isPinned = false, onPin = {}, modifier = Modifier)
+        }
+        val node = rule.onNodeWithTag(pinTag(item.id)).fetchSemanticsNode()
+        assertEquals(32, node.size.width, "列表行图钉的视觉边长应为 32dp,实际=${node.size.width}")
+        assertEquals(32, node.size.height, "列表行图钉的视觉边长应为 32dp,实际=${node.size.height}")
     }
 }

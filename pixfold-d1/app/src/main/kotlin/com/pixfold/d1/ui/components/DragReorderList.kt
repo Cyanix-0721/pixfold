@@ -58,6 +58,7 @@ fun DragReorderList(
     modifier: Modifier = Modifier,
     onScrollToTopClick: (() -> Unit)? = null,
     scrollToTopSignal: Int = 0,
+    header: (@Composable () -> Unit)? = null,
 ) {
     val listState = rememberLazyListState()
     val scope = rememberCoroutineScope()
@@ -166,6 +167,12 @@ fun DragReorderList(
             // 作为后代先拿到事件,会把拖拽抢成 cancel。
             userScrollEnabled = draggingIndex == null,
         ) {
+            // 头部区块(排序规则编辑器)。理由与 [DragReorderGrid] 完全一致:
+            // 独立 item、不参与 itemsIndexed,保证 `onClick(index)` / `slotBounds[index]`
+            // 的**逻辑索引**不被前导项污染。
+            if (header != null) {
+                item(key = DRAG_HEADER_ITEM_KEY) { header() }
+            }
             itemsIndexed(items, key = { _, it -> it.id }) { index, item ->
                 // 滚出视口的行被销毁时清掉它的过期坐标,免得拖拽起点命中错误的行。
                 val latestIndex by rememberUpdatedState(index)
