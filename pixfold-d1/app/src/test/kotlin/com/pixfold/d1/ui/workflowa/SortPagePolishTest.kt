@@ -4,9 +4,14 @@ import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.longClick
 import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performTouchInput
+import com.pixfold.d1.R
+import com.pixfold.d1.TestText
 import com.pixfold.d1.domain.mock.MockData
 import com.pixfold.d1.ui.components.TAG_SCROLL_TO_TOP
 import org.junit.Rule
@@ -15,6 +20,7 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 import java.io.File
+import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
 /**
@@ -25,10 +31,22 @@ import kotlin.test.assertTrue
  * | ① | 排序规则展开时无法下滑 | [expanding_the_rule_editor_does_not_shrink_the_scroll_container] 等 |
  * | ③ | 网格/列表切换选中有高亮所以不需要"✔" | [mode_toggle_suppresses_the_default_checkmark] |
  * | ④ | 集合按钮内的字没有居中,集合名(数量)后面还有一块空格的感觉 | [collection_chip_format_does_not_use_full_width_parentheses] |
- * | ⑤ | 网格视图加个列数按钮(默认选自适应) | [column_control_changes_card_width] 等 |
+ * | ⑤ | 网格视图加个列数按钮(默认选自适应) | [column_button_shows_the_current_count_in_the_menu] 等 |
  *
  * ② (PinToggle 32dp) 的断言在 [com.pixfold.d1.ui.components.PinButtonTest]
  * —— 它是组件级行为,与页面无关。
+ *
+ * ## ⑤ 的第二轮(用户 2026-09-26 再提,本文件多数据此改写)
+ *
+ * 第一轮是 4 个数字按钮 + 一个「自适应」按钮,单独占一行。用户随后指出三个问题:
+ * 自适应档被拆成两行、行高与 2/3/4 不一致;要求**纯图标 + 长按出说明 + 点击下拉列表**;
+ * 且图标应挪到网格/列表切换按钮**右边**而不单独占行。最终落地形态见
+ * [com.pixfold.d1.ui.workflowa.ColumnCountButton] 的 KDoc。
+ *
+ * 本段断言的**核心难点**:`DropdownMenuItem` 不设 `selected` 语义(已核实 M3 1.4.0
+ * `Menu.kt` 的 `DropdownMenuItemContent` 只挂 `clickable`),所以"高亮的是哪一档"
+ * 在语义树里唯一的痕迹是 `leadingIcon` 那个对勾图标 —— 断言必须查
+ * [columnCheckTag],且必须 `useUnmergedTree = true`(菜单项的 `clickable` 会合并子节点)。
  */
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [34], qualifiers = "w400dp-h800dp")
@@ -37,12 +55,21 @@ class SortPagePolishTest {
     @get:Rule
     val rule = createComposeRule()
 
-    private fun setPage() {
+    /**
+     * 默认不传两个"设置页默认列数"参数 ⇒ 两者为 `null` ⇒ 落到自适应算式,
+     * 这正是「用户没在设置里选过」的初始状态。
+     */
+    private fun setPage(
+        portraitDefaultColumns: Int? = null,
+        landscapeDefaultColumns: Int? = null,
+    ) {
         rule.setContent {
             SortAndPreviewPage(
                 collections = MockData.workspaceA.collections,
                 contentInsets = WindowInsets(0, 0, 0, 0),
                 initialCollectionId = "trip",
+                portraitDefaultColumns = portraitDefaultColumns,
+                landscapeDefaultColumns = landscapeDefaultColumns,
             )
         }
     }
@@ -271,8 +298,8 @@ class SortPagePolishTest {
     @Test
     fun mode_toggle_suppresses_the_default_checkmark() {
         val code = decommented(source("ui/workflowa/SortAndPreviewPage.kt"))
-        // 只看 `ModeToggle` 这一个函数体 —— 文件里的 `ColumnToggle`(列数控件)同样传了
-        // `icon = {}`,按整份文件断言会让本用例在 `ModeToggle` 被改回去时仍然通过。
+        // 只看 `ModeToggle` 这一个函数体 —— 文件里还有别的分段按钮用法,
+        // 按整份文件断言会让本用例在 `ModeToggle` 被改回去时仍然通过。
         val body = functionBody(code, "private fun ModeToggle(")
 
         assertTrue(
@@ -286,19 +313,29 @@ class SortPagePolishTest {
     }
 
     /**
-     * 列数控件也不得带对勾。
+     * 列数控件已从 `SegmentedButton` 换成 `DropdownMenuItem`,**没有"默认对勾"这回事**。
      *
-     * 它和模式切换是两个独立的 `SingleChoiceSegmentedButtonRow`,漏掉任何一个都会让
-     * 界面上出现"高亮 + 勾"的双重选中表达(用户明确说只要高亮)。
+     * 这条守卫钉的是"回退":`SingleChoiceSegmentedButtonRow` 每个 `SegmentedButton` 默认都会
+     * 在选中时画 `SegmentedButtonDefaults.Icon(selected)`,一旦有人把列数控件改回分段按钮
+     * 而忘了传 `icon = {}`,界面上就会重新出现"高亮 + 勾"的双重选中表达
+     * (用户 2026-09-26:「网格/列表切换按钮选中有高亮所以不需要"✔"」)。
+     *
+     * 之所以是**源码结构断言**:`Icons.Filled.Check` 的 `contentDescription = null`,
+     * 在语义树里不作节点 —— 任何"查一下有没有勾"的运行时断言都是恒真的空断言。
      */
     @Test
-    fun column_toggle_suppresses_the_default_checkmark() {
-        val body = functionBody(
-            decommented(source("ui/workflowa/SortAndPreviewPage.kt")),
-            "private fun ColumnToggle(",
+    fun column_button_is_not_a_segmented_button_row() {
+        val code = decommented(source("ui/workflowa/SortAndPreviewPage.kt"))
+        val body = functionBody(code, "private fun ColumnCountButton(")
+
+        assertTrue(
+            !body.contains("SegmentedButton"),
+            "列数控件又改回了分段按钮 ⇒ 选中态会重新画默认对勾(✔),与模式切换不一致",
         )
-        assertTrue(body.contains("icon = {}"), "列数控件仍会画默认对勾(✔)")
-        assertTrue(!body.contains("SegmentedButtonDefaults.Icon("), "列数控件又用回了默认图标")
+        assertTrue(
+            body.contains("DropdownMenuItem("),
+            "列数控件不再是下拉列表项 ⇒ 用户裁决的「点击下拉列表选择」失效",
+        )
     }
 
     // ---------------------------------------------------------------- ④ 集合芯片文案
@@ -353,116 +390,225 @@ class SortPagePolishTest {
     // ---------------------------------------------------------------- ⑤ 列数控件
 
     /**
-     * 列数控件默认存在,且默认停在「自适应」一档。
+     * 列数按钮只在网格模式出现(列数只对网格有意义),且默认**不展开**菜单。
      *
-     * "默认停在自适应"不能只看节点存在 —— 必须读 `SemanticsProperties.Selected`,
-     * 否则把默认值改成 2 列时本用例照样通过。
+     * 第二轮该按钮从"单独一行"挪进了网格/列表切换按钮**右边**(用户 2026-09-26:
+     * 「因为只有一个图标所以可以放在网格/列表的切换按钮右边而不用单独占用一行」),
+     * 但"仅网格"这条没变。
      */
     @Test
-    fun column_control_defaults_to_adaptive() {
+    fun column_button_appears_only_in_grid_mode() {
         setPage()
-        rule.onNodeWithTag(TAG_COLUMN_ROW).assertExists()
-        rule.onNodeWithTag(TAG_COLUMN_ADAPTIVE).assertExists()
-        listOf(2, 3, 4).forEach { rule.onNodeWithTag(columnTag(it)).assertExists() }
+        rule.onNodeWithTag(TAG_COLUMN_BUTTON).assertExists()
+        // 按钮存在 ≠ 列表已展开:下拉菜单默认必须是关的,否则它会盖住网格
+        rule.onNodeWithTag(TAG_COLUMN_MENU).assertDoesNotExist()
 
-        assertTrue(isSelected(TAG_COLUMN_ADAPTIVE), "默认应选中「自适应」")
-        listOf(2, 3, 4).forEach {
-            assertTrue(!isSelected(columnTag(it)), "默认不该选中 $it 列")
+        rule.onNodeWithTag(TAG_MODE_LIST_OPTION).performClick()
+        rule.waitForIdle()
+        rule.onNodeWithTag(TAG_COLUMN_BUTTON).assertDoesNotExist()
+    }
+
+    /**
+     * 点图标展开下拉列表;列表里**只有数字**(没有「自适应」项),当前档位打勾。
+     *
+     * w400dp-h800dp 下自适应算式 `(400 - 16) / 80 = 4.8` ⇒ 4 列,故勾应在 4。
+     * 竖屏上限 5、下界 2 ⇒ 列表恰为 2/3/4/5(用户裁决:「去除自适应选项」+「竖屏显示 2–5」)。
+     * 若有人把「自适应」当选项加回列表,`columnTag(6)` 之外的条目数会变,这里的边界断言即失效。
+     */
+    @Test
+    fun column_menu_lists_the_numbers_and_checks_the_current_one() {
+        setPage()
+        openColumnMenu()
+
+        listOf(2, 3, 4, 5).forEach { rule.onNodeWithTag(columnTag(it)).assertExists() }
+        rule.onNodeWithTag(columnTag(1)).assertDoesNotExist() // 下界 2
+        rule.onNodeWithTag(columnTag(6)).assertDoesNotExist() // 竖屏上限 5
+
+        assertTrue(hasChecked(4), "400dp 下自适应是 4 列,勾应在 4 列那一档")
+        listOf(2, 3, 5).forEach {
+            assertTrue(!hasChecked(it), "当前是 4 列,不该同时给 $it 列打勾")
         }
     }
 
-    /** 点某一档后,选中态独占转移到该档(同一行内只能有一个选中)。 */
-    @Test
-    fun column_control_selection_is_exclusive() {
-        setPage()
-
-        rule.onNodeWithTag(columnTag(2)).performClick()
-        rule.waitForIdle()
-        assertTrue(isSelected(columnTag(2)), "点了 2 列却没选中")
-        assertTrue(!isSelected(TAG_COLUMN_ADAPTIVE), "选了 2 列后「自适应」仍显示选中")
-
-        rule.onNodeWithTag(TAG_COLUMN_ADAPTIVE).performClick()
-        rule.waitForIdle()
-        assertTrue(isSelected(TAG_COLUMN_ADAPTIVE), "点回「自适应」却没选中")
-        assertTrue(!isSelected(columnTag(2)), "点回「自适应」后 2 列仍显示选中")
-    }
-
-    private fun isSelected(tag: String): Boolean {
-        val config = rule.onNodeWithTag(tag).fetchSemanticsNode().config
-        return config.contains(SemanticsProperties.Selected) &&
-            config[SemanticsProperties.Selected]
-    }
-
-    /** 列表模式不显示列数控件(列数只对网格有意义)。 */
-    @Test
-    fun column_control_is_hidden_in_list_mode() {
-        setPage()
-        rule.onNodeWithTag(TAG_MODE_LIST_OPTION).performClick()
-        rule.waitForIdle()
-        rule.onNodeWithTag(TAG_COLUMN_ROW).assertDoesNotExist()
-    }
-
     /**
-     * 点数字档真的改变卡片宽度。
+     * 选一档后:菜单关闭、卡片宽度真的变、勾转移到新档。
      *
      * Robolectric **会**做真实布局(只是不测量文本),故卡片宽度是可断言的物理量。
-     * 实测(w400dp-h800dp,网格容器 400x503):自适应=120、2 列=184、3 列=120、4 列=88。
-     * ⇒ `w(2) > w(自适应) > w(4)`,且 `w(3) == w(自适应)`。
+     * 实测(w400dp-h800dp,网格容器 400dp;`contentPadding` 8dp × 2,格间**无** spacing,
+     * 格间视觉间隙来自每格自己的 `padding(4.dp)`):
+     * `(400 - 16) / n - 8` ⇒ 4 列=88、3 列=128、2 列=184。
+     * ⇒ `w(2) > w(3) > w(4)`,且 `w(4) == w(自适应)`。
      *
-     * 最后一条把"自适应在 400dp 下正好是 3 列"钉住:`ADAPTIVE_COLUMN_MIN_WIDTH` 若被调大
-     * (例如 110dp → 130dp,400dp 只剩 2 列),`column_control_changes_card_width` 的
-     * 单调性断言仍然成立,只有这条会红。
+     * 最后一条把"自适应在 400dp 下正好是 4 列"钉住:`ADAPTIVE_COLUMN_MIN_WIDTH` 若被调大
+     * (例如 80dp → 110dp,400dp 只剩 3 列),前面的单调性断言**仍然成立**,只有这条会红
+     * —— 这正是它存在的理由。
      */
     @Test
-    fun column_control_changes_card_width() {
+    fun column_selection_changes_card_width_and_moves_the_check() {
         setPage()
-
         val adaptive = firstCardWidth()
-        rule.onNodeWithTag(columnTag(2)).performClick()
-        rule.waitForIdle()
-        val two = firstCardWidth()
-        rule.onNodeWithTag(columnTag(3)).performClick()
-        rule.waitForIdle()
-        val three = firstCardWidth()
-        rule.onNodeWithTag(columnTag(4)).performClick()
-        rule.waitForIdle()
-        val four = firstCardWidth()
+        // 当前档位不靠菜单断言:按钮自己的 contentDescription 就是「N 列」,
+        // 不展开菜单也能读(菜单里的对勾只在展开时存在,见 hasChecked)。
+        assertAnnouncedColumns(4, "w400dp 下自适应应为 4 列(播报不对说明算式或上界变了)")
 
-        assertTrue(two > adaptive, "选 2 列后卡片应更宽(自适应=$adaptive 2列=$two)")
-        assertTrue(adaptive > four, "选 4 列后卡片应更窄(自适应=$adaptive 4列=$four)")
+        val two = pickColumn(2)
+        // 选完必须立刻关闭:菜单不关会一直盖住网格,用户以为没生效
+        rule.onNodeWithTag(TAG_COLUMN_MENU).assertDoesNotExist()
+        val three = pickColumn(3)
+        val four = pickColumn(4)
+
+        assertTrue(two > three, "2 列应比 3 列更宽(2列=$two 3列=$three)")
+        assertTrue(three > four, "3 列应比 4 列更宽(3列=$three 4列=$four)")
         assertTrue(
-            three == adaptive,
-            "400dp 下自适应应等于 3 列(自适应=$adaptive 3列=$three)" +
+            adaptive == four,
+            "400dp 下自适应应等于 4 列(自适应=$adaptive 4列=$four)" +
                 " —— 不等说明 ADAPTIVE_COLUMN_MIN_WIDTH 让默认列数变了",
         )
+
+        // 展开菜单核对对勾**转移**了(而不只是"多了一个勾")
+        openColumnMenu()
+        assertTrue(hasChecked(4), "改选 4 列后勾应在 4 列那一档")
+        assertTrue(!hasChecked(2), "改选 4 列后 2 列不该还留着勾")
     }
 
     /**
-     * 自适应真的随宽度变。
+     * 自适应真的随可用宽度变。
      *
-     * 320dp 下可用约 304dp,`304 / 110 = 2.76` ⇒ 2 列;同一档位在 400dp 下是 3 列。
-     * 若把 `GridCells.Adaptive` 退回 `GridCells.Fixed(3)`(即忽略 `columns == null`),
-     * 本用例会红。
+     * 320dp 下可用 `320 - 16 = 304`,`304 / 80 = 3.8` ⇒ 3 列;同一算式在 400dp 下是 4 列。
+     * 若有人把页面算出的列数写死成常数(即忽略自适应),本用例会红 ——
+     * 这是"默认列数跟随机器分辨率"这条用户诉求的离线守卫。
      */
     @Test
     @Config(sdk = [34], qualifiers = "w320dp-h800dp")
     fun adaptive_column_count_follows_the_available_width() {
         setPage()
         val adaptive = firstCardWidth()
+        assertAnnouncedColumns(3, "320dp 下自适应应为 3 列")
 
-        rule.onNodeWithTag(columnTag(2)).performClick()
-        rule.waitForIdle()
+        val two = pickColumn(2)
         assertTrue(
-            firstCardWidth() == adaptive,
-            "320dp 下自适应应等于 2 列(自适应=$adaptive 2列=${firstCardWidth()})",
+            two > adaptive,
+            "320dp 下 2 列应比自适应(3 列)更宽(自适应=$adaptive 2列=$two)",
         )
 
-        rule.onNodeWithTag(columnTag(3)).performClick()
-        rule.waitForIdle()
+        val three = pickColumn(3)
         assertTrue(
-            firstCardWidth() < adaptive,
-            "320dp 下 3 列应比自适应(2 列)更窄(自适应=$adaptive 3列=${firstCardWidth()})",
+            three == adaptive,
+            "320dp 下 3 列应等于自适应(自适应=$adaptive 3列=$three)",
         )
+    }
+
+    /**
+     * 设置页的「默认列数」是排序页的**起点**(用户裁决:「设置 = 默认值」)。
+     *
+     * 传 `2` 时当前档位应是 2 列,而不是自适应算出的 4 列 ——
+     * 这条把优先级 `设置默认值 > 自适应` 钉住;没有它,把参数完全忽略也能全绿。
+     */
+    @Test
+    fun setting_default_columns_seeds_the_page() {
+        setPage(portraitDefaultColumns = 2)
+
+        assertAnnouncedColumns(2, "设置里选了 2 列,排序页应停在 2 列")
+    }
+
+    /**
+     * 横屏用**横屏**那一项、竖屏用竖屏那一项(用户裁决:
+     * 「排序页根据屏幕方向实时切换使用哪一个」)。
+     *
+     * `w800dp-h400dp` 下 `Configuration.orientation == LANDSCAPE`。两个字段故意给**不同值**
+     * (竖屏 5 / 横屏 2),当前档位是 2 ⇒ 取的是横屏那一项。若把两个字段写反、或写死取竖屏,
+     * 会播报 5 ⇒ 本用例红。
+     */
+    @Test
+    @Config(sdk = [34], qualifiers = "w800dp-h400dp")
+    fun landscape_uses_the_landscape_default() {
+        setPage(portraitDefaultColumns = 5, landscapeDefaultColumns = 2)
+
+        assertAnnouncedColumns(2, "横屏应取 landscapeDefaultColumns=2(播报 5 说明误用了竖屏那一项)")
+    }
+
+    /**
+     * 自适应值超过该方向上限时**临时并入**下拉列表
+     * (用户裁决选项 A:「把它临时并入下拉列表,保证当前值永远可见可选」)。
+     *
+     * w1200dp 下 `(1200 - 16) / 80 = 14.8` ⇒ 14 列,而横屏上限只有 9。
+     * 若不并入,列表最高只到 9,界面就在**说谎**(勾在 9,网格实际 14 列)。
+     */
+    @Test
+    @Config(sdk = [34], qualifiers = "w1200dp-h800dp")
+    fun out_of_range_adaptive_value_is_merged_into_the_menu() {
+        setPage()
+        openColumnMenu()
+
+        listOf(2, 9, 14).forEach {
+            rule.onNodeWithTag(columnTag(it)).assertExists()
+        }
+        rule.onNodeWithTag(columnTag(10)).assertDoesNotExist()
+        assertTrue(hasChecked(14), "当前 14 列,勾应在临时并入的 14 那一档")
+    }
+
+    /**
+     * 长按图标弹出说明文字(用户裁决:「长按图标是显示说明这是列数」)。
+     *
+     * 说明文字 = 资源 `a_cols_label`(如「列数」)。**必须连文案一起断言**:
+     * 只断言"弹出了东西"无法发现"弹出的是别的提示"。
+     *
+     * ⚠️ 这条是本文件里唯一依赖 M3 内部手势时序的断言(`TooltipBox` 的长按走
+     * `BasicTooltip.handleGestures`,且提示 1.5s 后自动消失)。若在 Robolectric 下不稳定,
+     * 按 §7.4 的处置是**撤掉它并写明原因**,而不是留一条会随机红的断言 ——
+     * 提示的视觉形态本来也只能真机判定。
+     */
+    @Test
+    fun long_press_shows_the_column_count_label() {
+        setPage()
+
+        rule.onNodeWithTag(TAG_COLUMN_BUTTON).performTouchInput { longClick() }
+        rule.waitForIdle()
+
+        rule.onNodeWithText(TestText.of(R.string.a_cols_label)).assertExists()
+    }
+
+    /** 展开列数下拉菜单(点图标)。 */
+    private fun openColumnMenu() {
+        rule.onNodeWithTag(TAG_COLUMN_BUTTON).performClick()
+        rule.waitForIdle()
+    }
+
+    /** 展开菜单 → 点某一档 → 返回该档生效后的卡片宽度。 */
+    private fun pickColumn(n: Int): Int {
+        openColumnMenu()
+        rule.onNodeWithTag(columnTag(n)).performClick()
+        rule.waitForIdle()
+        return firstCardWidth()
+    }
+
+    /**
+     * 当前生效档位是否打了勾(即 `leadingIcon` 存在)。
+     *
+     * **必须 `useUnmergedTree = true`**:`DropdownMenuItem` 自身挂了 `clickable`,
+     * 合并语义树里子节点(对勾图标)根本不可见。用 `onAllNodes...isNotEmpty()`
+     * 而不是 `assertExists()` 是为了能取布尔值做**否定**断言(缺勾也要能测)。
+     */
+    private fun hasChecked(n: Int): Boolean = rule
+        .onAllNodesWithTag(columnCheckTag(n), useUnmergedTree = true)
+        .fetchSemanticsNodes()
+        .isNotEmpty()
+
+    /**
+     * 断言按钮**当前播报的档位**是 `n` 列。
+     *
+     * 读的是按钮自己的 `contentDescription`(资源 `a_cols_cd`,如「4 列」)——
+     * 这是不展开菜单时唯一能反映"现在生效的是几列"的语义痕迹
+     * (对勾只在下拉菜单展开期间存在,见 [hasChecked])。
+     */
+    private fun assertAnnouncedColumns(n: Int, message: String) {
+        val config = rule.onNodeWithTag(TAG_COLUMN_BUTTON).fetchSemanticsNode().config
+        assertTrue(
+            config.contains(SemanticsProperties.ContentDescription),
+            "列数按钮没有 contentDescription ⇒ 界面读屏与离线测试都看不出当前是几列",
+        )
+        val actual = config[SemanticsProperties.ContentDescription].firstOrNull()
+        assertEquals(TestText.of(R.string.a_cols_cd, n), actual, message)
     }
 
     private fun firstCardWidth(): Int =

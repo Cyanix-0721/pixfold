@@ -33,6 +33,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
@@ -49,6 +50,11 @@ import com.pixfold.d1.domain.settings.ColorStyle
 import com.pixfold.d1.domain.settings.PixFoldSettings
 import com.pixfold.d1.domain.settings.StorageAccess
 import com.pixfold.d1.domain.settings.ThemeMode
+import com.pixfold.d1.ui.components.LANDSCAPE_MAX_COLUMNS
+import com.pixfold.d1.ui.components.PORTRAIT_MAX_COLUMNS
+import com.pixfold.d1.ui.components.adaptiveColumnCount
+import com.pixfold.d1.ui.components.columnOptions
+import com.pixfold.d1.ui.components.orientationWidth
 import com.pixfold.d1.ui.theme.isAffectedByColorSpec
 
 /**
@@ -69,6 +75,9 @@ const val TAG_SETTINGS_COLOR_SPEC = "settings-color-spec"
 const val TAG_SETTINGS_PURE_BLACK = "settings-pure-black"
 const val TAG_SETTINGS_LANGUAGE = "settings-language"
 const val TAG_SETTINGS_STORAGE = "settings-storage"
+/** 网格默认列数:竖屏 / 横屏两行(用户 2026-09-26 第二轮裁决「设置里竖屏横屏分出 2 个选项」)。 */
+const val TAG_SETTINGS_COLUMNS_PORTRAIT = "settings-columns-portrait"
+const val TAG_SETTINGS_COLUMNS_LANDSCAPE = "settings-columns-landscape"
 const val TAG_SETTINGS_PREDICTIVE_BACK = "settings-predictive-back"
 const val TAG_SETTINGS_VERSION = "settings-version"
 const val TAG_SETTINGS_REPO = "settings-repo"
@@ -255,6 +264,25 @@ fun SettingsScreen(
             )
             // D1 不连真实文件系统,此项只记偏好 —— 如实标注,不假装已生效。
             Note(stringResource(R.string.settings_storage_note))
+
+            // 网格默认列数(用户 2026-09-26 第二轮裁决:「设置里竖屏横屏分出 2 个选项,
+            // 默认都是自适应值作为默认」+「设置里两个方向各多一项『跟随自适应』(显示算出的数)」)。
+            // 两项都含「跟随自适应」档 ⇒ `null`(跟随)与具体数字在界面上**都可见**,不是隐藏状态。
+            DefaultColumnsRow(
+                label = stringResource(R.string.settings_columns_portrait),
+                tag = TAG_SETTINGS_COLUMNS_PORTRAIT,
+                current = settings.portraitDefaultColumns,
+                portrait = true,
+                onSelect = { onChange(settings.copy(portraitDefaultColumns = it)) },
+            )
+            DefaultColumnsRow(
+                label = stringResource(R.string.settings_columns_landscape),
+                tag = TAG_SETTINGS_COLUMNS_LANDSCAPE,
+                current = settings.landscapeDefaultColumns,
+                portrait = false,
+                onSelect = { onChange(settings.copy(landscapeDefaultColumns = it)) },
+            )
+            Note(stringResource(R.string.settings_columns_note))
 
             SwitchRow(
                 label = stringResource(R.string.settings_predictive_back),
@@ -538,6 +566,74 @@ private fun <T> ChoiceRow(
             modifier = Modifier.testTag(TAG_CHOICE_DIALOG),
         )
     }
+}
+
+/**
+ * 某一屏幕方向的**默认网格列数**设置项
+ * (用户 2026-09-26 第二轮裁决:「设置里两个方向各多一项『跟随自适应』(显示算出的数);
+ * 选它就回到实时跟随」)。
+ *
+ * ## 值模型:`Int?`
+ *
+ * - `null` = **跟随自适应** —— 每次都按当前可用宽重算,设备换了/分屏了也跟着变;
+ * - 具体数字 = 固定列数,不随宽度变。
+ *
+ * 为什么不用枚举把两者合并(如 `DefaultColumns { Adaptive, C2..C9 }`):那样"自适应"
+ * 与"固定 N 列"变成同一个枚举的两类成员,而下面的选项列表长度本身随方向变
+ * (竖屏到 5、横屏到 9),枚举就得为每个方向各写一份。`null` 这一个哨兵值更小也更准 ——
+ * 它天然就是 `Int` 类型的"没有值"。
+ *
+ * ## 为什么"跟随自适应"要显式列出来
+ *
+ * 早期设想是不给选项、直接把算出的数当默认。用户裁决改成**显式一项**,且**显示算出的数**
+ * (`跟随自适应（4）`)—— 否则用户选了固定值之后就没有回到自适应的入口,
+ * 只能靠"重置全部设置"这种重锤。
+ *
+ * ## 与下拉列表的分工
+ *
+ * 这里是**默认值**(下次进入排序页时的起点);排序页工具栏的列数按钮是**本次进入的临时覆盖**
+ * (用户裁决:「设置 = 默认值;工具栏 = 本页临时覆盖,离开页面即失效」)。这条关系写在
+ * 本 Section 下方的 [Note] 里,免得用户以为在排序页改了就持久化了。
+ *
+ * 复用 [ChoiceRow](而不是新写一个对话框):选项数量最多 9 个(横屏),
+ * 与"色彩风格"同一量级,`ChoiceRow` 的既定理由(选项多、窄屏不挤、可断言已生效)同样成立。
+ * 唯一要求是"当前值文案"必须与对应选项文案**逐字相同** —— `ChoiceRow` 用
+ * `text == current` 判选中,故选中的档位文案一律由同一组字符串资源生成。
+ *
+ * @param portrait true = 竖屏那行(上限 5、宽度取屏幕短边);false = 横屏那行。
+ */
+@Composable
+private fun DefaultColumnsRow(
+    label: String,
+    tag: String,
+    current: Int?,
+    portrait: Boolean,
+    onSelect: (Int?) -> Unit,
+) {
+    // 该方向的自适应值:设置页拿不到网格容器的实测宽,用屏幕宽估算(见 orientationWidthDp)。
+    // 与排序页共用同一算式,免得两处各算各的。
+    val adaptive = adaptiveColumnCount(orientationWidth(LocalConfiguration.current, portrait))
+    val adaptiveText = stringResource(R.string.settings_columns_adaptive_value, adaptive)
+    val maxColumns = if (portrait) PORTRAIT_MAX_COLUMNS else LANDSCAPE_MAX_COLUMNS
+    // 数字档用 columnOptions 生成:若存量设置里有个超出本方向上上限的数(旧版本写入、
+    // 或手改偏好文件),它会被并进列表 ⇒ 当前值不会"看不见"。
+    val numbers = columnOptions(maxColumns, current ?: adaptive)
+    // 选项文案**先在 lambda 外算好**:`buildList {}` 的接收者类型带 @BuilderInference,
+    // 在里面直接调 @Composable 的 stringResource 会推断失败(实测报
+    // "Cannot infer type for value parameter" + "@Composable invocations can only happen
+    // from the context of a @Composable function")。用 map 预计算与列数按钮里的写法一致。
+    val numberTexts = numbers.map { stringResource(R.string.a_cols_cd, it) }
+
+    ChoiceRow(
+        label = label,
+        current = if (current == null) adaptiveText else stringResource(R.string.a_cols_cd, current),
+        tag = tag,
+        // 「跟随自适应」排第一,且**显示算出的数** —— 否则「跟随自适应」是句空话,
+        // 用户看不出跟随结果是不是自己想要的。
+        options = listOf<Pair<Int?, String>>(null to adaptiveText) +
+            numbers.mapIndexed { index, n -> n to numberTexts[index] },
+        onSelect = onSelect,
+    )
 }
 
 @Composable

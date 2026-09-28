@@ -3,6 +3,7 @@ package com.pixfold.d1.domain.settings
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 /**
@@ -24,6 +25,12 @@ class PixFoldSettingsTest {
         assertEquals(ColorStyle.TonalSpot, s.colorStyle)
         assertEquals(ColorSpecVersion.V2021, s.colorSpec)
         assertFalse(s.pureBlack, "纯黑背景默认关闭")
+        assertNull(
+            s.portraitDefaultColumns,
+            "竖屏默认列数默认是 null —— 表示「跟随自适应」。纯 JVM 领域层编译期不知道屏幕宽," +
+                "写死任何数字都会在窄屏上挤出问题;null 让界面用当机算出的值。",
+        )
+        assertNull(s.landscapeDefaultColumns, "横屏默认列数同理,默认跟随自适应")
         assertEquals(AppLanguage.System, s.language)
         assertEquals(StorageAccess.Saf, s.storageAccess, "文件访问默认 SAF")
     }
@@ -71,6 +78,8 @@ class PixFoldSettingsTest {
             colorStyle = ColorStyle.Vibrant,
             colorSpec = ColorSpecVersion.V2025,
             pureBlack = true,
+            portraitDefaultColumns = 3,
+            landscapeDefaultColumns = 7,
             language = AppLanguage.English,
             storageAccess = StorageAccess.AllFiles,
         )
@@ -81,6 +90,8 @@ class PixFoldSettingsTest {
         assertEquals(AccentChoice.Green, changed.accent)
         assertEquals(ColorSpecVersion.V2025, changed.colorSpec)
         assertTrue(changed.pureBlack)
+        assertEquals(3, changed.portraitDefaultColumns)
+        assertEquals(7, changed.landscapeDefaultColumns)
         assertEquals(AppLanguage.English, changed.language)
         assertEquals(StorageAccess.AllFiles, changed.storageAccess)
     }

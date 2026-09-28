@@ -53,14 +53,56 @@ const val DRAG_HEADER_ITEM_KEY = "drag-reorder-header"
 /**
  * 自适应列数时每列的最小宽度(用户 2026-09-26 指定「默认选自适应」)。
  *
- * 取 110dp 的实测依据:PJX110 是 361dp 宽,可用宽 361 − 8×2(容器 contentPadding) = 345dp,
- * `345 / 110 = 3.13` ⇒ 自适应恰好给出 **3 列**,与用户已认可的旧写死 `Fixed(3)` 观感一致
- * (真机卡片实测 375px ≈ 107dp,3 列)。取更小的值(如 100dp)会在窄屏挤出 4 列,
- * 取更大(如 120dp)会在常见手机上掉成 2 列 —— 都不是用户要的"默认和原来一样"。
+ * **取 80dp 的依据(2026-09-26 第二轮裁决「调窄自适应的最小卡宽,让你机器上自适应 = 4 列」)**:
+ * PJX110 竖屏 361dp 宽,容器 `contentPadding` 左右各 8dp ⇒ 可用宽 `361 − 16 = 345dp`。
+ * `345 / 80 = 4.31` ⇒ 自适应给出 **4 列**(用户明确要的默认观感)。
+ *
+ * 算式与 Compose 官方 `GridCells.Adaptive` 一致(见 [adaptiveColumnCount]):
+ * `count = floor(available / minWidth)`,此处 `available` 已扣除 `contentPadding`、
+ * 且本仓**没传** `Arrangement.spacedBy` ⇒ spacing = 0(格间间隙来自每格的 `padding(4.dp)`,
+ * 不参与网格列宽计算)。这是 [adaptiveColumnCount] 里不出现 spacing 项的原因。
+ *
+ * 旧值 110dp 曾在同机上算出 3 列(`345 / 110 = 3.13`);本次按用户裁决调窄到 80dp。
+ * 各档预期:361dp(竖屏,可用 345)⇒ 4 列;400dp(可用 384)⇒ 4 列;320dp(可用 304)⇒ 3 列;
+ * 794dp(横屏,可用 778)⇒ 9 列。
  *
  * 这里用 `val` 而非 `const val`:`Dp` 是对象,不能作编译期常量。
  */
-val ADAPTIVE_COLUMN_MIN_WIDTH: Dp = 110.dp
+val ADAPTIVE_COLUMN_MIN_WIDTH: Dp = 80.dp
+
+/** 网格容器左右 `contentPadding` 之和;自适应算式要从可用宽里扣掉它。 */
+private const val GRID_CONTENT_PADDING_DP = 16
+
+/**
+ * 由容器宽度算出**自适应列数** —— 网格列数算式的**唯一事实来源**。
+ *
+ * 页面用 `LocalConfiguration.current.screenWidthDp` 折成 `Dp` 调它(设置页预览、
+ * 排序页默认值、测试断言三处共用同一算式,才不会各算各的)。
+ *
+ * 算式与 Compose 官方 `GridCells.Adaptive.calculateCrossAxisCellSizes` 对齐 ——
+ * 源码 `androidx/compose/foundation/lazy/grid/LazyGridDsl.kt` 为
+ * `maxOf((availableSize + spacing) / (minSize.roundToPx() + spacing), 1)`,
+ * 本仓 spacing = 0(见 [ADAPTIVE_COLUMN_MIN_WIDTH] 的说明),故退化为
+ * `floor(available / minWidth)`,且**下限为 1**(容器再窄也至少一列,
+ * 这与官方 `maxOf(…, 1)` 一致 —— 返回 0 会让 `GridCells.Fixed(0)` 直接崩)。
+ *
+ * ⚠️ 本函数**不是** `@Composable`,`minColumnWidth` 用 `Dp` 参与浮点除法而非
+ * `roundToPx()`:手机/平板上 `minWidth` 都是整数 dp,`roundToPx()` 只是把同一
+ * 整数换算成 px 再换回来,不改变比值;这样做是为了能在**纯 JVM 单测**里直接断言
+ * (无需 Robolectric 的 `Density`)。刻意保留这一取舍的说明,免得后人以为漏了 `Density`。
+ *
+ * @param containerWidth 网格容器的实际宽度(含其 `contentPadding`)。
+ * @param minColumnWidth 每列最小宽度,默认 [ADAPTIVE_COLUMN_MIN_WIDTH]。
+ */
+fun adaptiveColumnCount(
+    containerWidth: Dp,
+    minColumnWidth: Dp = ADAPTIVE_COLUMN_MIN_WIDTH,
+): Int {
+    val available = containerWidth.value - GRID_CONTENT_PADDING_DP
+    if (minColumnWidth.value <= 0f) return 1
+    return maxOf((available / minColumnWidth.value).toInt(), 1)
+}
+
 
 
 
@@ -91,7 +133,7 @@ fun DragReorderGrid(
     isPinned: (String) -> Boolean,
     onClick: (Int) -> Unit,
     modifier: Modifier = Modifier,
-    columns: Int? = 3,
+    columns: Int = 3,
     onScrollToTopClick: (() -> Unit)? = null,
     scrollToTopSignal: Int = 0,
     header: (@Composable () -> Unit)? = null,
@@ -202,13 +244,11 @@ fun DragReorderGrid(
     ) {
         LazyVerticalGrid(
             state = gridState,
-            // `columns == null` = 自适应(用户 2026-09-26 指定「默认选自适应」)。
-            // 页面传 null;组件默认仍为 3,以免动到既有组件测试的拖拽几何。
-            columns = if (columns == null) {
-                GridCells.Adaptive(ADAPTIVE_COLUMN_MIN_WIDTH)
-            } else {
-                GridCells.Fixed(columns)
-            },
+            // 列数由**页面**算好传进来(用户 2026-09-26 裁决:自适应值就是默认选项,
+            // 排序页只高亮它)。此前这里收 `Int?` 并用 `GridCells.Adaptive` 自己算,
+            // 于是"当前生效的是几列"只有本组件知道,页面无法高亮 —— 现改为
+            // 页面用 [adaptiveColumnCount] 算出具体数,这里只认 [GridCells.Fixed]。
+            columns = GridCells.Fixed(columns),
             modifier = Modifier
                 .fillMaxSize()
                 .testTag(TAG_GRID_CONTAINER),

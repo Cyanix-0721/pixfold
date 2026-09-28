@@ -37,6 +37,8 @@ class SharedPrefsSettingsStore(context: Context) : SettingsStore {
         colorSpec = readEnum(KEY_COLOR_SPEC, ColorSpecVersion.entries, ColorSpecVersion.V2021),
         pureBlack = prefs.getBoolean(KEY_PURE_BLACK, false),
         predictiveBackAnimation = prefs.getBoolean(KEY_PREDICTIVE_BACK, true),
+        portraitDefaultColumns = readNullableColumns(KEY_COLUMNS_PORTRAIT),
+        landscapeDefaultColumns = readNullableColumns(KEY_COLUMNS_LANDSCAPE),
         language = readEnum(KEY_LANGUAGE, AppLanguage.entries, AppLanguage.System),
         storageAccess = readEnum(KEY_STORAGE, StorageAccess.entries, StorageAccess.Saf),
     )
@@ -52,7 +54,30 @@ class SharedPrefsSettingsStore(context: Context) : SettingsStore {
             putBoolean(KEY_PREDICTIVE_BACK, settings.predictiveBackAnimation)
             putString(KEY_LANGUAGE, settings.language.name)
             putString(KEY_STORAGE, settings.storageAccess.name)
+            // `null` = 跟随自适应 = "没选过" ⇒ **删掉这个 key**,而不是写一个哨兵数字。
+            // 两者在语义上不同:写哨兵就得再挑一个永远不会被选中的值(如 0 或 -1),
+            // 那个约定一旦被将来的合法取值撞上就静默出错;删除 key 则天然让旧版本
+            // 与新版本都读到"没选过"。
+            putNullableColumns(KEY_COLUMNS_PORTRAIT, settings.portraitDefaultColumns)
+            putNullableColumns(KEY_COLUMNS_LANDSCAPE, settings.landscapeDefaultColumns)
         }
+    }
+
+    /**
+     * 读取"可空的列数":**缺失 key ⇒ `null`(跟随自适应)**。
+     *
+     * 与 [readEnum] 同一原则 —— 任何非法值都回退到默认(`null`),绝不抛异常。
+     * 这里额外防一手 `<= 0`:0 列或负列数在界面上无意义,只可能来自手改的偏好文件,
+     * 让它退回自适应比让它渲染出一个空网格好。
+     */
+    private fun readNullableColumns(key: String): Int? {
+        if (!prefs.contains(key)) return null
+        return prefs.getInt(key, 0).takeIf { it > 0 }
+    }
+
+    /** 写入可空列数:`null` 用 [SharedPreferences.Editor.remove],不写哨兵值。 */
+    private fun SharedPreferences.Editor.putNullableColumns(key: String, value: Int?) {
+        if (value == null) remove(key) else putInt(key, value)
     }
 
     /** 读取枚举:值缺失或已不认识时回退 [fallback],**不抛异常**。 */
@@ -69,6 +94,8 @@ class SharedPrefsSettingsStore(context: Context) : SettingsStore {
         const val KEY_COLOR_SPEC = "color_spec"
         const val KEY_PURE_BLACK = "pure_black"
         const val KEY_PREDICTIVE_BACK = "predictive_back_animation"
+        const val KEY_COLUMNS_PORTRAIT = "columns_portrait"
+        const val KEY_COLUMNS_LANDSCAPE = "columns_landscape"
         const val KEY_LANGUAGE = "language"
         const val KEY_STORAGE = "storage_access"
     }

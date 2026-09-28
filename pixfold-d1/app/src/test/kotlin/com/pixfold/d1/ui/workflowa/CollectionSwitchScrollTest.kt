@@ -39,6 +39,15 @@ class CollectionSwitchScrollTest {
 
     private val collections: List<ImageCollection> = MockData.workspaceA.collections
 
+    /**
+     * 本文件测的是 W1(切集合回顶),**与列数无关** ⇒ 把列数钉死,不让它随
+     * `ADAPTIVE_COLUMN_MIN_WIDTH` 漂移。
+     *
+     * 起因:自适应最小卡宽从 110dp 调到 80dp 后 `w400dp-h1000dp` 的默认列数由 3 变 4,
+     * 卡片变小 ⇒ `scan`(只有 14 张)在 4 列下不再溢出视口,"下滑"这个前置条件**根本无法成立**,
+     * 两条用例因此假红。用 2 列(卡片最大)让各集合在测试视口下必然可滚,
+     * 前置条件从此与列数算式解耦。
+     */
     private fun setPage(mode: ViewMode = ViewMode.Grid) {
         rule.setContent {
             SortAndPreviewPage(
@@ -46,6 +55,8 @@ class CollectionSwitchScrollTest {
                 contentInsets = WindowInsets(0, 0, 0, 0),
                 initialCollectionId = "trip",
                 initialMode = mode,
+                portraitDefaultColumns = SCROLL_TEST_COLUMNS,
+                landscapeDefaultColumns = SCROLL_TEST_COLUMNS,
             )
         }
     }
@@ -166,5 +177,15 @@ class CollectionSwitchScrollTest {
         rule.onNodeWithTag(collectionTag("scan")).performClick()
         rule.waitForIdle()
         assertTrue(!scrollToTopVisible(), "本就在顶部时切换集合仍应停在顶部")
+    }
+
+    private companion object {
+        /**
+         * 钉死 2 列 —— 卡片最大,保证 trip(30 张)/ scan(14 张)在本文件视口下都必然溢出。
+         *
+         * 不写成页面默认值(自适应)是刻意的:本文件不该因为列数算式的改动而变红,
+         * 那条算式由 `SortPagePolishTest` 与 `ColumnOptionsTest` 专门守护。
+         */
+        const val SCROLL_TEST_COLUMNS = 2
     }
 }

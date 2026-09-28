@@ -780,6 +780,7 @@ md 里另有 3 处 `ThumbCard` 引用（`HANGOFF.md:2785`、`docs/notes/d1-archi
 | **P1** | 14 | 拖拽**无法跨视口** —— 30 张图时从第 1 张拖到第 30 张**物理上不可能** | **功能性缺陷（目标不可达）** | **✅ 2026-09-25 已修**（真机核对 2026-09-26 通过） |
 | **P1** | 15 | 预览**取错图**（声明序 vs 页序）+ 预览往返**丢失所选集合** + 预览页缺改名入口 | **功能性缺陷（显示的不是点的那张）** | **✅ 2026-09-26 已修**（真机 5 项核对通过） |
 | **P3** | 6/7 | 容器重复；MetadataPage **754 行** | 结构性；**规模结论已给**（领域成本个位数 ms，见 §7，无需分页） |
+| **P1** | 16 | 五项交互修订（排序页滚动 / 图钉尺寸 / 去对勾 / 芯片文案 / 列数控件），**其中 ⑤ 列数控件同日走第二轮修订** | 一致性 / 可用性 | **✅ 2026-09-27 已修**（真机核对通过；第二轮见 §16b） |
 
 **建议顺序**：~~**P0 先做**~~（**✅ 2026-09-24 已完成**），
 ~~再 P1（固定终局动作）~~（**✅ 2026-09-25 已完成**）；~~长列表筛选~~（**✅ 2026-09-26 已完成**，见 §3），
@@ -787,6 +788,8 @@ P2/P3 视情况。第 2 项修复**真机核对已通过**（2026-09-25，与 §
 离线全绿：282 + 229 + lint 零告警 + 6 组变异全捕获 —— 底栏是纯布局位移、不涉数据路径。
 **第 15 节（2026-09-26）**离线全绿：`app 352` / `domain 247` + lint 零告警 + **16 组变异全捕获**，
 真机 5 项逐条读数见 §15.8。
+**第 16 节（2026-09-27）**离线全绿：`app 395` / `domain 247` + lint 零告警 + **16 组变异全捕获**，
+真机 9 项逐条读数见 §16.7；**同节 ⑤ 列数控件于同日走第二轮修订**（纯图标下拉 + 竖/横屏默认列数设置），见 §16b。
 
 > **流程约定**：以上均为**设计变更**（动页面结构），需先出设计方案交用户确认，
 > 再进入实现；实现后按「修复自证三层」（领域单测 → UI 断言 → 真机实证）交付。
@@ -1464,6 +1467,8 @@ LazyList 实为按 **key** 解析 `updateScrollPositionIfTheFirstItemWasMoved`�
 | ⑤ | 列数控件位置/交互 | 紧贴模式行下方、单独一行、左对齐；点 `2 列` 首行图钉 **2** 个、点 `4 列` **4** 个、点回 `自适应` **3** 个 ✅；列表模式该行**不出现** ✅ |
 | ⑤ | 默认自适应在 361dp | 三列卡片 `x42-417`/`x445-820`/`x848-1222`，与修补前 `a_step1.xml` **逐像素相同** ✅ |
 
+**⚠️ 上表 ⑤ 的两行已被 §16b 取代**：列数控件当日就走了第二轮修订（从「单独一行 4 个数字按钮 + 自适应」改为「模式行内纯图标 + 下拉 2–5」，默认自适应由 **3 列变 4 列**）。下文两条观测限制仍成立。
+
 **⚠️ 两条真机观测限制**：
 ①**`selected="true"` 在 uiautomator dump 里读不到** —— Compose 的 `SemanticsProperties.Selected`
 未被映射（整个 dump 里唯一的 `selected="true"` 是步骤页签）。
@@ -1477,6 +1482,140 @@ LazyList 实为按 **key** 解析 `updateScrollPositionIfTheFirstItemWasMoved`�
 
 调试产物已清理（设备 `/data/local/tmp` 的 `.xml`/`.png` 计数归 **0**），
 `svc power stayon false` 已复位（`mStayOn=false`），应用已 force-stop，`adb disconnect` 已断开。
+
+---
+
+## 16b. ✅ P1 续：列数控件第二轮（模式行内图标下拉 + 竖屏/横屏默认列数设置）—— 2026-09-27 已修，真机核对通过
+
+**这是 §16 ⑤ 的第二轮修订。** 上一轮交付的形态（4 个数字按钮＋「自适应」按钮**单独占一行**、左对齐）
+被用户当场否决：一是「自适应被拆成 2 行导致高度和 2/3/4 不一样很难看」，
+二是模式行右侧本就有空位却空着。所以 §16.7 表里 ⑤ 的两行读数
+（「紧贴模式行下方、**单独一行**」、「默认自适应三列」）**已被本节取代**，只作历史记录。
+
+### 16b.1 用户原话（逐字，两条）
+
+| # | 用户原话（逐字） | 落点 |
+| --- | --- | --- |
+| ⑤-1 | 「自适应被拆成2行导致高度和2/3/4不一样很难看，不能改成图标（不要直接文字显示，长按图标显示出这是列数的说明）点击下拉列表选择，去除自适应选项。在设置里加上列数的默认列数设置，这里的默认列数的默认选项是根据机器分辨率自适应的，顺带一提我觉得我的手机4列作为默认比较好看」 | 控件形态 + 默认值来源 + 新增设置项 |
+| ⑤-2 | 「然后因为只有一个图标所以可以放在网格/列表的切换按钮右边而不用单独占用一行」 | 位置 |
+
+### 16b.2 九条裁决（用户，勿重推）
+
+| # | 主题 | 裁决 |
+| --- | --- | --- |
+| 1 | `icon_form` | 纯图标；当前值**只在下拉列表**里显示；长按图标出提示说明「这是列数」 |
+| 2 | `col_options` | 工具栏下拉 = **2 / 3 / 4 / 5**，**无**「自适应」项 |
+| 3 | `settings_relation` | 设置 = 默认值；工具栏 = **本页临时覆盖，离开页面即失效** |
+| 4 | `adaptive_target` | 调窄 `ADAPTIVE_COLUMN_MIN_WIDTH`，使 361dp 上自适应 = **4 列** |
+| 5 | `commit_timing` | 先提交上一轮，再开新轮（已做 `e93d759`） |
+| 6 | `toolbar_bridge` | 设置里无「自适应」项，**算出的自适应值就是默认项**；排序页点图标展开下拉并高亮该项；设置里竖屏/横屏分**两项**，默认都是自适应值；排序页按屏幕方向**实时**取用 |
+| 7 | `resolve_out_of_range` | 选项 A：超范围的当前值**临时并入**下拉列表，保证当前值永远可见可选 |
+| 8 | `col_option_range` | 竖屏 1–5 / 横屏 2–9（**括号写明「显示 2–5 / 2–9」**）⇒ 实现取**下界 2**，上界随方向 |
+| 9 | `adapt_recovery` | 新增「跟随自适应」选项（显示算出的数）；**部分推翻第 6 条** ⇒ 模型改 `Int?`（`null` = 跟随自适应），设置页须有显式「跟随自适应」项 |
+
+⚠️ **裁决 8 的取舍**：裁决原文写「竖屏 1–5」，但括号里又写「显示 2–5」。
+按**更具体的显示范围**执行（`MIN_COLUMNS = 2`）；1 列仍可经自适应算出后被并入下拉（裁决 7）。
+
+### 16b.3 修法：一份共享算式 + 三层优先级
+
+新建 `pixfold-d1/app/src/main/kotlin/com/pixfold/d1/ui/components/ColumnOptions.kt` **作列数算式的唯一事实来源**，
+避免设置页与排序页各算一遍发生漂移（§12「7 处同源」的教训）：
+
+- `const val PORTRAIT_MAX_COLUMNS = 5` / `const val LANDSCAPE_MAX_COLUMNS = 9` / `const val MIN_COLUMNS = 2`
+- `fun columnOptions(maxColumns: Int, current: Int): List<Int>` —— 基础列表 `(MIN_COLUMNS..maxColumns)`；
+  当前值不在基础列表内时**并入并重排**（裁决 7）。
+- `@Composable fun isPortraitOrientation(): Boolean`（`UNDEFINED` 当竖屏）、`orientationWidth(...)`（竖屏取 `min(w,h)`、横屏取 `max(w,h)`）
+
+星级优先级就在排序页一行：
+`val columns = columnOverride ?: settingColumns ?: adaptiveColumns`
+—— **工具栏临时覆盖 > 设置默认值 > 自适应**。
+`columnOverride` 用 `remember`（**刻意不用 `rememberSaveable`**），因为裁决 3 的要求就是「离开页面即失效」。
+
+设置侧：`PixFoldSettings` 新增 `portraitDefaultColumns: Int? = null` / `landscapeDefaultColumns: Int? = null`
+（**`domain/` 是纯 JVM 模块，编译期不知屏宽，故默认必须是 `null`**）；
+`SharedPrefsSettingsStore` 新增 `readNullableColumns`/`putNullableColumns` —— **`null` 直接 `remove(key)`，不写哨兵值**
+（写 `0` 会在旧版本里读成合法列数）。
+
+### 16b.4 ☈ 本轮最重要的技术事实：下拉里的「选中态」在语义树里不存在
+
+`DropdownMenuItem` 在 material3 1.4.0 里**不设 `selected`/`selectable`/`toggleable` 语义**
+（源码 `Menu.kt` 与 `AndroidMenu.android.kt` 全文 grep 零命中），它的 modifier 链只有
+`clickable(...).fillMaxWidth().size(...).padding(contentPadding)`。⇒
+
+1. 高亮当前档**只能靠 `leadingIcon`**（故本轮新增 `res/drawable/ic_check.xml`）。
+2. 离线断言**读不到 `isSelected`**，只能查**对勾图标自己的 `testTag`**，且必须
+   **`useUnmergedTree = true`** —— 菜单项的 `clickable` 会把子节点合并进去。
+3. 对勾**只在菜单展开期间存在于语义树** ⇒ 本轮首次跑闸门时四个用例因在**菜单未展开**时调
+   `hasChecked()` 而**恒为 false**。修法 = 新增断言 helper `assertAnnouncedColumns(n, message)`，
+   改读**按钮自己的 `contentDescription`**（`a_cols_cd` = 「N 列」）—— 它在未展开时也可读。
+   同时保留一处 `openColumnMenu()` + `hasChecked` 用来钉住「对勾真的转移了」。
+   反证：那两个先调 `openColumnMenu()` 的用例一直是绿的。
+
+### 16b.5 自证
+
+- **静态侧**：`pixfold-d1/app/src/test/kotlin/com/pixfold/d1/ui/components/ColumnOptionsTest.kt`（纯 JVM，8 例）直接钉住 `4`@361dp、`4`@400dp、`3`@320dp、`9`@794dp、
+  `336dp` 临界点（`16 + 80*4`）与 `335dp`、不低于 1 列的保底、超范围当前值合并。
+- **持久化侧**：`pixfold-d1/app/src/test/kotlin/com/pixfold/d1/data/SharedPrefsSettingsStoreTest.kt`（**本仓第一个直测该 Store 的用例**，6 例）：
+  往返、两方向各自独立的 key、「跟随自适应」以**缺失 key** 表示、缺失 key 读作跟随自适应、
+  手工写入非法值（0/-1/-9）回退跟随自适应、保存「跟随自适应」会清掉旧固定值。
+- **四道闸门**：`app 395`（373 → **+22**）/ `domain 247` 全绿、lint **0 errors / 0 warnings**、APK **33,369,264 B**
+  （跑前已清 `app/build/test-results/testDebugUnitTest`、`domain/build/test-results/test`、`app/build/outputs/apk/debug/app-debug.apk`）。
+- **变异 16 组全部捕获、0 逃逸、0 跳过**（脚本 `pixfold-d1/app/build/mutate_round.py`，不跟踪）：
+
+| 编号 | 变异 | 红了 |
+| --- | --- | --- |
+| M1 | `ADAPTIVE_COLUMN_MIN_WIDTH` 80 → 110dp | 7 |
+| M2 | `MIN_COLUMNS = 2` → `1` | 5 |
+| M3 | `columnOptions` 当前值合并分支→ `return base` | 4 |
+| M4 | 竖/横默认列数两字段取反 | 2 |
+| M5 | `columns` 三层优先级去掉 `settingColumns` | 4 |
+| M6 | `leadingIcon` 判定→ `if (false)` | 3 |
+| M7 | `putNullableColumns` 的 `remove` 分支取反 | 2 |
+| M8 | 长按提示文案改成 `a_cols_cd` | 1 |
+| M9 | `PORTRAIT_MAX_COLUMNS` 5 → 9 | 4 |
+| M10 | `readNullableColumns` 的 `takeIf { it > 0 }` → `!= 0` | 1 |
+| M11 | 设置页自适应文案参数改 `1` | 1 |
+| M12 | 设置页两行都用竖屏宽算 | **首轮逃逸 ❌** |
+| M13 | 列数按钮在列表模式也显示 | 1 |
+| M14 | 选完不关菜单（去 `expanded = false`） | 2 |
+| M15 | 按钮去 `contentDescription` | 5 |
+| M16 | `orientationWidthDp` 竖/横取反 | 8 |
+
+- **⚠️ 一条先存活后补杀（M12）**：原设置页用例只钉了**竖屏行**的数字，
+  「两行都按竖屏宽度算」完全溜过闸门。补写 `each orientation shows its own adaptive number`
+  （同时断言竖屏 `4` 与横屏 `24`，取 `w400dp-h2000dp`）后杀死 ⇒ **一条真实的断言空洞**。
+  ⚠️ 补写时还踩了一坑：我原以为横屏的数字只在展开后出现，而**两行都常驻显示自己算出的数**。
+- **⚠️ M8 有杀伤力** ⇒ 长按提示的 Robolectric 断言稳定，**不**按 §7.4 撤掉 `long_press_shows_the_column_count_label`。
+
+### 16b.6 真机核对（2026-09-27 通过，用户授权，PJX110 / Android 16 / 361dp×794dp）
+
+| # | 核对项 | 实测读数 |
+| --- | --- | --- |
+| a | 纯图标 | 按钮 `[487,924][655,1092]`、`content-desc='4 列'`、**`text=''`** ⇒ 无任何可见文字 ✅ |
+| a | 位置（紧贴模式切换右侧、同一行） | 模式切换 `[42,938][266,1078]` + `[263,938][487,1078]`，列数按钮 `x` 从 **487** 开始 ⇒ 紧贴其右 ✅ |
+| a | 自适应目标 | 361dp 上自适应 = **4 列**（播报 `4 列`）✅ |
+| b | 下拉列表 | 四项 `2 列`/`3 列`/`4 列`/`5 列`，`text` = 2/3/4/5 ⇒ 恰为 **2/3/4/5**、**无「自适应」项**、竖屏上限 **5** ✅ |
+| b | 当前档高亮 | 2/3/5 的数字文字 `x=529`，**`4 列` 的 `x=655`** —— 被左侧对勾挤开 **126px = 36dp**（对勾是 `DropdownMenuItem` 主动让位，`selected` 语义不存在）✅ |
+| c | 选 2 列：卡片变宽 + 播报同步 | 按钮 `content-desc='2 列'`；卡片 `[42,1306][618,1980]` 宽 **576px = 164.6dp**（4 列时 274px = 78.3dp）✅ |
+| d | 长按提示「列数」 | 提示框 `y=826..909`（高 84px）、`x=499..641`，**正压在按钮 `y=924..1092` 上方**（与 `TooltipAnchorPosition.Above` 一致）；框内暗像素包围盒 `x=529..641`、`y=848..901`，可辨认出「列数」✅ |
+| e | 工具栏覆盖**不**持久 | 2 列 → `keyevent 4` 回首页 → 重进 A ⇒ 播报 **`4 列`**（回到自适应）✅ |
+| f | 设置两行各显示本方向自适应值 | `竖屏默认列数` = **`跟随自适应（4）`**；`横屏默认列数` = **`跟随自适应（9）`**；说明文字「作用于网格视图；排序页的列数按钮可在本次进入时临时覆盖。」✅ |
+| g | 设置播种 + 横屏取横屏值 | 竖屏会话选 `2 列` ⇒ 设置行变 `2 列`、横屏仍 `跟随自适应（9）`；重进 A ⇒ **`2 列`**；转横屏（ROTATION_90）⇒ **`9 列`**（忽略竖屏的 2）；横屏下拉 **2–9**、对勾在 **9**（`9 列` 的数字 `x=795` 而 3–8 列全为 `x=669`）✅ |
+| h | 转回竖屏 + 清空设置 | 转回 ROTATION_0 ⇒ 播报 **`2 列`**（取竖屏设置值）；选 `跟随自适应（4）` ⇒ 两行都回到自适应；重进 A ⇒ **`4 列`** ✅ |
+| i/j | 收尾清理 | `/data/local/tmp` 的 `.xml`/`.png` 计数 **25 → 0**；`accelerometer_rotation=1`、`user_rotation=0`、`mStayOn=false`、应用已 force-stop ✅ |
+
+⚠️ **本轮新增的操作教训（值得固定下来）**：长按提示 **1.5s 后自动消失**，
+而 `pixfold-d1/dumpui.bat` 的 `uiautomator dump` 往返耗时远超 1.5s ⇒ **两次都只拍到空白**；
+`input swipe` 也触发不了长按。正解 = **把动作与取证串进设备侧的同一个 `adb shell`**：
+
+```
+adb shell "input draganddrop 571 1008 571 1008 700; screencap -p /data/local/tmp/tip.png"
+```
+
+再与基线截图做**逐像素比对**（本机 `python3` 无 PIL，用 `zlib` + PNG 逐行反滤波手写解码器）。
+—— 同样的道理适用于任何「有纯自动隐藏计时」的瞬态 UI。
+
+调试产物已清理，`svc power stayon false` 已复位，应用已 force-stop。
 
 ---
 

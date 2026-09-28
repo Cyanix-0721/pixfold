@@ -38,12 +38,11 @@
     <string name="a_view_grid">Grid</string>
     <string name="a_view_list">List</string>
     <string name="a_view_cd">%1$s view</string>
-    <!-- Grid column-count control (user ruling 2026-09-26: "add a column-count button
-         to the grid view, defaulting to adaptive"). -->
+    <!-- Grid column-count control (user ruling 2026-09-26, revised):
+         an icon-only button whose long-press tooltip is this label; the current value
+         is shown only inside the dropdown. -->
     <string name="a_cols_label">Columns</string>
-    <string name="a_cols_adaptive">Auto</string>
     <string name="a_cols_cd">Columns: %1$d</string>
-    <string name="a_cols_adaptive_cd">Adaptive column count</string>
 
     <!-- ============ Step 1 · sort rule editor (SortRuleEditor) ============ -->
     <plurals name="a_sort_levels">

@@ -2439,6 +2439,67 @@ LazyList 实为按 **key** 解析 `updateScrollPositionIfTheFirstItemWasMoved`,�
 (`mStayOn=false`),应用已 force-stop,`adb disconnect` 已断开。
 详见 `docs/notes/d1-ui-friction-inventory.md` §16。
 
+### ✅ 列数控件第二轮（模式行内图标下拉 + 竖屏/横屏默认列数设置）—— 2026-09-27 已修,真机核对通过
+
+**这是 `docs/notes/d1-ui-friction-inventory.md` §16 ⑤ 的第二轮修订**:上一轮交付的「4 个数字按钮 +
+「自适应」按钮单独占一行」被用户当场否决。
+
+**用户原话(逐字,两条)**:
+- 「自适应被拆成2行导致高度和2/3/4不一样很难看,不能改成图标(不要直接文字显示,长按图标显示出这是列数的说明)点击下拉列表选择,去除自适应选项。在设置里加上列数的默认列数设置,这里的默认列数的默认选项是根据机器分辨率自适应的,顺带一提我觉得我的手机4列作为默认比较好看」
+- 「然后因为只有一个图标所以可以放在网格/列表的切换按钮右边而不用单独占用一行」
+
+**九条裁决(用户,勿重推)**:①纯图标,当前值**只在下拉列表**显示,长按出提示说明「这是列数」;②工具栏下拉 = 2/3/4/5,无「自适应」项;
+③设置 = 默认值,工具栏 = 本页临时覆盖、离开即失效;④调窄 `ADAPTIVE_COLUMN_MIN_WIDTH` 使 361dp = 4 列;
+⑤先提交上一轮(`e93d759`);⑥设置里无「自适应」项,**算出的自适应值就是默认项**,排序页展开下拉时高亮它,
+设置里竖屏/横屏分两项、默认都是自适应值,排序页按屏幕方向实时取用;⑦超范围当前值临时并入下拉列表(保证永远可见可选);
+⑧竖屏 1–5 / 横屏 2–9 —— 括号写明「显示 2–5 / 2–9」⇒ 实现取**下界 2**、上界随方向;
+⑨新增「跟随自适应」选项,**部分推翻第 ⑥ 条** ⇒ 模型改 `Int?`(`null` = 跟随自适应),设置页须有显式「跟随自适应」项。
+
+**实现**(三层优先级 `columnOverride ?: settingColumns ?: adaptiveColumns`):
+- 新建 `pixfold-d1/app/src/main/kotlin/com/pixfold/d1/ui/components/ColumnOptions.kt` 作**列数算式唯一事实来源**:
+  `PORTRAIT_MAX_COLUMNS = 5` / `LANDSCAPE_MAX_COLUMNS = 9` / `MIN_COLUMNS = 2`、`columnOptions(maxColumns, current)`、
+  `isPortraitOrientation()`、`orientationWidth(...)` —— 设置页与排序页**共用同一份算式**,两处不可能算出不同的数。
+- `pixfold-d1/app/src/main/kotlin/com/pixfold/d1/ui/components/DragReorderGrid.kt`:`ADAPTIVE_COLUMN_MIN_WIDTH` **110.dp → 80.dp**、
+  `columns: Int? = 3` **→ `columns: Int = 3`**、`GridCells.Adaptive` **→ `GridCells.Fixed(columns)`**;新增 `adaptiveColumnCount(containerWidth, minColumnWidth)`
+  (刻意不依赖 `Density`/`roundToPx()`,以便纯 JVM 测试直接断言)。
+- `pixfold-d1/app/src/main/kotlin/com/pixfold/d1/ui/workflowa/SortAndPreviewPage.kt`:`ColumnToggle`(4 按钮 + 自适应)整体删除,改为 `ColumnCountButton` = 纯图标 `IconButton` +
+  `TooltipBox`(长按)+ `DropdownMenu`;状态 `columnOverride` 用 `remember`(**不用 `rememberSaveable`**,因为裁决 ③ 就是「离开页面即失效」)。
+- 设置页新增两行 `DefaultColumnsRow`(竖屏/横屏各一),选项 = 「跟随自适应(N)」+ 2…上界;
+  `pixfold-d1/domain/src/main/kotlin/com/pixfold/d1/domain/settings/PixFoldSettings.kt` 新增 `portraitDefaultColumns: Int? = null` / `landscapeDefaultColumns: Int? = null`
+  (**纯 JVM 模块不得引用 Android/Compose 类型**);
+  `pixfold-d1/app/src/main/kotlin/com/pixfold/d1/data/SharedPrefsSettingsStore.kt` 用 `readNullableColumns`/`putNullableColumns` —— **`null` 直接 `remove(key)`,不写哨兵值**。
+- ⚠️ **`DropdownMenuItem` 不设 `selected` 语义**(经 material3 1.4.0 源码核实):高亮的唯一痕迹是 `leadingIcon`,故下拉里
+  当前档的画法是一个**对勾图标**,而测试必须查 `columnCheckTag(n)` 且 **`useUnmergedTree = true`**(菜单项的 `clickable` 会合并子节点)。
+
+**四道闸门**:`app 395`(373→**+22**)/`domain 247` 全绿、lint **0 errors / 0 warnings**、APK **33,369,264 B**;
+**变异 16 组全捕获、0 逃逸、0 跳过**(脚本 `pixfold-d1/app/build/mutate_round.py`,不跟踪)。
+⚠️ **一条先存活后补杀**:M12(设置页把两行的自适应宽度都写死成竖屏)首轮**逃逸** —— 原用例只钉竖屏行的数字,
+「两行都按竖屏宽算」完全溜过;补 `each orientation shows its own adaptive number`(同时断言竖屏 `4` 与横屏 `24`)后杀死。
+
+**✅ 真机核对已通过(2026-09-27,PJX110 / Android 16 / 361dp×794dp,用户授权后执行)**,9 项逐条读数:
+- **控件形态**:按钮 `[487,924][655,1092]`、`content-desc='4 列'`、**`text=''`**(纯图标,无可见文字);
+  模式切换 `[42,938][266,1078]`+`[263,938][487,1078]` ⇒ 列数按钮**紧贴其右、同一行**(裁决 ①/⑤-2 双证)。
+- **自适应目标达成**:361dp 上自适应 = **4 列**(裁决 ④ 的用户目标值)。
+- **下拉**:四项 `2 列`/`3 列`/`4 列`/`5 列`,`text` = 2/3/4/5 ⇒ 恰为 **2/3/4/5**、**无「自适应」项**、竖屏上限 5;
+  高亮痕迹 = `4 列` 的数字文字 `x=655` 而 2/3/5 为 `x=529`,**被左侧对勾挤开 126px = 36dp**。
+- **选 2 列**:按钮播报 `2 列`,卡片宽 **576px = 164.6dp**(4 列时 274px = 78.3dp)。
+- **长按提示**:提示框出现在 `y=826..909`、`x=499..641`,**正压在按钮上方**(与 `TooltipAnchorPosition.Above` 一致),
+  框内暗像素包围盒可辨认出「列数」。
+- **不持久**:选 2 列 → `keyevent 4` 回首页 → 重进 A ⇒ 播报 **`4 列`**(临时覆盖未持久化)。
+- **设置两行**:`竖屏默认列数` = **`跟随自适应（4）`**、`横屏默认列数` = **`跟随自适应（9）`**。
+- **横屏实时取用**:设置里把竖屏钉成 `2 列` ⇒ 竖屏排序页播报 `2 列`;转横屏(ROTATION_90) ⇒ 忽略竖屏值播报 **`9 列`**,
+  横屏下拉范围 **2–9**、对勾在 **9**;转回竖屏 ⇒ 播报 `2 列`。
+- **清空即回自适应**:设置里选「跟随自适应（4）」⇒ 两行都回到自适应,重进排序页播报 **`4 列`**。
+
+⚠️ **操作教训(本轮新增)**:长按提示 **1.5s 自动消失**,而 `pixfold-d1/dumpui.bat` 的 `uiautomator dump` 往返太慢,
+两次都抓不到;`input swipe` 也触发不了长按。正解 = **把动作与取证串进设备侧的同一个 `adb shell`**
+(`input draganddrop X Y X Y 700; screencap -p /data/local/tmp/tip.png`),再与基线截图做逐像素比对
+(本机 `python3` 无 PIL,用 `zlib` 手写 PNG 反滤波解码)。
+
+调试产物已清理(设备 `/data/local/tmp` 的 `.xml`/`.png` 计数 **25 → 0**),`svc power stayon false` 已复位
+(`mStayOn=false`)、`accelerometer_rotation` 已还原为 `1`、应用已 force-stop。
+详见 `docs/notes/d1-ui-friction-inventory.md` §16b。
+
 ### D2：平台能力验证
 
 **目标**:优先 Android SAF。重点验证最容易推翻技术选型的能力,不先做完整业务。

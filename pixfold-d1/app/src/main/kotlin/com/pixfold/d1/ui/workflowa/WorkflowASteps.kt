@@ -140,6 +140,15 @@ fun WorkflowASteps(
     initialNamingState: NamingState? = null,
     /** 命名状态变化上报(仅上层持有状态时有意义)。 */
     onNamingStateChange: (NamingState) -> Unit = {},
+    /**
+     * 网格默认列数(来自设置页)—— 竖屏 / 横屏各一个,`null` = 跟随自适应。
+     *
+     * 只做**透传**:真正按方向二选一发生在 `SortAndPreviewPage` 内部(那里才读得到
+     * `LocalConfiguration` 并会随旋转重组)。本组件刻意不在这里选,免得"哪个方向"
+     * 在两个地方各判一次、日后改一处漏一处。
+     */
+    portraitDefaultColumns: Int? = null,
+    landscapeDefaultColumns: Int? = null,
 ) {
     // 跨步骤共享的唯一状态源。这些状态**必须留在嵌套 NavHost 之外** ——
     // 它们要跨步骤存活,而 NavHost 里每个 destination 都是独立作用域。
@@ -253,6 +262,8 @@ fun WorkflowASteps(
                             externalState = state,
                             onStateChange = { updateState(it) },
                             onNext = { navController.navigate(WorkflowANamingRoute) },
+                            portraitDefaultColumns = portraitDefaultColumns,
+                            landscapeDefaultColumns = landscapeDefaultColumns,
                             modifier = Modifier.weight(1f),
                         )
                     }

@@ -2,6 +2,7 @@ package com.pixfold.d1.ui.workflowa
 
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
@@ -13,16 +14,25 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.material3.Button
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.PlainTooltip
 import androidx.compose.material3.SegmentedButton
 import androidx.compose.material3.SegmentedButtonDefaults
 import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.TooltipAnchorPosition
+import androidx.compose.material3.TooltipBox
+import androidx.compose.material3.TooltipDefaults
+import androidx.compose.material3.rememberTooltipState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
@@ -32,6 +42,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
@@ -53,7 +64,13 @@ import com.pixfold.d1.domain.workflowa.updatePageOrder
 import com.pixfold.d1.domain.workflowa.workflowAStateOf
 import com.pixfold.d1.ui.components.DragReorderGrid
 import com.pixfold.d1.ui.components.DragReorderList
+import com.pixfold.d1.ui.components.LANDSCAPE_MAX_COLUMNS
+import com.pixfold.d1.ui.components.PORTRAIT_MAX_COLUMNS
 import com.pixfold.d1.ui.components.PageActionBar
+import com.pixfold.d1.ui.components.adaptiveColumnCount
+import com.pixfold.d1.ui.components.columnOptions
+import com.pixfold.d1.ui.components.isPortraitOrientation
+import com.pixfold.d1.ui.components.orientationWidth
 import com.pixfold.d1.ui.text.textOf
 
 const val TAG_GRID = "view-grid"
@@ -70,20 +87,36 @@ const val TAG_RULE_SUMMARY_BAR = "rule-summary-bar"
 const val TAG_RULE_SUMMARY_TOGGLE = "rule-summary-toggle"
 
 /**
- * 网格列数控件的行 tag(用户 2026-09-26 裁决:「网格视图加个列数按钮(默认选自适应)」)。
+ * 网格列数控件的 testTag(用户 2026-09-26 第二轮裁决:
+ * 「纯图标，但是当前值只在下拉列表显示，长按图标是显示说明这是列数」)。
  *
- * 该控件**单独占一行**、紧贴网格/列表切换行下方、仅网格模式显示 —— 不是最初裁决描述里
- * 的"放在切换行内"。原因是真机实测 361dp 下切换行只剩 104dp 空隙,而 4 个按钮即便去掉
- * 选中勾也需约 200dp 以上,塞进去必然溢到视口外(正是 2026-09-25 已实测过的缺陷类型)。
- * 该偏离已向用户确认,用户选「单独一行,紧贴切换行下方」。
+ * 该按钮**放在网格/列表切换按钮右边、同一行内**,不单独占一行 ——
+ * 第一轮曾单独占一行(当时是 4 个数字按钮,361dp 下切换行塞不下);
+ * 改成纯图标后只占 48dp,与切换按钮同行的宽度账已重新算过(见 [ColumnCountButton])。
+ * 该修订是用户当回合指令「因为只有一个图标所以可以放在网格/列表的切换按钮右边
+ * 而不用单独占用一行」。
  */
-const val TAG_COLUMN_ROW = "column-row"
+const val TAG_COLUMN_BUTTON = "column-button"
 
-/** 「自适应」那一档的 testTag;数字档用 [columnTag]。 */
-const val TAG_COLUMN_ADAPTIVE = "column-adaptive"
+/** 列数下拉菜单本身的 testTag(仅展开时存在)。 */
+const val TAG_COLUMN_MENU = "column-menu"
 
-/** 数字档列数按钮的 testTag。 */
+/** 下拉菜单里某一档列数的 testTag。 */
 fun columnTag(n: Int) = "column-$n"
+
+/**
+ * 「当前生效那一档」的对勾图标 testTag。
+ *
+ * 之所以要给一个 `contentDescription = null` 的装饰性图标挂 tag:`DropdownMenuItem`
+ * **不设** selected 语义(其内部只挂 `clickable`,已核实 `Menu.kt` 的
+ * `DropdownMenuItemContent`),所以"高亮的是哪一档"在语义树里唯一的痕迹就是这个图标。
+ * 若不给它挂 tag,「高亮错了档位」这类缺陷在离线测试里**无法被发现** ——
+ * 只能靠真机肉眼看,而真机核对很贵。
+ *
+ * 查它时必须 `useUnmergedTree = true`:菜单项的 `clickable` 会合并子节点语义,
+ * 而父节点自己已有 [columnTag],子节点的 tag 在合并树里会被父节点的同名属性压掉。
+ */
+fun columnCheckTag(n: Int) = "column-check-$n"
 
 /** 集合选择按钮的 testTag。 */
 fun collectionTag(id: String) = "collection-$id"
@@ -116,6 +149,19 @@ fun batchLabelRes(isCustom: Boolean): Int =
  *   传 null 时本页自持状态(单独使用/测试场景,行为不变)。
  * @param onStateChange 状态变化上报(仅上层持有状态时有意义)。
  * @param onNext 进入步骤 2 的回调;为 null 时不显示"下一步"按钮(单独使用场景)。
+ * @param portraitDefaultColumns 竖屏下的**默认列数**(来自设置页);`null` = 跟随自适应。
+ * @param landscapeDefaultColumns 横屏下的默认列数;`null` = 跟随自适应。
+ *
+ * ## 列数三层的来源(用户 2026-09-26 裁决 + 第二轮补充)
+ *
+ * 1. **自适应算式**([com.pixfold.d1.ui.components.adaptiveColumnCount])—— 兜底,
+ *    也是"跟随自适应"的含义;
+ * 2. **设置页的默认值**(上面两个参数,按屏幕方向实时二选一)—— 用户没在排序页动过时的起点;
+ * 3. **本页临时覆盖**(工具栏图标按钮选的值)—— 只在本次进入有效,**离开页面即失效**,
+ *    不回写设置(用户裁决:「设置 = 默认值;工具栏 = 本页临时覆盖,离开页面即失效」)。
+ *
+ * 三者优先级 3 > 2 > 1。工具栏下拉列表**只有数字,没有「自适应」项**(用户裁决 6):
+ * "当前是哪一档"由页面算出具体数字再高亮,而不是列一个抽象的"自适应"选项。
  *
  * ## 头部可伸缩(用户 2026-09-25 指定)
  *
@@ -147,6 +193,8 @@ fun SortAndPreviewPage(
     externalState: WorkflowAState? = null,
     onStateChange: (WorkflowAState) -> Unit = {},
     onNext: (() -> Unit)? = null,
+    portraitDefaultColumns: Int? = null,
+    landscapeDefaultColumns: Int? = null,
 ) {
     var mode by remember { mutableStateOf(initialMode) }
     // 本地状态权威,初值取自 externalState,每次变更上报上层(理由同 NamingPage:
@@ -166,16 +214,26 @@ fun SortAndPreviewPage(
     // (直接把 SortRuleEditor 当 root 组合)就得先展开才能点字段,徒增一处耦合。
     // `rememberSaveable` 让它扛住进程重建(与 NamingPage 的 editorExpanded 同一模式)。
     var ruleExpanded by rememberSaveable { mutableStateOf(false) }
-    // 网格列数(用户 2026-09-26 裁决:「网格视图加个列数按钮(默认选自适应)」)。
+    // ---- 列数:三级来源 + 本页临时覆盖(用户 2026-09-26 裁决 + 第二轮补充)----
     //
-    // `null` = 自适应(交 [DragReorderGrid] 用 `GridCells.Adaptive` 按可用宽自动定列);
-    // 2/3/4 = 固定列数。默认自适应 —— 361dp 下自适应算出来正好 3 列,与旧写死 `Fixed(3)`
-    // 观感一致,故"默认自适应"对老用户不会突然换样子。
+    //   优先级:本页临时覆盖 > 设置页的默认值(按屏幕方向二选一) > 自适应算式
     //
-    // 它属于**视图偏好**,与 `mode` 同层,**不进** `externalState`(那是领域状态:
-    // 页序/固定/规则)。这里用 `remember` 而非 `rememberSaveable`,与紧邻的 `mode` 保持一致
-    // —— 同一性质的两个设置没有理由一个扛旋转、一个不扛。
-    var columns by remember { mutableStateOf<Int?>(null) }
+    // 为什么必须在这里算出**具体数字**、而不是把 `Int?` 交给网格让 `GridCells.Adaptive`
+    // 自己算:下拉列表要**高亮当前生效的那一档**(用户裁决:「点击图标展开下拉列表就
+    // 高亮那个选项」),而"当前生效的是几列"只有先算出来才可能被高亮。
+    // 算式本身仍是唯一事实来源([adaptiveColumnCount]),设置页预览/本页默认/测试三处共用。
+    //
+    // 本页覆盖用 `remember`(非 `rememberSaveable`),与紧邻的 `mode` 同层同性质:
+    // 旋转重建 Activity ⇒ 覆盖清零、回到新方向自己的默认值,正是用户裁决
+    // 「工具栏 = 本页临时覆盖,离开页面即失效」的延伸;若扛过旋转,横屏会沿用
+    // 竖屏选的 4 列(横屏下很难看)。
+    var columnOverride by remember { mutableStateOf<Int?>(null) }
+    val isPortrait = isPortraitOrientation()
+    val adaptiveColumns = adaptiveColumnCount(
+        orientationWidth(LocalConfiguration.current, isPortrait),
+    )
+    val settingColumns = if (isPortrait) portraitDefaultColumns else landscapeDefaultColumns
+    val columns = columnOverride ?: settingColumns ?: adaptiveColumns
     // 初始集合也要通知上层,避免预览与当前集合不一致
     androidx.compose.runtime.LaunchedEffect(activeId) { onActiveCollectionChange(activeId) }
 
@@ -289,7 +347,23 @@ fun SortAndPreviewPage(
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            ModeToggle(mode = mode, onChange = { mode = it })
+            // 左侧:视图切换 + 列数按钮**同一行**(用户 2026-09-26 第二轮指令:
+            // 「因为只有一个图标所以可以放在网格/列表的切换按钮右边而不用单独占用一行」)。
+            // 第一轮它是 4 个数字按钮、361dp 下切换行塞不下才单独占一行;改成纯图标后
+            // 只占 48dp(IconButton 触控下限),宽度账已重新算:切换按钮约 128dp + 4dp
+            // 间距 + 48dp ≈ 180dp,而右侧「本组独立 + 开关」约 108dp,361dp − 24dp(左右
+            // padding) = 337dp 足够。⚠️ 这仍是**估算**:Robolectric 不做真实文本测量,
+            // "是否真的放得下"属于 §7.4 表里只能真机核对的一类。
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                ModeToggle(mode = mode, onChange = { mode = it })
+                // 仅网格模式显示:列表模式没有"列数"这个概念。
+                if (mode == ViewMode.Grid) {
+                    ColumnCountButton(
+                        columns = columns,
+                        onSelect = { columnOverride = it },
+                    )
+                }
+            }
 
             Row(verticalAlignment = Alignment.CenterVertically) {
                 // "本组独立"开关(验收第 7 项后半:此前该能力在界面上不存在)
@@ -307,13 +381,6 @@ fun SortAndPreviewPage(
                         .semantics { contentDescription = customRuleCd },
                 )
             }
-        }
-
-        // 列数控件**单独占一行**,紧贴切换行下方,仅网格模式显示。
-        // (不是最初裁决描述里的"放在切换行内" —— 361dp 下切换行只剩 104dp 空隙,
-        //  而 4 个按钮即便去掉选中勾也需约 200dp。该偏离已向用户确认,用户选"单独一行"。)
-        if (mode == ViewMode.Grid) {
-            ColumnToggle(columns = columns, onChange = { columns = it })
         }
 
         // ---- 排序规则:摘要栏常驻,编辑器默认折叠(用户 2026-09-25 指定)----
@@ -537,53 +604,105 @@ private fun ModeToggle(mode: ViewMode, onChange: (ViewMode) -> Unit) {
 }
 
 /**
- * 网格列数控件(用户 2026-09-26 裁决:「网格视图加个列数按钮(默认选自适应)」)。
+ * 网格列数按钮 —— **纯图标**,点击展开下拉列表,长按显示说明
+ * (用户 2026-09-26 第二轮裁决:「纯图标，但是当前值只在下拉列表显示，
+ * 长按图标是显示说明这是列数」)。
  *
- * 数字按钮组:`自适应 / 2 / 3 / 4`。选中的一档由容器高亮表示 —— 与上方的网格/列表
- * 切换同一族控件、同一套视觉语言(故同样传 `icon = {}` 去掉对勾)。
+ * ## 为什么按钮上**不**显示当前列数
  *
- * **为什么单独占一行**:361dp 下切换行只剩 104dp 空隙,4 个按钮即便去掉对勾也需约 200dp,
- * 塞进去必然溢到视口外。该偏离已向用户确认(用户选「单独一行,紧贴切换行下方」)。
+ * 用户明确要求纯图标。理由也成立:按钮只有 48dp,`4 列` 这样的文字会把它撑宽或换行,
+ * 而列数是低频查看的信息 —— 需要时展开列表即可。代价是"当前几列"不再一眼可见,
+ * 由 `contentDescription`(`a_cols_cd`,如「4 列」)向读屏用户补齐。
  *
- * `columns == null` 表示自适应;`GridCells.Adaptive` 的实际列数由
- * [com.pixfold.d1.ui.components.DragReorderGrid] 按可用宽算出(361dp 下为 3 列)。
+ * ## 长按与点击为什么不冲突
+ *
+ * 两者都挂在同一个 `IconButton` 上,但 M3 的 `TooltipBox` 内部
+ * (`androidx/compose/material3/internal/BasicTooltip.kt` 的 `Modifier.handleGestures`)
+ * 在长按触发后**会消费随后的抬手事件**,于是子节点的 `onClick` 不再触发;
+ * 它同时只在 `PointerEventPass.Initial` 观察、不消费,普通短按照样穿到 `IconButton`。
+ * 换句话说"长按出说明、轻点出列表"是 API 保证的,不需要自己写手势判别。
+ *
+ * ## 下拉列表的内容
+ *
+ * 只有数字,没有「自适应」项(用户裁决 6:「设置里没有自适应选项,而是计算出的
+ * 自适应值就是默认的选项,排序页里点击图标展开下拉列表就高亮那个选项」)。
+ * 当前生效那一档用 `leadingIcon` 打勾 —— `DropdownMenuItem` 的 `leadingIcon` 传 null
+ * 时不占位,非 null 时左边留出图标槽(两态宽度不同,这是 M3 的既定布局,不是缺陷)。
+ * 列表长度按屏幕方向取上限(竖屏 5 / 横屏 9),并把当前值临时并入,保证永远可见可选。
+ *
+ * @param columns 当前**生效**的列数(页面已按"覆盖 > 设置默认 > 自适应"算好)。
+ * @param onSelect 选中某一档时的回调;页面把它存为本次进入的临时覆盖。
  */
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun ColumnToggle(columns: Int?, onChange: (Int?) -> Unit) {
-    // 先解析文案:下方 lambda 非 @Composable 上下文
+private fun ColumnCountButton(columns: Int, onSelect: (Int) -> Unit) {
+    // 先解析文案:tooltip/菜单项的 lambda 非 @Composable 上下文
     val label = stringResource(R.string.a_cols_label)
-    val adaptiveLabel = stringResource(R.string.a_cols_adaptive)
-    val adaptiveCd = stringResource(R.string.a_cols_adaptive_cd)
-    val options = listOf<Int?>(null, 2, 3, 4)
-    val optionCds = options.map { n ->
-        if (n == null) adaptiveCd else stringResource(R.string.a_cols_cd, n)
-    }
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(start = 12.dp, end = 12.dp, bottom = 4.dp)
-            .testTag(TAG_COLUMN_ROW),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Text(
-            text = label,
-            style = MaterialTheme.typography.labelMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.padding(end = 8.dp),
-        )
-        SingleChoiceSegmentedButtonRow {
+    val columnsCd = stringResource(R.string.a_cols_cd, columns)
+    val portrait = isPortraitOrientation()
+    val maxColumns = if (portrait) PORTRAIT_MAX_COLUMNS else LANDSCAPE_MAX_COLUMNS
+    val options = columnOptions(maxColumns, columns)
+    // 每个数字档的无障碍描述(如「4 列」);lambda 里调不了 stringResource,先算好。
+    val optionCds = options.map { stringResource(R.string.a_cols_cd, it) }
+
+    var expanded by remember { mutableStateOf(false) }
+
+    Box {
+        TooltipBox(
+            positionProvider = TooltipDefaults.rememberTooltipPositionProvider(
+                TooltipAnchorPosition.Above,
+            ),
+            tooltip = {
+                PlainTooltip { Text(text = label) }
+            },
+            state = rememberTooltipState(),
+        ) {
+            IconButton(
+                onClick = { expanded = true },
+                modifier = Modifier
+                    .testTag(TAG_COLUMN_BUTTON)
+                    // 纯图标 => 无障碍描述必须自己给:读屏用户看不到"几列",只能听。
+                    .semantics { contentDescription = columnsCd },
+            ) {
+                Icon(
+                    painter = painterResource(R.drawable.ic_view_column),
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
+
+        DropdownMenu(
+            expanded = expanded,
+            onDismissRequest = { expanded = false },
+            modifier = Modifier.testTag(TAG_COLUMN_MENU),
+        ) {
             options.forEachIndexed { index, option ->
-                SegmentedButton(
-                    selected = columns == option,
-                    onClick = { onChange(option) },
-                    shape = SegmentedButtonDefaults.itemShape(index = index, count = options.size),
-                    icon = {},
+                DropdownMenuItem(
+                    text = { Text(text = option.toString()) },
+                    onClick = {
+                        expanded = false
+                        onSelect(option)
+                    },
+                    // 当前生效那一档打勾。`DropdownMenuItem` **不设** selected 语义
+                    // (已核实 `Menu.kt` 的 `DropdownMenuItemContent` 只挂 `clickable`),
+                    // 故高亮完全靠这个图标;测试也据此断言(见 SortPagePolishTest)。
+                    leadingIcon = if (option == columns) {
+                        {
+                            Icon(
+                                painter = painterResource(R.drawable.ic_check),
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.testTag(columnCheckTag(option)),
+                            )
+                        }
+                    } else {
+                        null
+                    },
                     modifier = Modifier
-                        .testTag(if (option == null) TAG_COLUMN_ADAPTIVE else columnTag(option))
+                        .testTag(columnTag(option))
                         .semantics { contentDescription = optionCds[index] },
-                ) {
-                    Text(text = if (option == null) adaptiveLabel else option.toString())
-                }
+                )
             }
         }
     }

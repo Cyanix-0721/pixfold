@@ -122,6 +122,22 @@ data class PixFoldSettings(
      * > 于是"是否做手势跟随动画"是可以运行时切换的。本开关控制的就是后者。
      */
     val predictiveBackAnimation: Boolean = true,
+    /**
+     * 网格视图的**竖屏**默认列数(用户 2026-09-26 裁决;第二轮补充「跟随自适应」)。
+     *
+     * `null` = **跟随自适应** —— 由屏幕可用宽与最小卡宽实时算出(见
+     * `com.pixfold.d1.ui.components.adaptiveColumnCount`);非 null = 用户固定选的列数。
+     *
+     * **为什么默认 null 而不是写死一个数**:默认列数必须随设备分辨率走,
+     * 而本类在纯 JVM 模块里、编译期不知道屏幕宽度。`null` 是"还没选过"的忠实表示,
+     * 于是"恢复默认"也自然回到跟随自适应。
+     *
+     * 竖屏与横屏**分开两个字段**:同一台设备在两个方向上的合适列数差很远
+     * (PJX110 竖屏 361dp 算出 4 列,横屏 794dp 算出 9 列),共用一个值必然有一边难看。
+     */
+    val portraitDefaultColumns: Int? = null,
+    /** 网格视图的**横屏**默认列数。语义同 [portraitDefaultColumns]。 */
+    val landscapeDefaultColumns: Int? = null,
     val language: AppLanguage = AppLanguage.System,
     val storageAccess: StorageAccess = StorageAccess.Saf,
 ) {

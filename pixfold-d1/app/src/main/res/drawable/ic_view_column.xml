@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Material Icons "view_column" — 网格列数按钮的图标(用户 2026-09-26 裁决:
+  「纯图标，但是当前值只在下拉列表显示，长按图标是显示说明这是列数」)。
+
+  图形 = 三个等宽竖条(左/中/右),表示"分列"。
+
+  素材来源:https://github.com/google/material-design-icons
+            src/action/view_column/materialicons/24px.svg
+  License: Apache License 2.0
+
+  与 ic_arrow_drop_down.xml 的坑不同:官方这份 24px SVG **本身就是 24x24 正坐标**
+  (viewBox "0 0 24 24"),不必像 960 viewBox 那版做负坐标平移,故直接照抄 pathData。
+  三段依次为中(9.33~14.67)、右(15.67~21)、左(3~8.33)竖条,合起来铺满 3~21。
+-->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <path
+        android:fillColor="#FF000000"
+        android:pathData="M14.67,5v14H9.33V5H14.67z M15.67,19H21V5h-5.33V19z M8.33,19V5H3v14H8.33z" />
+</vector>

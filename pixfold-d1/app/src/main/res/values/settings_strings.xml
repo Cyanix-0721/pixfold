@@ -72,6 +72,10 @@
     <string name="storage_all">All files access</string>
     <string name="settings_predictive_back">Predictive back animation</string>
     <string name="settings_predictive_back_desc">Preview the exit while swiping back; off switches immediately</string>
+    <string name="settings_columns_portrait">Default columns (portrait)</string>
+    <string name="settings_columns_landscape">Default columns (landscape)</string>
+    <string name="settings_columns_adaptive_value">Auto (%1$d)</string>
+    <string name="settings_columns_note">Applies to the grid view. The column button on the sort page overrides it for the current visit only.</string>
     <string name="licenses_correction_title">License correction</string>
     <string name="licenses_correction_body">The artifact POM for com.materialkolor:material-color-utilities declares MIT, but the module ships an Apache-2.0 LICENSE (ported from the official material-foundation/material-color-utilities). This app complies with Apache-2.0.</string>
 </resources>

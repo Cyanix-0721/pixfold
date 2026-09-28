@@ -175,6 +175,10 @@ fun PixFoldApp(store: SettingsStore? = null) {
                             onStateChange = { workflowAState = it },
                             initialNamingState = namingState,
                             onNamingStateChange = { namingState = it },
+                            // 网格默认列数(设置在设置页;排序页按屏幕方向二选一,
+                            // 工具栏列的临时覆盖不回写这里)。
+                            portraitDefaultColumns = settings.portraitDefaultColumns,
+                            landscapeDefaultColumns = settings.landscapeDefaultColumns,
                         )
                     }
                 }
