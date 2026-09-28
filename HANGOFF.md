@@ -2500,6 +2500,8 @@ LazyList 实为按 **key** 解析 `updateScrollPositionIfTheFirstItemWasMoved`,�
 (`mStayOn=false`)、`accelerometer_rotation` 已还原为 `1`、应用已 force-stop。
 详见 `docs/notes/d1-ui-friction-inventory.md` §16b。
 
+**已提交** `f6dfaa9`(24 files,+1440/−168,**直接提交到 `dev`、无独立分支、未推送**)。
+
 ### D2：平台能力验证
 
 **目标**:优先 Android SAF。重点验证最容易推翻技术选型的能力,不先做完整业务。

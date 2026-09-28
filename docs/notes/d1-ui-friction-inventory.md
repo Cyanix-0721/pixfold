@@ -1617,6 +1617,8 @@ adb shell "input draganddrop 571 1008 571 1008 700; screencap -p /data/local/tmp
 
 调试产物已清理，`svc power stayon false` 已复位，应用已 force-stop。
 
+**已提交** `f6dfaa9`(24 files,+1440/−168,**直接提交到 `dev`、无独立分支、未推送**)。
+
 ---
 
 ## 附：本文件的取证方式（可复现）
