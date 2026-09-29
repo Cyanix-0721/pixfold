@@ -2606,7 +2606,7 @@ options.forEachIndexed { index, option ->
 
 详见 `docs/notes/d1-ui-friction-inventory.md` §16c。
 
-**已提交** `TODO_COMMIT`。
+**已提交** `3ca85b0`(8 files,+692/−86,**直接提交到 `dev`、无独立分支、未推送**)。
 
 ### D2：平台能力验证
 

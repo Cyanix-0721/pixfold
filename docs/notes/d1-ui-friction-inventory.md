@@ -1813,6 +1813,8 @@ adb shell "input keyevent 111; sleep 1; input tap 300 2600; sleep 1; \
   ⚠️ 方法教训：`uiautomator` 给的 text 节点 bounds 是**槽位框**（铺满后 84px 宽），
   不能用来判断字形是否居中 ⇒ 必须**从 PNG 采样墨迹**（`uv run --with pillow`，逐列扫描与两种背景色差 > 90 的像素）。
 
+**已提交** `3ca85b0`（8 files，+692/−86，**直接提交到 `dev`、无独立分支、未推送**）。
+
 ## 附：本文件的取证方式（可复现）
 
 | 结论 | 取法 |
