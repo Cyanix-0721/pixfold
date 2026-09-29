@@ -1,5 +1,6 @@
 package com.pixfold.d1.ui.workflowa
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -12,6 +13,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.material3.Button
 import androidx.compose.material3.DropdownMenu
@@ -48,7 +50,9 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.pixfold.d1.R
@@ -101,22 +105,37 @@ const val TAG_COLUMN_BUTTON = "column-button"
 /** 列数下拉菜单本身的 testTag(仅展开时存在)。 */
 const val TAG_COLUMN_MENU = "column-menu"
 
+/**
+ * 列数下拉菜单的宽度 = 48dp,与列数按钮([TAG_COLUMN_BUTTON],实测 168px = 48.0dp)同宽。
+ *
+ * 用户 2026-09-27 第三次订正:「列数下拉列表只显示个数字,选项却特别宽,不好看」,
+ * 并裁决定稿 **48dp**。
+ *
+ * ## 为什么在容器这一处给宽就够(不必逐条目重复 `Modifier.width()`)
+ *
+ * 菜单默认宽 112dp 来自 M3:`Menu.kt:527` 的
+ * `DropdownMenuItemDefaultMinWidth = 112.dp` 是**库内 `private val`,外部无法下调**,
+ * 由 `Menu.kt:419 DropdownMenuItemContent` 的
+ * `modifier.clickable(...).fillMaxWidth().sizeIn(minWidth = 112.dp, maxWidth = 280.dp, ...)`
+ * 兜在条目上 —— 只有一位数字也被撑成 112dp。
+ *
+ * 收窄之所以能"从上面压下来",是因为链上每一环都 `enforceIncoming = true`(服从上游约束):
+ *  1. 该 `sizeIn` 默认 `enforceIncoming = true`(`Size.kt:226-238`)⇒ 服从上游;
+ *  2. 调用方的 `modifier` 正是**最上游** —— `Menu.kt:359-415 DropdownMenuContent` 把它
+ *     放在内层 `Column` 链首:
+ *     `modifier.padding(vertical = 8.dp).width(IntrinsicSize.Max).verticalScroll(...)`;
+ *     androidMain `AndroidMenu.android.kt:74-85` 的 `DropdownMenu` 逐字透传该 `modifier`;
+ *  3. 紧随其后的 `width(IntrinsicSize.Max)` 也 `enforceIncoming = true`
+ *     (`Intrinsic.kt:51` + `Intrinsic.kt:236-300 IntrinsicWidthNode`)⇒ 同样服从 48dp 上限。
+ *
+ * ⇒ 在 `DropdownMenu(modifier = ...)` 上单点设宽即可收窄**整个菜单**,
+ * 条目侧的 112dp 兜底被自动夹掉。这比逐条目 `Modifier.width(48.dp)` 少 4 处重复,
+ * 也不会出现"容器与条目两处宽度各自演化而失配"的隐患。
+ */
+private val COLUMN_MENU_WIDTH = 48.dp
+
 /** 下拉菜单里某一档列数的 testTag。 */
 fun columnTag(n: Int) = "column-$n"
-
-/**
- * 「当前生效那一档」的对勾图标 testTag。
- *
- * 之所以要给一个 `contentDescription = null` 的装饰性图标挂 tag:`DropdownMenuItem`
- * **不设** selected 语义(其内部只挂 `clickable`,已核实 `Menu.kt` 的
- * `DropdownMenuItemContent`),所以"高亮的是哪一档"在语义树里唯一的痕迹就是这个图标。
- * 若不给它挂 tag,「高亮错了档位」这类缺陷在离线测试里**无法被发现** ——
- * 只能靠真机肉眼看,而真机核对很贵。
- *
- * 查它时必须 `useUnmergedTree = true`:菜单项的 `clickable` 会合并子节点语义,
- * 而父节点自己已有 [columnTag],子节点的 tag 在合并树里会被父节点的同名属性压掉。
- */
-fun columnCheckTag(n: Int) = "column-check-$n"
 
 /** 集合选择按钮的 testTag。 */
 fun collectionTag(id: String) = "collection-$id"
@@ -626,9 +645,47 @@ private fun ModeToggle(mode: ViewMode, onChange: (ViewMode) -> Unit) {
  *
  * 只有数字,没有「自适应」项(用户裁决 6:「设置里没有自适应选项,而是计算出的
  * 自适应值就是默认的选项,排序页里点击图标展开下拉列表就高亮那个选项」)。
- * 当前生效那一档用 `leadingIcon` 打勾 —— `DropdownMenuItem` 的 `leadingIcon` 传 null
- * 时不占位,非 null 时左边留出图标槽(两态宽度不同,这是 M3 的既定布局,不是缺陷)。
  * 列表长度按屏幕方向取上限(竖屏 5 / 横屏 9),并把当前值临时并入,保证永远可见可选。
+ *
+ * ## 当前档位怎么"高亮"(2026-09-27 用户第二次订正)
+ *
+ * 第一版用 `leadingIcon` 打对勾。用户否掉了:「列数下拉要的效果是高亮而不是打勾」
+ * ⇒ 改为**整行背景填充**。
+ *
+ * 三个 M3 事实决定了只能这么写:
+ *  1. `DropdownMenuItem` **不设** selected 语义(`Menu.kt` 的 `DropdownMenuItemContent`
+ *     只挂 `clickable`),故 `selected` 必须自己补,否则读屏用户与离线断言都看不出选中项;
+ *  2. `MenuItemColors` **没有** selected 变体(只有 textColor / leadingIconColor /
+ *     trailingIconColor 及其 disabled 版),故"选中底色"不会由 `colors` 参数给出,
+ *     只能自己在 `modifier` 上填;
+ *  3. 填在 `modifier` 上是安全的:`DropdownMenuItemContent` 把调用方的 `modifier`
+ *     放在链首(`modifier.clickable(...).fillMaxWidth().sizeIn(...).padding(...)`),
+ *     所以背景铺满整行、连内部 12dp 横向内边距一起 —— 正是"高亮条"该有的样子;
+ *     而 `DropdownMenu` 的 `Column` 有 8dp 纵向内边距,首尾条目够不着圆角,
+ *     不必自己描圆角。
+ *
+ * 色角色取 M3 官方的菜单选中项配色(`tokens/MenuTokens.kt`):
+ * `ListItemSelectedContainerColor = secondaryContainer` +
+ * `ListItemSelectedLabelTextColor = onSecondaryContainer`。用官方角色而非硬编码,
+ * 既符合约束 7,也与仓内既有"选中"语义(FilterChip、底栏)同源。
+ *
+ * ## 菜单为什么只有 48dp(2026-09-27 用户第三次订正)
+ *
+ * 用户指出「列数下拉列表只显示个数字,选项却特别宽,不好看」,并裁决收窄到
+ * **48dp(与列数按钮同宽)**。根因不在本页代码:M3 的
+ * `DropdownMenuItemDefaultMinWidth = 112.dp`(`Menu.kt:527`,库内 `private val`,
+ * 外部无法下调)被 `DropdownMenuItemContent` 的
+ * `sizeIn(minWidth = DropdownMenuItemDefaultMinWidth, ...)` 兜住,
+ * 于是只有一位数字的条目也被撑成 112dp。
+ *
+ * 收窄的写法**只在 [COLUMN_MENU_WIDTH] 一处给宽**,不逐条目重复 `Modifier.width()`。
+ * 依据是该 `sizeIn` 的 `enforceIncoming = true`(`Size.kt:226-238`)⇒ 它服从**上游**
+ * 约束;而调用方的 `modifier` 正是上游 —— `DropdownMenuContent` 把它放在内层
+ * `Column` 链首(`Menu.kt:359-415`):
+ * `modifier.padding(vertical = 8.dp).width(IntrinsicSize.Max).verticalScroll(...)`,
+ * 链上紧随其后的 `width(IntrinsicSize.Max)` 同样 `enforceIncoming = true`
+ * (`Intrinsic.kt:51` + `Intrinsic.kt:174-205`)⇒ 也服从这个上限。
+ * 因此容器单点设宽即可收窄整个菜单,条目侧的 112dp 兜底会被自动夹掉。
  *
  * @param columns 当前**生效**的列数(页面已按"覆盖 > 设置默认 > 自适应"算好)。
  * @param onSelect 选中某一档时的回调;页面把它存为本次进入的临时覆盖。
@@ -675,33 +732,51 @@ private fun ColumnCountButton(columns: Int, onSelect: (Int) -> Unit) {
         DropdownMenu(
             expanded = expanded,
             onDismissRequest = { expanded = false },
-            modifier = Modifier.testTag(TAG_COLUMN_MENU),
+            // 宽度只在**这一处**给:容器上的固定宽会沿约束链压掉条目侧的 112dp 兜底,
+            // 故不必逐条目重复 `Modifier.width()`(依据见 [COLUMN_MENU_WIDTH] 的说明)。
+            modifier = Modifier
+                .testTag(TAG_COLUMN_MENU)
+                .width(COLUMN_MENU_WIDTH),
         ) {
             options.forEachIndexed { index, option ->
+                val isCurrent = option == columns
+                // 当前生效那一档 = 整行背景填充高亮(用户 2026-09-27 裁决定稿)。
+                // 背景填在 `modifier` 上是安全的:`DropdownMenuItemContent` 把调用方
+                // 的 modifier 放在链首,故会铺满整行(含内部 12dp 内边距);
+                // 首尾条目够不着圆角,不必自己描。
+                // 非当前档用 `Modifier`(而不是填透明色),免得白draw一层。
+                val highlight = if (isCurrent) {
+                    // 颜色用 M3 官方菜单选中项角色(MenuTokens.ListItemSelectedContainerColor)。
+                    Modifier.background(MaterialTheme.colorScheme.secondaryContainer)
+                } else {
+                    Modifier
+                }
                 DropdownMenuItem(
-                    text = { Text(text = option.toString()) },
+                    // 数字要**水平居中**:M3 把 text 槽位放在一个 `Box(Modifier.weight(1f))` 里
+                    // (`Menu.kt:461-479`),Box 默认把子项贴着起始边放,于是数字被行内的
+                    // 12dp `contentPadding` 顶到左边(真机实测 x=529 = 行左缘 487 + 42px/12dp)。
+                    // 槽位自身没有对齐参数可传 ⇒ 只能让 Text 铺满该槽位再用 `TextAlign.Center`
+                    // 把文字摆到槽位中线;槽位左右各有等宽内边距,故这也是整行的中线。
+                    text = {
+                        Text(
+                            text = option.toString(),
+                            modifier = Modifier.fillMaxWidth(),
+                            textAlign = TextAlign.Center,
+                        )
+                    },
                     onClick = {
                         expanded = false
                         onSelect(option)
                     },
-                    // 当前生效那一档打勾。`DropdownMenuItem` **不设** selected 语义
-                    // (已核实 `Menu.kt` 的 `DropdownMenuItemContent` 只挂 `clickable`),
-                    // 故高亮完全靠这个图标;测试也据此断言(见 SortPagePolishTest)。
-                    leadingIcon = if (option == columns) {
-                        {
-                            Icon(
-                                painter = painterResource(R.drawable.ic_check),
-                                contentDescription = null,
-                                tint = MaterialTheme.colorScheme.primary,
-                                modifier = Modifier.testTag(columnCheckTag(option)),
-                            )
-                        }
-                    } else {
-                        null
-                    },
                     modifier = Modifier
                         .testTag(columnTag(option))
-                        .semantics { contentDescription = optionCds[index] },
+                        .then(highlight)
+                        // M3 的 DropdownMenuItem 不设 selected 语义,只能自己补:
+                        // 读屏用户与离线断言都靠它认出"当前是哪一档"。
+                        .semantics {
+                            selected = isCurrent
+                            contentDescription = optionCds[index]
+                        },
                 )
             }
         }

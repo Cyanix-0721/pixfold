@@ -2502,6 +2502,112 @@ LazyList 实为按 **key** 解析 `updateScrollPositionIfTheFirstItemWasMoved`,�
 
 **已提交** `f6dfaa9`(24 files,+1440/−168,**直接提交到 `dev`、无独立分支、未推送**)。
 
+### ✅ 列数控件第三轮（下拉「当前档位」整行背景填充 + 行宽收窄 48dp + 数字居中）—— 2026-09-27 已修,真机核对通过
+
+**起因**:`User said (m22963)`(逐字)「列数下拉要的效果是高亮而不是打勾」。
+**根因**(第二轮真机读数可证):`DropdownMenuItem` 的 `leadingIcon` 传 `null` 时不占位、非 `null` 时左侧让出图标槽
+⇒ **两态宽度不同**(第二轮实测:当前档数字 `x=655`、其余档 `x=529`,偏移 126px = 36dp)。
+宽度不一致正是「不像高亮」的观感来源 —— **对勾只是高亮的一种实现方式,不是高亮本身**。
+
+**形态裁决**:`ask_user_question` 给四选项(仅文字色 / **背景填充色** / 边框 / 左侧色条),
+用户选 (m23013)(逐字选项标签)**「2背景填充色」** ⇒ **整行背景填充**。
+
+**material3 1.4.0 源码级依据**(一手,解包自 `pixfold-d1/app/build/m3src/`):
+
+- `Menu.kt:419 DropdownMenuItemContent(...)` 的调用方 `modifier` **在链首** ——
+  `modifier.clickable(...).fillMaxWidth().sizeIn(minWidth = DropdownMenuItemDefaultMinWidth, maxWidth = DropdownMenuItemDefaultMaxWidth, minHeight = MenuListItemContainerHeight).padding(contentPadding)`
+  ⇒ `.background()` **铺满整行**(含内部 12dp 横向内边距)。
+- `Menu.kt:274-290 MenuItemColors(textColor, leadingIconColor, trailingIconColor, disabled*)` ——
+  **没有 selected 变体** ⇒ 选中底色**不会**由 `colors` 给出,只能在 `modifier` 上自己填。
+- `Menu.kt` / `AndroidMenu.android.kt` 内 `selected`/`selectable`/`toggleable` 语义 **grep 零命中**
+  ⇒ 测试读不到 `isSelected`,`selected` 语义必须自己显式设置。
+- `Menu.kt:524-528`:`MenuListItemContainerHeight = 48.dp`、`DropdownMenuItemHorizontalPadding = 12.dp`、
+  `DropdownMenuItemDefaultMinWidth = 112.dp`、`DropdownMenuItemDefaultMaxWidth = 280.dp`;`Menu.kt:526 DropdownMenuVerticalPadding = 8.dp`。
+- 外层 `Surface` 已 `clip` 圆角(`Surface.kt:475`)+ 内层 `Column` 有 8dp 纵向内边距 ⇒ 首尾条目够不着圆角
+  ⇒ **`.background()` 只填矩形即可,刻意不写 `clip`**。
+- 官方选中项配色(`tokens/MenuTokens.kt`):**`ListItemSelectedContainerColor = SecondaryContainer`**、
+  `ListItemSelectedLabelTextColor = OnSecondaryContainer`、`ListItemSelectedLeadingTrailingIconColor = OnSecondaryContainer`。
+- **配色角色回源**:`ColorSchemes.kt:97 secondaryContainer = role(secondaryContainer)`;
+  `ColorSchemes.kt:150-200 withPureBlack()` 只压 `background/surface/surfaceBright/surfaceDim/surfaceContainerLowest/Low/Container/High/Highest`
+  与 `surfaceVariant`,但**不动 `secondaryContainer`** ⇒ 纯黑(OLED)模式下选中填充仍可见。
+
+**实现**(唯一生产文件 `pixfold-d1/app/src/main/kotlin/com/pixfold/d1/ui/workflowa/SortAndPreviewPage.kt`):
+
+```kotlin
+options.forEachIndexed { index, option ->
+    val isCurrent = option == columns
+    val highlight = if (isCurrent) {
+        Modifier.background(MaterialTheme.colorScheme.secondaryContainer)
+    } else {
+        Modifier
+    }
+    DropdownMenuItem(
+        text = { Text(text = option.toString()) },
+        onClick = { expanded = false; onSelect(option) },
+        modifier = Modifier
+            .testTag(columnTag(option))
+            .then(highlight)
+            .semantics { selected = isCurrent; contentDescription = optionCds[index] },
+    )
+}
+```
+
+- **删** `fun columnCheckTag(n: Int) = "column-check-$n"` 及其 13 行 KDoc;**整块删** `leadingIcon`。
+- **删** `app/src/main/res/drawable/ic_check.xml`(删前全仓仅 `SortAndPreviewPage.kt:679` 一处引用)——
+  不清会被 lint `UnusedResources`(生效 + `warningsAsErrors = true`)硬失败。
+- 非选中档用 `Modifier`(而非 `Color.Unspecified`)⇒ 不白画一层;随之 `androidx.compose.ui.graphics.Color` 成为
+  **未用 import**,已删(同上 lint 硬失败)。
+- `SemanticsProperties.Selected` 是**全仓首次使用**;仓内 `selected = ...` **参数**用法本已遍布
+  (`IssueFilterRow.kt:55/63`、`SortAndPreviewPage.kt:281/583`、`SettingsScreen.kt:546` 等),但那是组件参数,不是语义属性。
+- 第二轮的九条裁决与实现(纯图标 / 档位 2–5 / 去掉「自适应」项 / 竖横屏两个默认列数设置 /
+  `ADAPTIVE_COLUMN_MIN_WIDTH` 110→80dp 使 361dp = 4 列 / 超范围值并入 / 临时覆盖)**全部保持不变**。
+
+**离线闸门(五轮修订合并后终值)**:`:app:testDebugUnitTest` 42 files / **399 tests** / 0 failed / 0 skipped(较第二轮 395 **+4**);
+`:domain:test` 20 files / **247 tests** / 0/0/0;APK **33,368,725 B**;lint **`0 errors, 0 warnings, 4 hints`**。
+**变异全捕获**:高亮轮 M0–M6、宽度轮 M1–M4、居中轮 M5–M8 —— 其中居中轮的 **M8 专门证明居中几何断言非空洞**(把 `Text` 包进 `Box(contentAlignment = CenterStart)`、两个源码 token 留在原位 ⇒ 结构断言必绿,而几何断言确实红并给出「行中线=24.0, 数字节点中线=13.0」)。
+⚠️ 其中 **M1(删 `.then(highlight)`)** 先暴露了一个真实断言空洞:`selected` 语义与背景填充**分属两条 `.` 链**,
+只删背景填充时 `isHighlighted()` 仍全绿而用户看得见的底色已消失 ⇒ 守卫测试因此加了 `.then(highlight)` 断言后才杀死。
+
+⚠️ **这条 error 已在本轮内闭环**:首跑 `:app:lintDebug` 曾报 1 条 error,逐字为
+`gradle-wrapper.properties:3: Error: A newer version of Gradle than 9.7.1 is available: 9.8.0 [AndroidGradlePluginVersion]` ——
+属**工具链环境漂移**,与本轮改动无关(对报告 `grep -c -E 'SortAndPreviewPage|SortPagePolishTest|ic_check'` ⇒ **0 命中**)。
+**用户裁决 `lint_drift_policy`(逐字选项标签)=「A:升级 Gradle wrapper 到 9.8.0,单独一轮处理」**
+⇒ **2026-09-27 同日并入本轮落地**:改 `gradle-wrapper.properties` 第 3 行 `distributionUrl` → 重跑四道闸门
+⇒ lint 转 **`0 errors, 0 warnings, 4 hints`**、APK **33,368,725 B** 逐字节同尺寸,详见 §12.6 表格末行。
+`app/build.gradle.kts:52-73` 的豁免清单**未动**(那段注释明写三项检查是**刻意重新启用**的)。
+
+**真机核对**(2026-09-27 通过,用户单独授权,PJX110 / Android 16 / 361dp×794dp):7 项全过,核心读数 ——
+菜单四行**左边缘全 `x=487`、右边缘全 `x=879`(宽 392px)**、数字**全在 `x=529..558`** ⇒
+对比第二轮的 `x=655` vs `x=529`,**36dp 宽度差已消除**;像素采样第 4 行(当前档)y=1540 四处全 `(80,52,55)`、
+第 2/3/5 行全 `(0,0,0)` ⇒ **仅当前档整行填充**;选 2 列后填充**随选择转移**、卡片宽 274px → **576px = 164.6dp**;
+长按提示 `x=499..641`/`y=826..909` 与第二轮**逐字相同**;临时覆盖**不**持久化;设置页两行仍 `跟随自适应（4）`/`（9）`。
+
+⚠️ **本轮新增操作教训**:`input draganddrop X Y X Y`(起止同点)在本机被判定为**点击**而非长按
+⇒ 会重新打开下拉菜单(第二轮回写的「`input draganddrop` 可以触发长按」**因此不完全成立**);
+正解 = 用**显式运动事件** `input motionevent DOWN/UP`,并把动作与取证串进设备侧**同一条** `adb shell`
+(瞬态提示 1.5s 后消失)。另:**`uiautomator dump` 不映射 tooltip**(提示不是可访问节点)⇒ 提示只能靠**像素**取证。
+
+**同日又走两轮修订**(用户逐字追加,均已真机核对):
+
+- **第四轮:下拉菜单过宽**(`User said (m23557)`「列数下拉列表只显示个数字，选项却特别宽，不好看」)
+  ⇒ 收窄到 **48dp**(`ask_user_question` 选「改成 48dp(与列数按钮同宽)」)。
+  同回合 `User said (m23631)` 要求「更优雅的写法」⇒ 宽度**只给在容器一处**
+  `DropdownMenu(modifier = Modifier.testTag(TAG_COLUMN_MENU).width(COLUMN_MENU_WIDTH))`,**条目侧一字不改**。
+  **源码依据**:`Menu.kt:419` 条目侧 `sizeIn(minWidth = DropdownMenuItemDefaultMinWidth = 112.dp, …)` 默认
+  `enforceIncoming = true` ⇒ 会被上游固定宽夹住;`Menu.kt:359-415` 内层 `width(IntrinsicSize.Max)` 同样
+  `enforceIncoming = true`(`Intrinsic.kt:51`);调用方 `modifier` 又在链首 ⇒ **单点设宽即可压掉 112dp 兜底**。
+  真机读数:四行**全 `[487,…][655,…]`、w=168px = 48.0dp**(上一轮为 392px = 112.0dp)。
+- **第五轮:数字不居中**(`User said (m23942)` 逐字「数字没有居中显示」)
+  ⇒ M3 把 text 槽位放在 `Box(Modifier.weight(1f))` 里(`Menu.kt:461-479`),Box 默认把子项贴起始边放,
+  数字被行内 12dp `contentPadding` 顶到左边(真机实测 x=529 = 行左缘 487 + 42px/12dp);
+  槽位自身没有对齐参数可传 ⇒ 只能让 `Text` **铺满槽位**再 `textAlign = TextAlign.Center`。
+  真机**像素**取证(节点框 ≠ 字形):四个数字**墨迹**中线 vs 行中线偏差 **≤ 0.5px = 0.14dp**,
+  墨迹 x=559..582(宽 24px)远在 48dp 行内 ⇒ **居中且未被截断**。
+
+详见 `docs/notes/d1-ui-friction-inventory.md` §16c。
+
+**已提交** `TODO_COMMIT`。
+
 ### D2：平台能力验证
 
 **目标**:优先 Android SAF。重点验证最容易推翻技术选型的能力,不先做完整业务。
@@ -3045,13 +3151,14 @@ mise ls                  # 看 mise 管的工具版本
 | --- | --- |
 | Git / VS Code / Android Studio | 2.55.0.windows.5 / 1.138.0 / 2026.1.4.7 |
 | JDK | temurin-17.0.20+101(mise;Android/Gradle 构建所需);另有 Studio 内置 **JBR 25.0.3** 可用(完整 JDK) |
-| Gradle / AGP / Kotlin / Compose BOM | **9.7.1 / 9.4.1 / 2.4.20 / 2026.09.00** —— **2026-09-20 主动升级到当时最新 stable**(用户决策:"尽量都用新的稳定版本",考虑后期维护)。原值 9.6.0 / 9.4.0 / 2.2.10 / 2026.02.01 来自 Studio 2026.1.4 模板。**升级动因**:引入 AboutLibraries 15.2.0 需 Kotlin ≥ 2.4.10。**升级经探针实测**(临时分支验证后弃用):编译通过 + **既有 461 项测试全绿** + assembleDebug + lint 零告警。证据见 `docs/notes/d1-toolchain-evidence.md` §8 |
+| Gradle / AGP / Kotlin / Compose BOM | **9.8.0 / 9.4.1 / 2.4.20 / 2026.09.00** —— **2026-09-20 主动升级到当时最新 stable**(用户决策:"尽量都用新的稳定版本",考虑后期维护)。原值 9.6.0 / 9.4.0 / 2.2.10 / 2026.02.01 来自 Studio 2026.1.4 模板。**升级动因**:引入 AboutLibraries 15.2.0 需 Kotlin ≥ 2.4.10。**升级经探针实测**(临时分支验证后弃用):编译通过 + **既有 461 项测试全绿** + assembleDebug + lint 零告警。证据见 `docs/notes/d1-toolchain-evidence.md` §8 |
 | compileSdk / minSdk / targetSdk | **37** / **34** / **36** —— `compileSdk` 于 2026-09-20 由 36 升到 37 (新依赖链 AboutLibraries → Compose 1.12.1 要求;`platforms;android-37.0` 本机已装)。**`targetSdk` 仍锁 36**(与真机 Android 16 对齐,§12.6 策略不变)—— 二者分离:`compileSdk` 只决定"用哪个 SDK 编译",`targetSdk` 决定运行时行为契约。故 `OldTargetApi` 的 lint 豁免理由继续成立。**`minSdk` 于 2026-09-25 由 30 再提到 34**(见下一行) |
 | minSdk 由 24 提到 **30** | **2026-09-22 用户裁决**。起因:用户问"为什么要做 API 24/25 回退,我的安卓手机最低安卓 16"。**功能面实测**(查 `android-36/data/api-versions.xml` 类级 `since`):roadmap 所需 API 在 minSdk=30 已全部到手 —— `java/nio/file/Files`=26(D2a 归档)、`android/graphics/ImageDecoder`=28(D3/D4 解码)、`android/app/NotificationChannel`=26(D4 进度通知);`LocaleManager`=33 未到手但**已有 `Build.VERSION` 分支**(`Theme.kt:48`、`PixFoldApp.kt:192`);`ZipOutputStream`/`ZipFile`/`ZipEntry` 全部 since=1、SAF `DocumentsContract`=19 ⇒ **CBZ 打包与 SAF 在任意 minSdk 都可行**。**依赖面实测**:activity-compose 1.13.0→23、material3/material3-ripple/navigation-compose 2.10.2→24、material-color-utilities→21、aboutlibraries-compose/-m3→21 ⇒ **无任何依赖阻止 minSdk=30**。**连带改动**:①`mipmap-anydpi-v26/` 必须删、三层 `<adaptive-icon>` 移入 `mipmap-anydpi/`(否则 lint 报 `UnnecessaryQualifier` 而本项目 `warningsAsErrors=true` 直接失败);②原先给 API 24/25 兜底的 48dp 普通 vector 回退档及其源码结构用例**一并删除**。**Java 工具链不动**(`JavaVersion.VERSION_17` + `:domain` 的 `jvmToolchain(17)`)。**已否决的 minSdk=36**:虽可删尽三处版本分支并与真机完全对齐,但 Robolectric 的 SDK 36 sandbox 硬性要求 **Java 21**(逐字 `Failed to create a Robolectric sandbox: Android SDK 36 requires Java 21 (have Java 17)`),且 29 个测试文件的 `@Config(sdk=[34])` 需全部改 `[36]`,代价不成比例。**连带现象(非缺陷)**:minSdk≥28 时 AGP **故意不压缩 dex**,debug APK 由 13 MB 变为 33 MB —— AGP 的 `DexPackaging` DSL 源码逐字「If null, dex files will be uncompressed when minSdk >= 28」,用意是 ART 可直接 mmap 加载、省安装期解压。逐档实测 26→13,040,830 B(全 DEFLATED)、28/29/30→33.2 MB(全 STORED);加 `packaging { dex { useLegacyPackaging = true } }` 可回到 13,007,710 B,但**用户裁决保持默认**。详见 `docs/notes/d1-toolchain-evidence.md` §9.7 |
 | minSdk 由 30 提到 **34** | **2026-09-25 用户裁决**(用户问「minSDK34有什么新的功能可以用吗要不直接切34」)。**起因**:`docs/notes/d1-toolchain-evidence.md:292` 记录应用内语言依赖 `LocaleManager`/`LocaleConfig`(API 33+),minSdk=30 时需要 `Build.VERSION` 分支兜底。**33 与 34 的代码清理成本完全相同** —— 两者都要求删掉同一批 3 处 `ObsoleteSdkInt` 守卫:`AndroidManifest.xml` 的 `tools:targetApi="33"`、`PixFoldApp.kt` 的 `SDK_INT < TIRAMISU`、`Theme.kt` 的 `SDK_INT >= S`。⇒ 既然成本一样,取 34 可额外拿到 **HDR gainmap**(`android/graphics/Gainmap`、`Bitmap.getGainmap()/hasGainmap()/setGainmap()`),供 D3/D4 图片管线用。**连带删除**:`AndroidManifest.xml` 的 `xmlns:tools` 与 `tools:targetApi`、`PixFoldApp.kt` 的 `import android.os.Build` + 版本守卫、`Theme.kt` 的 `import android.os.Build` + 版本守卫(`settings.monetEnabled && Build.VERSION.SDK_INT >= S` → `if (settings.monetEnabled)`)。⚠️ **纠正一处早先的错判**:上一行里"29 个测试文件的 `@Config(sdk=[34])` 必须全改 `[36]`"是 **minSdk=36 的代价**;minSdk=34 与测试用的 `@Config(sdk=[34])` **完全一致,零测试改动**(实测 `app` 292 / `domain` 229 全绿、无一条用例需改)。**未受影响**:`compileSdk=37`/`targetSdk=36`/Java 17 全部不动。**最小真机验证**:APK 由 33,549,783 B → **33,046,763 B**(−503,020 B,dex 压缩策略随 minSdk 档位变化)。详见 `docs/notes/d1-toolchain-evidence.md` §9(以 30→34 为准) |
 | **16 KB 页大小支持** | ✅ **已达标,零配置**(2026-09-24 核查)。权威判定 = SDK 自带 `zipalign -c -P 16 -v 4 app-debug.apk` → `Verification successful`、`exit=0`,4 条 `lib/**/*.so` 偏移 `% 16384` 全为 **0**;**ELF 侧** `readelf -lW` 的 3 个 `LOAD` 段 `Align` 全为 **`0x4000`**;4 条 `.so` 在 APK 内均 **STORED 未压缩**(对齐的前提)。**未做任何配置** —— AGP ≥ 8.5.1 会自动做(官方逐字「align them on a 16 KB zip-aligned boundary」),本项目 AGP **9.4.1** 远高于门槛;`gradle.properties` 与 `app/build.gradle.kts` 内**无** `packaging`/`useLegacyPackaging`/`alignment` 任何配置(已 grep 确认)。**唯一 `.so` 来源** = 传递依赖 `androidx.graphics:graphics-path:1.0.1`(经 `androidx.compose.ui:ui-graphics-android:1.12.1`),本项目**无** `jniLibs/`、**无** `externalNativeBuild`/`ndkVersion`/`cmake`。⚠️ **教训**:按 ZIP 结构自算 data 偏移会得出**错误结论**(arm64-v8a 自算 `% 16384 = 1536` 看似未对齐),因为没计入 AGP 注入的 alignment extra field ⇒ **对齐判定只认 `zipalign -c -P 16`**。Play 对该项的强制要求(2025-11-01 起)**不适用**(本项目不上架,`HANGOFF.md:1719`),但零成本达标,如实登记。详见 `docs/notes/d1-toolchain-evidence.md` §10 |
 | Android platform | `platforms;android-36`(**已装**,与真机 Android 16 对齐);`android-37.0` 也在(模板默认带的) |
 | Android SDK 根 | `C:\Users\Administrator\AppData\Local\Android\Sdk` |
+| ✅ **已完成:Gradle wrapper 9.7.1 → 9.8.0**(2026-09-27 同日落地) | **2026-09-27 用户裁决立项**(`ask_user_question` 选项「A:升级 Gradle wrapper 到 9.8.0,单独一轮处理」)。**起因**:`:app:lintDebug` 报出 `gradle-wrapper.properties:3: Error: A newer version of Gradle than 9.7.1 is available: 9.8.0 [AndroidGradlePluginVersion]` —— 该检查是 2026-09-20 工具链收紧时**刻意重新启用**的三项之一(见 `app/build.gradle.kts:52-73` 注释),上游一发新版就必然翻红。**未在本轮处置**:该 error 对当轮改动 **0 命中**(`grep -c -E 'SortAndPreviewPage\|SortPagePolishTest\|ic_check'` 报告 = 0),属纯环境噪声;用户裁决留作单独一轮。**升级前须先取的一手结论**:① **AGP 9.4.1 × Gradle 9.8.0 兼容性未获一手证据**(`web_fetch` 取 Gradle 兼容矩阵页被截断,不得按印象判定);② 已从 AGP jar 抽出的一手事实是 **AGP 只设下限、无上限** —— `com/android/build/gradle/internal/plugins/VersionCheckPlugin.class` 内字符串为 `GRADLE_MIN_VERSION` / `Minimum supported Gradle version is ` / ` Current version is ` / `9.6.0` / `VERSION_CHECK_OVERRIDE_PROPERTY` / `isGradleWrapperTaskRunning` / `gradle/wrapper/gradle-wrapper.properties`,⇒ 9.8.0 在允许区间内但仍需实测。**升级步骤**:改 `pixfold-d1/gradle/wrapper/gradle-wrapper.properties` 第 3 行 `distributionUrl` → 重跑四道闸门 → 若 lint 转绿则同时评估能否**再收紧**豁免清单(`warningsAsErrors = true` 要求清单尽可能小)。**已下载的 wrapper 发行版**:`C:\Users\Administrator\.gradle\wrapper\dists\` 现只有 `gradle-9.6.0-bin`、`gradle-9.7.1-bin`(`9.8.0` **未下载**)。**2026-09-27 完成**:改 `pixfold-d1/gradle/wrapper/gradle-wrapper.properties` 第 3 行 `distributionUrl` 为 `gradle-9.8.0-bin.zip`(旧文件留档 `pixfold-d1/artifacts/gradle-wrapper.properties.bak`),重跑四道闸门 ⇒ **全绿**:`BUILD SUCCESSFUL`、`:app:testDebugUnitTest` 42 files / 399 tests / 0 failed、`:domain:test` 20 files / 247 tests / 0/0/0、**lint 由 1 error 转 `0 errors, 0 warnings, 4 hints`**(prev 的 `AndroidGradlePluginVersion` error 消失)、APK **33,368,725 B**(与升级前逐字节同尺寸)。结论:AGP 9.4.1 与 Gradle 9.8.0 兼容,实测通过;豁免清单 `app/build.gradle.kts:52-73` 本轮**未动**。 |
 
 ### 12.7 验证工程归档(2026-09-13)
 

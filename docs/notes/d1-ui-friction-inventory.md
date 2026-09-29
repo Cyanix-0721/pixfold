@@ -780,7 +780,7 @@ md 里另有 3 处 `ThumbCard` 引用（`HANGOFF.md:2785`、`docs/notes/d1-archi
 | **P1** | 14 | 拖拽**无法跨视口** —— 30 张图时从第 1 张拖到第 30 张**物理上不可能** | **功能性缺陷（目标不可达）** | **✅ 2026-09-25 已修**（真机核对 2026-09-26 通过） |
 | **P1** | 15 | 预览**取错图**（声明序 vs 页序）+ 预览往返**丢失所选集合** + 预览页缺改名入口 | **功能性缺陷（显示的不是点的那张）** | **✅ 2026-09-26 已修**（真机 5 项核对通过） |
 | **P3** | 6/7 | 容器重复；MetadataPage **754 行** | 结构性；**规模结论已给**（领域成本个位数 ms，见 §7，无需分页） |
-| **P1** | 16 | 五项交互修订（排序页滚动 / 图钉尺寸 / 去对勾 / 芯片文案 / 列数控件），**其中 ⑤ 列数控件同日走第二轮修订** | 一致性 / 可用性 | **✅ 2026-09-27 已修**（真机核对通过；第二轮见 §16b） |
+| **P1** | 16 | 五项交互修订（排序页滚动 / 图钉尺寸 / 去对勾 / 芯片文案 / 列数控件），**其中 ⑤ 列数控件同日连走第二、三、四、五轮修订** | 一致性 / 可用性 | **✅ 2026-09-27 已修**（真机核对通过；第二轮见 §16b；第三轮「高亮改为整行背景填充」、第四轮「菜单收窄 48dp」、第五轮「数字居中」见 §16c） |
 
 **建议顺序**：~~**P0 先做**~~（**✅ 2026-09-24 已完成**），
 ~~再 P1（固定终局动作）~~（**✅ 2026-09-25 已完成**）；~~长列表筛选~~（**✅ 2026-09-26 已完成**，见 §3），
@@ -789,7 +789,10 @@ P2/P3 视情况。第 2 项修复**真机核对已通过**（2026-09-25，与 §
 **第 15 节（2026-09-26）**离线全绿：`app 352` / `domain 247` + lint 零告警 + **16 组变异全捕获**，
 真机 5 项逐条读数见 §15.8。
 **第 16 节（2026-09-27）**离线全绿：`app 395` / `domain 247` + lint 零告警 + **16 组变异全捕获**，
-真机 9 项逐条读数见 §16.7；**同节 ⑤ 列数控件于同日走第二轮修订**（纯图标下拉 + 竖/横屏默认列数设置），见 §16b。
+真机 9 项逐条读数见 §16.7；**同节 ⑤ 列数控件于同日连走第二轮修订**（纯图标下拉 + 竖/横屏默认列数设置，见 §16b）**与第三轮修订**（下拉当前档由对勾改为整行背景填充，见 §16c）。
+**第 16c 节（2026-09-27）**离线：`app 399` / `domain 247` + lint **`0 errors, 0 warnings, 4 hints`** + **15 组变异全捕获**（M0–M6 高亮轮、M1–M4 宽度轮、M5–M8 居中轮；其中高亮轮 M1 与居中轮 M8 分别证实并堵上了两个真实断言空洞），
+真机 7 项逐条读数见 §16c.6；⚠️ 本轮 `:app:lintDebug` 的 1 条 error 属**工具链环境漂移**（Gradle 9.8.0 上游发布，报告对本轮改动 0 命中），
+经用户裁决**升级到 Gradle 9.8.0**，已于**同日并入本轮落地**（lint 由 1 error 转全绿），详见 §16c.7。
 
 > **流程约定**：以上均为**设计变更**（动页面结构），需先出设计方案交用户确认，
 > 再进入实现；实现后按「修复自证三层」（领域单测 → UI 断言 → 真机实证）交付。
@@ -1621,6 +1624,195 @@ adb shell "input draganddrop 571 1008 571 1008 700; screencap -p /data/local/tmp
 
 ---
 
+## 16c. ✅ P1 续：列数控件第三轮（下拉「当前档位」**整行背景填充** + 行宽收窄 **48dp** + 数字**居中**）—— 2026-09-27 已修，真机核对通过（7 项 + 后续两轮各 1 项）
+
+### 16c.1 起因与用户裁决
+
+- `User said (m22963)`（逐字）：「列数下拉要的效果是高亮而不是打勾」。
+- **根因**（第二轮真机读数可证）：`DropdownMenuItem` 的 `leadingIcon` 传 `null` 时不占位、非 `null` 时左侧让出图标槽 ⇒ **两态宽度不同**。第二轮实测：当前档位数字被对勾挤到 `x=655`，其余档位在 `x=529`（偏移 126px = 36dp）。宽度不一致正是「不像高亮」的观感来源 —— **对勾只是高亮的一种实现方式，不是高亮本身**。
+- **形态裁决**：`ask_user_question` 给四选项（仅文字色 / **背景填充色** / 边框 / 左侧色条），用户选 (m23013)（逐字选项标签）**「2背景填充色」** ⇒ **整行背景填充**。
+
+### 16c.2 material3 1.4.0 源码级依据（一手，解包自 `pixfold-d1/app/build/m3src/`）
+
+| 事实 | 源码位置 / 原文 |
+| --- | --- |
+| 调用方 `modifier` **在链首** ⇒ `.background()` 铺满整行（含内部 12dp 横向内边距） | `commonMain/androidx/compose/material3/Menu.kt:419` `DropdownMenuItemContent(...)`：`modifier.clickable(...).fillMaxWidth().sizeIn(minWidth = DropdownMenuItemDefaultMinWidth, maxWidth = DropdownMenuItemDefaultMaxWidth, minHeight = MenuListItemContainerHeight).padding(contentPadding)` |
+| `MenuItemColors` **没有 selected 变体**（只有 textColor / leadingIconColor / trailingIconColor 及各自 disabled 版） | `Menu.kt:274-290` ⇒ 选中底色**不会**由 `colors` 给出，只能在 `modifier` 上自己填 |
+| `Menu.kt` / `AndroidMenu.android.kt` 内 `selected` / `selectable` / `toggleable` 语义 **grep 零命中** | ⇒ 测试读不到 `isSelected`，`selected` 语义必须自己显式设置 |
+| 尺寸 token | `Menu.kt:524-528`：`MenuListItemContainerHeight = 48.dp`、`DropdownMenuItemHorizontalPadding = 12.dp`、`DropdownMenuItemDefaultMinWidth = 112.dp`、`DropdownMenuItemDefaultMaxWidth = 280.dp`；`Menu.kt:526 DropdownMenuVerticalPadding = 8.dp` |
+| 外层 `Surface` 已 `clip` 圆角 + 内层 `Column` 有 8dp 纵向内边距 ⇒ 首尾条目够不着圆角 | `Surface.kt:475` `clip(shape)`；⇒ **`.background()` 只填矩形即可，刻意不写 `clip`** |
+| 官方选中项配色 | `tokens/MenuTokens.kt`：**`ListItemSelectedContainerColor = SecondaryContainer`**、`ListItemSelectedLabelTextColor = OnSecondaryContainer`、`ListItemSelectedLeadingTrailingIconColor = OnSecondaryContainer`；容器 `ContainerColor = SurfaceContainer`、`ContainerShape = CornerExtraSmall` |
+| 菜单渲染在 `Popup` 里 | `androidMain/androidx/compose/material3/AndroidMenu.android.kt:69-86` |
+
+**配色角色回源**：`pixfold-d1/app/src/main/kotlin/com/pixfold/d1/ui/theme/ColorSchemes.kt:97 secondaryContainer = role(secondaryContainer)`；`ColorSchemes.kt:150-200 fun ColorScheme.withPureBlack()` 只把 `background/surface/surfaceBright/surfaceDim/surfaceContainerLowest/Low/Container/High/Highest` 压成 `Color.Black`、`surfaceVariant = Color(0xFF1A1A1A)`，**不动 `secondaryContainer`** ⇒ 纯黑（OLED）模式下选中填充仍可见。
+
+### 16c.3 实现（唯一生产文件 `pixfold-d1/app/src/main/kotlin/com/pixfold/d1/ui/workflowa/SortAndPreviewPage.kt`）
+
+```kotlin
+options.forEachIndexed { index, option ->
+    val isCurrent = option == columns
+    val highlight = if (isCurrent) {
+        Modifier.background(MaterialTheme.colorScheme.secondaryContainer)
+    } else {
+        Modifier
+    }
+    DropdownMenuItem(
+        text = { Text(text = option.toString()) },
+        onClick = { expanded = false; onSelect(option) },
+        modifier = Modifier
+            .testTag(columnTag(option))
+            .then(highlight)
+            .semantics { selected = isCurrent; contentDescription = optionCds[index] },
+    )
+}
+```
+
+- **删** `fun columnCheckTag(n: Int) = "column-check-$n"` 及其 13 行 KDoc；**整块删** `leadingIcon`。
+- **删** `pixfold-d1/app/src/main/res/drawable/ic_check.xml`（删前全仓仅 `SortAndPreviewPage.kt:679` 一处引用）—— 不清会被 lint `UnusedResources`（生效 + `warningsAsErrors = true`）硬失败。
+- 非选中档用 `Modifier`（而非 `Color.Unspecified`）⇒ 不白画一层；随之 `androidx.compose.ui.graphics.Color` 成为**未用 import**，已删（同上 lint 硬失败）。
+- `SemanticsProperties.Selected` 是**全仓首次使用**（grep 零先例）；仓内 `selected = ...` **参数**用法本已遍布（`IssueFilterRow.kt:55/63`、`SortAndPreviewPage.kt:281/583`、`SettingsScreen.kt:546` 等），但那是组件参数，不是语义属性。
+
+### 16c.4 断言（`pixfold-d1/app/src/test/kotlin/com/pixfold/d1/ui/workflowa/SortPagePolishTest.kt`）
+
+- `hasChecked(n)`（读 `columnCheckTag` + `useUnmergedTree = true`）⇒ **`isHighlighted(n)`**：`rule.onAllNodesWithTag(columnTag(n), useUnmergedTree = true).fetchSemanticsNodes().firstOrNull()?.config ?: return false`，再判 `config.contains(SemanticsProperties.Selected) && config[SemanticsProperties.Selected]`（用 `firstOrNull` 使**否定断言**也能取到 `false`）。
+- 两处测试改名：`..._checks_the_current_one` ⇒ `..._highlights_the_current_one`；`..._moves_the_check` ⇒ `..._moves_the_highlight`。
+- **新增源码结构守卫** `current_column_is_highlighted_by_a_background_fill_not_a_checkmark()` —— **7 条**断言：`.background(`、`secondaryContainer`、`option == columns`、`if (isCurrent)`、`.then(highlight)`、`!leadingIcon`、`!ic_check`。
+  - **为什么要断言到「接线」**：`selected` 语义与背景填充**分属两条 `.` 链** ⇒ 只删 `.then(highlight)` 时 `isHighlighted()` 仍全绿而用户看得见的底色已消失。**这条空洞在随后的变异 M1 中被实测证实**（见 16c.5）。
+  - **为什么又是结构断言而非像素断言**：底色是**绘制**产物，而条目渲染在 `Popup` 里，Robolectric 下 `onRoot().captureToImage()` 能否截到 Popup 内容**未经证实**，拿它当断言前提是埋雷。**底色本身已由真机像素读数钉住**（见 16c.6 ③）。
+
+### 16c.5 变异验证（M0–M6 全杀，还原逐字节一致）
+
+| 变异 | 内容 | 结果 |
+| --- | --- | --- |
+| M0 | 基线不改 | 全绿 ✓ 42 files / 396 tests / 0 failed |
+| M1 | 删 `\n                        .then(highlight)` | **杀死 ✓ 1 条失败**（若不设 `.then(highlight)` 断言则**存活** ⇒ 证实 16c.4 的空洞） |
+| M2 | `val isCurrent = option == columns` ⇒ `= true` | 杀死 ✓ 3 条失败 |
+| M3 | `val highlight = if (isCurrent) {` ⇒ `if (false) {` | 杀死 ✓ 1 条失败 |
+| M4 | `secondaryContainer` ⇒ `primaryContainer` | 杀死 ✓ 1 条失败 |
+| M5 | `selected = isCurrent` ⇒ `selected = false` | 杀死 ✓ 3 条失败 |
+| M6 | 加回 `leadingIcon = { Icon(painterResource(R.drawable.ic_view_column), contentDescription = null) },` | 杀死 ✓ 1 条失败 |
+
+脚本 `pixfold-d1/artifacts/mutate_round3.py`（gitignored）；**还原一律用 `cp` 备份 + 内存副本，绝不用 `git checkout --`**；还原校验打印「还原校验：OK（逐字节相同）」。
+
+### 16c.6 真机核对（2026-09-27 通过，用户单独授权，PJX110 / Android 16 / 1264×2780px / 560dpi = 361dp×794dp，locale zh-CN）
+
+| # | 核对项 | 实测读数 |
+| --- | --- | --- |
+| ① | 首页入口 | `PixFold` `[56,217][379,343]`；设置 `[1040,196][1208,364]`；工作流 A `[56,406][1208,630]` ✅ |
+| ② | 361dp 自适应 = 4 列 | 列数按钮 `content-desc='4 列'`、`text=''` `[487,924][655,1092]`；网格四列 `001` `[42,1306][316,1678]`、`002` `[344,…]`、`003` `[646,…]`、`004` `[948,…]` ⇒ 卡片宽 **274px = 78.3dp** ✅ |
+| ③ | **两态等宽（本轮核心）** | 四个菜单行**左边缘全 `x=487`、右边缘全 `x=879`（宽 392px）**，数字**全在 `x=529..558`**：`2 列` `[487,1120][879,1288]`、`3 列` `[487,1288][879,1456]`、`4 列` `[487,1456][879,1624]`、`5 列` `[487,1624][879,1792]` ⇒ 对比第二轮（当前档 `x=655` vs 其余 `x=529`），**36dp 宽度差已消除** ✅ |
+| ③ | **整行背景填充 + 仅当前档** | `r3_menu.png`（270,938 B）采样：第 2/3/5 行（y=1204/1372/1708）在 x=500/620/800/870 **全部 `(0,0,0)`**；**第 4 行（y=1540）四处全 `(80,52,55)`**；菜单外参考 `(141,58,57)` ✅ |
+| ③ | **填充随选择转移** | 选 2 列后 `r3_menu2.png`（222,906 B）：`2列` y=1204 = `(80,52,55)`，`3/4/5列` = `(0,0,0)` ✅ |
+| ④ | 选中后卡片真的变宽 | tap 后按钮 `content-desc='2 列'`；卡片 `001` `[42,1306][618,1980]` 宽 **576px = 164.6dp**（4 列时 274px）✅ |
+| ⑤ | 长按提示未被本轮破坏 | 亮气泡 `(255,248,247)` 位于 **x=499..641、y=826..909**，与第二轮读数**逐字相同** ✅ |
+| ⑥ | 工具栏临时覆盖**不**持久 | 选 2 列 → `keyevent 111` + `4` 回首页 → 重进 A ⇒ 按钮回到 **`4 列`**、卡片 `001` 恢复 `[42,1306][316,1678]`（274px）✅ |
+| ⑦ | 设置页两行 | `竖屏默认列数` = **`跟随自适应（4）`** `[845,821][1222,891]`；`横屏默认列数` = **`跟随自适应（9）`** `[845,989][1222,1059]`；说明行「作用于网格视图；排序页的列数按钮可在本次进入时临时覆盖。」✅ |
+
+⚠️ **本轮新增操作教训**：`input draganddrop 571 1008 571 1008`（起止同点）在本机被判定为**点击**而非长按 ⇒ 会重新打开下拉菜单。正解 = 用**显式运动事件**，并把动作与取证串进设备侧**同一条** `adb shell`：
+
+```
+adb shell "input keyevent 111; sleep 1; input tap 300 2600; sleep 1; \
+           input motionevent DOWN 571 1008; sleep 2; \
+           screencap -p /data/local/tmp/tip.png; uiautomator dump /data/local/tmp/tip.xml; \
+           input motionevent UP 571 1008"
+```
+
+（第二轮记的「`input draganddrop` 可以触发长按」**在本轮不成立** —— 起止点相同的写法退化为点击。改用 `motionevent DOWN/UP` 后一次成功。）另：**`uiautomator dump` 不映射 tooltip**（提示不是可访问节点）⇒ 提示只能靠**像素**取证。
+
+收尾：`/data/local/tmp` 的 `.xml`/`.png` 计数 **归零**（`ls` 只剩既有非调试产物）；`accelerometer_rotation=1`、`user_rotation=0`、`svc power stayon false`、`am force-stop com.pixfold.d1` 均已复位。
+
+### 16c.7 离线闸门与 lint 红项归因
+
+- `:app:testDebugUnitTest` 42 files / **396 tests** / 0 failed / 0 skipped（较第二轮 395 **+1**，即新增的结构守卫）。
+  ⚠️ 此 396 是**第三轮高亮修订**当时的读数；同日另两轮修订（§16c.9 宽度、§16c.10 居中）各再 +1，**最终为 42 files / 399 tests / 0 failed / 0 skipped**。
+- `:domain:test` 20 files / **247 tests** / 0/0/0。
+- `:app:assembleDebug` ⇒ `app/build/outputs/apk/debug/app-debug.apk` = **33,368,725 B**。
+- ✅ `:app:lintDebug` **最终 = `0 errors, 0 warnings, 4 hints`**。首跑曾有 **1 error / 0 warnings / 4 hints**，唯一 error 逐字：
+  `D:\Programing\Personal\pixfold\pixfold-d1\gradle\wrapper\gradle-wrapper.properties:3: Error: A newer version of Gradle than 9.7.1 is available: 9.8.0 [AndroidGradlePluginVersion]`
+  **归因 = 环境漂移**（Gradle 9.8.0 上游新发布，上一轮跑闸门时该检查无对象可报）：对 `grep -c -E 'SortAndPreviewPage|SortPagePolishTest|ic_check'` 数 lint 报告 ⇒ **0 命中**，本轮改动一个都没出现在报告里。4 个 hints 全是既有 `AutoboxingStateCreation`（`ui/components/DragReorderGrid.kt:175`、`:176`，`ui/components/DragReorderList.kt:94`、`:95`）。
+  **用户裁决 `lint_drift_policy`（逐字选项标签）= 「A：升级 Gradle wrapper 到 9.8.0」** ⇒ **2026-09-27 同日并入本轮落地**（改 `gradle-wrapper.properties:3` 第 3 行 `distributionUrl` → 重跑四道闸门 ⇒ error 消失、lint `0 errors, 0 warnings, 4 hints`、APK **33,368,725 B** 逐字节同尺寸，与升级前一致）；`app/build.gradle.kts:52-73` 的豁免清单**未动**（那段注释明写三项检查是**刻意重新启用**的）。
+
+### 16c.8 与第二轮的关系
+
+第二轮的九条裁决与实现（纯图标 / 档位 2–5 / 去掉「自适应」项 / 竖横屏两个默认列数设置 / `ADAPTIVE_COLUMN_MIN_WIDTH` 110→80dp 使 361dp = 4 列 / 超范围值并入 / 临时覆盖）**全部保持不变**；本轮**只换高亮的呈现形态**：`leadingIcon` 对勾 ⇒ 整行 `secondaryContainer` 背景填充。第二轮小节见 §16b，其 16b.6 表中「当前档高亮」那一行的读数（`4 列` 的 `x=655`）**已被本轮 ③ 取代**。
+
+### 16c.9 第四轮：下拉菜单过宽 ⇒ 收窄 48dp（单点、不逐条目重复）
+
+- `User said (m23557)`（逐字）：「列数下拉列表只显示个数字，选项却特别宽，不好看」。
+- 同回合 `User said (m23631)`（逐字）：「菜单宽度这个没有更加优雅的写法吗，另外你好像又又又又又忘了更新任务面板进度」
+  ⇒ (a) 要求**更优雅**的写法（否掉逐条目 `Modifier.width()`）；(b) **第五次**任务面板批评。
+- **形态裁决**：`ask_user_question` id `menu_width_fix`，用户选（逐字选项标签）**「改成 48dp（与列数按钮同宽）」**。
+- **源码依据**（一手，解包自 `pixfold-d1/app/build/m3src/`、`fdsrc2/`）：
+
+| 事实 | 源码位置 / 原文 |
+| --- | --- |
+| 条目侧宽度被 `sizeIn` 兜到 **112dp**，但其默认 `enforceIncoming = true` ⇒ 会被上游固定宽**夹住** | `Menu.kt:419` `…fillMaxWidth().sizeIn(minWidth = DropdownMenuItemDefaultMinWidth = 112.dp, maxWidth = DropdownMenuItemDefaultMaxWidth = 280.dp, minHeight = MenuListItemContainerHeight)`；`Size.kt:226-238 sizeIn` 的 `SizeElement(enforceIncoming = true)` |
+| 内层 `width(IntrinsicSize.Max)` 同样 `enforceIncoming = true` ⇒ 服从传入的 48dp 上限 | `Menu.kt:359-415` `Column(modifier = modifier.padding(vertical = DropdownMenuVerticalPadding).width(IntrinsicSize.Max).verticalScroll(scrollState))`；`Intrinsic.kt:51 Modifier.width(intrinsicSize) = … IntrinsicWidthElement(width = …, enforceIncoming = true, …)` |
+| 调用方 `modifier` 在**链首**；外层 `Surface` **不接收**调用方 modifier ⇒ 宽度只作用在内层 `Column` 上，`Surface` 随之包裹收缩 | `Menu.kt:359-415`；`Intrinsic.kt:268-300 IntrinsicSizeModifier.measure` 的 `constraints.constrain(contentConstraints)` |
+| 公开 `DropdownMenu` 确实把 `modifier` 透传到该 `Column` | commonMain `Menu.kt:122-136 expect fun DropdownMenu(… modifier = Modifier …)`；`AndroidMenu.android.kt:42-87 actual fun DropdownMenu` 内 `Popup { DropdownMenuContent(…, modifier = modifier, content = content) }` |
+| `Modifier.width(Dp)` 自身也是 `enforceIncoming = true`（会被 Popup 的屏幕宽约束夹住，不影响 48dp） | `Size.kt:61-73 Modifier.width(width: Dp) = SizeElement(minWidth = width, maxWidth = width, enforceIncoming = true)` |
+
+- **实现**（`pixfold-d1/app/src/main/kotlin/com/pixfold/d1/ui/workflowa/SortAndPreviewPage.kt`）：
+  新增 `private val COLUMN_MENU_WIDTH = 48.dp`（带 30 余行 KDoc 逐条引上表源码），
+  `DropdownMenu(modifier = Modifier.testTag(TAG_COLUMN_MENU).width(COLUMN_MENU_WIDTH))` ——
+  **宽度只在这一处给，条目侧一字未改**。这正是用户 m23631 要的「更优雅的写法」：
+  库的 112dp 兜底是 `private`、无法从外部调低，但因为它 `enforceIncoming = true`，**上游单点设宽即等价于全局收窄**。
+- **断言**（`SortPagePolishTest.kt`）：
+  - `column_menu_is_as_narrow_as_the_button()` —— 用 `rule.density` 算 `48.dp.roundToPx()`，
+    断言 `TAG_COLUMN_MENU` 节点与**每一档条目**（`columnTag(2..5)`）的真实布局宽度都 `== expected`
+    （守住「条目侧 112dp 兜底确实被夹掉」）。
+  - `column_menu_width_is_set_once_on_the_container()` —— **位置断言**：`widthAt in (menuCallAt + 1) until firstItemAt`
+    （`menuCallAt = body.indexOf("DropdownMenu(")`、`firstItemAt = body.indexOf("DropdownMenuItem(")`），
+    即宽度必须写在**菜单容器的 modifier** 里、**不得挪到条目链上**（后者正是用户否掉的写法）。
+- **变异**：M1（删容器固定宽）、M2（宽度挪到逐条目）、M3（具名常量→魔法数字 `48.dp`）**全部杀死**；
+  M4（`48`→`64dp`）由 `column_menu_is_as_narrow_as_the_button` 杀死，
+  而位置断言**刻意不管数值**（已在测试注释写明分工）。
+- **真机核对**：四行**全部 `[487,…][655,…]`、w=168px = 48.0dp**（上一轮 392px = 112.0dp）；
+  逐行 `2 列` `[487,1120][655,1288]`、`3 列` `[487,1288][655,1456]`、`4 列` `[487,1456][655,1624]`、`5 列` `[487,1624][655,1792]`。
+  高亮仍整行填充且随选择转移（选 2 列后 `x=500`/`x=630` 均 `(80,52,55)`，3/4/5 行全 `(0,0,0)`）；
+  选 2 列后卡片外层 `[42,1306][618,1980]` = **576px = 164.6dp**（4 列时 274px）。
+  ⚠️ 量卡片宽**必须取外层节点**：内层拖拽柄（cd 为 `…固定位置`）只有 168px，曾因此得出矛盾结论。
+
+### 16c.10 第五轮：数字未居中 ⇒ `fillMaxWidth()` + `TextAlign.Center`
+
+- `User said (m23942)`（逐字，全文）：「数字没有居中显示」。
+- **根因**（M3 一手源码）：`DropdownMenuItemContent` 把文字槽位放在一个**没有对齐参数**的
+  `Box(Modifier.weight(1f))` 里（`Menu.kt:461-479`）—— `Box` 默认把子项贴**起始边**放，
+  于是数字被行内 12dp `contentPadding` 顶到左边（`Menu.kt:525 DropdownMenuItemHorizontalPadding = 12.dp`）。
+  真机实测：四个数字 text 节点**全在 `x=529..558`**，行左缘 `487` ⇒ 距左 **42px = 12dp**，确实是左对齐。
+  槽位自身没有对齐参数可传 ⇒ **只能在 `text` lambda 内让 `Text` 铺满槽位再 `TextAlign.Center`**。
+- **实现**：
+  ```kotlin
+  text = {
+      Text(
+          text = option.toString(),
+          modifier = Modifier.fillMaxWidth(),
+          textAlign = TextAlign.Center,
+      )
+  },
+  ```
+  新增 import `androidx.compose.ui.text.style.TextAlign`。
+- **断言**（`column_menu_numbers_are_horizontally_centered()`，**两层分工**）：
+  1. **几何层** —— 对每档取条目节点与「`hasText(n.toString()) and hasAnyAncestor(hasTestTag(columnTag(n)))`」的
+     数字节点（`useUnmergedTree = true`），断言两者中线偏差 `abs(itemCX - numberCX) <= 1f`。
+  2. **结构层** —— 源码位置断言 `fillAt in (slotAt + 1) until alignAt`
+     （`slotAt = body.indexOf("text = {")`、`fillAt = body.indexOf("Modifier.fillMaxWidth()")`、`alignAt = body.indexOf("textAlign = TextAlign.Center")`）。
+  - **为什么必须两层**：`TextAlign` 只影响**字形**位置、**不改语义节点 bounds**，且 Robolectric 不做真实文本测量
+    ⇒ 几何层**永远看不见** `TextAlign` 是否生效（它只能证明 `fillMaxWidth()` 生效）；结构层只能证明源码写法。
+    两条合起来才等价于「数字居中」。**真机像素读数**才是终审（见下）。
+- **变异**：M5（删 `textAlign = TextAlign.Center`）、M6（删 `Modifier.fillMaxWidth()`）、
+  M7（`TextAlign.Center` → `TextAlign.Start`）**全部杀死** —— 但**三组都杀在结构层**，
+  故几何层尚缺独立杀伤证据（有做结构层影子的嫌疑）。**M8 专门堵这个洞**：
+  把 `Text` 包进 `Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.CenterStart)`、`Text` 退回 wrap-content
+  ⇒ 两个 token 仍在原位（结构断言**必绿**）而数字确实不居中。结果 **M8 杀在几何断言**，
+  失败消息逐字 `2 列那一档的数字没有铺满 M3 的 text 槽位:行中线=24.0, 数字节点中线=13.0 ⇒ 数字会贴左内边距(12dp),看着不居中`
+  ⇒ **几何层独立有效，不是结构层的影子**。
+- **真机核对（像素级，节点框 ≠ 字形）**：四个数字的**墨迹**纵向中线 vs 行中线偏差
+  **≤ 0.5px = 0.14dp**（行 2/3/4 为 0.14dp、行 5 为 0.00dp），墨迹 x=559..582（宽 **24px**）
+  远在 48dp 行内 ⇒ **居中且未被 48dp 行宽截断**；换到高亮行（第 2 行）复测同样成立。
+  ⚠️ 方法教训：`uiautomator` 给的 text 节点 bounds 是**槽位框**（铺满后 84px 宽），
+  不能用来判断字形是否居中 ⇒ 必须**从 PNG 采样墨迹**（`uv run --with pillow`，逐列扫描与两种背景色差 > 90 的像素）。
+
 ## 附：本文件的取证方式（可复现）
 
 | 结论 | 取法 |
@@ -1638,6 +1830,8 @@ adb shell "input draganddrop 571 1008 571 1008 700; screencap -p /data/local/tmp
 | 第 15 节「漏上报是否可见」 | 靠**变异**而非阅读：把上报改成只写本地，看测试是否变红 —— 单页内不变红即说明该性质无断言覆盖 |
 | 第 3 节「筛选是否真按谓词筛」 | 真机 `uiautomator dump` 数 `将跳过` / `将重命名` / `成功` / `跳过` 行；并造出「2 个跳过项」以让 `仅问题（2）` 的 N 可核对 |
 | 第 3 节「筛选条是否真常驻」 | 同一页 `swipe` 滚动前后各 dump 一次，比对筛选条 `bounds` 是否逐像素相同；同时确认 `PlanHeader` 已滚出视口（对照组） |
+| 第 16c.9 节「菜单真的只有 48dp」 | 真机 `uiautomator dump` 读 `TAG_COLUMN_MENU` 与四个条目节点的 `bounds`（应全为 168px = 48.0dp）；对照上一轮的 392px = 112.0dp |
+| 第 16c.10 节「数字真的居中」 | ⚠️ **不能**读 text 节点 bounds（那是铺满后的槽位框，恒等于行中线）；必须从 `screencap` 的 PNG 逐列扫描「与行内两种背景色差 > 90」的像素求墨迹范围，再与行中线比对 |
 | 第 3 节「删掉的类是否真没进包」 | 解包 APK 全部 `classes*.dex` 做字节子串计数：`DraggableThumbCard` 与 `ThumbCard` 计数**相等**即证明后者仅为前者名字的子串 （`grep -c` 对二进制/多 dex 不可靠，返回 0） |
 
 

@@ -3,6 +3,9 @@ package com.pixfold.d1.ui.workflowa
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.semantics.SemanticsProperties
+import androidx.compose.ui.test.hasAnyAncestor
+import androidx.compose.ui.test.hasTestTag
+import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.longClick
 import androidx.compose.ui.test.onAllNodesWithTag
@@ -10,6 +13,7 @@ import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTouchInput
+import androidx.compose.ui.unit.dp
 import com.pixfold.d1.R
 import com.pixfold.d1.TestText
 import com.pixfold.d1.domain.mock.MockData
@@ -20,6 +24,7 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 import java.io.File
+import kotlin.math.abs
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
@@ -44,9 +49,27 @@ import kotlin.test.assertTrue
  * [com.pixfold.d1.ui.workflowa.ColumnCountButton] 的 KDoc。
  *
  * 本段断言的**核心难点**:`DropdownMenuItem` 不设 `selected` 语义(已核实 M3 1.4.0
- * `Menu.kt` 的 `DropdownMenuItemContent` 只挂 `clickable`),所以"高亮的是哪一档"
- * 在语义树里唯一的痕迹是 `leadingIcon` 那个对勾图标 —— 断言必须查
- * [columnCheckTag],且必须 `useUnmergedTree = true`(菜单项的 `clickable` 会合并子节点)。
+ * 的 `Menu.kt` 的 `DropdownMenuItemContent` 只挂 `clickable`),所以本页**自己补**了
+ * `selected` 语义(见 [com.pixfold.d1.ui.workflowa.ColumnCountButton])。断言据
+ * [SemanticsProperties.Selected] 读它 —— 这是全仓第一处读该语义的测试。
+ *
+ * 高亮的**视觉**形态是整行背景填充(`secondaryContainer`);底色本身由
+ * `BottomBarStyleTest` 那类像素断言才测得到,本文件只钉"哪一档被选中"这一语义事实。
+ *
+ * ## ⑤ 的第三轮(用户 2026-09-27:「列数下拉列表只显示个数字,选项却特别宽,不好看」)
+ *
+ * 菜单默认被 M3 的 `DropdownMenuItemDefaultMinWidth = 112.dp`(库内 `private val`,
+ * 外部无法下调)撑宽,收窄到 48dp 的办法是**在容器一处设宽**而不是逐条目重复。
+ * 断言分两层:[column_menu_is_as_narrow_as_the_button] 量**真实布局宽度**,
+ * [column_menu_width_is_set_once_on_the_container] 钉"宽度只有一个定义点"这一结构。
+ *
+ * ## ⑤ 的第四轮(用户 2026-09-27:「数字没有居中显示」)
+ *
+ * 收窄到 48dp 后数字反而更显偏:它被行内 12dp `contentPadding` 顶在左边。根因是 M3
+ * 把 text 槽位放进 `Box(Modifier.weight(1f))`(`Menu.kt:461-479`),Box 默认起始对齐。
+ * 修法 = `fillMaxWidth()` 铺满槽位 + `TextAlign.Center` 居中字形,两者缺一不可,
+ * 故 [column_menu_numbers_are_horizontally_centered] 也同时钉**几何**与**结构** ——
+ * 因为 Robolectric 不做真实文本测量,`TextAlign` 的效果在节点 `bounds` 上不可见。
  */
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [34], qualifiers = "w400dp-h800dp")
@@ -338,6 +361,69 @@ class SortPagePolishTest {
         )
     }
 
+    /**
+     * 当前档位的高亮是**整行背景填充**,不是打勾
+     * (用户 2026-09-27 第二次订正:「列数下拉要的效果是高亮而不是打勾」,
+     * 并在给出四选一时选了「背景填充色」)。
+     *
+     * ## 为什么又是源码结构断言
+     *
+     * 底色是**绘制**产物:Robolectric 不做真实绘制,而这里的条目在 `Popup` 里
+     * (`DropdownMenu` 走 `Popup` 渲染),`onRoot().captureToImage()` 能否截到 Popup
+     * 内容未经证实 —— 拿它当断言前提是给自己埋雷。故这里钉两件**语义/结构**事实:
+     *
+     *  1. `modifier` 上确实有 `.background(`,且填的是官方的菜单选中项角色
+     *     `secondaryContainer`(取自 `MenuTokens.ListItemSelectedContainerColor`);
+     *  2. 不再有 `leadingIcon`(对勾的载体),也不再引用已删除的 `ic_check` 资源。
+     *
+     * 前提:第 2 条若放过,`ic_check.xml` 一旦被删就会编译失败 —— 所以它同时是
+     * "废弃图形必须清干净"的守卫(lint `UnusedResources` 生效、`warningsAsErrors = true`)。
+     *
+     * ## 为什么要断言到"接线"而不只断言"存在 `.background(`"
+     *
+     * 变异验证发现过一个**空洞**:`selected` 语义与背景填充分属两条链
+     * (`.then(highlight)` 与 `.semantics { selected = … }`),于是
+     * **删掉 `.then(highlight)` 后 `isHighlighted` 仍然全绿**(语义还在),
+     * 而用户真正看得见的底色已经没了。同理把 `if (isCurrent)` 写成 `if (false)`
+     * 也只让颜色消失、`.background(` 这串字符还在函数体里。
+     * ⇒ 光断言"体里出现过 `.background(`"是够不着这类改动的,必须把
+     * **条件**与**接线**一起钉住(见下方三条 `contains`)。
+     */
+    @Test
+    fun current_column_is_highlighted_by_a_background_fill_not_a_checkmark() {
+        val code = decommented(source("ui/workflowa/SortAndPreviewPage.kt"))
+        val body = functionBody(code, "private fun ColumnCountButton(")
+
+        assertTrue(
+            body.contains(".background("),
+            "当前档位没有任何背景填充 ⇒ 用户要的「高亮」不见了",
+        )
+        assertTrue(
+            body.contains("secondaryContainer"),
+            "背景色不是 M3 官方的菜单选中项容器角色(secondaryContainer) ⇒ 与仓内既有选中语义不同源",
+        )
+        assertTrue(
+            body.contains("option == columns"),
+            "「哪一档是当前档」的比较没了 ⇒ 高亮不再跟着生效值走",
+        )
+        assertTrue(
+            body.contains("if (isCurrent)"),
+            "背景填充不再以「是不是当前档」为条件 ⇒ 要么全部高亮、要么全都不亮",
+        )
+        assertTrue(
+            body.contains(".then(highlight)"),
+            "算了 highlight 却没接到菜单项的 modifier 上 ⇒ 看不到底色(而 selected 语义仍在,断言会假绿)",
+        )
+        assertTrue(
+            !body.contains("leadingIcon"),
+            "又把对勾加回来了(leadingIcon) ⇒ 用户明确否决的「打勾」形态回归",
+        )
+        assertTrue(
+            !body.contains("ic_check"),
+            "还在引用已删除的 ic_check 图形 ⇒ 要么编译不过,要么对勾又回来了",
+        )
+    }
+
     // ---------------------------------------------------------------- ④ 集合芯片文案
 
     /**
@@ -409,14 +495,14 @@ class SortPagePolishTest {
     }
 
     /**
-     * 点图标展开下拉列表;列表里**只有数字**(没有「自适应」项),当前档位打勾。
+     * 点图标展开下拉列表;列表里**只有数字**(没有「自适应」项),当前档位高亮。
      *
-     * w400dp-h800dp 下自适应算式 `(400 - 16) / 80 = 4.8` ⇒ 4 列,故勾应在 4。
+     * w400dp-h800dp 下自适应算式 `(400 - 16) / 80 = 4.8` ⇒ 4 列,故高亮应在 4。
      * 竖屏上限 5、下界 2 ⇒ 列表恰为 2/3/4/5(用户裁决:「去除自适应选项」+「竖屏显示 2–5」)。
      * 若有人把「自适应」当选项加回列表,`columnTag(6)` 之外的条目数会变,这里的边界断言即失效。
      */
     @Test
-    fun column_menu_lists_the_numbers_and_checks_the_current_one() {
+    fun column_menu_lists_the_numbers_and_highlights_the_current_one() {
         setPage()
         openColumnMenu()
 
@@ -424,14 +510,14 @@ class SortPagePolishTest {
         rule.onNodeWithTag(columnTag(1)).assertDoesNotExist() // 下界 2
         rule.onNodeWithTag(columnTag(6)).assertDoesNotExist() // 竖屏上限 5
 
-        assertTrue(hasChecked(4), "400dp 下自适应是 4 列,勾应在 4 列那一档")
+        assertTrue(isHighlighted(4), "400dp 下自适应是 4 列,高亮应在 4 列那一档")
         listOf(2, 3, 5).forEach {
-            assertTrue(!hasChecked(it), "当前是 4 列,不该同时给 $it 列打勾")
+            assertTrue(!isHighlighted(it), "当前是 4 列,不该同时把 $it 列也标成选中")
         }
     }
 
     /**
-     * 选一档后:菜单关闭、卡片宽度真的变、勾转移到新档。
+     * 选一档后:菜单关闭、卡片宽度真的变、高亮转移到新档。
      *
      * Robolectric **会**做真实布局(只是不测量文本),故卡片宽度是可断言的物理量。
      * 实测(w400dp-h800dp,网格容器 400dp;`contentPadding` 8dp × 2,格间**无** spacing,
@@ -444,11 +530,11 @@ class SortPagePolishTest {
      * —— 这正是它存在的理由。
      */
     @Test
-    fun column_selection_changes_card_width_and_moves_the_check() {
+    fun column_selection_changes_card_width_and_moves_the_highlight() {
         setPage()
         val adaptive = firstCardWidth()
         // 当前档位不靠菜单断言:按钮自己的 contentDescription 就是「N 列」,
-        // 不展开菜单也能读(菜单里的对勾只在展开时存在,见 hasChecked)。
+        // 不展开菜单也能读(菜单里的高亮只在展开时存在,见 isHighlighted)。
         assertAnnouncedColumns(4, "w400dp 下自适应应为 4 列(播报不对说明算式或上界变了)")
 
         val two = pickColumn(2)
@@ -465,10 +551,165 @@ class SortPagePolishTest {
                 " —— 不等说明 ADAPTIVE_COLUMN_MIN_WIDTH 让默认列数变了",
         )
 
-        // 展开菜单核对对勾**转移**了(而不只是"多了一个勾")
+        // 展开菜单核对高亮**转移**了(而不只是"多了一处高亮")
         openColumnMenu()
-        assertTrue(hasChecked(4), "改选 4 列后勾应在 4 列那一档")
-        assertTrue(!hasChecked(2), "改选 4 列后 2 列不该还留着勾")
+        assertTrue(isHighlighted(4), "改选 4 列后高亮应在 4 列那一档")
+        assertTrue(!isHighlighted(2), "改选 4 列后 2 列不该还留着高亮")
+    }
+
+    /**
+     * 下拉菜单的宽度**真的**收窄到 48dp(与列数按钮同宽)。
+     *
+     * 用户 2026-09-27:「列数下拉列表只显示个数字,选项却特别宽,不好看」⇒ 裁决定稿 48dp。
+     * Robolectric 会做真实布局 ⇒ 宽度是可断言的物理量(实测真机上 M3 默认把它撑成
+     * 392px = 112.0dp,正是 `DropdownMenuItemDefaultMinWidth`)。
+     *
+     * 断言分两个方向,缺一不可:
+     *  - 菜单节点宽度 == 48dp ⇒ 容器上的固定宽确实生效了;
+     *  - 每一档条目的宽度也 == 48dp ⇒ 条目侧那个 112dp 兜底**被夹掉了**,
+     *    否则会出现"容器 48dp 而条目仍按 112dp 排布"的内容溢出。
+     *
+     * 用 `density` 换算而**不写字面 px**:Robolectric 的密度是实现细节,
+     * 写死 px 会让这条断言在密度变化时变成噪声。
+     */
+    @Test
+    fun column_menu_is_as_narrow_as_the_button() {
+        setPage()
+        openColumnMenu()
+
+        val density = rule.density
+        val expected = with(density) { 48.dp.roundToPx() }
+
+        val menuWidth = rule.onNodeWithTag(TAG_COLUMN_MENU).fetchSemanticsNode().size.width
+        assertEquals(
+            expected,
+            menuWidth,
+            "下拉菜单宽度应为 48dp(与列数按钮同宽)—— 更宽说明又退回 M3 的 112dp 兜底",
+        )
+
+        listOf(2, 3, 4, 5).forEach { n ->
+            val itemWidth = rule.onNodeWithTag(columnTag(n)).fetchSemanticsNode().size.width
+            assertEquals(
+                expected,
+                itemWidth,
+                "$n 列那一档的宽度应跟菜单同为 48dp ⇒ 条目侧的 112dp 兜底必须被夹掉",
+            )
+        }
+    }
+
+    /**
+     * 宽度只在**容器一处**定义,不逐条目重复 `Modifier.width(...)`。
+     *
+     * 这是用户点名的「有没有更优雅的写法」那条诉求的离线守卫。收窄之所以能只写一处,
+     * 是因为 M3 链上每一环都 `enforceIncoming = true`(服从上游约束):
+     * `DropdownMenuItemContent` 的 `sizeIn(minWidth = 112.dp, ...)`(`Menu.kt:419`)
+     * 服从调用方 `modifier`,而 `DropdownMenuContent` 把该 `modifier` 放在内层 `Column`
+     * 链首(`Menu.kt:359-415`),其后的 `width(IntrinsicSize.Max)` 同样服从
+     * (`Intrinsic.kt:51`)⇒ 容器单点设宽即可压掉整个菜单的 112dp。
+     *
+     * 若有人改成"每个 `DropdownMenuItem` 各写一次 `Modifier.width(48.dp)`",
+     * 功能上仍对、[column_menu_is_as_narrow_as_the_button] 也仍绿,
+     * 但那正是用户否掉的写法 ⇒ 只有本条能拦住。
+     *
+     * **2026-09-27 补强(变异 M2 逼出来的)**:本条最初只数 `.width(COLUMN_MENU_WIDTH)`
+     * 的出现次数。变异验证时把宽度从容器挪到条目上,计数仍是 1 ⇒ **断言存活**。
+     * 计数守得住"不重复",守不住"挪了位置"。故现在同时钉**位置**:该 token 必须
+     * 落在 `DropdownMenu(` 与第一个 `DropdownMenuItem(` 之间 —— 即菜单容器的
+     * `modifier` 段内,而不是条目链上。
+     *
+     * **本条刻意不管数值**(把常量改成 `64.dp` 时本条仍绿,由
+     * [column_menu_is_as_narrow_as_the_button] 杀)。分工:那条读**真实布局宽度**管数值,
+     * 本条读**源码位置**管写法。再加一条数值断言只会与前者重复,故不设。
+     */
+    @Test
+    fun column_menu_width_is_set_once_on_the_container() {
+        val code = decommented(source("ui/workflowa/SortAndPreviewPage.kt"))
+        val body = functionBody(code, "private fun ColumnCountButton(")
+
+        val widthUses = body.lines().count { it.contains(".width(COLUMN_MENU_WIDTH)") }
+        assertEquals(
+            1,
+            widthUses,
+            "下拉宽度应在容器那一处只写一次 ⇒ 出现 $widthUses 次说明又改回逐条目重复了",
+        )
+
+        // `DropdownMenu(` 不会误命中 `DropdownMenuItem(`(后者紧跟的是 `I`,不是 `(`)。
+        val menuCallAt = body.indexOf("DropdownMenu(")
+        val firstItemAt = body.indexOf("DropdownMenuItem(")
+        val widthAt = body.indexOf(".width(COLUMN_MENU_WIDTH)")
+        assertTrue(menuCallAt >= 0, "源码里找不到 `DropdownMenu(` 调用")
+        assertTrue(firstItemAt > menuCallAt, "源码里找不到 `DropdownMenu(` 之后的条目调用")
+        assertTrue(widthAt >= 0, "宽度不再由具名常量 COLUMN_MENU_WIDTH 给出 ⇒ 48dp 散成了魔法数字")
+        assertTrue(
+            widthAt in (menuCallAt + 1) until firstItemAt,
+            "宽度必须写在**菜单容器的 `modifier`** 里(`DropdownMenu(` 与第一个 " +
+                "`DropdownMenuItem(` 之间),而不是挪到条目链上 —— 后者正是用户否掉的写法",
+        )
+    }
+
+    /**
+     * 菜单里的数字**水平居中**,不是贴着左内边距。
+     *
+     * 用户 2026-09-27 指出「数字没有居中显示」:收窄到 48dp 后,数字被行内 12dp 的
+     * `contentPadding` 顶在左边(真机实测 x=529 = 行左缘 487 + 42px/12dp),
+     * 右边留一大块空 ⇒ 观感偏。根因在 M3:它把 text 槽位放在 `Box(Modifier.weight(1f))`
+     * 里(`Menu.kt:461-479`),Box 默认把子项贴起始边放,而槽位**没有**对齐参数可传。
+     *
+     * 修法 = 两步,缺一不可:让 `Text` 用 `Modifier.fillMaxWidth()` **铺满**槽位,
+     * 再用 `TextAlign.Center` 把字形摆到槽位中线。槽位左右内边距等宽(无 leading/
+     * trailing 图标时两者都是 0,行内 12dp 来自 `contentPadding`)⇒ 槽位中线 = 整行中线。
+     *
+     * ⚠️ 两条断言的**分工必须说清**(否则会误以为任一条能独立证明"居中"):
+     *  - **几何**:数字节点的中线 == 该行节点的中线。这证明的是 `fillMaxWidth()` 生效了 ——
+     *    少了它就退回 wrap-content,节点贴左,中线立刻偏 12dp+。
+     *  - **结构**:`TextAlign.Center` 确实写在同一处 `text = { }` 里。这条必须单独存在:
+     *    `TextAlign` 只影响**字形**在文本布局内的位置,不影响语义节点的 `bounds`;
+     *    而 Robolectric 根本不做真实文本测量 ⇒ 几何断言**永远看不见** `TextAlign`
+     *    有没有生效,只能靠源码守。两条合起来才等价于"数字居中"。
+     */
+    @Test
+    fun column_menu_numbers_are_horizontally_centered() {
+        setPage()
+        openColumnMenu()
+
+        // 逐档检查:任何一档没铺满槽位都会红。
+        listOf(2, 3, 4, 5).forEach { n ->
+            val item = rule.onNodeWithTag(columnTag(n)).fetchSemanticsNode()
+            val numberNode = rule.onNode(
+                hasText(n.toString()) and hasAnyAncestor(hasTestTag(columnTag(n))),
+                useUnmergedTree = true,
+            ).fetchSemanticsNode()
+
+            val itemCenterX = item.boundsInRoot.left + item.size.width / 2f
+            val numberCenterX = numberNode.boundsInRoot.left + numberNode.size.width / 2f
+
+            assertTrue(
+                abs(itemCenterX - numberCenterX) <= 1f,
+                "$n 列那一档的数字没有铺满 M3 的 text 槽位:行中线=$itemCenterX, " +
+                    "数字节点中线=$numberCenterX ⇒ 数字会贴左内边距(12dp),看着不居中",
+            )
+        }
+
+        // 结构守卫:`TextAlign.Center` 必须与 `fillMaxWidth()` 写在同一处 `text = { }` 内。
+        // 按位置断言而不是全文 `contains`,免得别处新加的 `fillMaxWidth()` 冒充。
+        val body = functionBody(
+            decommented(source("ui/workflowa/SortAndPreviewPage.kt")),
+            "private fun ColumnCountButton(",
+        )
+        val slotAt = body.indexOf("text = {")
+        val fillAt = body.indexOf("Modifier.fillMaxWidth()")
+        val alignAt = body.indexOf("textAlign = TextAlign.Center")
+        assertTrue(slotAt >= 0, "源码里找不到菜单项的 `text = {` 槽位")
+        assertTrue(
+            alignAt > slotAt,
+            "菜单数字应显式用 `TextAlign.Center` 居中 —— 少了它 `fillMaxWidth()` 只让" +
+                "文字框变宽,字形仍贴左(M3 的 text 槽位默认起始对齐)",
+        )
+        assertTrue(
+            fillAt in (slotAt + 1) until alignAt,
+            "`TextAlign.Center` 只有在 Text 铺满槽位时才等于'整行居中'⇒ 同一个槽位里" +
+                "必须同时有 `Modifier.fillMaxWidth()`",
+        )
     }
 
     /**
@@ -544,7 +785,7 @@ class SortPagePolishTest {
             rule.onNodeWithTag(columnTag(it)).assertExists()
         }
         rule.onNodeWithTag(columnTag(10)).assertDoesNotExist()
-        assertTrue(hasChecked(14), "当前 14 列,勾应在临时并入的 14 那一档")
+        assertTrue(isHighlighted(14), "当前 14 列,高亮应在临时并入的 14 那一档")
     }
 
     /**
@@ -583,23 +824,34 @@ class SortPagePolishTest {
     }
 
     /**
-     * 当前生效档位是否打了勾(即 `leadingIcon` 存在)。
+     * 当前生效档位是否被高亮(即该档带 `Selected = true` 语义)。
      *
-     * **必须 `useUnmergedTree = true`**:`DropdownMenuItem` 自身挂了 `clickable`,
-     * 合并语义树里子节点(对勾图标)根本不可见。用 `onAllNodes...isNotEmpty()`
-     * 而不是 `assertExists()` 是为了能取布尔值做**否定**断言(缺勾也要能测)。
+     * 读的是本页**自己补**的 `selected` 语义(M3 的 `DropdownMenuItem` 不提供,
+     * 详见 [com.pixfold.d1.ui.workflowa.ColumnCountButton] 的 KDoc)。这是全仓第一处
+     * 读 `SemanticsProperties.Selected` 的断言,故用 `onAllNodes...firstOrNull` 而非
+     * `assertExists`,`false` 也要能取到 —— 否定断言(不该高亮的档确实没高亮)与
+     * 肯定断言同等重要。
+     *
+     * `useUnmergedTree = true`:`clickable` 会把子节点(数字 `Text`)合并进来,
+     * 不拆开的话读到的是合并后的大节点(虽然 `selected` 仍在,但语义更嘈杂)。
      */
-    private fun hasChecked(n: Int): Boolean = rule
-        .onAllNodesWithTag(columnCheckTag(n), useUnmergedTree = true)
-        .fetchSemanticsNodes()
-        .isNotEmpty()
+    private fun isHighlighted(n: Int): Boolean {
+        val config = rule
+            .onAllNodesWithTag(columnTag(n), useUnmergedTree = true)
+            .fetchSemanticsNodes()
+            .firstOrNull()
+            ?.config
+            ?: return false
+        return config.contains(SemanticsProperties.Selected) &&
+            config[SemanticsProperties.Selected]
+    }
 
     /**
      * 断言按钮**当前播报的档位**是 `n` 列。
      *
      * 读的是按钮自己的 `contentDescription`(资源 `a_cols_cd`,如「4 列」)——
      * 这是不展开菜单时唯一能反映"现在生效的是几列"的语义痕迹
-     * (对勾只在下拉菜单展开期间存在,见 [hasChecked])。
+     * (菜单项的选中语义只在下拉展开期间存在,见 [isHighlighted])。
      */
     private fun assertAnnouncedColumns(n: Int, message: String) {
         val config = rule.onNodeWithTag(TAG_COLUMN_BUTTON).fetchSemanticsNode().config
