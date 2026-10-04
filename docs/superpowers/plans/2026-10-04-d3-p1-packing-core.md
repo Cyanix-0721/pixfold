@@ -198,6 +198,7 @@ cmd.exe /c "D:\Programing\Personal\pixfold\pixfold-d1\run-gradle.bat :app:lintDe
 | W14 | 余量加固（§3 余量政策）：**第三次广扫荡**——再换 8 个文件（`NaturalOrder` / `SortItems` / `NamingEval` / `Warnings` / `RenamePlan` / `NamingSummary` / `WorkflowAState` / `PixFoldSettings`）投 **58 组**变异，覆盖前三次都没碰过的自然序解析、排序字段、命名求值、警告参数、改名计划谓词、命名摘要、批次规则与设置默认值 | 存活变异必须补到全捕获，或按 §0.4 **给出可复核的等价性证明**并写文档说明 | ✅ 完成（轮 10：58 组 → **43 捕获 / 15 存活 / 0 锚点缺失 / 0 编译失败**；15 个存活者判定为 **13 真缺口 + 2 已证等价**，13 个真缺口补断言后**全部转为捕获**且每条捕获者是**它自己的新用例**；2 个等价者（N4/R2）重跑**仍存活**，与证明一致；+10 用例 ⇒ domain **367** 项；生产代码零改动） |
 | W15 | 余量加固（§3 余量政策）：**第四次广扫荡**——目标面换成此前六次（W7/W8/W11/W12/W13/W14）**从未投过变异**的整个 `model/` 包 + 从零覆盖的 `workflowb/`，共 9 个文件投 **64 组**变异，覆盖 `hasWarningOnly`/`effectiveScheme` 谓词、`hasValue` 三态、`needsConfirmation`、`isOverridden`、`SortRule` 两条守卫、`sizeLabel` 两个阈值、`relPath`/`fileName`、`WorkflowBState` 全部 12 个入口、内存设置存储与 `Msg` 参数契约 | 存活变异必须补到全捕获，或按 §0.4 **给出可复核的等价性证明**并写文档说明 | ✅ 完成（轮 11：64 组 → **32 捕获 / 32 存活 / 0 锚点缺失 / 0 编译失败**；32 个存活者判定为 **31 真缺口 + 1 已证等价**（N6），31 个真缺口补断言后**全部转为捕获**且每条捕获者是**它自己的新用例**；1 个等价者重跑**仍存活**，与证明一致；+39 用例 ⇒ domain **406** 项；生产代码零改动） |
 | W16 | 余量加固（§3 余量政策）：**第五次广扫荡（收尾轮）**——按 AST 精算出的历史覆盖表，挑历史变异组数最少的文件与**零测试引用**的表达面，共 23 个文件投 **66 组**变异，重点覆盖 12 张「枚举 → `TextKey`」映射表、`DangerAction` 文案三元组、`comicVolumeOf`/`setIncluded`/`includedVolumes`/`updateComponent`/`clearOverride`/`containsIllegalChar`/`compareNaturalTokens` 等生产有调用但测试零引用的函数 | 存活变异必须补到全捕获，或按 §0.4 **给出可复核的等价性证明**并写文档说明 | ✅ 完成（轮 12：66 组 → **42 捕获 / 24 存活 / 0 锚点缺失 / 0 编译失败**；24 个存活者判定为 **23 真缺口 + 1 已证等价**（C5），23 个真缺口补断言后**全部转为捕获**；1 个等价者重跑**仍存活**，与证明一致；+19 用例 ⇒ domain **425** 项；生产代码零改动） |
+| W17 | **R1 修复（用户裁决「细说 R1」后授权）**：让撤销记录能恢复原文件名 —— `ExecEntry` 增 `originalPath`（+ 第三条不变量）、`executeRenameOp` 成功分支从 `op.proposal.image.fileName` 填、`undoOpsOf` 的 Rename 分支改取它作 `to` | 红→绿；`from` = 新名（起点）、`to` = 原名（终点）**不同源**；变异验证 0 逃逸 | ✅ 完成（轮 13：**6 组变异全捕获 / 0 存活 / 0 锚点缺失 / 0 编译失败**；两条"如实记录缺陷"用例翻成正向断言 ⇒ +3 用例，domain **428** 项；生产代码 +26 行） |
 
 **余量处理**：W1–W10 全部完成且仍有轮次 ⇒ **继续加固核心**（更多边界 / 更多变异 / 更多不变式），
 **不越界**到未授权工作面（适配层检查、D2b、真机、UI）。
@@ -1181,6 +1182,128 @@ domain 闸门：**32 files / 425 tests / 0F 0E 0S**（406 → 425，**+19**）�
 
 ---
 
+#### 轮 13（2026-10-04 21:48）— W17 **R1 修复**：撤销记录能恢复原文件名
+
+- 提交：`cc4c30c` fix(d3): 撤销记录恢复原文件名（R1：from 取新名、to 取原名，不再空操作）
+- 改动：5 files (+106/−35)（生产 2 个 `domain/plan/{Execution,OperationPlan}.kt` +26 行；测试 3 个
+  `plan/{UndoAlignmentTest,ExecutionReportTest,PackingPipelineTest}.kt`）
+- 闸门：app 399 tests / domain **428** tests / 0F 0E / lint 0 errors 0 warnings（旧产物）/ assembleDebug OK
+- 变异：6 组，**6 捕获 / 0 存活 / 0 锚点缺失 / 0 编译失败**（两遍一致）
+- 结论 / 阻塞 / 待裁决：**R1 关闭**（§4 表格状态已改）。R2/R3/R4 仍未决，均不阻塞。
+
+##### 用户裁决与本轮授权
+
+用户 `m04079` 裁决五项，其中第 ① 项「细说 R1」已在 `m04152` 交代清楚；`m04081` 进一步确认
+R1 按"扩 `ExecEntry` 加原名字段"这条修法落地（即 §4 表格 R1 行里列的第 ① 种语义）。
+本轮即执行该裁决。**未新增 `TextKey`、未改 `app/**`、未改构建脚本、未新增依赖。**
+
+##### 缺陷逐字回顾（修之前）
+
+`UndoOp.RestoreRenamed(from, to)` 的语义是「把改名后的文件改回去」⇒ `from` 应是新名、`to` 应是**原文件名**。
+但成功项的 `label` 与 `createdPath` 都是 `op.finalName`（`OperationPlan.kt:72` 的
+`override val label: String get() = op.finalName` 与成功分支的 `createdPath = op.finalName`），
+于是推导出的记录是 `RestoreRenamed("改后.jpg", "改后.jpg")` —— **空操作**，真要按它回滚是回不去的。
+根因：`ExecEntry` 里**没有任何字段**能装原文件名。
+
+为什么 D1 一直没暴露：`performUndo` 恒返回 `applied = false`（原型不触碰真实文件系统），
+UI 只显示「已记录 N 项」，**从不消费 `from`/`to`**；真机核对（`HANGOFF.md:540` 第 17 项）看到的
+也是同一句话。⇒ 这是一个**只在撤销记录内部、对用户暂时不可见**的语义缺陷。
+
+##### 修复（三处生产改动）
+
+1. `domain/plan/Execution.kt`：`ExecEntry` 增末位字段 `val originalPath: String? = null`，
+   KDoc 写明「本项动手之前，这个位置上原本存在的东西；`null` = 原位置本来就是空的（纯新建）」，
+   即它与 `createdPath` 一起才构成一次完整的「从哪来 → 到哪去」。
+2. 同文件 init 增**第三条 `require`**：`require(outcome == ExecOutcome.Succeeded || originalPath == null)`。
+   理由与既有两条同源（跳过项与失败项什么也没动，带上原名就是无中生有）。消息仍是**中文开发者诊断**，
+   不建键（与既有两条判据一致）。
+3. 同文件 `undoOpsOf` 的 Rename 分支：
+   `UndoOp.RestoreRenamed(from = path, to = e.originalPath ?: path)`。
+   **`from` 仍取 `createdPath`**（= 新名 = 回滚起点），`to` 首次改取原名。
+4. `domain/plan/OperationPlan.kt` 的 `executeRenameOp` 成功分支补
+   `originalPath = op.proposal.image.fileName` —— 原文件名只存在于**计划**里，
+   报告若不带上它，"从报告推导撤销"（`undoRecordOf(report)`）这条入口在类型上就永远取不到。
+
+##### 为什么 `originalPath` 落在 `ExecEntry`，以及为什么**回落**而不是 `requireNotNull`
+
+本台账开头（`UndoAlignmentTest` 文件头）声明的不变量是：**两个撤销入口必须产出同一份记录** ——
+`undoRecordOf(report)`（只有报告）与 `undoRecordFrom(plan, report)`（报告 + 计划）。
+若只让后者从计划里现取原名，两个入口就会给出不同的 `to`，"不可能漂移"就成了空话。
+把原名放进报告自己，两条路径才真正等价 —— 这也是**选第 ① 种修法**的实质理由。
+
+`to = e.originalPath ?: path` 的**回落**是刻意的：报告构造不保证每条成功项都带原名 ——
+`UndoAlignmentTest > a report kind that disagrees with the plan kind is visible in the undo record`
+这条用例**刻意**用 Package 报告配 Rename 计划（正是为了钉住"kind 从哪来"这一层）。
+回落成空操作最坏是"没回滚"；改成 `requireNotNull` 会让整个撤销入口抛异常；
+而删错文件不可逆。两害相权取保守的那个 —— 这一点已由变异 **M6** 反证：
+`requireNotNull` 版本被上述用例捕获。
+
+##### 红→绿（两段式，红是**真运行期断言失败**）
+
+第一次尝试时红是编译错（`Unresolved reference 'originalPath'`），**不算数**。
+于是拆成两步：先只加字段 + 填字段、`undoOpsOf` 原样不动 ⇒ 再跑：
+
+```
+UndoAlignmentTest > only the succeeded entry of a mixed rename batch is undoable() FAILED
+UndoAlignmentTest > a successful rename undo restores the original file name() FAILED
+425 tests completed, 2 failed
+BUILD FAILED in 6s
+```
+
+⇒ 这才是真红（2 条断言因 `to` 仍是新名而失败）。随后改 `undoOpsOf` ⇒ `BUILD SUCCESSFUL in 7s`。
+另外本轮**新增 3 条断言**（`ExecutionReportTest`：跳过项/失败项不得携带 `originalPath`、
+成功项可省略 —— 反向不能堵死；并把既有的 `rename undo maps to restoring the original name`
+从"只断言 `from`"补成**同时钉死 `to`**）。
+
+##### 两条"如实记录缺陷"的用例翻成正向断言
+
+| 原用例名 | 新用例名 | 变化 |
+| --- | --- | --- |
+| `a successful rename undo currently collapses from and to onto the new name` | `a successful rename undo restores the original file name` | `assertEquals(op.from, op.to, …)` ⇒ `assertEquals("改后.jpg", op.from)` + `assertEquals(original, op.to)` |
+| `the undo record cannot recover the original name from the report alone` | `the report carries the original name so undo no longer needs the plan` | 保留 `e.label != original`（标签仍是新名），新增 `assertEquals(original, e.originalPath)` |
+
+第三条 `only the succeeded entry of a mixed rename batch is undoable` 也补了 `to` 断言。
+⇒ 上一轮 §6.5 里那句「`from`/`to` 对调的变异**存活**」的**等价变异**预测在本轮兑现：
+该变异（M2）现在**被捕获**。
+
+##### 变异表（6 组，全捕获；`python3 pixfold-d1/artifacts/mutate_w17.py`）
+
+| # | 变异 | 结果 | 捕获者 |
+| --- | --- | --- | --- |
+| M1 | 改名撤销的 `to` 退回 `createdPath`（缺陷 R1 复活） | 捕获 | `UndoAlignmentTest > only the succeeded entry of a mixed rename batch is undoable()` |
+| M2 | 改名撤销的 `from`/`to` 对调 | 捕获 | `ExecutionReportTest > rename undo maps to restoring the original name()` |
+| M3 | 成功项的原文件名改用 `finalName` 填 | 捕获 | 同上 |
+| M4 | 成功项不填原文件名（回落成 `createdPath`） | 捕获 | 同上 |
+| M5 | `originalPath` 不变量弱化（只挡 `Skipped`、放过 `Failed`） | 捕获 | `ExecutionReportTest > a failed entry cannot carry an original path()` |
+| M6 | 回落改成 `requireNotNull`（拿不到原名就抛异常） | 捕获 | `UndoAlignmentTest > a report kind that disagrees with the plan kind is visible in the undo record()` |
+
+```
+总数 6 / 捕获 6 / 存活 0 / 锚点缺失 0 / 编译失败 0
+还原核对：全部逐字节一致（Execution.kt 2b35dd2b36c1 / OperationPlan.kt 5e18dbd48e00）
+```
+
+**两遍一致**：第一遍的 M1 由 `ExecutionReportTest` 捕获、M4 的"捕获者"栏被 Gradle 的
+`> Task :domain:test FAILED` 行抢占（归因取行取错了）；修正归因逻辑（排除 `> Task` 行）后
+第二遍重跑，结论相同、捕获者更精确。第二遍前先做**前置核对**：
+两个生产文件的 sha256 与 `artifacts/w17bak/` 备份**逐字节一致**才开跑。
+
+##### 结论与越界核对
+
+- **R1 关闭**。§4 表格 R1 行状态改为「✅ 已修复（轮 13，W17）」。
+- **未新增待裁决项**；R2/R3/R4 仍未决，均不阻塞。
+- 本轮**改动了生产代码**（`domain/plan/{Execution,OperationPlan}.kt`，+26 行）—— 这是本分支
+  自 W10 终验以来**第一次**改生产代码，因为 R1 是用户明确裁决要修的**真缺陷**（不是余量加固）。
+- **未新增 `TextKey`**（新 `require` 的消息是开发者诊断，中文不建键）；
+  **未改 `app/**`**（`git diff --name-only dev...d3/p1 -- pixfold-d1/app/` = 0 条）；
+  **未改任何 `res/values*/**.xml`**；**未改构建脚本**；**未新增依赖**。
+- ⚠️ lint 读数仍是**旧产物**（`app/build/reports/lint-results-debug.txt` mtime 17:44）：
+  本次 `:app:lintDebug` 执行了，但 `lintAnalyzeDebug` / `lintReportDebug` 为 `UP-TO-DATE`。
+  可判定正确（`app/**` 仍未改），但**不得当作新鲜读数引用**。
+- ⚠️ `ExecutionReportTest > rename undo maps to restoring the original name` 此前**只断言 `from`**，
+  本轮补上 `to` —— 这正是 HANGOFF 所记"测试数量不等于测试强度"的一个实例。
+
+---
+
 ## 4. 待裁决 / 阻塞（越界项写这里，不自行决定）
 
 > 出现下列任一情况，**停止该项**并在此登记，然后继续**下一项**工作：
@@ -1189,7 +1312,7 @@ domain 闸门：**32 files / 425 tests / 0F 0E 0S**（406 → 425，**+19**）�
 
 | # | 轮次 | 事项 | 为什么不能自行决定 | 状态 |
 | --- | --- | --- | --- | --- |
-| R1 | 3（W6） | `UndoOp.RestoreRenamed(from, to)` 在成功项上恒 `from == to`（空操作）—— `executeRenameOp` 成功分支的 `label` 与 `createdPath` 都取 `op.finalName`，报告里**无处**携带原文件名 | 修法有两种且语义不同：①扩 `ExecEntry` 加原名字段；②让 `undoRecordFrom(plan, report)` 从计划取 `op.proposal.image.fileName`（只有它手里有计划）。选哪种、以及 `from`/`to` 的最终语义，都属撤销记录的产品决策；且本轮契约是"既有可观测行为逐字不变" | ⏸ 待用户裁决（不阻塞 W8–W10） |
+| R1 | 3（W6） | `UndoOp.RestoreRenamed(from, to)` 在成功项上恒 `from == to`（空操作）—— `executeRenameOp` 成功分支的 `label` 与 `createdPath` 都取 `op.finalName`，报告里**无处**携带原文件名 | 修法有两种且语义不同：①扩 `ExecEntry` 加原名字段；②让 `undoRecordFrom(plan, report)` 从计划取 `op.proposal.image.fileName`（只有它手里有计划）。选哪种、以及 `from`/`to` 的最终语义，都属撤销记录的产品决策；且本轮契约是"既有可观测行为逐字不变" | ✅ **已修复**（轮 13 / W17：用户 `m04081` 采纳第 ① 种修法 —— `ExecEntry` 增 `originalPath`、`executeRenameOp` 从计划填、`undoOpsOf` 改取它作 `to`；6 组变异全捕获；详见 §3.1 轮 13） |
 | R2 | 3（W7） | `RenamePlannedOp.describe()` 在无原因时只能给 `Msg(TextKey.OpStatusRename)` 一句状态词 | 改名侧**没有**逐项句子契约（`RenamePlanPage` 渲染的是"原名 → 新名"两列 + 状态标签）；要补齐就得**新增 TextKey**，而本轮明令禁止 | ⏸ 待用户裁决（当前行为已够用，非缺陷） |
 | R3 | 7（W11） | `OutputConflictPolicy.Overwrite` + 输出已存在时，报告报 `Succeeded`、`createdPath` = **被替换的那个旧文件**路径，撤销据此推导 `DeleteCreated(该路径)` ⇒ 真执行会**删掉用户原有的 CBZ**，且被覆盖的内容无法恢复 | 「覆盖的撤销」是什么，属产品决策，三种语义完全不同：①当作新建 ⇒ 删掉（现状，会把用户旧文件也删了）②覆盖前先备份 ⇒ 撤销时恢复备份（要给 `ExecEntry` 加"被覆盖路径"字段）③覆盖项标为不可撤销（要把 `OverwriteExisting` 传进 `undoOpsOf`）。**危险动作机制已认识此场景**（`DangerAction.kt` 判 `OverwriteExisting`），只有撤销推导从不查策略。按 §7.1「有歧义先请用户裁决」，故只记录 | ⏸ 待用户裁决（不阻塞余量轮） |
 | R4 | 9（W13） | `validatePageConsistency(volume)` 的输入就是 `renumberPages(volume)` 的**输出**（`ComicInfoXml.kt:111` 调 `:93-97 previewOf`），两者同源 ⇒ ①`pages.size != order.size` 恒假、②校验侧补零位数与重编号侧恒等、③`startsWith("$expected.")` 恒真 ⇒ **`pageIssues` 恒空、`consistent` 恒真**，UI 的告警分支（`app/…/workflowb/PackPreviewPage.kt:204 if (!preview.consistent)`）**不可达** | 要让这两个分支可达，必须改 `validatePageConsistency` 的**输入语义**（例如改成校验"磁盘上真实存在的页"而非"按页序重编号的页"，或校验 `volume.pages` 与 `pageOrder.order` 是否一致）。这改变了"一致性"这个词在 D3 里的含义，且会牵动 UI 告警的触发条件 ⇒ **属产品决策**。本轮只做等价性证明与记录，**不改输入来源** | ⏸ 待用户裁决（不阻塞余量轮；**非本轮引入**，是既有设计） |
@@ -1307,6 +1430,8 @@ cmd.exe /c "D:\Programing\Personal\pixfold\pixfold-d1\run-gradle.bat clean \
   > 轮 12（W16）+19 ⇒ **425**（见 §3.1 轮 12；1 个新建 `text/TextKeyMappingTest.kt` 共 13 条
   > + 5 个既有文件各追加 1–2 条：`ComicMetadataTest` 44 / `NamingEvalTest` 34 / `CbzWriterTest` 21 /
   > `OperationPlanTest` 25 / `RenameLibraryPlanTest` 13）。
+  > 轮 13（W17 / R1）+3 ⇒ **428**（见 §3.1 轮 13；`ExecutionReportTest` 新增 3 条不变量用例，
+  > 并把 `rename undo maps to restoring the original name` 从"只断言 `from`"补成同时钉死 `to`）。
   > `app` 始终 **399** 未变（本分支一行未改 `app/**`）。
 - 产物：`app/build/outputs/apk/debug/app-debug.apk`（33,385,168 字节，mtime 17:43）⇒ `assembleDebug` 真实产出。
 
@@ -1330,6 +1455,10 @@ cmd.exe /c "D:\Programing\Personal\pixfold\pixfold-d1\run-gradle.bat clean \
 > 轮 11（W15）**+8 files / +445 / −0**（6 个新建测试文件 + 2 个既有测试文件各 +1 用例，同样全是测试文件）。
 > 轮 12（W16）**+6 files / +318 / −0**（1 个新建 `text/TextKeyMappingTest.kt` 219 行 + 5 个既有测试文件
 > 共 +99 行，**同样全是测试文件**；生产代码零改动，`git diff --quiet HEAD -- pixfold-d1/domain/src/main` 通过）。
+> 轮 13（W17 / R1 修复）**+5 files / +106 / −35** —— 这是本分支自 W10 终验以来**第一次改生产代码**
+> （`domain/plan/Execution.kt` +23 / `domain/plan/OperationPlan.kt` +3），其余 3 个是测试文件
+> （`plan/UndoAlignmentTest.kt` 重写两条用例、`plan/ExecutionReportTest.kt` +3 用例并补 `to` 断言、
+> `plan/PackingPipelineTest.kt` 仅改注释）。R1 是用户裁决要修的**真缺陷**，不是余量加固。
 > 当前实时读数以 `git diff --stat dev...d3/p1` 为准（结论不变：**改动面只有 `domain/**` + `HANGOFF.md` + 本台账**，
 > `pixfold-d1/app/**` 始终 **0 条**）。
 
@@ -1340,7 +1469,9 @@ cmd.exe /c "D:\Programing\Personal\pixfold\pixfold-d1\run-gradle.bat clean \
 
 | 提交 | 类型 | 内容 |
 | --- | --- | --- |
-| `（轮 12 回填 = 本次提交）` | docs | 台账回填轮 12 提交号（`b0f0e88`） |
+| `（轮 13 回填 = 本次提交）` | docs | 台账回填轮 13（W17 / R1）提交号与读数 |
+| `cc4c30c` | fix | W17 / R1：撤销记录恢复原文件名（+3 用例 ⇒ domain 428） |
+| `47f42ff` | docs | 台账回填轮 12（W16）提交号与读数（收尾轮） |
 | `b0f0e88` | test | W16：五次广扫荡 66 组 → 24 存活 → 23 真缺口全捕获（+19 用例 ⇒ domain 425） |
 | `ffd9433` | docs | 台账回填轮 11（W15）提交号与读数 |
 | `8b3e988` | test | W15：四次广扫荡 64 组 → 32 存活 → 31 真缺口全捕获（+39 用例 ⇒ domain 406） |
