@@ -813,7 +813,7 @@ O1 的第一版断言写在既有用例 `pinned item keeps position across apply
 
 #### 轮 10（2026-10-04 19:1x）— W14 余量加固：第三次广扫荡（换 8 个文件，58 组）
 
-- 提交：`（待回填）` test(d3): 补十处未覆盖表达面（W14 广扫荡 58 组 → 15 存活 → 13 真缺口全捕获）
+- 提交：`3185b15` test(d3): 补十处未覆盖表达面（W14 广扫荡 58 组 → 15 存活 → 13 真缺口全捕获）
 - 改动：4 files / **+138 / −0**（**纯断言增量，生产代码零改动**，`git diff --name-only` 只列测试文件）
   - `pixfold-d1/domain/src/test/kotlin/com/pixfold/d1/domain/naming/NamingWarningsTest.kt`（+73，5 用例）
   - `pixfold-d1/domain/src/test/kotlin/com/pixfold/d1/domain/workflowa/WorkflowAStateTest.kt`（+40，2 用例）
@@ -959,7 +959,7 @@ O1 的第一版断言写在既有用例 `pinned item keeps position across apply
    D3 退出条件的「正式宣布达成」（那是白天的判断）。
 
 > **轮 10 收工时的实测读数**（供早间直接比对，省一次跑闸门；闸门仍以你自己重跑为准）：
-> `git rev-list --count dev..d3/p1` = **19**；`git status --porcelain` 空；
+> `git rev-list --count dev..d3/p1` = **19**（轮 10 测试提交 `3185b15` + 本回填提交）；`git status --porcelain` 空；
 > domain `25 files / 367 tests / 0F 0E 0S`（源码 `@Test` 亦为 **367**，无排除项）、
 > app `42 files / 399 tests / 0F 0E`（源码 `@Test` **400**，差的 1 个是 `NegativeControlTest`，
 > 被 `app/build.gradle.kts` 的 `unitTests.all { exclude("**/NegativeControlTest.class") }` 排除）；
@@ -1041,7 +1041,7 @@ cmd.exe /c "D:\Programing\Personal\pixfold\pixfold-d1\run-gradle.bat clean \
 | 提交 | 类型 | 内容 |
 | --- | --- | --- |
 | `（轮 10 回填 = 本次提交）` | docs | 台账回填轮 10 提交号 |
-| `（待回填）` | test | W14：三次广扫荡 58 组 → 15 存活 → 13 真缺口全捕获（+10 用例 ⇒ domain 367） |
+| `3185b15` | test | W14：三次广扫荡 58 组 → 15 存活 → 13 真缺口全捕获（+10 用例 ⇒ domain 367） |
 | `a1768c7` | docs | 台账回填轮 9 |
 | `52dd0a7` | test | W13：二轮广扫荡 39 组 → 12 存活 → 8 真缺口全捕获（+7 用例 ⇒ domain 357） |
 | `（轮 8 回填）` | docs | 台账回填轮 8 提交号（`3c34c75`） |
