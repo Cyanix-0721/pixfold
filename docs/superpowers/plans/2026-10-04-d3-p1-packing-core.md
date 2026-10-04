@@ -199,6 +199,7 @@ cmd.exe /c "D:\Programing\Personal\pixfold\pixfold-d1\run-gradle.bat :app:lintDe
 | W15 | 余量加固（§3 余量政策）：**第四次广扫荡**——目标面换成此前六次（W7/W8/W11/W12/W13/W14）**从未投过变异**的整个 `model/` 包 + 从零覆盖的 `workflowb/`，共 9 个文件投 **64 组**变异，覆盖 `hasWarningOnly`/`effectiveScheme` 谓词、`hasValue` 三态、`needsConfirmation`、`isOverridden`、`SortRule` 两条守卫、`sizeLabel` 两个阈值、`relPath`/`fileName`、`WorkflowBState` 全部 12 个入口、内存设置存储与 `Msg` 参数契约 | 存活变异必须补到全捕获，或按 §0.4 **给出可复核的等价性证明**并写文档说明 | ✅ 完成（轮 11：64 组 → **32 捕获 / 32 存活 / 0 锚点缺失 / 0 编译失败**；32 个存活者判定为 **31 真缺口 + 1 已证等价**（N6），31 个真缺口补断言后**全部转为捕获**且每条捕获者是**它自己的新用例**；1 个等价者重跑**仍存活**，与证明一致；+39 用例 ⇒ domain **406** 项；生产代码零改动） |
 | W16 | 余量加固（§3 余量政策）：**第五次广扫荡（收尾轮）**——按 AST 精算出的历史覆盖表，挑历史变异组数最少的文件与**零测试引用**的表达面，共 23 个文件投 **66 组**变异，重点覆盖 12 张「枚举 → `TextKey`」映射表、`DangerAction` 文案三元组、`comicVolumeOf`/`setIncluded`/`includedVolumes`/`updateComponent`/`clearOverride`/`containsIllegalChar`/`compareNaturalTokens` 等生产有调用但测试零引用的函数 | 存活变异必须补到全捕获，或按 §0.4 **给出可复核的等价性证明**并写文档说明 | ✅ 完成（轮 12：66 组 → **42 捕获 / 24 存活 / 0 锚点缺失 / 0 编译失败**；24 个存活者判定为 **23 真缺口 + 1 已证等价**（C5），23 个真缺口补断言后**全部转为捕获**；1 个等价者重跑**仍存活**，与证明一致；+19 用例 ⇒ domain **425** 项；生产代码零改动） |
 | W17 | **R1 修复（用户裁决「细说 R1」后授权）**：让撤销记录能恢复原文件名 —— `ExecEntry` 增 `originalPath`（+ 第三条不变量）、`executeRenameOp` 成功分支从 `op.proposal.image.fileName` 填、`undoOpsOf` 的 Rename 分支改取它作 `to` | 红→绿；`from` = 新名（起点）、`to` = 原名（终点）**不同源**；变异验证 0 逃逸 | ✅ 完成（轮 13：**6 组变异全捕获 / 0 存活 / 0 锚点缺失 / 0 编译失败**；两条"如实记录缺陷"用例翻成正向断言 ⇒ +3 用例，domain **428** 项；生产代码 +26 行） |
+| W18 | **R2 补齐（用户裁决「改吧」后授权新增 `TextKey`）**：改名侧逐项句子契约 —— 新增 `TextKey.RenamePlanRename` + 双语 `domain_rename_plan_rename` + `PixFoldText.resId()` 映射；`RenamePlannedOp.describe()` 未跳过项改给「原名 → 新名」，跳过项无原因时回落 `OpStatusSkip`（原为 `OpStatusRename`，等于说"会重命名"却跳过） | 红→绿；**首次改 `app/**`**（资源 + 映射）；变异含**资源内容**变异（占位符数量/方向/重复）且必须全捕获 | ✅ 完成（轮 14：**10 组变异全捕获 / 0 存活 / 0 锚点缺失 / 0 编译失败**；两遍结论一致；domain **429**、app **402**；生产代码 +5 文件 含 2 个双语资源） |
 
 **余量处理**：W1–W10 全部完成且仍有轮次 ⇒ **继续加固核心**（更多边界 / 更多变异 / 更多不变式），
 **不越界**到未授权工作面（适配层检查、D2b、真机、UI）。
@@ -1302,6 +1303,153 @@ BUILD FAILED in 6s
 - ⚠️ `ExecutionReportTest > rename undo maps to restoring the original name` 此前**只断言 `from`**，
   本轮补上 `to` —— 这正是 HANGOFF 所记"测试数量不等于测试强度"的一个实例。
 
+#### 轮 14（2026-10-04 22:2x）— W18 **R2 补齐**：改名侧逐项句子契约（**首次改 `app/**`**）
+
+- 提交：`759ef68` fix(d3): 改名计划行给出「原名 → 新名」（R2：新增 TextKey + 双语资源）
+- 改动：7 files (+183/−14)（生产 5 个：`domain/text/TextKey.kt` +21、`domain/plan/OperationPlan.kt` ±22、
+  `app/…/ui/text/PixFoldText.kt` +3、`app/src/main/res/values/domain_strings.xml` +4、
+  `app/src/main/res/values-zh/domain_strings.xml` +4；测试 2 个：`plan/OperationPlanTest.kt`、
+  `app/…/ui/text/PixFoldTextTest.kt` +111）
+- 闸门：app **402** tests / domain **429** tests / 0F 0E 0S / lint **0 errors, 0 warnings, 4 hints（新鲜读数）** / assembleDebug OK
+- 变异：10 组，**10 捕获 / 0 存活 / 0 锚点缺失 / 0 编译失败**（两遍一致）
+- 结论 / 阻塞 / 待裁决：**R2 关闭**（§4 表格状态已改）。R3/R4 仍未决，均不阻塞。
+
+##### 用户裁决与本轮授权
+
+用户 `m04081` 就 R2 回「**改吧**」⇒ 授权**新增 `TextKey`**；`m04079` 第 ⑤ 项另要求"这属于 i18n 内容，
+顺带实现了，然后看下前面相关 i18n 的要不要调整"。R2 因此**首次改动 `app/**`**
+（此前 13 轮里 `git diff --name-only dev...d3/p1 -- pixfold-d1/app/` 恒为 0 条）——
+改的是**资源与映射**，不是 UI 布局：`RenamePlanPage.kt` 一行未动（理由见下）。
+
+##### 缺陷逐字回顾（修之前）
+
+`HANGOFF.md:2690-2693`：「**R2(非缺陷)**:`RenamePlannedOp.describe()` 在无原因时只能给一句状态词
+(`Msg(TextKey.OpStatusRename)`)—— 改名侧没有逐项句子契约(计划页渲染的是"原名 → 新名"两列)。
+补齐需**新增 `TextKey`**,而本轮明令禁止新增键(会牵动 `PixFoldText.kt` 的穷尽 `when` 与双语资源,
+把 lint 风险引入无人值守窗口)。」
+
+逐条核对后**发现两处，不只一处**：
+1. **未跳过项没有句子**（原记录的那一处）：`describe()` 只回 `Msg(TextKey.OpStatusRename)`——「将重命名」，
+   说不出"从什么改成什么"。
+2. **跳过项无原因时回落方向是错的**（原记录没提）：原实现把"无原因"与"未跳过"**混在同一分支**，
+   于是跳过项若无 `reason` 就会回落到 `OpStatusRename` —— 对一个**将被跳过**的项说「将重命名」，
+   比"没话说"更误导。构造上 `buildRenamePlan` 必给跳过项配 `reason`（`RenamePlan.kt:32-41`
+   取 `warnings.first { Duplicate || IllegalChar }.message`），故这条今天是**不可达**的，
+   但它是同一个 `when` 的另一半，本轮一并摆正。
+
+##### 三处生产改动（逐字）
+
+1. `pixfold-d1/domain/src/main/kotlin/com/pixfold/d1/domain/text/TextKey.kt`：
+   - 文件头前缀清单插 `RenamePlan*`；
+   - 在 `PackSkipOutputExists,` 与「执行报告文本」段之间新开一段
+     `// ---------------- 改名计划行(RenamePlannedOp.describe) ----------------` + **`RenamePlanRename,`**（单键）。
+     其 KDoc 写明：两个参数都是**文件名字符串**、无数量变格（故**不**登记 `pluralQuantityIndex()`）；
+     打包侧有 `PackCreateCbz` 说清"这一项要做什么"，改名侧原先只有一句状态词；
+     ⚠️ 第 1 个参数是**改之前**的名字、第 2 个是**改之后**的 —— 顺序反了句子仍通顺但意思全错。
+2. `domain/src/main/kotlin/com/pixfold/d1/domain/plan/OperationPlan.kt`：
+   `RenamePlannedOp.describe()` 改为**两分支**：
+   `if (op.isSkipped) listOf(op.reason ?: Msg(TextKey.OpStatusSkip)) else listOf(Msg(TextKey.RenamePlanRename, listOf(op.proposal.image.fileName, op.finalName)))`；
+   文件头那句「本文件**不新增任何 [TextKey]**」删除，改为注明轮 14 的例外。
+3. 双语资源 + 映射：`app/src/main/res/values/domain_strings.xml` 增
+   `<string name="domain_rename_plan_rename">Rename %1$s → %2$s</string>`；
+   `app/src/main/res/values-zh/domain_strings.xml` 增 `重命名 %1$s → %2$s`；
+   `app/src/main/kotlin/com/pixfold/d1/ui/text/PixFoldText.kt` 的穷尽 `resId()` 增
+   `TextKey.RenamePlanRename -> R.string.domain_rename_plan_rename`。
+
+##### 为什么落在 `RenamePlannedOp` 而**不**动 `RenamePlanPage.kt`
+
+`grep -rn "\.describe()" --include=*.kt app/src` ⇒ 只有两处消费者，且**都是打包侧**：
+`app/…/ui/plan/PlanComponents.kt:139`（`PlanRow` 收的是 `VolumePackPlan`）与
+`app/test/…/ui/plan/PlanUiTest.kt:81`。改名计划页渲染的是**自己的两列布局**
+（`RenamePlanPage.kt:235 RenamePlanRow` → `:273 text = "→ ${op.finalName}"`），**不经过 `describe()`**。
+因此 `OperationPlan.describe()` 的改名分支在 app 侧**零消费者** —— 本轮补的是**领域层契约**
+（"计划必须可解释"，约束 5）与"键 → 译文"的可解析性，UI 布局保持原样。这是刻意的：
+R2 的授权是"补齐契约 + i18n"，不是重做计划页。
+
+##### 红→绿（两段式，含真实红）
+
+- **红**（先只改测试、生产代码未动）：`:domain:test --rerun-tasks` ⇒
+  `OperationPlanTest > describe of a rename plan spells out the original and the new name() FAILED`
+  与 `… > a skipped rename op without a reason falls back to the skip status word() FAILED`，
+  `429 tests completed, 2 failed`，`BUILD FAILED in 6s` ⇒ **运行期断言红，不是编译错**。
+- **绿**：改完 `describe()` 后同命令 ⇒ `BUILD SUCCESSFUL in 5s`。
+
+##### 两条用例翻正向对照表
+
+| 用例 | 轮 14 之前 | 轮 14 之后 |
+| --- | --- | --- |
+| `OperationPlanTest > describe of a rename plan …` | 原名 `… falls back to the rename status key`，断言 `listOf(Msg(TextKey.OpStatusRename))`（**钉的是缺陷**） | 改名 `… spells out the original and the new name`，断言 `listOf(Msg(TextKey.RenamePlanRename, listOf(原名, 新名)))`（**钉方向**） |
+| `OperationPlanTest > a skipped rename op without a reason …` | 不存在 | 新增：手工造 `reason = null` 的 Skipped 项，断言回落 `OpStatusSkip`（**钉回落方向**） |
+| `PixFoldTextTest > rename plan line …` | 不存在 | 新增 3 条：`… mentions both names with the original first`（手工拼 `Msg`）、`… produced by the domain resolves with both real file names`（完整链路）、`the chinese rename plan line keeps both names with the original first`（`qualifiers = "zh-rCN"`） |
+
+##### ★ 本轮最重要的发现：**"同一条解析路径"的期望值看不见资源写错**
+
+本仓既有做法（`test_strategy = B`）是：UI 措辞**不写死**，期望值一律经 `TestText`/`resolveText`
+从**同一份资源**算出 ⇒ 与语言无关。这在"键 → 资源"这一步上很稳，但有一个**结构性盲区**：
+如果资源**内容本身**写错，期望值与实际值会**一起错**，断言照样全绿。
+
+实证（W18 第一遍）：把英文资源改成只有一个占位符 `Rename %1$s`（第二个文件名被静默吞掉），
+上面那两条比对型断言**全部照常通过**。故本轮补了一条**不依赖措辞、只看句子可观测形状**的判据：
+句子必须**同时提到两个名字，且原名排在新名之前**（`indexOf` 双非负 + 顺序）。
+这一条同时抓住三类资源内容错误：少占位符（名字没出现）、占位符写反（顺序失败）、
+两侧同一占位符（缺一个名字）。
+
+同理，Robolectric 默认 locale 是 `en_US` ⇒ 本文件其余用例跑的全是**英文**那一份，
+`values-zh/` 的内容**一行都不会被读到**；故另加一条 `qualifiers = "zh-rCN"` 的同款形状断言。
+没有它，中文资源被写成方向反的句子时**测试全绿而中文用户看到反的**。
+
+##### 10 组变异表（两遍一致）
+
+| # | 变异 | 判定 | 捕获者 |
+| --- | --- | --- | --- |
+| M1 | `describe` 未跳过分支退回一句状态词（**缺陷原样复活**） | 捕获 | `OperationPlanTest > describe of a rename plan spells out the original and the new name()` |
+| M2 | 两个参数对调（新名在前） | 捕获 | 同上 |
+| M3 | 跳过回落方向反了（回落到「将重命名」） | 捕获 | `OperationPlanTest > a skipped rename op without a reason falls back to the skip status word()` |
+| M4 | 丢掉跳过分支（一律走正向句子） | 捕获 | 同上（2 failed） |
+| M5 | 分支判据用错（把未跳过当跳过） | 捕获 | 同上（3 failed） |
+| M6 | `resId()` 把 `RenamePlanRename` 映射到旧状态词资源 | 捕获 | `PixFoldTextTest > the rename plan line produced by the domain resolves with both real file names` |
+| M7 | `resId()` 映射到跳过状态资源 | 捕获 | 同上 |
+| M8 | **英文资源**少写一个占位符（第二个文件名被吞） | 捕获 | 同上（**这条逼出了上面的形状判据**） |
+| M9 | **中文资源**调换两个占位符（方向反） | 捕获 | `PixFoldTextTest > the chinese rename plan line keeps both names with the original first` |
+| M10 | **中文资源**两侧写成同一个占位符 | 捕获 | 同上 |
+
+```
+总数 10 / 捕获 10 / 存活 0 / 锚点缺失 0 / 编译失败 0
+还原核对: 全部逐字节一致(OperationPlan.kt 2c5cec10989e / TextKey.kt 9368222f75cb /
+          PixFoldText.kt 84d829c5369f / values/domain_strings.xml ad7a49621f20 /
+          values-zh/domain_strings.xml c3e73ebb9a48)
+```
+
+##### ⚠️ 本轮踩到的工具缺陷：备份按 basename ⇒ 双语资源互相覆盖
+
+`values/domain_strings.xml` 与 `values-zh/domain_strings.xml` **同名**。W18 第一遍的备份写
+`BAK / p.name`，于是后写的（中文）覆盖了前一份（英文）；M8 变异后"还原"把**中文内容写进了英文文件**，
+该文件在剩余组里一直是坏的 ⇒ **M8 判成"存活"、M9/M10 判成"编译失败"，三个结论全部作废**。
+破案证据：第一遍汇总把两个同名文件打印成同一个哈希 `c3e73ebb9a48`。
+修法：备份保留**相对路径**（`BAK / p.relative_to(ROOT)`），重跑后两个哈希不同、10 组全捕获、两遍一致。
+教训已写进脚本 KDoc —— `values*/` 下有 **6 组同名资源文件**，任何备份/还原都要保留相对路径。
+英文文件已从 `HEAD` 版本恢复并重新施加 R2 改动（`git diff --stat` 复核 = `2 files changed, 8 insertions(+)`，
+`grep -c "重命名"` 在英文文件上 = **0**）。
+
+##### 结论与越界核对
+
+- **R2 关闭**。§4 表格 R2 行状态改为「✅ 已修复（轮 14 / W18）」。
+- **未新增待裁决项**；R3/R4 仍未决，均不阻塞。
+- 本轮**按用户授权**新增了 1 个 `TextKey` 并**首次改动 `app/**`**（2 个资源 + 1 个映射 + 1 个测试），
+  但 `RenamePlanPage.kt` 等 UI 布局文件**一行未动**；**未改构建脚本**；**未新增依赖**。
+  `HANGOFF.md` **本轮一字未改**（与轮 13 同款处置）：`HANGOFF.md:2690-2693` 记的是**轮 9 当时**
+  "明令禁止新增键"这件事，属历史记录；**R2 的当前状态以本台账 §4 表格为准**（已改 ✅）。
+- 闸门读数（本轮四道闸门后**单独重跑**了 `:app:lintDebug --rerun-tasks` 与
+  `:app:assembleDebug --rerun-tasks` 以免沿用缓存）：`:app:lintDebug` ⇒
+  `32 actionable tasks: 32 executed`，报告 mtime **22:21:53** ⇒ **新鲜读数**，
+  `0 errors, 0 warnings, 4 hints`（4 条仍全为 `AutoboxingStateCreation` hint）。
+  `:app:assembleDebug --rerun-tasks` ⇒ `41 actionable tasks: 41 executed`，
+  APK 33,402,024 字节（mtime 22:22:15；比上一版**小** 3,877 字节 —— 属正常波动，
+  两个新字符串同时写进了 `resources.arsc`，已用 `zipfile` 逐字节回读证实
+  `Rename %1$s → %2$s` 与 `重命名 %1$s → %2$s` 都在 APK 内）。
+- 测试计数口径：`domain` 源码 `@Test` = **429** = XML **429**；`app` 源码 `@Test` = **403**，
+  XML = **402**，差 1 仍是 `NegativeControlTest`（被 `unitTests.all { exclude(...) }` 排除）。
+
 ---
 
 ## 4. 待裁决 / 阻塞（越界项写这里，不自行决定）
@@ -1313,7 +1461,7 @@ BUILD FAILED in 6s
 | # | 轮次 | 事项 | 为什么不能自行决定 | 状态 |
 | --- | --- | --- | --- | --- |
 | R1 | 3（W6） | `UndoOp.RestoreRenamed(from, to)` 在成功项上恒 `from == to`（空操作）—— `executeRenameOp` 成功分支的 `label` 与 `createdPath` 都取 `op.finalName`，报告里**无处**携带原文件名 | 修法有两种且语义不同：①扩 `ExecEntry` 加原名字段；②让 `undoRecordFrom(plan, report)` 从计划取 `op.proposal.image.fileName`（只有它手里有计划）。选哪种、以及 `from`/`to` 的最终语义，都属撤销记录的产品决策；且本轮契约是"既有可观测行为逐字不变" | ✅ **已修复**（轮 13 / W17：用户 `m04081` 采纳第 ① 种修法 —— `ExecEntry` 增 `originalPath`、`executeRenameOp` 从计划填、`undoOpsOf` 改取它作 `to`；6 组变异全捕获；详见 §3.1 轮 13） |
-| R2 | 3（W7） | `RenamePlannedOp.describe()` 在无原因时只能给 `Msg(TextKey.OpStatusRename)` 一句状态词 | 改名侧**没有**逐项句子契约（`RenamePlanPage` 渲染的是"原名 → 新名"两列 + 状态标签）；要补齐就得**新增 TextKey**，而本轮明令禁止 | ⏸ 待用户裁决（当前行为已够用，非缺陷） |
+| R2 | 3（W7） | `RenamePlannedOp.describe()` 在无原因时只能给 `Msg(TextKey.OpStatusRename)` 一句状态词 | 改名侧**没有**逐项句子契约（`RenamePlanPage` 渲染的是"原名 → 新名"两列 + 状态标签）；要补齐就得**新增 TextKey**，而本轮明令禁止 | ✅ **已修复**（轮 14 / W18：用户 `m04081`「改吧」授权新增 `TextKey.RenamePlanRename` —— 未跳过项给出「原名 → 新名」逐项句子，双语资源 + `PixFoldText` 映射同步补齐；顺带修掉跳过项无原因时回落到 `OpStatusRename` 的错误方向；10 组变异全捕获，含 4 组资源内容变异；详见 §3.1 轮 14） |
 | R3 | 7（W11） | `OutputConflictPolicy.Overwrite` + 输出已存在时，报告报 `Succeeded`、`createdPath` = **被替换的那个旧文件**路径，撤销据此推导 `DeleteCreated(该路径)` ⇒ 真执行会**删掉用户原有的 CBZ**，且被覆盖的内容无法恢复 | 「覆盖的撤销」是什么，属产品决策，三种语义完全不同：①当作新建 ⇒ 删掉（现状，会把用户旧文件也删了）②覆盖前先备份 ⇒ 撤销时恢复备份（要给 `ExecEntry` 加"被覆盖路径"字段）③覆盖项标为不可撤销（要把 `OverwriteExisting` 传进 `undoOpsOf`）。**危险动作机制已认识此场景**（`DangerAction.kt` 判 `OverwriteExisting`），只有撤销推导从不查策略。按 §7.1「有歧义先请用户裁决」，故只记录 | ⏸ 待用户裁决（不阻塞余量轮） |
 | R4 | 9（W13） | `validatePageConsistency(volume)` 的输入就是 `renumberPages(volume)` 的**输出**（`ComicInfoXml.kt:111` 调 `:93-97 previewOf`），两者同源 ⇒ ①`pages.size != order.size` 恒假、②校验侧补零位数与重编号侧恒等、③`startsWith("$expected.")` 恒真 ⇒ **`pageIssues` 恒空、`consistent` 恒真**，UI 的告警分支（`app/…/workflowb/PackPreviewPage.kt:204 if (!preview.consistent)`）**不可达** | 要让这两个分支可达，必须改 `validatePageConsistency` 的**输入语义**（例如改成校验"磁盘上真实存在的页"而非"按页序重编号的页"，或校验 `volume.pages` 与 `pageOrder.order` 是否一致）。这改变了"一致性"这个词在 D3 里的含义，且会牵动 UI 告警的触发条件 ⇒ **属产品决策**。本轮只做等价性证明与记录，**不改输入来源** | ⏸ 待用户裁决（不阻塞余量轮；**非本轮引入**，是既有设计） |
 
@@ -1432,6 +1580,10 @@ cmd.exe /c "D:\Programing\Personal\pixfold\pixfold-d1\run-gradle.bat clean \
   > `OperationPlanTest` 25 / `RenameLibraryPlanTest` 13）。
   > 轮 13（W17 / R1）+3 ⇒ **428**（见 §3.1 轮 13；`ExecutionReportTest` 新增 3 条不变量用例，
   > 并把 `rename undo maps to restoring the original name` 从"只断言 `from`"补成同时钉死 `to`）。
+  > 轮 14（W18 / R2）domain +1 ⇒ **429**、app **+2** ⇒ **402**（见 §3.1 轮 14；domain 侧
+  > 一条用例翻正向 + 新增一条回落方向用例；app 侧 `PixFoldTextTest` 新增 3 条，其中
+  > 两条是"句子可观测形状"判据 —— 一条钉英文槽位、一条钉中文槽位）。
+  > ⚠️ 这也是本分支**首次**让 `app` 测试数从 399 变动：此前 13 轮 `app` 恒 399。
   > `app` 始终 **399** 未变（本分支一行未改 `app/**`）。
 - 产物：`app/build/outputs/apk/debug/app-debug.apk`（33,385,168 字节，mtime 17:43）⇒ `assembleDebug` 真实产出。
 
@@ -1459,16 +1611,27 @@ cmd.exe /c "D:\Programing\Personal\pixfold\pixfold-d1\run-gradle.bat clean \
 > （`domain/plan/Execution.kt` +23 / `domain/plan/OperationPlan.kt` +3），其余 3 个是测试文件
 > （`plan/UndoAlignmentTest.kt` 重写两条用例、`plan/ExecutionReportTest.kt` +3 用例并补 `to` 断言、
 > `plan/PackingPipelineTest.kt` 仅改注释）。R1 是用户裁决要修的**真缺陷**，不是余量加固。
-> 当前实时读数以 `git diff --stat dev...d3/p1` 为准（结论不变：**改动面只有 `domain/**` + `HANGOFF.md` + 本台账**，
-> `pixfold-d1/app/**` 始终 **0 条**）。
+> 轮 14（W18 / R2 补齐）**+7 files / +183 / −14** —— 这是本分支**首次改动 `pixfold-d1/app/**`**
+> （用户 `m04081`「改吧」授权新增 `TextKey`）：生产 5 个文件里 2 个是双语资源
+> （`values/domain_strings.xml` 与 `values-zh/domain_strings.xml` 各 +4）、1 个是映射
+> （`ui/text/PixFoldText.kt` +3）、2 个在 domain（`text/TextKey.kt` +21 新增 1 键、
+> `plan/OperationPlan.kt` ±22 改 `describe()` 两分支）；测试 2 个（`plan/OperationPlanTest.kt`
+> 一条翻正向 + 一条新增、`app/…/ui/text/PixFoldTextTest.kt` +111 三条新用例）。
+> ⚠️ `app/**` 的"0 条"结论**从本轮起不再成立**，是**授权范围内**的改动（资源 + 映射 + 测试），
+> UI 布局文件（如 `ui/workflowa/RenamePlanPage.kt`）仍**一行未动**。
+> 当前实时读数以 `git diff --stat dev...d3/p1` 为准；改动面 = `domain/**` + `app/src/main/res/values*/`
+> （2 个文件）+ `app/…/ui/text/PixFoldText.kt` + `app/src/test/**`（1 个文件）+ `HANGOFF.md` + 本台账。
 
 ### 6.4 提交拓扑（`git log --oneline dev..d3/p1`）
 
 > **不写死条数**（终验当时为 9；W10 提交与回填提交各 +1）—— 以命令输出为准。
+> ⚠️ 轮 14 起 `pixfold-d1/app/**` 有改动，故 §6.3 里"`app/**` 始终 0 条"的旧结论**已作废**。
 > 截至 W9/W10 落地的链条如下（最新在上）；**轮 7（W11）至轮 11（W15）的提交与回填见各自小节**：
 
 | 提交 | 类型 | 内容 |
 | --- | --- | --- |
+| `（轮 14 回填 = 本次提交）` | docs | 台账回填轮 14（W18 / R2）提交号与读数 |
+| `759ef68` | fix | W18 / R2：改名计划行给出「原名 → 新名」（+1 `TextKey`、双语资源、映射；domain 429 / app 402） |
 | `（轮 13 回填 = 本次提交）` | docs | 台账回填轮 13（W17 / R1）提交号与读数 |
 | `cc4c30c` | fix | W17 / R1：撤销记录恢复原文件名（+3 用例 ⇒ domain 428） |
 | `47f42ff` | docs | 台账回填轮 12（W16）提交号与读数（收尾轮） |
@@ -1499,7 +1662,14 @@ cmd.exe /c "D:\Programing\Personal\pixfold\pixfold-d1\run-gradle.bat clean \
 
 ### 6.5 结论与明确的"未做"
 
-- **完成**：W0–**W16** 全部 ✅（§3 状态表）；D3 退出条件 1 所要求的**打包领域核心**
+- **完成**：W0–**W18** 全部 ✅（§3 状态表）；D3 退出条件 1 所要求的**打包领域核心**
+  **轮 13（W17）另加**：R1 真缺陷修复（撤销 `from == to` 空操作 ⇒ `ExecEntry.originalPath`），6 组变异全捕获，
+  +3 用例（425 → **428**）。
+  **轮 14（W18）另加**：R2 补齐（新增 `TextKey.RenamePlanRename` + 双语资源 + `resId()` 映射，
+  `RenamePlannedOp.describe()` 未跳过项给出「原名 → 新名」、跳过项无原因回落 `OpStatusSkip`），
+  10 组变异全捕获（含 4 组**资源内容**变异），domain +1 ⇒ **429**、app +2 ⇒ **402**。
+  ⚠️ 本轮是本分支**首次改动 `pixfold-d1/app/**`**（用户 `m04081`「改吧」授权），
+  但只动资源 / 映射 / 测试，UI 布局文件一行未动。
   （`PackagePlan`/`OperationPlan` 语义、`ExecutionReport`、`UndoRecord`）已落地并有 **425** 项单测覆盖。
   **余量轮 7（W11）另加**：条目名撞名守卫（真漏洞，已修）+ 2 用例；
   **余量轮 8（W12）另加**：广扫荡 23 组变异 → 2 存活 → 补断言后全捕获 ⇒ 又 +2 用例（348 → **350**）；
@@ -1536,7 +1706,16 @@ cmd.exe /c "D:\Programing\Personal\pixfold\pixfold-d1\run-gradle.bat clean \
   **R3**（轮 7 新登记）`Overwrite` 策略下撤销会去删**用户原有的文件**（修法三选一，属产品决策）；
   **R4**（轮 9 新登记）页序自检的两个分支**永不可达**（校验输入与重编号输出同源）⇒
   `consistent` 恒真、`PackPreviewPage.kt:204` 的告警分支不可达；修法要改"一致性"的输入语义，属产品决策。
-  **四项均不阻塞余量轮。**
+  **其中 R1 已于轮 13（W17）关闭、R2 已于轮 14（W18）关闭**；**R3/R4 仍未决**，均不阻塞。
+  **轮 13（W17）未新增待裁决项** —— 6 组变异全捕获，无存活者；R1 是用户裁决后按第 ① 种语义落地。
+  **轮 14（W18）未新增待裁决项** —— 10 组变异全捕获，无存活者；R2 是用户「改吧」后按
+  "新增单个 `TextKey` + 双语资源 + 映射"这条最小授权面落地。
+  > ⚠️ **轮 14 的一条覆盖事实，单独记下**（与轮 12 那条互补）：轮 12 已确认"键 → 哪一句译文"
+  > 无自动化检查；轮 14 进一步实证了这个盲区的**具体形态**——资源**内容**写错时，
+  > "期望值经同一份资源算出"的既有做法会让期望值与实际值**一起错**，断言照样全绿。
+  > 本轮用"句子可观测形状"判据（两个名字都出现、原名在前）在**英文**与**中文**两个槽位各补一条，
+  > 才把 3 组资源内容变异从"存活/假编译失败"转为捕获。**该盲区对全部 50+ 个键依然存在**，
+  > 只是现在有了一个可复制的判据形态。
   **轮 8（W12）未新增待裁决项** —— Q1/Q6 两个存活变异都属"断言区分度不够"，
   语义本身没有分歧（四元组顺序、前导点归属在代码里都是确定的），故直接补断言，无需用户裁决。
   **轮 9（W13）新增 R4 一项待裁决** —— 12 个存活者里 8 个是"断言不够"（直接补断言即可），
