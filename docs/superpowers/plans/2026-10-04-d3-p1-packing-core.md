@@ -150,14 +150,14 @@ cmd.exe /c "D:\Programing\Personal\pixfold\pixfold-d1\run-gradle.bat :app:lintDe
 
 | # | 工作项 | 验收（可判定） | 状态 |
 | --- | --- | --- | --- |
-| W0 | 准备：开分支 `d3/p1` + 写本台账 + `create_goal(12)` | 分支存在、台账已提交、goal 已武装 | ✅ 进行中 |
-| W1 | `OperationPlan` 词汇落地：`sealed interface PlannedOp`（`Rename`/`Package`/`DeleteSourceDir`/`CleanEmptyDir`）+ `data class OperationPlan(ops)` 带 `total/skipped/runnable/counts/describe()`；`operationPlanOf(plans)` / `operationPlanOfRenames(ops)` | 红→绿单测；`describe()` **复用既有 `Pack*` 键，不新增 TextKey** | ⬜ |
-| W2 | `executePackagePlans` 改由 `OperationPlan` 驱动（`execute(plan): ExecutionReport`），旧函数保留为薄委托 | 既有 `PackagePlanTest`/`ExecutionReportTest`/`PlanUiTest` **零改动**全绿 | ⬜ |
-| W3 | `executeRenamePlan` 同上（`operationPlanOfRenames`） | 既有 `RenamePlan`/`ExecutionReport` 相关测试零改动全绿 | ⬜ |
-| W4 | `pack/CbzWriter.kt`：`write(comicInfoXml, pages, out, timeMillis)` —— **STORED**（依据 `scripts-behavior-matrix.md:267` 参考脚本用 `ZIP_STORED`）、`ComicInfo.xml` **结构上强制第 0 条**、条目名 UTF-8 | 单测用 `ZipInputStream` 回读：条目顺序、`getMethod() == STORED`、名称集合、内容逐字节相等 | ⬜ |
-| W5 | `pack/CbzWritePlan.kt`：`buildCbzWritePlan(volume)` 复用 `ComicInfo.build` + `renumberPages`；`interface PageByteSource { fun bytesOf(itemId: String): ByteArray? }` + `writeCbz(plan, source, out, timeMillis)` 返回 `CbzWriteResult(written, missing)` | 单测：页序含人工调整、≥100 页跨 3→4 位补零、缺图 → `missing` 而非抛异常 | ⬜ |
+| W0 | 准备：开分支 `d3/p1` + 写本台账 + `create_goal(12)` | 分支存在、台账已提交、goal 已武装 | ✅ 完成（`8d1aa5d`；goal `goal-6d888f82-18f9-4bca-b0de-5181f7bba3ae`，armed / max 12） |
+| W1 | `OperationPlan` 词汇落地：`sealed interface PlannedOp`（`PackagePlannedOp`/`RenamePlannedOp`）+ `data class OperationPlan(kind, ops, dangerActions)` 带 `total/skipped/runnable/counts/describe()`；`operationPlanOf(plans)` / `operationPlanOfRenames(ops)` | 红→绿单测；`describe()` **复用既有 `Pack*` 键，不新增 TextKey** | ✅ 完成（17 用例，`72232c1`） |
+| W2 | `executePackagePlans` 改由 `OperationPlan` 驱动（`executePlan(plan): ExecutionReport`），旧函数保留为薄委托 | 既有 `PackagePlanTest`/`ExecutionReportTest` **零改动**全绿 | ✅ 完成（`72232c1`；`executePackagePlans` 现为一行委托） |
+| W3 | `executeRenamePlan` 同上（`operationPlanOfRenames`） | 既有 `RenamePlan`/`ExecutionReport` 相关测试零改动全绿 | ✅ 完成（`72232c1`；撤销推导收成唯一实现 `undoOpsOf`） |
+| W4 | `pack/CbzWriter.kt`：`write(comicInfoXml, pages, out, timeMillis)` —— **STORED**（依据 `scripts-behavior-matrix.md:267` 参考脚本用 `ZIP_STORED`）、`ComicInfo.xml` **结构上强制第 0 条**、条目名 UTF-8 | 单测用 `ZipInputStream` 回读：条目顺序、`getMethod() == STORED`、名称集合、内容逐字节相等 | ✅ 完成（20 用例，`55408ba`） |
+| W5 | `pack/CbzWritePlan.kt`：`buildCbzWritePlan(volume)` 复用 `ComicInfo.build` + `renumberPages`；`interface PageByteSource { fun bytesOf(itemId: String): ByteArray? }` + `writeCbz(plan, source, out, timeMillis)` 返回 `CbzWriteResult(writtenEntries, missing)` | 单测：页序含人工调整、≥100 页跨 3→4 位补零、缺图 → `missing` 而非抛异常 | ✅ 完成（20 用例，`55408ba`） |
 | W6 | `UndoRecord` / `ExecutionReport` 与新词汇对齐的全路径覆盖 | 单测：Package→`DeleteCreated`、Rename→`RestoreRenamed`、Skipped/Failed 不产生撤销项、`canUndo=false → null` | ⬜ |
-| W7 | 变异清扫（≥ 20 组）覆盖 W1–W6 新增断言 | 0 逃逸；存活变异按 §0.4 处理并记录 | ⬜ |
+| W7 | 变异清扫（W1–W6 合计 ≥ 20 组） | 0 逃逸；存活变异按 §0.4 处理并记录 | 🔄 已完成 W4 8 组 + W5 12 组（19 捕获 / 1 等价） |
 | W8 | 边界与不变式加固（空卷 / 单页 / 重名跳过 / `isBlank` 输出目录 / 冲突策略矩阵） | 新增断言 + 变异验证 | ⬜ |
 | W9 | 文档回写：`HANGOFF.md` §9.1 追加「D3 打包核心轮」+ 本文件写「早间复核清单」 | **只追加**，不改阶段快照 | ⬜ |
 | W10 | 终验：干净工作树重跑四道闸门 + 计数比对 + `git log --oneline dev..d3/p1` 汇总 | 本文件写最终读数 | ⬜ |
@@ -184,6 +184,77 @@ cmd.exe /c "D:\Programing\Personal\pixfold\pixfold-d1\run-gradle.bat :app:lintDe
   `exit_plan_mode` 的批准事件，不构成直接人类消息。若 `create_goal` 被拒 ⇒ 本轮**不自行改成
   默认 256 轮**，按 §5 请用户发一条放行消息。
 - 待裁决：无
+- **结果**：`create_goal` **成功**（`exit_plan_mode` 的批准构成直接人类消息）——
+  `goal.id = goal-6d888f82-18f9-4bca-b0de-5181f7bba3ae`、`revision = 1`、`phase = active`、
+  `activation = armed`、`maxGoalRounds = 12`。上一条阻塞**已解除**。
+
+#### 轮 1（2026-10-04 17:5x）— W1+W2+W3 统一操作词汇
+- 提交：`72232c1` feat(d3): 统一操作词汇 OperationPlan（打包/改名共用一个执行入口，旧入口改薄委托）
+- 改动：`plan/Execution.kt`（改，−34/+? 行：旧两个入口变一行委托、撤销推导收成唯一实现
+  `undoOpsOf`）、`plan/OperationPlan.kt`（新，255 行）、`plan/OperationPlanTest.kt`（新，17 用例）
+- RED 证据：`e: …/OperationPlanTest.kt:41 Unresolved reference 'operationPlanOf'`、
+  `:209 Unresolved reference 'executePlan'`
+- 闸门：`BUILD SUCCESSFUL in 48s` / `62 actionable tasks: 17 executed, 45 up-to-date` /
+  app 42 files · 399 tests / domain 21 files · 264 tests / 0F 0E / lint 0 告警 /
+  assembleDebug OK
+- 变异：留到 W7 汇总（W1–W3 的断言在 W7 与 W4/W5 一起清扫）
+- 设计决定（**后续勿推翻**）：
+  1. `PlannedOp` 只有 `PackagePlannedOp` / `RenamePlannedOp` 两个实现 ——
+     「清理空目录」是**计划级字段** `OperationPlan.dangerActions`，不造 `PlannedOp`。
+     理由：给它造一条 op 会让计划项数凭空 +1，报告与计划行数对不上。
+  2. `OperationPlan.init` 用 `require(ops.all { it.kind == kind })` 强制同质 ——
+     撤销语义按 `ExecKind` 分（Package→`DeleteCreated`、Rename→`RestoreRenamed`），
+     混装会用错的回滚方式。诊断消息保持中文字面量（不是用户文案）。
+  3. 执行分支**复制**而非"桥接"：`executePackageOp` 内部直接读 `item.plan`，
+     保证既有可观测行为逐字不变；旧入口只做一行委托。
+  4. `RenamePlannedOp.describe()` 只能给「跳过原因 或 `Msg(TextKey.OpStatusRename)`」——
+     改名侧没有逐项句子契约，且**不新增 TextKey**（§0.2 禁令 2）。
+- 结论 / 阻塞 / 待裁决：无
+
+#### 轮 2（2026-10-04 18:3x）— W4+W5 CBZ 字节生成与写入计划
+- 提交：`55408ba` feat(d3): CBZ 字节生成与写入计划（CbzWriter + CbzWritePlan + PageByteSource）
+- 改动：`pack/CbzWriter.kt`（新，128 行）、`pack/CbzWritePlan.kt`（新，139 行）、
+  `pack/CbzWriterTest.kt`（新，20 用例）、`pack/CbzWritePlanTest.kt`（新，20 用例）
+- RED 证据：`e: …/CbzWriterTest.kt:33 Unresolved reference 'CbzEntry'`、`:41 Unresolved reference 'CbzWriter'`；
+  第二轮 `e: …/CbzWritePlanTest.kt:62 Unresolved reference 'PageByteSource'`、`:66 Unresolved reference 'CbzWritePlan'`、
+  `:85 Unresolved reference 'buildCbzWritePlan'`（共 31 处未解析引用）
+- 闸门：`BUILD SUCCESSFUL` / exit 0 / app 42 files · 399 tests（未变，正确）/ 
+  domain 23 files · 305 tests / 0F 0E / lint 0 告警 / assembleDebug OK
+- 变异：**20 组，19 捕获，1 等价**
+  - W4 第一轮 6 组：M1 排序 ✓、M2 改 DEFLATED ✓、M3 忽略 timeMillis ✓、
+    M4 去掉 require ✓、**M5 `toByteArray()` 平台默认编码 —— 存活**、
+    **M6 `close()` 替 `finish()` —— 存活**
+  - 因 M5/M6 存活而**补断言**：新增 `the caller's stream is left open`（用带 `closed` 标记的
+    `TrackingStream`，因 `ByteArrayOutputStream.close()` 是空操作测不出）、
+    `a finished stream is still usable by the caller`、`an empty entry name is rejected`、
+    `a directory shaped entry name is rejected`、`entries compare by byte content rather than identity`
+  - 补断言后第二轮 7 组：M5b 显式 `ISO_8859_1` ✓（⇒ M5 是**等价变异**：Gradle 测试 JVM 的
+    `file.encoding` 就是 UTF-8，故 `toByteArray()` 与 `toByteArray(Charsets.UTF_8)` 在本机
+    不可区分；断言本身有效，已用 M5b 证实）、M6 `close()` ✓、M7 去空名 require ✓、
+    M8 去目录名 require ✓、M9 去自定义 equals ✓、M10 `contentEquals`→引用相等 ✓、
+    M11 先写页后写 XML ✓
+  - W5 第一轮 10 组：N1 写部分（非全有或全无）✓、N2 missing 按卷序而非计划序 ✓、
+    N3 writtenEntries 漏 ComicInfo ✓、N4 去重名 require ✓、**N5 去空 XML require —— 存活**、
+    N6 去 timeMillis require ✓、N7 用 `volume.pages` 而非 `pageOrder` ✓、
+    N8 忽略 `renumberPages` 补零 ✓、N9 `ok` 恒真 ✓、N10 缺图时伪造 writtenEntries ✓
+  - 因 N5 存活而**补断言** `an empty comic info xml is rejected`（并顺手把原
+    `a plan with no pages still carries a usable comic info xml` 从 `assertNull` 反写法
+    改成 `assertTrue(isNotEmpty())`，读起来才是正向断言）
+  - 补断言后第二轮 2 组：N5 ✓（被新用例杀死）、N11 `ok` 恒假 ✓
+- 设计决定（**后续勿推翻**）：
+  1. **全有或全无**：任何一页取不到字节 ⇒ 一个字节都不写。理由：参考脚本
+     `batch_pack_cbz.py` 遇到读不到的文件会抛 `IOError` 终止，**绝不**产出少页的 CBZ；
+     若"能读到几页就写几页"，调用方会拿到一个**看起来完全正常**的 CBZ（能打开、
+     ComicInfo 也在，只是页数少了）。
+  2. **先全部探测再决定写不写**，探测顺序 = 计划顺序 —— 既让 `missing` 顺序可预期，
+     也避免"边写边取"留下半成品。
+  3. `timeMillis` 校验在 `writeCbz` 里**前置**（`CbzWriter.write` 里也有同一断言）——
+     否则 `timeMillis = 0` + 缺图会静默返回「缺图」而不指出时间戳有问题。
+  4. **重名检测放在 `CbzWritePlan`，不放 `CbzWriter`** —— 后者是字节原语，职责是把给定条目
+     照原样写出来；重名与否是**计划的正确性**问题，该在有名字来源的那层判。
+  5. `CbzWriteResult.writtenEntries` 是 `List<String>`（含 `ComicInfo.xml`）而非计数 ——
+     报告必须能与归档实际内容逐条核对。
+- 结论 / 阻塞 / 待裁决：无
 
 ---
 
