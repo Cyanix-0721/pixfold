@@ -257,6 +257,7 @@ cmd.exe /c "D:\Programing\Personal\pixfold\pixfold-d1\run-gradle.bat :app:lintDe
 - 结论 / 阻塞 / 待裁决：无
 
 #### 轮 3（2026-10-04 18:5x）— W6+W7 撤销全路径对齐 + 变异清扫
+- 提交：`e82cdb9` test(d3): 撤销/报告全路径对齐 + 30 组变异清扫（28 捕获 / 2 等价）
 - 改动：`domain/src/test/kotlin/com/pixfold/d1/domain/plan/UndoAlignmentTest.kt`（新，16 用例）、
   `OperationPlanTest.kt`（+6 用例：runnable 真实读数、label 真实杀伤力、skipReason 契约、
   失败行回落原名、describe 三条路径）、`OperationPlan.kt`（**仅把 `executePackageOp` /
