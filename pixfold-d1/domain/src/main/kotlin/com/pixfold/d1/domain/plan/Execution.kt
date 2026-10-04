@@ -99,76 +99,25 @@ enum class ExecKind(val titleKey: TextKey) {
  *  - 计划已标记 skipped → 跳过,并沿用计划的 skipReason。
  *
  * 先判"计划跳过"再判失败:计划说要跳过的卷,其失败条件无意义,报"失败"会误导。
+ *
+ * **实现已收进统一词汇**([executePlan] + [PackagePlannedOp]):本函数保留原签名与
+ * 逐字行为,只做薄委托 —— D3 之前"打包"与"改名"各有一套执行逻辑,新增第三种操作
+ * (复制/移动)时没有任何结构提示"还得再补一份"。现在两种操作共用
+ * [PlannedOp] 与 [executePlan],加一种就是编译期错误而不是静默漏掉。
  */
-fun executePackagePlans(plans: List<VolumePackPlan>): ExecutionReport {
-    val entries = plans.map { plan ->
-        val v = plan.volume
-        when {
-            plan.skipped -> ExecEntry(
-                id = v.id,
-                label = v.cbzFileName,
-                outcome = ExecOutcome.Skipped,
-                reason = plan.skipReason,
-            )
-
-            v.pageCount == 0 -> ExecEntry(
-                id = v.id,
-                label = v.cbzFileName,
-                outcome = ExecOutcome.Failed,
-                reason = Msg(TextKey.PackFailNoPages),
-            )
-
-            v.outputDir.isBlank() -> ExecEntry(
-                id = v.id,
-                label = v.cbzFileName,
-                outcome = ExecOutcome.Failed,
-                reason = Msg(TextKey.PackFailEmptyOutputDir),
-            )
-
-            else -> ExecEntry(
-                id = v.id,
-                label = v.cbzFileName,
-                outcome = ExecOutcome.Succeeded,
-                createdPath = plan.outputPath,
-            )
-        }
-    }
-    return ExecutionReport(entries, ExecKind.Package)
-}
+fun executePackagePlans(plans: List<VolumePackPlan>): ExecutionReport =
+    executePlan(operationPlanOf(plans))
 
 /**
  * 执行重命名计划(模拟)。
  *
  * 失败判定:目标文件名为**空** → 失败「新名称为空」(用户清空覆盖框即可触发,
  * 领域层另有"空 = 撤销覆盖"的语义,但若最终名仍为空则无法执行)。
+ *
+ * **实现已收进统一词汇**([executePlan] + [RenamePlannedOp]),理由同 [executePackagePlans]。
  */
-fun executeRenamePlan(ops: List<RenameOp>): ExecutionReport {
-    val entries = ops.map { op ->
-        when {
-            op.isSkipped -> ExecEntry(
-                id = op.id,
-                label = op.finalName,
-                outcome = ExecOutcome.Skipped,
-                reason = op.reason,
-            )
-
-            op.finalName.isBlank() -> ExecEntry(
-                id = op.id,
-                label = op.proposal.image.fileName,
-                outcome = ExecOutcome.Failed,
-                reason = Msg(TextKey.RenameFailEmptyName),
-            )
-
-            else -> ExecEntry(
-                id = op.id,
-                label = op.finalName,
-                outcome = ExecOutcome.Succeeded,
-                createdPath = op.finalName,
-            )
-        }
-    }
-    return ExecutionReport(entries, ExecKind.Rename)
-}
+fun executeRenamePlan(ops: List<RenameOp>): ExecutionReport =
+    executePlan(operationPlanOfRenames(ops))
 
 // ---- 撤销(规格 §9.2:提供但为 mock) ----
 
@@ -192,20 +141,30 @@ data class UndoRecord(val ops: List<UndoOp>, val kind: ExecKind) {
 }
 
 /** 从报告推导撤销记录;没有成功项时返回 null(没有可撤销的东西)。 */
-fun undoRecordOf(report: ExecutionReport): UndoRecord? {
+fun undoRecordOf(report: ExecutionReport): UndoRecord? =
+    undoOpsOf(report, report.kind)?.let { UndoRecord(it, report.kind) }
+
+/**
+ * 撤销动作的**唯一**推导实现(按 [kind] 选回滚语义)。
+ *
+ * 只需一道判据:`ExecEntry` 的 init 已强制"只有成功项才有 createdPath"
+ * (createdPath 非空 ⟺ Succeeded)。此前这里并列了 outcome 与 path 两道等价判据,
+ * 属冗余 —— 冗余的代价是"去掉一道仍有另一道兜着",于是缺陷能被掩盖(见 ExecEntry 注释)。
+ *
+ * 收成一处之后,统一入口 [undoRecordFrom] 与既有的 [undoRecordOf] 不可能再漂移:
+ * 两者只差"kind 从哪来"(计划 vs 报告)。
+ *
+ * @return 逆向操作列表;没有可撤销的东西时返回 null
+ */
+internal fun undoOpsOf(report: ExecutionReport, kind: ExecKind): List<UndoOp>? {
     if (!report.canUndo) return null
-    // 只需一道判据:`ExecEntry` 的 init 已强制"只有成功项才有 createdPath"
-    // (createdPath 非空 ⟺ Succeeded)。此前这里并列了 outcome 与 path 两道等价判据,
-    // 属冗余 —— 冗余的代价是"去掉一道仍有另一道兜着",于是缺陷能被掩盖(见 ExecEntry 注释)。
-    val ops = report.entries
-        .mapNotNull { e ->
-            val path = e.createdPath ?: return@mapNotNull null
-            when (report.kind) {
-                ExecKind.Package -> UndoOp.DeleteCreated(path)
-                ExecKind.Rename -> UndoOp.RestoreRenamed(from = e.label, to = path)
-            }
+    return report.entries.mapNotNull { e ->
+        val path = e.createdPath ?: return@mapNotNull null
+        when (kind) {
+            ExecKind.Package -> UndoOp.DeleteCreated(path)
+            ExecKind.Rename -> UndoOp.RestoreRenamed(from = e.label, to = path)
         }
-    return UndoRecord(ops, report.kind)
+    }
 }
 
 /** 撤销结果。D1 为 mock,故 [applied] 恒为 false,由 [message] 说明原因。 */
