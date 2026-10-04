@@ -421,7 +421,7 @@ cmd.exe /c "D:\Programing\Personal\pixfold\pixfold-d1\run-gradle.bat :app:lintDe
 
 #### 轮 5（2026-10-04 17:3x）— W9 文档回写（`HANGOFF.md` 只追加）
 
-- 提交：（见下方回填行）
+- 提交：`ea78b3c` docs(d3): 回写 HANGOFF §9.1「D3 打包核心轮」+ 校正变异计数口径（W9）
 - 改动：`HANGOFF.md`（**仅追加一个小节**，插在 `### D1.1` 末尾 `**已提交** `3ca85b0`…` 之后、
   `### D2：平台能力验证`（`:2688` 附近）之前 —— 即 `HANGOFF.md:2611` 起的
   `#### ✅ D3 打包核心轮:统一操作词汇 + CBZ 字节生成(2026-10-04 分支 `d3/p1`,**未合并、未推送**)`）
@@ -460,7 +460,7 @@ cmd.exe /c "D:\Programing\Personal\pixfold\pixfold-d1\run-gradle.bat :app:lintDe
 
 #### 轮 6（2026-10-04 17:4x）— W10 终验（**带 `clean` 的全量重建**）
 
-- 提交：（见下方回填行）
+- 提交：`6682986` docs(d3): W10 终验读数（带 clean 的全量重建 64/64 + 越界逐条核对）
 - 改动：**仅本台账**（§3 W10 状态、本轮记录、`## 6. 自检结果` 全部填写）。
   **未改任何 Kotlin、未改 `HANGOFF.md`** ⇒ 本轮不可能影响闸门读数。
 - 做法：前置条件 = 工作树干净（`git status --porcelain` 空、`git stash list` 空），
@@ -542,8 +542,10 @@ cmd.exe /c "D:\Programing\Personal\pixfold\pixfold-d1\run-gradle.bat :app:lintDe
 
 ### 6.1 终验环境
 
-- 分支：`d3/p1`（`git rev-parse --abbrev-ref HEAD`）；提交数 `git rev-list --count dev..d3/p1` = **9**
-  （**不写死数字**，以命令输出为准；每次回填提交后会 +1）。
+- 分支：`d3/p1`（`git rev-parse --abbrev-ref HEAD`）。
+- 提交数：**以 `git rev-list --count dev..d3/p1` 的实时输出为准，此处不写死数字** ——
+  终验当时读到 **9**；此后 W10 自身的提交（`6682986`）与本次回填提交各 +1，现已更多。
+  这正是"不写死"的理由：每一次文档提交都会让写死的数字立刻过期。
 - 工作树：`git status --porcelain` 空、`git stash list` 空（终验**在干净工作树上跑**）。
 - 时间：`2026-10-04 17:43–17:45 (+08:00)`。
 
@@ -590,10 +592,14 @@ cmd.exe /c "D:\Programing\Personal\pixfold\pixfold-d1\run-gradle.bat clean \
   ⇒ 无命中；`pixfold-d1/artifacts/` 被 `pixfold-d1/.gitignore:9` 忽略（`git check-ignore -v` 已证实），
   变异脚本与备份**未入库**。
 
-### 6.4 提交拓扑（`git log --oneline dev..d3/p1`，9 条）
+### 6.4 提交拓扑（`git log --oneline dev..d3/p1`）
+
+> **不写死条数**（终验当时为 9；W10 提交与回填提交各 +1）—— 以命令输出为准。
+> 截至 W9/W10 落地的链条如下（最新在上）：
 
 | 提交 | 类型 | 内容 |
 | --- | --- | --- |
+| `6682986` | docs | W10：终验读数（带 `clean` 的全量重建 64/64 + 越界逐条核对） |
 | `ea78b3c` | docs | W9：`HANGOFF.md` §9.1 追加「D3 打包核心轮」+ 变异计数口径校正 |
 | `4359761` | docs | 台账回填轮 4 |
 | `a22a12a` | test | W8 跨层不变式（17 用例 / 16 变异全捕获） |
