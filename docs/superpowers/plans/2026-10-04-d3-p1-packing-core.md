@@ -135,6 +135,8 @@ cmd.exe /c "D:\Programing\Personal\pixfold\pixfold-d1\run-gradle.bat :app:lintDe
 | `pixfold-d1/domain/src/test/kotlin/com/pixfold/d1/domain/pack/CbzWriterTest.kt` | **新** | W4 |
 | `pixfold-d1/domain/src/test/kotlin/com/pixfold/d1/domain/pack/CbzWritePlanTest.kt` | **新** | W5 |
 | `pixfold-d1/domain/src/test/kotlin/com/pixfold/d1/domain/plan/UndoAlignmentTest.kt` | **新** | W6 |
+| `pixfold-d1/domain/src/test/kotlin/com/pixfold/d1/domain/plan/PackingPipelineTest.kt` | **新**：跨层不变式（计划页数 ↔ 归档条目数、成功 ↔ 可写、计划行 ↔ 报告行、撤销 ↔ 已创建） | W8 |
+| `pixfold-d1/artifacts/mutate_w8.py` + `artifacts/w8bak/` | 变异脚本与备份（`artifacts/` 已 gitignore，**不入库**） | W8 |
 | `HANGOFF.md` | 改：§9.1 追加「D3 打包核心轮」小节（**只追加**） | W9 |
 | `docs/superpowers/plans/2026-10-04-d3-p1-packing-core.md` | 本文件（台账） | 全程 |
 
@@ -158,7 +160,7 @@ cmd.exe /c "D:\Programing\Personal\pixfold\pixfold-d1\run-gradle.bat :app:lintDe
 | W5 | `pack/CbzWritePlan.kt`：`buildCbzWritePlan(volume)` 复用 `ComicInfo.build` + `renumberPages`；`interface PageByteSource { fun bytesOf(itemId: String): ByteArray? }` + `writeCbz(plan, source, out, timeMillis)` 返回 `CbzWriteResult(writtenEntries, missing)` | 单测：页序含人工调整、≥100 页跨 3→4 位补零、缺图 → `missing` 而非抛异常 | ✅ 完成（20 用例，`55408ba`） |
 | W6 | `UndoRecord` / `ExecutionReport` 与新词汇对齐的全路径覆盖 | 单测：Package→`DeleteCreated`、Rename→`RestoreRenamed`、Skipped/Failed 不产生撤销项、`canUndo=false → null` | ✅ 完成（`UndoAlignmentTest` 16 用例，轮 3） |
 | W7 | 变异清扫（W1–W6 合计 ≥ 20 组） | 0 逃逸；存活变异按 §0.4 处理并记录 | ✅ 完成：**合计 30 组，28 捕获 / 2 等价**（等价项理由均写进台账：M5 编码无关、P5 见 R1）。其中 9 组经「补断言」后由存活转为捕获 |
-| W8 | 边界与不变式加固（空卷 / 单页 / 重名跳过 / `isBlank` 输出目录 / 冲突策略矩阵） | 新增断言 + 变异验证 | ⬜ |
+| W8 | 边界与不变式加固（空卷 / 单页 / 重名跳过 / `isBlank` 输出目录 / 冲突策略矩阵） | 新增断言 + 变异验证 | ✅ 完成（`PackingPipelineTest` 17 用例，轮 4；**16 组变异全捕获**，其中 4 组只可能由本轮新增用例捕获 ⇒ 补的是真缺口） |
 | W9 | 文档回写：`HANGOFF.md` §9.1 追加「D3 打包核心轮」+ 本文件写「早间复核清单」 | **只追加**，不改阶段快照 | ⬜ |
 | W10 | 终验：干净工作树重跑四道闸门 + 计数比对 + `git log --oneline dev..d3/p1` 汇总 | 本文件写最终读数 | ⬜ |
 
@@ -328,6 +330,72 @@ cmd.exe /c "D:\Programing\Personal\pixfold\pixfold-d1\run-gradle.bat :app:lintDe
   3. 新测试的破坏性读数必须**写死具体数字**（如 `runnable == 4`）而非复算
      （`total - skipped`）—— 后者与实现同构，等于没有断言。P14 证实了这一点。
 - 结论 / 阻塞 / 待裁决：**R1 登记待裁决**（不阻塞后续 W8–W10，因为不改行为）
+
+#### 轮 4（2026-10-04 17:2x）— W8 边界与跨层不变式加固
+
+- 目标：补上**层与层之间**的等式。到 W7 为止每层各自被钉死了（`PackagePlanTest` 管"计划说什么"、
+  `ExecutionReportTest` 管"报告说什么"、`CbzWriterTest` 管"字节写成什么"），但**没有任何一条用例把三层连起来** ——
+  "计划宣称 16 页 + 报告说成功 + 归档里只有 15 张"这种坏成品可以全绿通过。
+- 新增 `pixfold-d1/domain/src/test/kotlin/com/pixfold/d1/domain/plan/PackingPipelineTest.kt`（17 用例，首跑即绿）。
+  该文件头部注释写明了「为什么单层测试不够」与「与既有用例的分工」，避免后续被当成重复用例删掉。
+- 覆盖的四类不变式：
+  1. **页数同源**：`PackPackPages` 行的实参 == 归档里除 `ComicInfo.xml` 外的条目数；
+     `VolumePackPlan.pageCount` == `CbzWritePlan.pageCount`（对**全部五卷**）；
+     人工删掉一页后宣称页数与条目数同步 −1（反向守卫，防止"两个页数都恒等于 `pages.size`"而假性相等）。
+  2. **成功项真的写得出来**：报告里每个 `Succeeded` 的项，其卷都 `writeCbz` 成功且 `createdPath == plan.outputPath`；
+     失败项必须 `createdPath == null` 且其写入计划确实为空页。
+  3. **计划行 ↔ 报告行对齐**（3×2 全策略矩阵）：行数、id 序列、label 序列逐行相等；
+     三类计数之和 == `plan.total`；`plan.skipped == report.skippedCount`。
+  4. **撤销只指向已创建**：`DeleteCreated` 的路径集合 **恰好** == 报告 `createdPath` 集合；
+     `RestoreRenamed` 只断言 `from`（`to` 的方向正是 R1 的对象，钉死它会在 R1 修复时假性变红）。
+- **补上的真实覆盖缺口（变异证明见下）**：`ExecutionReportTest` 只用 `""` 测空输出目录，
+  而 `isBlank()` 与 `isEmpty()` 在 `""` 上**同解** ⇒ 改成 `isEmpty()` 不会被任何既有用例发现。
+  新增用例遍历 `""` / `" "` / `"   "` / `"\t"` / `"\n"` 五种纯空白。
+  同理钉住**反向边界**：纯空白作者 `"   "` 在 XML 与计划行两侧都必须按"有值"处理
+  （`isNullOrEmpty` 而非 `isBlank` 的刻意选择），空串则两侧都给占位（`<Writer />` + `PackValueEmpty`）。
+- RED 证据：无（本项是**补断言**，实现未改 ⇒ 首跑即绿属预期）。
+  故**不依赖"先红后绿"来证明断言有效**，改由 16 组变异全捕获来证明（见下）。
+- 四道闸门：`BUILD SUCCESSFUL in 3s`，`62 actionable tasks: 4 executed, 58 up-to-date`，exit 0；
+  XML `app: 42 files / 399 tests / 0F 0E`（**未变，正确** —— 本分支不碰 `app/**`）、
+  `domain: 25 files / 345 tests / 0F 0E`（328 → 345，+17）。
+- lint 读数复核（**重要**）：`:app:lintDebug` 的 analyze/report 任务长期 `UP-TO-DATE`，
+  报告文件仍是 2026-09-29 的旧产物（`0 errors, 0 warnings, 4 hints`）。
+  已用 `git diff --name-only dev...d3/p1 -- pixfold-d1/app/` 确认**本分支从未改动 `app/**`** ⇒
+  UP-TO-DATE 是正确行为而非假绿；4 个 hint 均为 `AutoboxingStateCreation`（Jetpack Compose），
+  hint 不计入 `warningsAsErrors`。故"lint 0 告警"结论成立，但**后续轮次不要把它当成"新鲜读数"引用**。
+- 变异清扫 **16 组，16 捕获 / 0 存活 / 0 锚点缺失**（脚本 `pixfold-d1/artifacts/mutate_w8.py`，
+  备份落 `pixfold-d1/artifacts/w8bak/`，两处均已 gitignore）：
+
+  | # | 变异 | 作用文件 | 结果 | 捕获者 |
+  | --- | --- | --- | --- | --- |
+  | M1 | `v.outputDir.isBlank()` → `isEmpty()` | `plan/OperationPlan.kt` | 捕获 | **本文件新增**的 `a whitespace only output dir fails exactly like an empty one` |
+  | M2 | `field` 的 `isNullOrEmpty()` → `isNullOrBlank()` | `comic/ComicInfoXml.kt` | 捕获 | **本文件新增**的 `a whitespace only writer is written verbatim on both sides` |
+  | M3 | 计划行 `v.writer.isEmpty()` → `isBlank()` | `plan/PackagePlan.kt` | 捕获 | 同上 |
+  | M4 | `v.pageCount == 0` → `v.pages.isEmpty()` | `plan/OperationPlan.kt` | 捕获 | 4 条（既有 `ExecutionReportTest` ×2 + 本文件） |
+  | M5 | 写入计划改读 `volume.pages` 而非页序 | `pack/CbzWritePlan.kt` | 捕获 | 4 条（含本文件 `a volume whose page order was edited…`） |
+  | M6 | 计划 `pageCount = v.pages.size` | `plan/PackagePlan.kt` | 捕获 | **仅**本文件 `a volume whose page order was edited still announces the edited count` |
+  | M7 | `CbzWriter` 只写第一页 | `pack/CbzWriter.kt` | 捕获 | 7 条 |
+  | M8 | 报告行逆序 | `plan/OperationPlan.kt` | 捕获 | 2 条（含本文件全矩阵） |
+  | M9 | 报告丢弃失败行 | `plan/OperationPlan.kt` | 捕获 | 10 条 |
+  | M10 | `createdPath` 用 `cbzFileName` 而非冲突改名后的 `outputPath` | `plan/OperationPlan.kt` | 捕获 | 4 条（含本文件 `every operation reported as succeeded…`） |
+  | M11 | `skipped` 数成未跳过 | `plan/OperationPlan.kt` | 捕获 | 5 条 |
+  | M12 | `runnable = total` | `plan/OperationPlan.kt` | 捕获 | 1 条 |
+  | M13 | `canUndo` 恒真 | `plan/Execution.kt` | 捕获 | 5 条（含本文件 2 条） |
+  | M14 | 打包撤销删 `label` 而非 `createdPath` | `plan/Execution.kt` | 捕获 | 3 条（含本文件） |
+  | M15 | 改名撤销 `from` 改常量 | `plan/Execution.kt` | 捕获 | 4 条（含本文件） |
+  | M16 | 丢掉 `included` 过滤 | `plan/PackagePlan.kt` | 捕获 | 3 条（含本文件） |
+
+  **M1/M2/M3/M6 的捕获者只可能是本文件新增的用例** —— 这直接证明 W8 补的是真缺口，而不是重复断言。
+- 设计决定（**后续勿推翻**）：
+  1. 跨层断言只连"三层之间"，不重测单层细节 —— 单层细节已有归属文件，重复写会让后续改动时
+     "改一处红三处"，掩盖真正失效的那条。
+  2. `rename undo` 只钉 `from`，**刻意不钉 `to`** —— `to` 的方向是 R1 的待裁决对象；
+     钉死会在 R1 按任一方案修复时把一条正确改动误报为回归。
+  3. 变异脚本与备份移到 `pixfold-d1/artifacts/`（已 gitignore）而不是 `/tmp`：
+     本次实测发现**写入工具的 `/tmp` 与 bash 的 `/tmp` 不是同一个命名空间**（`write` 落盘的文件
+     bash 侧看不到），落工作区内的忽略目录才是可靠做法。
+- 结论 / 阻塞 / 待裁决：无新增待裁决项（R1/R2 仍未决，不阻塞）。
+  源码**零改动**（只新增测试文件），故本轮不存在行为变化风险。
 
 ---
 
