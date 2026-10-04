@@ -90,4 +90,28 @@ class NaturalOrderTest {
         assertEquals(listOf("千万"), tokenizeNatural("千万"))
         assertEquals(listOf("〇"), tokenizeNatural("〇"))
     }
+
+    @Test
+    fun `malformed chinese numeral runs are left as plain text`() {
+        // 可解析的形式只有 十 / 十X / XY / X十Y(XY 各是一位 一~九)。
+        // 其余罗列必须原样留作文本,否则会被当成一个数值参与比较,顺序静默改变。
+        assertEquals(listOf("一二三"), tokenizeNatural("一二三"), "多字罗列不是数字")
+        assertEquals(listOf("十二三"), tokenizeNatural("十二三"), "十后面最多接一位")
+        assertEquals(listOf("十十"), tokenizeNatural("十十"), "十不是个位数字")
+    }
+
+    @Test
+    fun `one side digits still compares by code unit`() {
+        // 一边数字段、一边文本段时必须走码点比较:'9'(0x39) > '!'(0x21)。
+        // 若误走"数值分支",会得到 1 位 < 2 位的反结果。
+        assertTrue(naturalCompare("9", "!x") > 0, "一边数字一边非数字应按码点比较,不能按有效长度")
+    }
+
+    @Test
+    fun `tokenizer does not append an empty token when the name ends with digits`() {
+        // 末尾那句 `if (last < s.length)` 是刻意的:记号序列里只允许非空段。
+        assertEquals(listOf("IMG_", "10"), tokenizeNatural("IMG_10"))
+        assertEquals(listOf("page", "07"), tokenizeNatural("page07"))
+        assertTrue(tokenizeNatural("").isEmpty(), "空串没有任何记号")
+    }
 }

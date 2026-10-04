@@ -33,6 +33,7 @@ class PixFoldSettingsTest {
         assertNull(s.landscapeDefaultColumns, "横屏默认列数同理,默认跟随自适应")
         assertEquals(AppLanguage.System, s.language)
         assertEquals(StorageAccess.Saf, s.storageAccess, "文件访问默认 SAF")
+        assertTrue(s.predictiveBackAnimation, "预测性返回动画默认开启")
     }
 
     @Test

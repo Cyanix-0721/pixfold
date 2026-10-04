@@ -320,4 +320,77 @@ class NamingWarningsTest {
         assertEquals("根_002.jpg", ps[1].proposedName)
         assertTrue(ps.none { it.hasConflict }, "默认结构按序号命名,跨目录同名不会撞车")
     }
+
+    // ---- 变异测试补强(轮 10):警告参数取值 + 冲突取用谓词 ----
+
+    @Test
+    fun `case collision reports the number of other items sharing the lowercase name`() {
+        // 文案是「大小写冲突:与 %1$d 项仅大小写不同」-> 参数必须是**其他**项的个数(组大小 - 1)。
+        val order = listOf(
+            item("a", base = "Pg"),
+            item("b", base = "pG"),
+            item("c", base = "pg"),
+        )
+        val ps = buildProposals(order, scheme(components = origOnly))
+        ps.forEach { p ->
+            val warn = p.warnings.first { it.type == ProposalWarningType.CaseCollision }
+            assertEquals(
+                com.pixfold.d1.domain.text.Msg(TextKey.WarnCaseCollision, listOf(2)),
+                warn.message,
+                "3 项仅大小写不同 -> 每项应与「其他 2 项」冲突",
+            )
+        }
+    }
+
+    @Test
+    fun `illegal char parts list control characters once and each reserved char once`() {
+        // parts 会被拼成用户可见的「非法字符:…」列表 -> 重复项必须先折叠,
+        // 否则两个制表符会在同一行里显示两次「控制字符」。
+        val order = listOf(item("a", base = "p\tq\t:r"))
+        val p = buildProposals(order, scheme(components = origOnly, sanitize = false))[0]
+        val warn = p.warnings.first { it.type == ProposalWarningType.IllegalChar }
+        assertEquals(
+            listOf<Any>(com.pixfold.d1.domain.text.Msg(TextKey.WarnIllegalCharControl), ":"),
+            warn.message.args[0],
+            "两个制表符只留一条「控制字符」,保留字符按出现顺序各一条",
+        )
+    }
+
+    @Test
+    fun `sanitize flag alone decides the illegal char warning even for an override`() {
+        // 契约(见类注释第 2 条):IllegalChar **只在 sanitize=false 时**产生。
+        // 用「覆盖名」当探针:proposedName 已被清洗,只有覆盖名能保留非法字符。
+        val order = listOf(item("a", base = "orig"))
+        val overrides = mapOf("a" to "a:b.jpg")
+        val ps = buildProposals(order, scheme(components = origOnly, sanitize = true), overrides = overrides)
+        assertEquals("a:b.jpg", ps[0].finalName, "前置条件:覆盖名不经过清洗")
+        assertFalse(
+            ProposalWarningType.IllegalChar in typesOf(ps[0]),
+            "开着清洗时不得再报 IllegalChar(与清洗互补而非重复)",
+        )
+    }
+
+    @Test
+    fun `an illegal char conflict alone still yields a readable reason`() {
+        // reason 的取用谓词必须同时认 Duplicate 与 IllegalChar;
+        // 只有非法字符这一种冲突时,谓词漏掉它会让 first{} 直接抛异常。
+        val order = listOf(item("a", base = "a:b"))
+        val plan = buildRenamePlan(buildProposals(order, scheme(components = origOnly, sanitize = false)))
+        val op = plan.single()
+        assertTrue(op.isSkipped, "非法字符应导致跳过")
+        assertEquals(TextKey.WarnIllegalChar, op.reason?.key, "reason 应取那条非法字符警告")
+    }
+
+    @Test
+    fun `reason prefers the duplicate warning when both conflicts are present`() {
+        // 警告按 Duplicate -> IllegalChar -> CaseCollision -> TooLong -> Overridden 追加,
+        // 故 first{} 必须取到 Duplicate;取 last{} 会变成 IllegalChar。
+        val order = listOf(item("a", base = "a:b"), item("b", base = "a:b"))
+        val plan = buildRenamePlan(buildProposals(order, scheme(components = origOnly, sanitize = false)))
+        assertEquals(
+            TextKey.WarnDuplicate,
+            plan.first().reason?.key,
+            "同时有重名与非法字符时,reason 应取先追加的重名警告",
+        )
+    }
 }

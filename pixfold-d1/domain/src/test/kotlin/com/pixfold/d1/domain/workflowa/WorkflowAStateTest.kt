@@ -152,4 +152,44 @@ class WorkflowAStateTest {
             assertTrue(order.order.all { it.collectionId == cid }, "$cid 页序不应混入其他集合的图")
         }
     }
+
+    // ---- 变异测试补强(轮 10):固定项与规则变更的交互 ----
+
+    @Test
+    fun `applying a rule to a custom collection keeps its pinned item`() {
+        // 覆盖缺口(变异测试发现):独立集合已有固定项时,改规则必须基于**当前状态**重排;
+        // 若从"原始图 + 新规则"重算,固定项的位置会被丢掉。
+        val s0 = workflowAStateOf(collections())
+        val s1 = toggleCustomRule(s0, "c1")                     // c1 独立,此时默认序 [a2, a10]
+        val c1 = s1.orders.getValue("c1")
+        val moved = com.pixfold.d1.domain.sort.moveItemTo(c1, "a10", 0)   // 人工把 a10 拖到首位
+        val s2 = updatePageOrder(s1, "c1", com.pixfold.d1.domain.sort.togglePin(moved, "a10"))
+        assertEquals(listOf("a10", "a2"), s2.orders.getValue("c1").order.map { it.id })
+
+        // nameAsc 的规则序是 [a2, a10] -> 固定项 a10 必须仍占首位
+        val s3 = applyRuleToCollection(s2, "c1", nameAsc)
+
+        assertEquals(
+            listOf("a10", "a2"),
+            s3.orders.getValue("c1").order.map { it.id },
+            "改规则时固定项必须留在原位(不得从原始图重算)",
+        )
+        assertEquals(1, s3.orders.getValue("c1").pinnedCount, "固定标记必须保留")
+    }
+
+    @Test
+    fun `pinnedCountTotal counts pins and is not the manual count`() {
+        // 覆盖缺口(变异测试发现):三个派生量里只有 pinnedCountTotal 从无断言,
+        // 把它写成 manualCount 也无人发现。
+        val s0 = workflowAStateOf(collections())
+        assertEquals(0, s0.pinnedCountTotal)
+
+        val c1 = s0.orders.getValue("c1")
+        // 只固定、不移动 -> manualCount 仍为 0,两个计数必须区分得开
+        val s1 = updatePageOrder(s0, "c1", com.pixfold.d1.domain.sort.togglePin(c1, c1.order.first().id))
+
+        assertEquals(1, s1.pinnedCountTotal, "固定一项后应计 1")
+        assertEquals(0, s1.manualCountTotal, "只固定不算人工调整")
+        assertFalse(s1.hasManualAnywhere)
+    }
 }
