@@ -211,6 +211,53 @@ class UndoAlignmentTest {
         )
     }
 
+    @Test
+    fun `an overwritten file is recorded as created and so undo would delete it`() {
+        // ⚠️ 这条断言记录的是**既有缺陷**，不是期望行为 —— 见台账「待裁决 R3」。
+        //
+        // `Overwrite` 策略 + 输出已存在时，报告报 `Succeeded`，`createdPath` 取的却是
+        // **本该被覆盖的那个旧文件**的路径。撤销据此推导出 `DeleteCreated(该路径)` ——
+        // 可那个文件**不是本次创建的**，是被**替换**的。真要执行撤销，会把用户
+        // 原有的 CBZ 删掉，而被覆盖掉的内容已经找不回来了。
+        //
+        // 为什么这属于"撤销记录骗人"：`canUndo` / 「已记录 N 项」把这一项算作
+        // "本次新增、可删除"。对 Skip 策略一切都对（跳过 = 什么都没产生，不进记录）；
+        // 唯独 Overwrite 这一个策略下，"created" 与"被替换"是两回事。
+        //
+        // 危险动作机制其实**已经**认识这个场景（`DangerAction.kt` 用
+        // `conflictPolicy == Overwrite && volume.outputExists` 判定 `OverwriteExisting`，
+        // 界面上会专门警告一次），但撤销推导走的是另一条路径，**从不查策略**。
+        //
+        // 为什么这里不改实现：先要产品裁决"覆盖的撤销"到底是什么 ——
+        // ①当作新建 ⇒ 删掉（现状，会把用户的旧文件也删了）
+        // ②覆盖前先备份 ⇒ 撤销时恢复备份（要给 `ExecEntry` 加"被覆盖路径"字段）
+        // ③覆盖项干脆不可撤销（要把 `OverwriteExisting` 传进 `undoOpsOf`）。
+        // 三种语义不同，按 §7.1 第 1 步「有歧义先请用户裁决」，本项目夜间无人值守，
+        // 故只记录、不动行为。
+        val plans = buildPackagePlans(listOf(op102), conflictPolicy = OutputConflictPolicy.Overwrite)
+        val report = executePackagePlans(plans)
+        val e = report.entries.single()
+        assertEquals(ExecOutcome.Succeeded, e.outcome, "前置:Overwrite 下照常执行")
+        assertEquals(
+            plans.single().outputPath,
+            e.createdPath,
+            "createdPath 指向的那个文件是**覆盖前就存在**的，不是本次创建的",
+        )
+        val op = undoRecordOf(report)!!.ops.single()
+        assertTrue(op is UndoOp.DeleteCreated, "撤销被推成「删除」，实际 $op")
+        assertEquals(
+            e.createdPath,
+            op.path,
+            "撤销会去删这个路径 —— 对 Overwrite 而言那是用户原有的文件（修复后此断言应改变）",
+        )
+        // 反向守卫:同一卷换成 Skip 策略就什么都不产生、不进撤销记录 ——
+        // 说明问题只出在 Overwrite 这一个分支上,不是"凡是已存在的输出都记错"。
+        val skipReport = executePackagePlans(
+            buildPackagePlans(listOf(op102), conflictPolicy = OutputConflictPolicy.Skip),
+        )
+        assertNull(undoRecordOf(skipReport), "Skip 策略下没有创建任何东西，不该有撤销记录")
+    }
+
     // ---- UndoRecord 自身的计数与可执行性 ----
 
     @Test

@@ -163,6 +163,7 @@ cmd.exe /c "D:\Programing\Personal\pixfold\pixfold-d1\run-gradle.bat :app:lintDe
 | W8 | 边界与不变式加固（空卷 / 单页 / 重名跳过 / `isBlank` 输出目录 / 冲突策略矩阵） | 新增断言 + 变异验证 | ✅ 完成（`PackingPipelineTest` 17 用例，轮 4；**16 组变异全捕获**，其中 4 组只可能由本轮新增用例捕获 ⇒ 补的是真缺口） |
 | W9 | 文档回写：`HANGOFF.md` §9.1 追加「D3 打包核心轮」+ 本文件写「早间复核清单」 | **只追加**，不改阶段快照 | ✅ 完成（轮 5：`HANGOFF.md:2611` 起追加；台账 §5 早间复核清单同步补写） |
 | W10 | 终验：干净工作树重跑四道闸门 + 计数比对 + `git log --oneline dev..d3/p1` 汇总 | 本文件写最终读数 | ✅ 完成（轮 6：**带 `clean` 的全量重建**，64/64 executed，exit 0；读数见 §6） |
+| W11 | 余量加固（§3 余量政策）：条目名与元数据条目撞名守卫 + 新缺陷登记 | 先实测确认漏洞存在，再红→绿；新缺陷只登记不自行修复 | ✅ 完成（轮 7：`CbzWritePlan` 拒 `ComicInfo.xml` 撞名 + 2 用例；**7 组变异全捕获**；**登记 R3**） |
 
 **余量处理**：W1–W10 全部完成且仍有轮次 ⇒ **继续加固核心**（更多边界 / 更多变异 / 更多不变式），
 **不越界**到未授权工作面（适配层检查、D2b、真机、UI）。
@@ -493,6 +494,101 @@ cmd.exe /c "D:\Programing\Personal\pixfold\pixfold-d1\run-gradle.bat :app:lintDe
 
 ---
 
+#### 轮 7（2026-10-04 17:5x）— W11 余量加固：条目名撞名守卫 + R3 登记
+
+- 提交：`（见回填行）`
+- 改动：3 files / +93 / −0（**纯增量，零删除**）
+  - `pixfold-d1/domain/src/main/kotlin/com/pixfold/d1/domain/pack/CbzWritePlan.kt`（+8）
+  - `pixfold-d1/domain/src/test/kotlin/com/pixfold/d1/domain/pack/CbzWritePlanTest.kt`（+38）
+  - `pixfold-d1/domain/src/test/kotlin/com/pixfold/d1/domain/plan/UndoAlignmentTest.kt`（+47）
+  - 工具：`pixfold-d1/artifacts/mutate_w11.py` + `artifacts/w11bak/`（`.gitignore:9` 已忽略，**不入库**）
+- 闸门：`BUILD SUCCESSFUL in 32s` / exit 0 / `62 actionable tasks: 14 executed, 48 up-to-date`；
+  lint **0 errors, 0 warnings, 4 hints**；JUnit XML `domain` **25 files / 348 tests / 0F 0E**
+  （345 → 348，**+3**）、`app` **42 files / 399 tests / 0F 0E**（**未变，正确**）；
+  源码 `@Test` 计数交叉核对 `domain` **348**（与 XML 一致）、`app` **400**（−1 `NegativeControlTest` = 399）。
+- 变异：**7 组，7 捕获，0 逃逸，0 锚点缺失**（N1–N7，脚本 `artifacts/mutate_w11.py`，
+  跑完逐文件 sha256 核对还原一致）。
+
+##### 本轮修的真漏洞：页名 == `ComicInfo.xml`
+
+`CbzWritePlan` 的 `init` 里**原本只有**「页与页重名」检查。但 `CbzWriter` **无条件**
+把 `ComicInfo.xml` 写在第 0 条 ⇒ 只要某页的条目名也叫 `ComicInfo.xml`，就会产出
+**两个同名条目**：ZIP 结构依然合法，阅读器取到哪一个不确定（可能把图片当元数据，
+也可能反过来）。这正是那条重名检查要防的**同一类静默错误**，只是调用方
+**不必自己把这个名字写进 `pages`** 就会撞上，所以那条检查看不见它。
+
+**先实测再动手**（不靠推理下结论）：临时探针 `ZzProbeTest` 实跑输出的
+`PROBE-B collision accepted=true` 证实漏洞存在，随后**立即 `rm -v` 删除探针**
+（`git status --porcelain` 已确认干净）。RED 证据（`--rerun-tasks`，exit=1）：
+
+```
+CbzWritePlanTest > a page named like the comic info entry is rejected() FAILED
+    org.opentest4j.AssertionFailedError at CbzWritePlanTest.kt:312
+346 tests completed, 1 failed
+BUILD FAILED in 5s
+```
+
+注意是 `AssertionFailedError` 而**不是**预期中的异常类型不符 ⇒ **根本没有异常被抛出**，
+撞名确实被静默接受。修复（`CbzWritePlan.kt`，紧随既有的重名 `require` 之后）：
+
+```kotlin
+val collision = pages.filter { it.fileName == CbzWriter.COMIC_INFO_ENTRY }.map { it.fileName }
+require(collision.isEmpty()) {
+    "页的条目名与元数据条目 ${CbzWriter.COMIC_INFO_ENTRY} 撞名（会产出两个同名条目）：$collision"
+}
+```
+
+两条新用例：`a page named like the comic info entry is rejected`（撞名必须被拒，
+且报错点明撞的是元数据条目名）+ `only the exact comic info name collides`
+（**守卫的精度**：`comicinfo.xml` / `ComicInfo.png` / `001-ComicInfo.xml` 都**不该**被拒 ——
+ZIP 条目名区分大小写，不能顺手扩大打击面，否则用户真有一张叫 `ComicInfo.png` 的图就打不了包）。
+第二条不是凑数：变异 N2/N3/N4 的唯一捕获者就是它（见下表）。
+
+##### 本轮登记的新缺陷：R3（**只记录，不自行修复**）
+
+用探针 `PROBE-A` 实测确认：`OutputConflictPolicy.Overwrite` + 输出**已存在**时 ——
+
+```
+PROBE-A outputExists=true
+PROBE-A report=[ExecEntry(id=op-102, label=海贼王 第102卷.cbz, outcome=Succeeded, ..., createdPath=E:\漫画库\_output/海贼王 第102卷.cbz)]
+PROBE-A undo=[DeleteCreated(path=E:\漫画库\_output\海贼王 第102卷.cbz)]
+```
+
+报告报 `Succeeded`，`createdPath` 取的却是**本该被覆盖的那个旧文件**的路径，撤销据此
+推导出 `DeleteCreated(该路径)` —— 可那个文件**不是本次创建的**，是被**替换**的。
+真要执行撤销，会**删掉用户原有的 CBZ**，而被覆盖掉的内容已经找不回来。
+
+值得注意：危险动作机制**已经认识**这个场景（`DangerAction.kt` 用
+`conflictPolicy == Overwrite && volume.outputExists` 判定 `OverwriteExisting`，界面上会专门
+警告一次），**但撤销推导走的是另一条路径，从不查策略**。属产品决策（「覆盖的撤销」
+到底是 ①当作新建 ⇒ 删掉 ②覆盖前备份 ⇒ 撤销时恢复 ③覆盖项干脆不可撤销），
+按 §7.1 第 1 步「有歧义先请用户裁决」⇒ **只记录、不动行为**，登记为 **R3**。
+
+诚实记录用例 `an overwritten file is recorded as created and so undo would delete it`
+（`UndoAlignmentTest.kt`）钉住当前行为并写明"修复后此断言应改变"，
+另含**反向守卫**：同一卷换成 `Skip` 策略就没有撤销记录 ⇒ 说明问题只出在 `Overwrite`
+这一个分支上，不是"凡是已存在的输出都记错"。
+
+##### 变异表（7 组，全捕获）
+
+| # | 变异 | 位置 | 结果 | 捕获者 |
+| --- | --- | --- | --- | --- |
+| N1 | 撞名守卫整个失效（`collision = emptyList()`） | `pack/CbzWritePlan.kt` | 捕获 | `a page named like the comic info entry is rejected` |
+| N2 | 判定放宽成 `contains` | 同上 | 捕获（**唯一**） | `only the exact comic info name collides` |
+| N3 | 判定放宽成 `endsWith` | 同上 | 捕获（**唯一**） | 同上 |
+| N4 | 判定改成 `ignoreCase = true` | 同上 | 捕获（**唯一**） | 同上 |
+| N5 | `require` 变成 `if (false) require(...)`（守卫写了但不生效） | 同上 | 捕获 | `a page named like the comic info entry is rejected` |
+| N6 | 成功项的 `createdPath` 改用 `outputDisplay` | `plan/OperationPlan.kt` | 捕获（5 用例） | 含本轮新用例 `an overwritten file is recorded as created...` |
+| N7 | 打包撤销恒返回 `null` | `plan/Execution.kt` | 捕获（11 用例） | — |
+
+**N2/N3/N4 的唯一捕获者都是本轮新增的精度用例** ⇒ 补的是真缺口；若只写"撞名被拒"
+那一条，把判定放宽成 `contains` 也不会有任何用例变红。
+
+- 结论 / 阻塞 / 待裁决：**新增 R3 待裁决**（见 §4）；R1/R2 仍未决，均不阻塞。
+  本轮**未新增 TextKey**、**未改 `app/**`**、**未改构建脚本**、**未新增依赖**。
+
+---
+
 ## 4. 待裁决 / 阻塞（越界项写这里，不自行决定）
 
 > 出现下列任一情况，**停止该项**并在此登记，然后继续**下一项**工作：
@@ -503,6 +599,7 @@ cmd.exe /c "D:\Programing\Personal\pixfold\pixfold-d1\run-gradle.bat :app:lintDe
 | --- | --- | --- | --- | --- |
 | R1 | 3（W6） | `UndoOp.RestoreRenamed(from, to)` 在成功项上恒 `from == to`（空操作）—— `executeRenameOp` 成功分支的 `label` 与 `createdPath` 都取 `op.finalName`，报告里**无处**携带原文件名 | 修法有两种且语义不同：①扩 `ExecEntry` 加原名字段；②让 `undoRecordFrom(plan, report)` 从计划取 `op.proposal.image.fileName`（只有它手里有计划）。选哪种、以及 `from`/`to` 的最终语义，都属撤销记录的产品决策；且本轮契约是"既有可观测行为逐字不变" | ⏸ 待用户裁决（不阻塞 W8–W10） |
 | R2 | 3（W7） | `RenamePlannedOp.describe()` 在无原因时只能给 `Msg(TextKey.OpStatusRename)` 一句状态词 | 改名侧**没有**逐项句子契约（`RenamePlanPage` 渲染的是"原名 → 新名"两列 + 状态标签）；要补齐就得**新增 TextKey**，而本轮明令禁止 | ⏸ 待用户裁决（当前行为已够用，非缺陷） |
+| R3 | 7（W11） | `OutputConflictPolicy.Overwrite` + 输出已存在时，报告报 `Succeeded`、`createdPath` = **被替换的那个旧文件**路径，撤销据此推导 `DeleteCreated(该路径)` ⇒ 真执行会**删掉用户原有的 CBZ**，且被覆盖的内容无法恢复 | 「覆盖的撤销」是什么，属产品决策，三种语义完全不同：①当作新建 ⇒ 删掉（现状，会把用户旧文件也删了）②覆盖前先备份 ⇒ 撤销时恢复备份（要给 `ExecEntry` 加"被覆盖路径"字段）③覆盖项标为不可撤销（要把 `OverwriteExisting` 传进 `undoOpsOf`）。**危险动作机制已认识此场景**（`DangerAction.kt` 判 `OverwriteExisting`），只有撤销推导从不查策略。按 §7.1「有歧义先请用户裁决」，故只记录 | ⏸ 待用户裁决（不阻塞余量轮） |
 
 **已知的、明确不碰的开放项**（不要在本轮"顺手"处理）：
 - HANGOFF §11 第 12 条：Android 端存储不足的**阈值与提示形态**，明写「待 D2b 真机验证后定」。
@@ -595,10 +692,13 @@ cmd.exe /c "D:\Programing\Personal\pixfold\pixfold-d1\run-gradle.bat clean \
 ### 6.4 提交拓扑（`git log --oneline dev..d3/p1`）
 
 > **不写死条数**（终验当时为 9；W10 提交与回填提交各 +1）—— 以命令输出为准。
-> 截至 W9/W10 落地的链条如下（最新在上）：
+> 截至 W9/W10 落地的链条如下（最新在上）；**轮 7（W11）的提交与回填见该轮小节**：
 
 | 提交 | 类型 | 内容 |
 | --- | --- | --- |
+| `（轮 7 回填）` | docs | 台账回填轮 7 提交号 + R3 登记 |
+| `（轮 7）` | fix | W11：条目名撞名守卫 + R3 诚实记录 |
+| `901baf1` | docs | 台账回填 W9/W10 提交号 |
 | `6682986` | docs | W10：终验读数（带 `clean` 的全量重建 64/64 + 越界逐条核对） |
 | `ea78b3c` | docs | W9：`HANGOFF.md` §9.1 追加「D3 打包核心轮」+ 变异计数口径校正 |
 | `4359761` | docs | 台账回填轮 4 |
@@ -616,6 +716,7 @@ cmd.exe /c "D:\Programing\Personal\pixfold\pixfold-d1\run-gradle.bat clean \
 
 - **完成**：W0–W10 全部 ✅（§3 状态表）；D3 退出条件 1 所要求的**打包领域核心**
   （`PackagePlan`/`OperationPlan` 语义、`ExecutionReport`、`UndoRecord`）已落地并有 345 项单测覆盖。
+  **余量轮 7（W11）另加**：条目名撞名守卫（真漏洞，已修）+ 2 用例 ⇒ domain **348** 项。
 - **未做 / 不宣称**（与 HANGOFF 小节一致，勿据此认为 D3 已完成）：
   1. ❌ **真机核对** —— 工作面 100% 领域层，按 §7.4 表第 1 行判定不需要；
   2. ❌ **D3 三项退出条件的正式宣布**；
@@ -624,6 +725,8 @@ cmd.exe /c "D:\Programing\Personal\pixfold\pixfold-d1\run-gradle.bat clean \
   4. ❌ **退出条件 2 的"适配层零 Android 依赖"可执行检查**（如 Gradle 依赖断言）—— 未授权，未做；
   5. ❌ D2b 五项、§11 第 12 条空间阈值。
 - **待用户裁决**（§4）：**R1** 撤销 `from == to` 空操作（既有缺陷，非本轮引入，修法二选一）；
-  **R2** 改名计划描述缺逐项句子（补齐需新增 `TextKey`，本轮禁止）。**两项均不阻塞并回。**
+  **R2** 改名计划描述缺逐项句子（补齐需新增 `TextKey`，本轮禁止）；
+  **R3**（轮 7 新登记）`Overwrite` 策略下撤销会去删**用户原有的文件**（修法三选一，属产品决策）。
+  **三项均不阻塞余量轮。**
 - **诚实性说明**：②③两项本可"顺手写上"，但那属于**替他做产品决策**，按 §7.1 第 1 步**只记录不改**。
 

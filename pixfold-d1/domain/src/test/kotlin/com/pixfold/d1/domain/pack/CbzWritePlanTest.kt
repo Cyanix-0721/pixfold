@@ -303,6 +303,44 @@ class CbzWritePlanTest {
     }
 
     @Test
+    fun `a page named like the comic info entry is rejected`() {
+        // 重名检查漏掉的**那一个**名字:ComicInfo.xml 由 CbzWriter 无条件写在第 0 条,
+        // 所以"页也叫 ComicInfo.xml"必然产出两个同名条目 —— 与上面那条重名检查要挡的
+        // 是同一类静默错误,只是调用方不必自己把这个名字写进 pages 就会撞上。
+        // ZIP 结构合法,阅读器取到哪一个不确定(可能拿到图片当元数据,也可能反过来),
+        // 故在计划层挡住。
+        val ex = assertFailsWith<IllegalArgumentException> {
+            CbzWritePlan(
+                volumeId = "v",
+                comicInfoXml = "<ComicInfo />",
+                pages = listOf(CbzPageEntry("a", "ComicInfo.xml")),
+            )
+        }
+        assertTrue("ComicInfo.xml" in ex.message.orEmpty(), "报错应点明撞的是元数据条目名，实际 ${ex.message}")
+    }
+
+    @Test
+    fun `only the exact comic info name collides`() {
+        // 上一条守卫的**精度**:挡的是"与元数据条目同名",不是"名字里含 ComicInfo"。
+        // 大小写、前后缀都不同名 —— ZIP 条目名是区分大小写的,不能顺手扩大打击面,
+        // 否则用户真有一张叫 `ComicInfo.png` 的图就打不了包了。
+        val plan = CbzWritePlan(
+            volumeId = "v",
+            comicInfoXml = "<ComicInfo />",
+            pages = listOf(
+                CbzPageEntry("a", "comicinfo.xml"),
+                CbzPageEntry("b", "ComicInfo.png"),
+                CbzPageEntry("c", "001-ComicInfo.xml"),
+            ),
+        )
+        assertEquals(
+            listOf("comicinfo.xml", "ComicInfo.png", "001-ComicInfo.xml"),
+            plan.pages.map { it.fileName },
+            "只有逐字同名的才该被拒",
+        )
+    }
+
+    @Test
     fun `an empty comic info xml is rejected`() {
         // 零字节的 ComicInfo.xml 是**静默错误**:归档结构完全合法,阅读器读元数据时
         // 只会拿到空串,没有任何异常可循。而 XML 本不该为空(至少含声明与根元素),

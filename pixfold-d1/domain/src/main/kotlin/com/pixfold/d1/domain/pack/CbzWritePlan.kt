@@ -43,6 +43,14 @@ data class CbzWritePlan(
         // (顺序、压缩方式、时间戳),重名与否是**计划的正确性**问题,该在有名字来源的这层判。
         val duplicated = pages.map { it.fileName }.groupingBy { it }.eachCount().filter { it.value > 1 }.keys
         require(duplicated.isEmpty()) { "计划里出现重复条目名：$duplicated" }
+        // 重名检查必须把**元数据条目**也算进来:[CbzWriter] 无条件把 ComicInfo.xml 写在第 0 条,
+        // 所以"页也叫 ComicInfo.xml"会产出两个同名条目 —— 与上面要挡的是同一类静默错误。
+        // ZIP 结构依然合法,阅读器取到哪一个不确定(可能把图片当元数据,也可能反过来),
+        // 而上面的重名检查看不见它(调用方不必自己写这个名字就会撞上)。
+        val collision = pages.filter { it.fileName == CbzWriter.COMIC_INFO_ENTRY }.map { it.fileName }
+        require(collision.isEmpty()) {
+            "页的条目名与元数据条目 ${CbzWriter.COMIC_INFO_ENTRY} 撞名（会产出两个同名条目）：$collision"
+        }
     }
 
     val pageCount: Int get() = pages.size
