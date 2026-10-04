@@ -2,6 +2,8 @@ package com.pixfold.d1.domain.plan
 
 import com.pixfold.d1.domain.mock.MockDataB
 import com.pixfold.d1.domain.model.LangChoice
+import com.pixfold.d1.domain.model.Suggestion
+import com.pixfold.d1.domain.comic.defaultCbzName
 import com.pixfold.d1.domain.text.Msg
 import com.pixfold.d1.domain.text.TextKey
 import kotlin.test.Test
@@ -137,6 +139,24 @@ class PackagePlanTest {
             "海贼王 第102卷.v2.final (1).cbz",
             plan.outputDisplay,
             "序号必须加在**最后一个**点之前(扩展名前)，而不是第一个点前",
+        )
+    }
+
+    @Test
+    fun `rename policy does not strip a leading dot`() {
+        // 回归:`dot <= 0` 同时管着两种"没有扩展名"的形态 —— 完全没有点(-1)与
+        // **点在最前面**(0)。上一条只钉了前者,于是把判定放宽成 `dot < 0` 的变异
+        // 存活(实测)。点在最前是**可达**的:`defaultCbzName` 在标题建议为空串时
+        // 就给出 ".cbz";用户也能在 B 侧元数据页把 CBZ 名改成任意文本。
+        assertEquals(
+            ".cbz",
+            defaultCbzName("fallback-id", Suggestion("", "空标题建议"), Suggestion(null, "无卷号")),
+            "标题建议为空串时应回落到该形态 —— 下面的用例才有现实依据",
+        )
+        assertEquals(
+            ".cbz (1)",
+            outputDisplayOf(".cbz", OutputConflictPolicy.Rename, outputExists = true),
+            "前导点是名字的一部分,不能当成扩展名把 (1) 插到它前面 —— 那会产出以空格开头的文件名",
         )
     }
 

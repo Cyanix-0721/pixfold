@@ -99,6 +99,32 @@ class ExecutionReportTest {
         )
     }
 
+    @Test
+    fun `summary keeps the four counts in their own positions`() {
+        // 回归:上一条用例里成功数与跳过数**都是 1**,于是「成功/跳过两个实参对调」
+        // 这个变异在四元组上完全不可见 —— 实测存活。这里让四个数**两两不等**,
+        // 任何一次位置对调都会改变消息内容。
+        val aot2 = library.volumes.first { it.id == "aot-2" }
+        val op101 = library.volumes.first { it.id == "op-101" }
+        val alsoConflicting = library.volumes.first { it.id == "aot-0" }.copy(outputExists = true)
+        val noPages = aot1.copy(pageOrder = aot1.pageOrder.copy(order = emptyList()))
+        val plans = buildPackagePlans(
+            // 3 卷正常 / 2 卷冲突跳过(含 mock 里本就 outputExists 的 op-102)/ 1 卷无页失败
+            listOf(aot1, aot2, op101, alsoConflicting, op102, noPages),
+            conflictPolicy = OutputConflictPolicy.Skip,
+        )
+        val report = executePackagePlans(plans)
+        assertEquals(6, report.entries.size)
+        assertEquals(3, report.succeededCount)
+        assertEquals(2, report.skippedCount)
+        assertEquals(1, report.failedCount)
+        assertEquals(
+            Msg(TextKey.ExecSummary, listOf(6, 3, 2, 1)),
+            report.summary,
+            "四元组顺序是（总数·成功·跳过·失败）—— 四个数两两不等才能发现位置错了",
+        )
+    }
+
     // ---- 顺序与计数 ----
 
     @Test

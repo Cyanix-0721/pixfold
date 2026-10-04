@@ -136,7 +136,11 @@ cmd.exe /c "D:\Programing\Personal\pixfold\pixfold-d1\run-gradle.bat :app:lintDe
 | `pixfold-d1/domain/src/test/kotlin/com/pixfold/d1/domain/pack/CbzWritePlanTest.kt` | **新** | W5 |
 | `pixfold-d1/domain/src/test/kotlin/com/pixfold/d1/domain/plan/UndoAlignmentTest.kt` | **新** | W6 |
 | `pixfold-d1/domain/src/test/kotlin/com/pixfold/d1/domain/plan/PackingPipelineTest.kt` | **新**：跨层不变式（计划页数 ↔ 归档条目数、成功 ↔ 可写、计划行 ↔ 报告行、撤销 ↔ 已创建） | W8 |
+| `pixfold-d1/domain/src/test/kotlin/com/pixfold/d1/domain/plan/ExecutionReportTest.kt` | 改：W12 补四元组区分度用例（+26） | W12 |
+| `pixfold-d1/domain/src/test/kotlin/com/pixfold/d1/domain/plan/PackagePlanTest.kt` | 改：W12 补前导点边界用例（+20） | W12 |
 | `pixfold-d1/artifacts/mutate_w8.py` + `artifacts/w8bak/` | 变异脚本与备份（`artifacts/` 已 gitignore，**不入库**） | W8 |
+| `pixfold-d1/artifacts/mutate_w11.py` + `artifacts/w11bak/` | 变异脚本与备份（同样**不入库**） | W11 |
+| `pixfold-d1/artifacts/mutate_w12.py` + `artifacts/w12bak/` | 变异脚本与备份（同样**不入库**） | W12 |
 | `HANGOFF.md` | 改：§9.1 追加「D3 打包核心轮」小节（**只追加**） | W9 |
 | `docs/superpowers/plans/2026-10-04-d3-p1-packing-core.md` | 本文件（台账） | 全程 |
 
@@ -164,6 +168,7 @@ cmd.exe /c "D:\Programing\Personal\pixfold\pixfold-d1\run-gradle.bat :app:lintDe
 | W9 | 文档回写：`HANGOFF.md` §9.1 追加「D3 打包核心轮」+ 本文件写「早间复核清单」 | **只追加**，不改阶段快照 | ✅ 完成（轮 5：`HANGOFF.md:2611` 起追加；台账 §5 早间复核清单同步补写） |
 | W10 | 终验：干净工作树重跑四道闸门 + 计数比对 + `git log --oneline dev..d3/p1` 汇总 | 本文件写最终读数 | ✅ 完成（轮 6：**带 `clean` 的全量重建**，64/64 executed，exit 0；读数见 §6） |
 | W11 | 余量加固（§3 余量政策）：条目名与元数据条目撞名守卫 + 新缺陷登记 | 先实测确认漏洞存在，再红→绿；新缺陷只登记不自行修复 | ✅ 完成（轮 7：`CbzWritePlan` 拒 `ComicInfo.xml` 撞名 + 2 用例；**7 组变异全捕获**；**登记 R3**） |
+| W12 | 余量加固（§3 余量政策）：**广扫荡找缺口**——在 W7/W8/W11 未变异过的表达面上投 23 组变异，针对存活者补断言 | 存活变异必须补到全捕获，或按 §0.4 归为等价并写文档说明 | ✅ 完成（轮 8：23 组 → **21 捕获 / 2 存活 / 0 锚点缺失**，2 个存活者补断言后**各自成为该变异的唯一捕获者**；+2 用例 ⇒ domain **350** 项；生产代码零改动） |
 
 **余量处理**：W1–W10 全部完成且仍有轮次 ⇒ **继续加固核心**（更多边界 / 更多变异 / 更多不变式），
 **不越界**到未授权工作面（适配层检查、D2b、真机、UI）。
@@ -589,6 +594,86 @@ PROBE-A undo=[DeleteCreated(path=E:\漫画库\_output\海贼王 第102卷.cbz)]
 
 ---
 
+#### 轮 8（2026-10-04 18:0x）— W12 余量加固：广扫荡找缺口（**不再靠猜**）
+
+- 提交：`（见下方回填行）` test(d3): 补两处未覆盖表达面（W12 广扫荡 23 组 → 2 存活 → 全捕获）
+- 改动：2 files / **+46 / −0**（**纯断言增量，生产代码零改动**）
+  - `pixfold-d1/domain/src/test/kotlin/com/pixfold/d1/domain/plan/ExecutionReportTest.kt`（+26）
+  - `pixfold-d1/domain/src/test/kotlin/com/pixfold/d1/domain/plan/PackagePlanTest.kt`（+20）
+  - 工具：`pixfold-d1/artifacts/mutate_w12.py` + `artifacts/w12bak/`（`.gitignore:9` 已忽略，**不入库**）
+- 闸门：`BUILD SUCCESSFUL in 3s` / exit 0 / `62 actionable tasks: 4 executed, 58 up-to-date`；
+  lint **0 errors, 0 warnings, 4 hints**；JUnit XML `domain` **25 files / 350 tests / 0F 0E**
+  （348 → 350，**+2**）、`app` **42 files / 399 tests / 0F 0E**（**未变，正确**）；
+  源码 `@Test` 计数交叉核对 `domain` **350**（与 XML 一致）、`app` **400**（−1 `NegativeControlTest` = 399）。
+
+##### 本轮方法：把"猜缺口"换成"广扫荡"
+
+W7/W8/W11 都是**先怀疑某处有问题、再去验证**。本轮换成反向做法：在 W7/W8/W11
+**尚未变异过的表达面**上一次性投 **23 组**变异（Q1–Q23），让测试自己告诉我哪里有洞 ——
+脚本先做锚点唯一性检查（命中 ≠1 次直接记 `ANCHOR-MISS`，不当成"存活"），
+每组跑完立即 `cp` 还原，收尾逐文件 sha256 核对。
+
+覆盖面：报告汇总四元组（5 组）· `outputDisplayOf` 边界（3）· XML 字段与转义（4）·
+重编号（4）· 归档写入（3）· 改名侧汇总与危险动作（4）。
+
+**结果：21 捕获 / 2 存活 / 0 锚点缺失。** 两个存活者都是**真缺口**（非等价变异）：
+
+| # | 变异 | 位置 | 首轮 | 补断言后 |
+| --- | --- | --- | --- | --- |
+| Q1 | `ExecSummary` 的**成功/跳过两个实参对调** | `plan/Execution.kt` | ★存活★ | 捕获 |
+| Q6 | `outputDisplayOf` 的 `dot <= 0` 放宽成 `dot < 0` | `plan/PackagePlan.kt` | ★存活★ | 捕获 |
+
+其余 21 组（Q2/Q3/Q4/Q5/Q7–Q23）首轮即被既有断言捕获，**未新增用例**。
+
+##### 存活者 Q1：为什么四元组写对了却钉不住
+
+既有的 `all three outcomes can appear in one report` 断言的是
+`Msg(TextKey.ExecSummary, listOf(3, 1, 1, 1))` —— 看似已经钉死。但用例构造的是
+"1 卷正常 / 1 卷冲突跳过 / 1 卷无页失败"，**成功数与跳过数都等于 1**，
+于是把这两个实参对调，四元组**一个字节都不变**。这不是断言无效，
+是**用例数据的区分度不够**：四个数里只要有两个相等，对应位置的交换就不可见。
+
+新增 `summary keeps the four counts in their own positions`：构造
+**6 卷 → 成功 3 / 跳过 2 / 失败 1**（四个数两两不等），断言 `listOf(6, 3, 2, 1)`。
+补充说明：原有的 `summary counts add up to the number of entries` 用的是
+**自洽性**（三项之和 == 总数），对调后依然自洽 ⇒ 它也杀不死 Q1，这是必然的，不是缺陷。
+
+##### 存活者 Q6：`dot <= 0` 的另一半没人管
+
+`outputDisplayOf` 的 `if (dot <= 0)` 一次性管着两种"没有扩展名"的形态：
+**完全没有点**（`lastIndexOf` 返回 −1）与**点在最前面**（返回 0）。
+既有用例 `rename policy appends the suffix even when there is no extension` 只钉了前者
+（输入 `"无扩展名"`），后者**一条都没有** ⇒ 判定放宽成 `dot < 0` 时，
+`".cbz"` 会走进"有扩展名"分支，产出 `".cbz"` → **`" (1).cbz"`**（以空格开头、
+在 Windows 上是**非法/易被资源管理器吞掉**的文件名）。
+
+前导点形态**可达**，不是造出来的边界：`defaultCbzName` 在标题建议为空串时给出
+`"$t.cbz"` ⇒ `"".cbz"` = `".cbz"`；用户在 B 侧元数据页也能把 CBZ 名改成任意文本
+（`MetaField.CbzName` → `MetaValue.Text`）。新增用例 `rename policy does not strip a leading dot`
+先用 `defaultCbzName("fallback-id", Suggestion("", …), Suggestion(null, …))` 断言
+产物确实是 `".cbz"`（**证明这个输入不是臆造的**），再断言
+`outputDisplayOf(".cbz", Rename, outputExists = true) == ".cbz (1)"`。
+
+##### 重跑确认（两个存活者都转为捕获）
+
+按 §0.4 补断言后**重跑原变异**（同一脚本能力，锚点唯一性检查通过，逐文件 sha256 还原一致
+`Execution.kt: ebcfcee593e3` / `PackagePlan.kt: 0f7dc9bd1f43`）：
+
+```
+[捕获] Q1 ExecSummary 成功/跳过两个数对调
+     ExecutionReportTest > summary keeps the four counts in their own positions() FAILED
+[捕获] Q6 dot<=0 -> dot<0
+     PackagePlanTest > rename policy does not strip a leading dot() FAILED
+```
+
+⇒ 两个新用例各自是**该变异的唯一捕获者**，补的是真缺口而非重复断言。
+
+- 结论 / 阻塞 / 待裁决：本轮**未新增待裁决项**（Q1/Q6 都属"断言不够"而非产品语义分歧，
+  无需用户裁决）；R1/R2/R3 仍未决，均不阻塞。
+  本轮**未改生产代码**、**未新增 TextKey**、**未改 `app/**`**、**未改构建脚本**、**未新增依赖**。
+
+---
+
 ## 4. 待裁决 / 阻塞（越界项写这里，不自行决定）
 
 > 出现下列任一情况，**停止该项**并在此登记，然后继续**下一项**工作：
@@ -673,6 +758,9 @@ cmd.exe /c "D:\Programing\Personal\pixfold\pixfold-d1\run-gradle.bat clean \
     被 `app/build.gradle.kts` 的 `unitTests.all { exclude("**/NegativeControlTest.class") }`
     默认排除。**因此 399 是正确的，不是丢测。**
   - `domain` 源码 `@Test` 计数 = **345**，与 XML **完全一致**（无排除项）。
+  > ⚠️ 上表是 **W10 终验那一刻**的读数，为历史记录，**不回改**。此后余量轮继续加断言：
+  > 轮 7（W11）+3 ⇒ **348**，轮 8（W12）+2 ⇒ **350**（见 §3.1 轮 7/轮 8 与 §6.5）。
+  > `app` 始终 **399** 未变（本分支一行未改 `app/**`）。
 - 产物：`app/build/outputs/apk/debug/app-debug.apk`（33,385,168 字节，mtime 17:43）⇒ `assembleDebug` 真实产出。
 
 ### 6.3 改动面与越界核对
@@ -689,13 +777,20 @@ cmd.exe /c "D:\Programing\Personal\pixfold\pixfold-d1\run-gradle.bat clean \
   ⇒ 无命中；`pixfold-d1/artifacts/` 被 `pixfold-d1/.gitignore:9` 忽略（`git check-ignore -v` 已证实），
   变异脚本与备份**未入库**。
 
+> ⚠️ 上面这段是 **W10 终验那一刻**的读数（**11 files / 2678 insertions**），为历史记录，**不回改**。
+> 余量轮的增量见各轮小节：轮 7（W11）**+3 files / +93 / −0**；轮 8（W12）**+2 files / +46 / −0**。
+> 当前实时读数以 `git diff --stat dev...d3/p1` 为准（结论不变：**改动面只有 `domain/**` + `HANGOFF.md` + 本台账**，
+> `pixfold-d1/app/**` 始终 **0 条**）。
+
 ### 6.4 提交拓扑（`git log --oneline dev..d3/p1`）
 
 > **不写死条数**（终验当时为 9；W10 提交与回填提交各 +1）—— 以命令输出为准。
-> 截至 W9/W10 落地的链条如下（最新在上）；**轮 7（W11）的提交与回填见该轮小节**：
+> 截至 W9/W10 落地的链条如下（最新在上）；**轮 7（W11）与轮 8（W12）的提交与回填见各自小节**：
 
 | 提交 | 类型 | 内容 |
 | --- | --- | --- |
+| `（轮 8 回填）` | docs | 台账回填轮 8 提交号 |
+| `（轮 8）` | test | W12：广扫荡 23 组 → 2 存活 → 补断言（+2 用例 ⇒ domain 350） |
 | `（轮 7 回填）` | docs | 台账回填轮 7 提交号 + R3 登记 |
 | `2fe36ce` | fix | W11：条目名撞名守卫 + R3 诚实记录 |
 | `901baf1` | docs | 台账回填 W9/W10 提交号 |
@@ -714,9 +809,10 @@ cmd.exe /c "D:\Programing\Personal\pixfold\pixfold-d1\run-gradle.bat clean \
 
 ### 6.5 结论与明确的"未做"
 
-- **完成**：W0–W10 全部 ✅（§3 状态表）；D3 退出条件 1 所要求的**打包领域核心**
-  （`PackagePlan`/`OperationPlan` 语义、`ExecutionReport`、`UndoRecord`）已落地并有 345 项单测覆盖。
-  **余量轮 7（W11）另加**：条目名撞名守卫（真漏洞，已修）+ 2 用例 ⇒ domain **348** 项。
+- **完成**：W0–W12 全部 ✅（§3 状态表）；D3 退出条件 1 所要求的**打包领域核心**
+  （`PackagePlan`/`OperationPlan` 语义、`ExecutionReport`、`UndoRecord`）已落地并有 **350** 项单测覆盖。
+  **余量轮 7（W11）另加**：条目名撞名守卫（真漏洞，已修）+ 2 用例；
+  **余量轮 8（W12）另加**：广扫荡 23 组变异 → 2 存活 → 补断言后全捕获 ⇒ 又 +2 用例（348 → **350**）。
 - **未做 / 不宣称**（与 HANGOFF 小节一致，勿据此认为 D3 已完成）：
   1. ❌ **真机核对** —— 工作面 100% 领域层，按 §7.4 表第 1 行判定不需要；
   2. ❌ **D3 三项退出条件的正式宣布**；
@@ -728,5 +824,7 @@ cmd.exe /c "D:\Programing\Personal\pixfold\pixfold-d1\run-gradle.bat clean \
   **R2** 改名计划描述缺逐项句子（补齐需新增 `TextKey`，本轮禁止）；
   **R3**（轮 7 新登记）`Overwrite` 策略下撤销会去删**用户原有的文件**（修法三选一，属产品决策）。
   **三项均不阻塞余量轮。**
+  **轮 8（W12）未新增待裁决项** —— Q1/Q6 两个存活变异都属"断言区分度不够"，
+  语义本身没有分歧（四元组顺序、前导点归属在代码里都是确定的），故直接补断言，无需用户裁决。
 - **诚实性说明**：②③两项本可"顺手写上"，但那属于**替他做产品决策**，按 §7.1 第 1 步**只记录不改**。
 
