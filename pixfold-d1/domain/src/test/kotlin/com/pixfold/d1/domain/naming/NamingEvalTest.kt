@@ -419,4 +419,20 @@ class NamingEvalTest {
         // UI 必须据此给出说明文案,否则用户会以为是自己弄坏了。
         assertEquals("ab.jpg", sanitizeName("a:b?.jpg", replacement = ""))
     }
+
+    @Test
+    fun `clear override drops just that one id`() {
+        // 「恢复建议值」按钮走的就是这条路径(ui/workflowa/NamingPage.kt 的 onResetOverride)。
+        // 若它变成空操作,按钮点下去毫无反应 —— 用户只能靠手输改回建议值;
+        // 若它清多了,用户给别的行手填的名字会被一起抹掉。
+        val state = NamingState(
+            scheme = NamingScheme(rootDirName = "根"),
+            overrides = mapOf("a" to "手填A.jpg", "b" to "手填B.jpg"),
+        )
+        val after = clearOverride(state, "a")
+        assertNull(after.overrides["a"], "被点的那一行必须回到建议值")
+        assertEquals("手填B.jpg", after.overrides["b"], "别的行的手填名字不能被顺手清掉")
+        // 未知 id 是真实可能的(列表已刷新但按钮回调仍拿着旧 id),不得抛异常也不得清空。
+        assertEquals(state, clearOverride(state, "已经不在列表里的 id"))
+    }
 }

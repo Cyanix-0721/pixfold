@@ -495,4 +495,18 @@ class ComicMetadataTest {
         // 页数差异用于验证页码补零与"页数来自页序"
         assertEquals(setOf(16, 18, 12, 20), library.volumes.map { it.pages.size }.toSet())
     }
+
+    @Test
+    fun `included volumes keeps only the checked ones`() {
+        // 取消勾选是用户表达"这卷别打包"的唯一手段;这张筛选结果同时喂给
+        // 计划(buildPackagePlans)与 UI 的计数(PackPreviewPage 的 includedCount)。
+        // 若它取反,用户取消勾选反而会**只打包被取消的那些**。
+        val rest = replaceVolume(library.volumes, setIncluded(aot2, false))
+        val kept = includedVolumes(rest)
+        assertFalse(kept.any { it.id == aot2.id }, "取消勾选的卷不得出现在结果里")
+        assertEquals(rest.count { it.included }, kept.size, "结果条数必须等于勾选数")
+        // 反面也要钉住:勾选状态为 true 的卷一个都不能少(空表也能"通过"上面那条)。
+        assertTrue(kept.any { it.id == op101.id }, "仍被勾选的卷不得被丢掉")
+        assertEquals(library.volumes.size - 1, kept.size)
+    }
 }

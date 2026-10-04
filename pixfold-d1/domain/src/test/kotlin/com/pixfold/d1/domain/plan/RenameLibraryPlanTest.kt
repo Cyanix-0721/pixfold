@@ -128,4 +128,47 @@ class RenameLibraryPlanTest {
         assertEquals(1, seq.size, "安全的重命名只需一次通用确认")
         assertTrue(seq.single() is ConfirmStep.General)
     }
+
+    @Test
+    fun `collection names carry the collection name not its root dir name`() {
+        // 计划页每一行的行首标注"这条属于哪个集合",读的就是这张表
+        // (ui/workflowa/RenamePlanPage.kt 用 collectionId 取)。
+        // 若这里记成 rootDirName,当集合名与根目录名不同(用户改过根名)时,
+        // 用户就会看到"旅行的照片"被标成"旅行照片"这类**看起来对但认不出**的标签。
+        val plan = buildLibraryRenamePlan(collections, state.orders, naming)
+        collections.forEach { c ->
+            assertEquals(
+                c.name,
+                plan.collectionNames[c.id],
+                "集合 ${c.id} 的标签必须是集合名而非根目录名",
+            )
+        }
+        // 本组 mock 里名与根目录名恰好相同,故再钉一条"改动根名不影响标签"的差分断言:
+        // 否则上面那条在 mock 上恒真,拦不住"记 rootDirName"的写法。
+        val renamed = collections.map { it.copy(rootDirName = "改过的根名") }
+        val plan2 = buildLibraryRenamePlan(renamed, state.orders, naming)
+        assertEquals(
+            renamed.map { it.name },
+            renamed.map { plan2.collectionNames[it.id] },
+            "根目录名改了也不该改变集合标签",
+        )
+    }
+
+    @Test
+    fun `plan counts expose the runnable and skipped split of the library plan`() {
+        // `.counts` 是统一操作词汇对外的那一个口子;两个数若对调,
+        // 确认框就会读成"将重命名 M 项(跳过 N)"——数字都有,只是含义反了。
+        val noIndex = NamingState(
+            NamingScheme(
+                rootDirName = "根",
+                components = listOf(com.pixfold.d1.domain.model.NameComponent(com.pixfold.d1.domain.model.NameComponentKind.OrigName)),
+            ),
+        )
+        val plan = buildLibraryRenamePlan(collections, state.orders, noIndex)
+        assertTrue(plan.skipped > 0, "本用例需要真的有跳过项，实际 ${plan.skipped}")
+        assertTrue(plan.runnable > 0, "本用例需要真的有可运行项，实际 ${plan.runnable}")
+        assertEquals(plan.total, plan.counts.total)
+        assertEquals(plan.skipped, plan.counts.skipped)
+        assertEquals(plan.runnable, plan.counts.runnable)
+    }
 }

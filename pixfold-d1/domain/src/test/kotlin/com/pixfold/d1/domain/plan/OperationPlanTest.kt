@@ -303,4 +303,22 @@ class OperationPlanTest {
             "无原因时给出该行在计划页上的状态词,而不是空列表",
         )
     }
+
+    @Test
+    fun `describe of a skipped rename op reports its reason instead of the status word`() {
+        // 跳过项与正常项在计划页上**只有这一句话**能区分开:
+        // 若跳过项也回退到「重命名」状态词,用户看到的就是一整列"都会改",
+        // 执行后才发现少了一批 —— 这正是"计划页必须可预期"要拦的事。
+        val reason = Msg(TextKey.WarnDuplicate, listOf(2, "x.jpg"))
+        val op = RenameOp(
+            proposal = NameProposal(image = aot1.pages.first(), proposedName = "x.jpg"),
+            status = OpStatus.Skipped,
+            reason = reason,
+        )
+        assertEquals(
+            listOf(reason),
+            operationPlanOfRenames(listOf(op)).describe(),
+            "有原因时必须原样给出原因,而不是回退到状态词",
+        )
+    }
 }

@@ -235,4 +235,12 @@ class CbzWriterTest {
         assertTrue(entry("001.jpg", "A") != entry("001.jpg", "B"), "内容不同必须不等")
         assertTrue(entry("001.jpg", "A") != entry("002.jpg", "A"), "条目名不同必须不等")
     }
+
+    @Test
+    fun `entry toString carries the name and the byte count`() {
+        // toString 是排障时唯一的可读入口(日志里打印条目)。若只剩名字,
+        // "条目写进去了但字节数为 0"这类问题就完全看不出来。
+        assertEquals("CbzEntry(name='001.jpg', bytes=1B)", entry("001.jpg", "A").toString())
+        assertEquals("CbzEntry(name='002.jpg', bytes=2B)", entry("002.jpg", "BB").toString())
+    }
 }
