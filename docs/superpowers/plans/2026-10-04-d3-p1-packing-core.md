@@ -200,6 +200,7 @@ cmd.exe /c "D:\Programing\Personal\pixfold\pixfold-d1\run-gradle.bat :app:lintDe
 | W16 | 余量加固（§3 余量政策）：**第五次广扫荡（收尾轮）**——按 AST 精算出的历史覆盖表，挑历史变异组数最少的文件与**零测试引用**的表达面，共 23 个文件投 **66 组**变异，重点覆盖 12 张「枚举 → `TextKey`」映射表、`DangerAction` 文案三元组、`comicVolumeOf`/`setIncluded`/`includedVolumes`/`updateComponent`/`clearOverride`/`containsIllegalChar`/`compareNaturalTokens` 等生产有调用但测试零引用的函数 | 存活变异必须补到全捕获，或按 §0.4 **给出可复核的等价性证明**并写文档说明 | ✅ 完成（轮 12：66 组 → **42 捕获 / 24 存活 / 0 锚点缺失 / 0 编译失败**；24 个存活者判定为 **23 真缺口 + 1 已证等价**（C5），23 个真缺口补断言后**全部转为捕获**；1 个等价者重跑**仍存活**，与证明一致；+19 用例 ⇒ domain **425** 项；生产代码零改动） |
 | W17 | **R1 修复（用户裁决「细说 R1」后授权）**：让撤销记录能恢复原文件名 —— `ExecEntry` 增 `originalPath`（+ 第三条不变量）、`executeRenameOp` 成功分支从 `op.proposal.image.fileName` 填、`undoOpsOf` 的 Rename 分支改取它作 `to` | 红→绿；`from` = 新名（起点）、`to` = 原名（终点）**不同源**；变异验证 0 逃逸 | ✅ 完成（轮 13：**6 组变异全捕获 / 0 存活 / 0 锚点缺失 / 0 编译失败**；两条"如实记录缺陷"用例翻成正向断言 ⇒ +3 用例，domain **428** 项；生产代码 +26 行） |
 | W18 | **R2 补齐（用户裁决「改吧」后授权新增 `TextKey`）**：改名侧逐项句子契约 —— 新增 `TextKey.RenamePlanRename` + 双语 `domain_rename_plan_rename` + `PixFoldText.resId()` 映射；`RenamePlannedOp.describe()` 未跳过项改给「原名 → 新名」，跳过项无原因时回落 `OpStatusSkip`（原为 `OpStatusRename`，等于说"会重命名"却跳过） | 红→绿；**首次改 `app/**`**（资源 + 映射）；变异含**资源内容**变异（占位符数量/方向/重复）且必须全捕获 | ✅ 完成（轮 14：**10 组变异全捕获 / 0 存活 / 0 锚点缺失 / 0 编译失败**；两遍结论一致；domain **429**、app **402**；生产代码 +5 文件 含 2 个双语资源） |
+| W19 | **R3 修复（用户 `m04079` 第③项授权）**：覆盖的撤销给出**三选一警告** —— 领域层新增 `UndoScope{ThisRun,Everything}` + `UndoOp.DeleteOverwritten`（与 `DeleteCreated` 类型可分）+ `ExecutionReport.overwrittenCount/needsUndoWarning` + `VolumePackPlan.overwritesExisting`（计划层唯一判据，报告计数与撤销推导共用）；UI 底栏撤销按钮在**有覆盖项时先弹框**（三个按钮各带色：两个执行档实心红、取消无底色 `TextButton`、**取消排在最后**），`onUndo` ⇒ `onUndoScope: (UndoScope) -> Unit`（**无默认值**，逼每个调用点表态） | 红→绿；**安全档绝不删用户原有文件**；变异含**资源内容**变异（占位符/重复文案/中文侧）且必须全捕获 | ✅ 完成（轮 15：**31 组变异两遍一致全捕获 / 0 存活 / 0 锚点缺失 / 0 编译失败**；第一遍曾 3 存活 + 2 编译失败，全部归因为**我的测试/变异设计错**并补强后转捕获 —— 其中 3 处是真测试缺口；domain **431**、app **420**；生产 5 文件 含 2 个双语资源） |
 
 **余量处理**：W1–W10 全部完成且仍有轮次 ⇒ **继续加固核心**（更多边界 / 更多变异 / 更多不变式），
 **不越界**到未授权工作面（适配层检查、D2b、真机、UI）。
@@ -1452,6 +1453,175 @@ R2 的授权是"补齐契约 + i18n"，不是重做计划页。
 
 ---
 
+#### 轮 15（2026-10-04 23:3x）— W19 **R3 修复**：覆盖的撤销给出「三选一」警告（**首次改 UI 布局**）
+
+- 提交：`b83098d` fix(d3): 覆盖已有文件后撤销先警告并让用户选范围（R3）
+- 改动：**16 files**（生产 7 个：`domain/plan/Execution.kt` +112/−9、`domain/plan/PackagePlan.kt` +17、
+  `domain/plan/OperationPlan.kt` +9、`domain/plan/DangerAction.kt` ±1、
+  `app/…/ui/plan/ExecutionReportPage.kt` +134/−2、`app/…/ui/workflowa/WorkflowASteps.kt` ±6、
+  `app/…/ui/workflowb/WorkflowBSteps.kt` ±6，以及 2 个双语资源
+  `app/src/main/res/values/strings_plan.xml` +13、`values-zh/strings_plan.xml` +12；
+  测试 7 个：新建 `app/…/ui/plan/UndoScopeDialogTest.kt`（14 用例）、
+  新建 `app/…/ui/plan/UndoScopeDialogStyleTest.kt`（2 用例）、
+  `app/…/ui/plan/PlanWiringTest.kt` +46（17 → 19）、`app/…/ui/plan/PlanUiTest.kt` ±9/−4、
+  `app/…/ui/plan/IssueFilterTest.kt` ±2（机械改签名）、
+  `domain/plan/UndoAlignmentTest.kt` +71/−29（17 → 18）、
+  `domain/plan/DangerActionTest.kt` +45/−9（16 → 17））
+- 闸门：app **420** tests / domain **431** tests / 0F 0E 0S / lint **0 errors, 0 warnings, 4 hints** / assembleDebug OK
+- 变异：31 组，**两遍一致 31 捕获 / 0 存活 / 0 锚点缺失 / 0 编译失败**
+- 结论 / 阻塞 / 待裁决：**R3 关闭**（§4 表格状态已改）。R4 仍未决，不阻塞。
+
+##### 用户裁决与本轮授权
+
+用户 `m04079` 第 ③ 项原文：「**添加警告，仅选择当前操作生成的撤销还是全部删除还是取消，
+记得按钮颜色要区分开，把取消放到最后边**」。四条要求逐条对应到实现：
+
+| 用户要求 | 实现 |
+| --- | --- |
+| 添加警告 | `ExecutionReport.needsUndoWarning = overwrittenCount > 0`；底栏撤销按钮**不再直接撤销**，改为先开 `UndoScopeDialog` |
+| 三个选择 | `UndoScope.ThisRun`（仅撤销本次生成的）/ `UndoScope.Everything`（全部删除，含被覆盖的）/ 取消 |
+| 按钮颜色要区分开 | 两个执行档 `Button(colors = dangerActionButtonColors())`（浅色实心 `error` / 深色 `errorContainer`）；取消是 `TextButton`，**无底色**。像素级判据见下 |
+| 取消放到最后边 | `Column` 里顺序 = 标题 → 正文 → 安全档 → 危险档 → **取消**；`cancel sits below both scopes in the laid out dialog` 用 `getBoundsInRoot().top` 钉死 |
+
+##### 缺陷逐字回顾（修之前）
+
+`HANGOFF.md:2686-2689`（轮 7 / W11 登记）：「**R3(缺陷)**:`OutputConflictPolicy.Overwrite` +
+输出已存在时,报告报 `Succeeded`、`createdPath` = **被替换的那个旧文件**路径,撤销据此推导
+`DeleteCreated(该路径)` ⇒ 真执行会**删掉用户原有的 CBZ**,且被覆盖的内容无法恢复。」
+
+根因不是"少写了一个 if"，而是**同一个问题在两个地方各判了一次、判据不同源**：
+危险动作机制（`DangerAction.overwritesExisting`）认识这个场景，**撤销推导却从不查策略**。
+所以修法是**把判据收成一处**（`VolumePackPlan.overwritesExisting`），让报告、危险动作、撤销推导共用。
+
+##### 修复（生产改动）
+
+1. `domain/plan/PackagePlan.kt`：`VolumePackPlan` 增
+   `val overwritesExisting: Boolean get() = !skipped && conflictPolicy == OutputConflictPolicy.Overwrite && volume.outputExists`
+   —— **全仓唯一判据**。`DangerAction.kt` 的 `OverwriteExisting` 分支随即改用它（原为同义的重复表达式）。
+2. `domain/plan/OperationPlan.kt`：打包成功分支改为
+   `createdPath = plan.outputPath, originalPath = if (plan.overwritesExisting) plan.outputPath else null`
+   —— 覆盖项**留下痕迹**，新建项**不留**。改名分支的 `originalPath` 含义不同（R1 用来存原名），故
+   `Execution.kt` 判覆盖时**必须按 kind 分叉**。
+3. `domain/plan/Execution.kt`：
+   - `private fun ExecEntry.isOverwrite(kind: ExecKind) = kind == ExecKind.Package && originalPath != null`
+     —— **kind 分叉是强制的**：改名侧 R1 用 `originalPath` 装"要改回去的原名"，若不看 kind，
+     每一次改名都会被算成"覆盖了别人的文件"，一撤销就删掉用户的原图。
+   - 新增 `enum class UndoScope { ThisRun, Everything }`，KDoc 写明 `ThisRun` 是安全档
+     （**永远不会删被覆盖的文件**）、`Everything` 是危险档。
+   - `sealed interface UndoOp` 增 `data class DeleteOverwritten(val path: String) : UndoOp`
+     —— 与被覆盖项**类型可分**（不是给 `DeleteCreated` 加个布尔标志：类型不同才能在 `when` 里穷尽）。
+   - `UndoRecord` 增 `val overwrittenOpCount: Int get() = ops.count { it is UndoOp.DeleteOverwritten }`。
+   - `ExecutionReport` 增 `overwrittenCount = entries.count { it.isOverwrite(kind) }` 与
+     `needsUndoWarning = overwrittenCount > 0`。
+   - `internal fun undoOpsOf(report, kind, scope: UndoScope = UndoScope.ThisRun)`；
+     `fun undoRecordOf(report, scope: UndoScope = UndoScope.ThisRun)`
+     —— **默认必须是保守的那一档**：忘了传参数只是"少删一点"（还能再点一次），
+     默认成危险档则会**不可逆地多删**。
+4. `app/…/ui/plan/ExecutionReportPage.kt`：
+   - 形参 `onUndo: () -> Unit` ⇒ **`onUndoScope: (UndoScope) -> Unit`，且故意不给默认值**。
+     KDoc 小节「## 为什么 [onUndoScope] 必须带 [UndoScope] 参数」写明：若仍收 `() -> Unit`，
+     界面能让用户确认"全部删除"而调用方照旧按安全档回滚 —— **警告弹了、选择也做了、结果什么都没变，
+     比不弹更糟**。没有默认值，每个调用点都得表态。
+   - 撤销按钮：`if (report.needsUndoWarning) scopeDialogOpen = true else onUndoScope(UndoScope.ThisRun)`
+     —— **没有覆盖项时一次都不打扰用户**（这是"仅在确有危险时才警告"的边界）。
+   - `UndoScopeDialog(overwrittenCount, onChoose, onCancel)`：标题（`headlineSmall` + `colorScheme.error`）
+     → 正文（`pluralStringResource(R.plurals.report_undo_warning_body, count, count)`）
+     → 安全档 `Button` → 危险档 `Button` → 取消 `TextButton`，全部 `fillMaxWidth`。
+     KDoc 解释**为什么不用 `AlertDialog`**：M3 的 `AlertDialog` 只有 `confirmButton`/`dismissButton`
+     两个槽位，摆不下三个同级按钮；而槽位位置随平台排版变化，会直接破坏"取消在最后边"。
+     故用 `Dialog` + `Surface`（`androidx.compose.ui.window.Dialog` 全仓此前零使用，随 compose-ui 发布，**不是新依赖**）。
+   - ⚠️ 四条文案全部在 `Dialog` **lambda 外面**解析（`stringResource` 不能在非 `@Composable` 的
+     `semantics {}` 里调用，而 `Dialog` 的 content lambda 里解析也没问题 —— 放到外面是为了让
+     "文案"与"结构"分离，测试可从语义树独立取值）。
+5. 两个生产调用点（`WorkflowASteps.kt:318`、`WorkflowBSteps.kt:201`）：
+   `onUndoScope = { scope -> undoMessage = performUndo(undoRecordOf(currentReport, scope)).message }`
+   —— **档位真的传下去了**，不是接住就扔。
+
+##### 红→绿（**第一版红是假的**）
+
+⚠️ 首版断言引用了 `report.overwrittenCount` / `needsUndoWarning` / `UndoScope` —— 这些**还不存在**，
+于是得到的是**编译错误，不是 RED**。正确顺序：先只写"用既有 API 能表达的断言"拿到真 RED，
+再补新 API 的断言。真 RED（`artifacts/red_r3.log`, RC=1）是两条真断言失败：
+
+```
+覆盖项必须在报告里留下「这个位置原本有东西」的痕迹 —— 否则撤销无从区分「本次新建」与「替换掉别人的」
+  ==> expected: <E:\漫画库\_output/海贼王 第102卷.cbz> but was: <null>
+Rename 的执行项不携带「被覆盖」痕迹  ==> expected: <null> but was: <第01卷_p001.jpg>
+```
+
+XML `tests=18 failures=2 errors=0`。第二条暴露了 **kind 分叉的必要性**：R1 让改名成功项也带
+`originalPath`（装原名），所以"有没有 `originalPath`"**不能**当作"是否覆盖"的判据。
+
+⚠️ 我第一版的**改名侧断言本身写错了**（断言 `originalPath` 为 null，与 R1 的契约冲突）——
+改成 `overwrittenCount == 0` + `!needsUndoWarning` + 两档推导结果相等，才是在陈述真契约。
+
+##### 变异验证：31 组两遍（`artifacts/w19_run_pass1.log` / `pass2.log`）
+
+新增静态锚点校验器 `artifacts/check_anchors.py`（`ast.parse` 静态求值，**绝不 `exec`** —— 轮 12 踩过
+"exec 历史脚本真的写了一版变异进生产文件"）。W19 覆盖面：计划层唯一判据（M1–M4）、报告覆盖痕迹
+（M5–M6）、`isOverwrite` kind 分叉（M7–M9）、计数与警告开关（M10–M11）、安全档跳过与两档判据
+（M12–M14）、`overwrittenOpCount`（M15–M16）、`undoRecordOf` 默认值（M17–M18）、危险动作复用（M19）、
+弹框触发（M20–M22）、两个 `onChoose` 接线（M23–M24、M27）、取消接线（M25）、关框（M26）、
+双语文案与占位符（M28–M31）。
+
+**第一遍：26 捕获 / 3 存活（M3、M28、M31）/ 2 编译失败（M29、M30）。**
+五处异常**逐条归因，全部是"我的变异/测试设计错"，不是生产缺陷**：
+
+| 异常 | 归因 | 处置 |
+| --- | --- | --- |
+| M3 存活（`overwritesExisting` 丢 `!skipped`） | **等价变异**：`buildPackagePlans` 里 `skipped = v.outputExists && conflictPolicy == Skip`，而 `overwritesExisting` 第二合取项是 `policy == Overwrite`；策略不可能同时是两者 ⇒ **`!skipped` 被蕴含**。穷举 `(outputExists, policy)` 六种组合，两个谓词完全相同 | 不判等价了事：**直接构造**出生产路径造不出的"Overwrite + 跳过"计划（`skippedOverwritePlan`），新增 `a skipped volume is never counted as overwriting` ⇒ 该合取项从此**可证伪** |
+| M28 存活（英文 `other` 变格丢 `%1$d`） | 原用例只有 **1** 个覆盖项 ⇒ Android 取 `one` 变格，**`other` 变格根本没被读到** | 新增 2 个覆盖项的用例跨过复数边界 ⇒ 捕获 |
+| M31 存活（中文正文丢 `%1$d`） | 其余用例跑在 Robolectric 默认 locale（`en_US`）⇒ **中文资源根本不会被加载** | 新增 `qualifiers = "zh-rCN-w400dp-h2000dp"` 用例 ⇒ 捕获 |
+| M29/M30 编译失败 | **变异本身非法**：我把 `<string name="report_undo_everything">…</string>` 整条换成了 `<string name="report_undo_this_run">…</string>`，于是同一个 key 出现两次、原 key 消失（实测 `report_undo_this_run` occurrences=2、`report_undo_everything`=0）⇒ AAPT 失败 | 改为**只换内容、保留原 key** ⇒ 两遍均捕获 |
+
+⚠️ 这条 M29/M30 是**方法论的坑**：变异"编译失败"看起来像"测试通过了"，实际是**变异体没被真正构建**，
+什么都没证明。**变异必须保证文件仍可编译**，否则该组结果无效。
+
+**第二遍（补强后，测试冻结）：31/31 全捕获，与第一遍的差异恰好是上面五组**：
+
+```
+CHANGED M3: ★存活★ -> 捕获      CHANGED M28: ★存活★ -> 捕获
+CHANGED M29: 编译失败 -> 捕获    CHANGED M30: 编译失败 -> 捕获
+CHANGED M31: ★存活★ -> 捕获      其余 26 组两遍均为"捕获"
+```
+
+##### 测试补强（3 处真缺口）
+
+- `domain/plan/DangerActionTest.kt`：抽 `skippedOverwritePlan(live)` 助手 + 新增
+  `a skipped volume is never counted as overwriting`（前置断言 `skipped == true` **且**
+  `conflictPolicy == Overwrite` **且** `volume.outputExists`，再断言 `!overwritesExisting`）。
+  这条用例的价值不在"多一条"，而在于它**让一个此前在真实数据上不可证伪的合取项变成可证伪**。
+- `app/…/ui/plan/UndoScopeDialogTest.kt` +4：`the two scope buttons do not render the same sentence`
+  与 `the chinese choices are worded differently from each other`（从**语义树**取
+  `config.getOrNull(SemanticsProperties.Text)` 拼接后的文本**两两比较** —— 不看资源 id，
+  故"两个按钮渲染同一句"可证伪）、`the warning body still contains the count when more than one file was replaced`、
+  `the chinese warning body also contains the count`。
+- ⚠️ **这是同类盲区第二次出现**（轮 14 已记：「用 `TestText`/`resolveText` 从**同一份资源**算期望，
+  内容写错也会通过」）。本轮把该教训推广成一条可复用判据：**凡是"键 → 译文"，判据必须落在
+  "渲染出来的句子有什么可观测形状"**（含不含数字、两两是否相同、顺序），而不是"等于同一个函数算出的值"。
+
+##### 结论与越界核对
+
+- **R3 关闭**。§4 表格 R3 行状态改为「✅ 已修复（轮 15 / W19）」。
+- **未新增待裁决项**；R4 仍未决，不阻塞。
+- 本轮**按用户授权改动 `app/**`**：新增 UI 组件（`UndoScopeDialog`）、改 UI 布局（撤销按钮 +
+  页面尾部）、新增 4 条双语字符串 + 1 个 `<plurals>`。**未改构建脚本**（`build.gradle.kts` /
+  `libs.versions.toml` / `.mise.toml` 逐条 `git diff --quiet` 确认未动）；**未新增依赖**
+  （`androidx.compose.ui.window.Dialog` 随 compose-ui 发布）；**未改 `HANGOFF.md`**
+  （`HANGOFF.md:2686-2689` 记的是**轮 7 当时**的登记，属历史记录；R3 当前状态以本台账 §4 为准）。
+- 测试计数口径：`domain` 源码 `@Test` = **431** = XML **431**；`app` 源码 `@Test` = **421**，
+  XML = **420**，差 1 仍是 `NegativeControlTest`（被 `unitTests.all { exclude(...) }` 排除）。
+  `app` 从 402 → 420（+18：`UndoScopeDialogTest` 14 + `UndoScopeDialogStyleTest` 2 + `PlanWiringTest` 2）。
+- **像素级判据**（`UndoScopeDialogStyleTest`，`@GraphicsMode(NATIVE)` 真取位图）：
+  浅色 `safe=#FFB3261E danger=#FFB3261E cancel=#FFE9E7EF surface=#FFE9E7EF`；
+  深色 `safe=#FF8C1D18 danger=#FF8C1D18 cancel=#FF29292F surface=#FF29292F`
+  ⇒ 两个执行档实心错误色，**取消像素与对话框表面色逐字节相同**（即"无底色"），
+  且 `channelDistance(cancel, safe) >= 40` 保证两者可分辨。
+  ⚠️ 对话框是**独立窗口**，`captureToImage` 必须对对话框节点自身截图，再把子节点 root 坐标
+  翻译成位图坐标；直接对页面截图量不到对话框像素。
+
+---
+
 ## 4. 待裁决 / 阻塞（越界项写这里，不自行决定）
 
 > 出现下列任一情况，**停止该项**并在此登记，然后继续**下一项**工作：
@@ -1462,7 +1632,7 @@ R2 的授权是"补齐契约 + i18n"，不是重做计划页。
 | --- | --- | --- | --- | --- |
 | R1 | 3（W6） | `UndoOp.RestoreRenamed(from, to)` 在成功项上恒 `from == to`（空操作）—— `executeRenameOp` 成功分支的 `label` 与 `createdPath` 都取 `op.finalName`，报告里**无处**携带原文件名 | 修法有两种且语义不同：①扩 `ExecEntry` 加原名字段；②让 `undoRecordFrom(plan, report)` 从计划取 `op.proposal.image.fileName`（只有它手里有计划）。选哪种、以及 `from`/`to` 的最终语义，都属撤销记录的产品决策；且本轮契约是"既有可观测行为逐字不变" | ✅ **已修复**（轮 13 / W17：用户 `m04081` 采纳第 ① 种修法 —— `ExecEntry` 增 `originalPath`、`executeRenameOp` 从计划填、`undoOpsOf` 改取它作 `to`；6 组变异全捕获；详见 §3.1 轮 13） |
 | R2 | 3（W7） | `RenamePlannedOp.describe()` 在无原因时只能给 `Msg(TextKey.OpStatusRename)` 一句状态词 | 改名侧**没有**逐项句子契约（`RenamePlanPage` 渲染的是"原名 → 新名"两列 + 状态标签）；要补齐就得**新增 TextKey**，而本轮明令禁止 | ✅ **已修复**（轮 14 / W18：用户 `m04081`「改吧」授权新增 `TextKey.RenamePlanRename` —— 未跳过项给出「原名 → 新名」逐项句子，双语资源 + `PixFoldText` 映射同步补齐；顺带修掉跳过项无原因时回落到 `OpStatusRename` 的错误方向；10 组变异全捕获，含 4 组资源内容变异；详见 §3.1 轮 14） |
-| R3 | 7（W11） | `OutputConflictPolicy.Overwrite` + 输出已存在时，报告报 `Succeeded`、`createdPath` = **被替换的那个旧文件**路径，撤销据此推导 `DeleteCreated(该路径)` ⇒ 真执行会**删掉用户原有的 CBZ**，且被覆盖的内容无法恢复 | 「覆盖的撤销」是什么，属产品决策，三种语义完全不同：①当作新建 ⇒ 删掉（现状，会把用户旧文件也删了）②覆盖前先备份 ⇒ 撤销时恢复备份（要给 `ExecEntry` 加"被覆盖路径"字段）③覆盖项标为不可撤销（要把 `OverwriteExisting` 传进 `undoOpsOf`）。**危险动作机制已认识此场景**（`DangerAction.kt` 判 `OverwriteExisting`），只有撤销推导从不查策略。按 §7.1「有歧义先请用户裁决」，故只记录 | ⏸ 待用户裁决（不阻塞余量轮） |
+| R3 | 7（W11） | `OutputConflictPolicy.Overwrite` + 输出已存在时，报告报 `Succeeded`、`createdPath` = **被替换的那个旧文件**路径，撤销据此推导 `DeleteCreated(该路径)` ⇒ 真执行会**删掉用户原有的 CBZ**，且被覆盖的内容无法恢复 | 「覆盖的撤销」是什么，属产品决策，三种语义完全不同：①当作新建 ⇒ 删掉（现状，会把用户旧文件也删了）②覆盖前先备份 ⇒ 撤销时恢复备份（要给 `ExecEntry` 加"被覆盖路径"字段）③覆盖项标为不可撤销（要把 `OverwriteExisting` 传进 `undoOpsOf`）。**危险动作机制已认识此场景**（`DangerAction.kt` 判 `OverwriteExisting`），只有撤销推导从不查策略。按 §7.1「有歧义先请用户裁决」，故只记录 | ✅ **已修复**（轮 15 / W19：用户 `m04079` 第③项裁决「添加警告，仅选择当前操作生成的撤销还是全部删除还是取消，记得按钮颜色要区分开，把取消放到最后边」—— 取的是**①的安全版**：默认档 `UndoScope.ThisRun` **永不删被覆盖的文件**，只有用户在弹框里显式选了 `Everything` 才会推导出 `DeleteOverwritten`；`VolumePackPlan.overwritesExisting` 收成全仓唯一判据，报告计数/危险动作/撤销推导共用同源；31 组变异两遍全捕获；详见 §3.1 轮 15） |
 | R4 | 9（W13） | `validatePageConsistency(volume)` 的输入就是 `renumberPages(volume)` 的**输出**（`ComicInfoXml.kt:111` 调 `:93-97 previewOf`），两者同源 ⇒ ①`pages.size != order.size` 恒假、②校验侧补零位数与重编号侧恒等、③`startsWith("$expected.")` 恒真 ⇒ **`pageIssues` 恒空、`consistent` 恒真**，UI 的告警分支（`app/…/workflowb/PackPreviewPage.kt:204 if (!preview.consistent)`）**不可达** | 要让这两个分支可达，必须改 `validatePageConsistency` 的**输入语义**（例如改成校验"磁盘上真实存在的页"而非"按页序重编号的页"，或校验 `volume.pages` 与 `pageOrder.order` 是否一致）。这改变了"一致性"这个词在 D3 里的含义，且会牵动 UI 告警的触发条件 ⇒ **属产品决策**。本轮只做等价性证明与记录，**不改输入来源** | ⏸ 待用户裁决（不阻塞余量轮；**非本轮引入**，是既有设计） |
 
 **已知的、明确不碰的开放项**（不要在本轮"顺手"处理）：
@@ -1585,7 +1755,19 @@ cmd.exe /c "D:\Programing\Personal\pixfold\pixfold-d1\run-gradle.bat clean \
   > 两条是"句子可观测形状"判据 —— 一条钉英文槽位、一条钉中文槽位）。
   > ⚠️ 这也是本分支**首次**让 `app` 测试数从 399 变动：此前 13 轮 `app` 恒 399。
   > `app` 始终 **399** 未变（本分支一行未改 `app/**`）。
+  > 轮 15（W19 / R3 修复）domain +2 ⇒ **431**、app **+18** ⇒ **420**（见 §3.1 轮 15；
+  > domain 侧 `DangerActionTest` 17（+1，含"直接构造生产造不出的 Overwrite+跳过 计划"）
+  > 与 `UndoAlignmentTest` 18（+1）；app 侧新建 `UndoScopeDialogTest` **14** +
+  > `UndoScopeDialogStyleTest` **2** + `PlanWiringTest` 17 → **19**）。
+  > ⚠️ 这是本分支**首次让 `app` 测试数出现两位数增长**，也是**首次改 UI 布局**
+  > （`ExecutionReportPage.kt` 新增 `UndoScopeDialog` 组件 + 底栏按钮分支）。
+  > 计数口径：`domain` 源码 `@Test` **431** = XML **431**；`app` 源码 `@Test` **421**、
+  > XML **420**，差 1 恒为 `NegativeControlTest`（`unitTests.all { exclude(...) }` 排除）。
 - 产物：`app/build/outputs/apk/debug/app-debug.apk`（33,385,168 字节，mtime 17:43）⇒ `assembleDebug` 真实产出。
+  > 轮 15 读数（`--rerun-tasks` 全量重建）：**33,420,392 字节**，mtime **2026-10-04 23:33:31**；
+  > `find app/src/main domain/src/main -newer <apk>` 为空 ⇒ APK 比所有源文件新（读数新鲜）；
+  > `resources.arsc` 内含全部 6 条新串（英/中各 3 条含 `<plurals>` 的 `one`/`other` 变格）
+  > 与 `%1$d file` 占位符。
 
 ### 6.3 改动面与越界核对
 
@@ -1621,6 +1803,18 @@ cmd.exe /c "D:\Programing\Personal\pixfold\pixfold-d1\run-gradle.bat clean \
 > UI 布局文件（如 `ui/workflowa/RenamePlanPage.kt`）仍**一行未动**。
 > 当前实时读数以 `git diff --stat dev...d3/p1` 为准；改动面 = `domain/**` + `app/src/main/res/values*/`
 > （2 个文件）+ `app/…/ui/text/PixFoldText.kt` + `app/src/test/**`（1 个文件）+ `HANGOFF.md` + 本台账。
+> 轮 15（W19 / R3 修复）**+16 files / +483 / −58** —— 生产 7 个文件
+> （`domain/plan/Execution.kt` +112/−9、`domain/plan/PackagePlan.kt` +17、`domain/plan/OperationPlan.kt` +9、
+> `domain/plan/DangerAction.kt` ±1、`app/…/ui/plan/ExecutionReportPage.kt` +134/−2 —— **首次改 UI 布局**、
+> `app/…/ui/workflowa/WorkflowASteps.kt` ±6、`app/…/ui/workflowb/WorkflowBSteps.kt` ±6，
+> 以及 2 个双语资源 `values/strings_plan.xml` +13 / `values-zh/strings_plan.xml` +12）；
+> 测试 7 个（2 个**新建** `app/…/ui/plan/UndoScopeDialogTest.kt` 14 用例与
+> `UndoScopeDialogStyleTest.kt` 2 用例，另 5 个既有文件共 +187/−42）。
+> ⚠️ 与轮 14 不同：轮 14 只动"资源 + 映射"，**本轮真的动了 UI 布局与交互**（撤销按钮改为
+> "有覆盖项先弹框"、新增 `UndoScopeDialog` 组件、新增 4 条双语字符串 + 1 个 `<plurals>`），
+> 但**未改构建脚本、未新增依赖、未改 `HANGOFF.md`**。
+> ⚠️ `app/**` 的"0 条"结论**从轮 14 起不再成立**，本轮进一步扩大；两条都属**用户授权范围**
+> （`m04081` 授权 R2、`m04079` 第③项授权 R3）。
 
 ### 6.4 提交拓扑（`git log --oneline dev..d3/p1`）
 
@@ -1630,7 +1824,9 @@ cmd.exe /c "D:\Programing\Personal\pixfold\pixfold-d1\run-gradle.bat clean \
 
 | 提交 | 类型 | 内容 |
 | --- | --- | --- |
-| `（轮 14 回填 = 本次提交）` | docs | 台账回填轮 14（W18 / R2）提交号与读数 |
+| `（轮 15 回填 = 本次提交）` | docs | 台账回填轮 15（W19 / R3）提交号与读数 |
+| `b83098d` | fix | W19 / R3：覆盖的撤销先警告并让用户选范围（+2 `UndoScope` 档位、`DeleteOverwritten`、双语资源与弹框；`onUndo` ⇒ `onUndoScope`；domain 431 / app 420） |
+| `（轮 14 回填）` | docs | 台账回填轮 14（W18 / R2）提交号与读数（`dc2e28e`） |
 | `759ef68` | fix | W18 / R2：改名计划行给出「原名 → 新名」（+1 `TextKey`、双语资源、映射；domain 429 / app 402） |
 | `（轮 13 回填 = 本次提交）` | docs | 台账回填轮 13（W17 / R1）提交号与读数 |
 | `cc4c30c` | fix | W17 / R1：撤销记录恢复原文件名（+3 用例 ⇒ domain 428） |
@@ -1662,7 +1858,7 @@ cmd.exe /c "D:\Programing\Personal\pixfold\pixfold-d1\run-gradle.bat clean \
 
 ### 6.5 结论与明确的"未做"
 
-- **完成**：W0–**W18** 全部 ✅（§3 状态表）；D3 退出条件 1 所要求的**打包领域核心**
+- **完成**：W0–**W19** 全部 ✅（§3 状态表）；D3 退出条件 1 所要求的**打包领域核心**
   **轮 13（W17）另加**：R1 真缺陷修复（撤销 `from == to` 空操作 ⇒ `ExecEntry.originalPath`），6 组变异全捕获，
   +3 用例（425 → **428**）。
   **轮 14（W18）另加**：R2 补齐（新增 `TextKey.RenamePlanRename` + 双语资源 + `resId()` 映射，
@@ -1694,6 +1890,15 @@ cmd.exe /c "D:\Programing\Personal\pixfold\pixfold-d1\run-gradle.bat clean \
   ⇒ 又 +19 用例（406 → **425**）。
   八次扫荡累计：W7 23 组 / W8 16 组 / W11 7 组 / W12 23 组 / W13 39 组 / W14 58 组 / W15 64 组 / **W16 66 组**。
   **W16 为 12 轮上限内的最后一轮**（goal `maxGoalRounds = 12`），后续加固需用户重新授权并追加轮次。
+  **轮 15（W19）另加**：R3 真缺陷修复（覆盖后撤销会删掉用户原有 CBZ）——领域层新增
+  `UndoScope{ThisRun,Everything}`、`UndoOp.DeleteOverwritten`、`ExecutionReport.overwrittenCount/needsUndoWarning`，
+  并把 `VolumePackPlan.overwritesExisting` 收成**全仓唯一判据**（报告计数 / 危险动作 / 撤销推导同源）；
+  UI 层撤销按钮在**有覆盖项时先弹三选一警告**（两个执行档实心错误色、取消无底色且排在最后），
+  `onUndo` ⇒ `onUndoScope: (UndoScope) -> Unit`（**无默认值**，逼每个调用点表态）。
+  31 组变异**两遍一致全捕获**（第一遍 3 存活 + 2 编译失败全部归因为测试/变异设计错，补强后转捕获），
+  domain +2 ⇒ **431**、app +18 ⇒ **420**。
+  ⚠️ 本轮是本分支**首次改动 UI 布局与交互**（此前轮 14 只动资源与映射）——用户 `m04079` 第③项授权范围内。
+  九次扫荡累计：W7 23 / W8 16 / W11 7 / W12 23 / W13 39 / W14 58 / W15 64 / W16 66 / **W19 31 组**。
 - **未做 / 不宣称**（与 HANGOFF 小节一致，勿据此认为 D3 已完成）：
   1. ❌ **真机核对** —— 工作面 100% 领域层，按 §7.4 表第 1 行判定不需要；
   2. ❌ **D3 三项退出条件的正式宣布**；
@@ -1706,7 +1911,11 @@ cmd.exe /c "D:\Programing\Personal\pixfold\pixfold-d1\run-gradle.bat clean \
   **R3**（轮 7 新登记）`Overwrite` 策略下撤销会去删**用户原有的文件**（修法三选一，属产品决策）；
   **R4**（轮 9 新登记）页序自检的两个分支**永不可达**（校验输入与重编号输出同源）⇒
   `consistent` 恒真、`PackPreviewPage.kt:204` 的告警分支不可达；修法要改"一致性"的输入语义，属产品决策。
-  **其中 R1 已于轮 13（W17）关闭、R2 已于轮 14（W18）关闭**；**R3/R4 仍未决**，均不阻塞。
+  **其中 R1 已于轮 13（W17）关闭、R2 已于轮 14（W18）关闭、R3 已于轮 15（W19）关闭**；
+  **R4 仍未决**，不阻塞。
+  **轮 15（W19）未新增待裁决项** —— 31 组变异两遍全捕获，无存活者（第一遍的 3 个存活者与
+  2 个编译失败已逐条归因为测试/变异设计错，并以补强断言消除）；R3 是用户 `m04079` 第③项
+  裁决后按"默认安全档 + 显式弹框选择 + 判据收成一处"这条最小授权面落地。
   **轮 13（W17）未新增待裁决项** —— 6 组变异全捕获，无存活者；R1 是用户裁决后按第 ① 种语义落地。
   **轮 14（W18）未新增待裁决项** —— 10 组变异全捕获，无存活者；R2 是用户「改吧」后按
   "新增单个 `TextKey` + 双语资源 + 映射"这条最小授权面落地。
