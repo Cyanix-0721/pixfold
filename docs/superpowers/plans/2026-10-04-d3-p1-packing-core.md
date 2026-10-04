@@ -333,6 +333,7 @@ cmd.exe /c "D:\Programing\Personal\pixfold\pixfold-d1\run-gradle.bat :app:lintDe
 
 #### 轮 4（2026-10-04 17:2x）— W8 边界与跨层不变式加固
 
+- 提交：`a22a12a`（`test(d3): 跨层不变式加固（W8：计划/报告/字节三层对齐 + 16 组变异全捕获）`）
 - 目标：补上**层与层之间**的等式。到 W7 为止每层各自被钉死了（`PackagePlanTest` 管"计划说什么"、
   `ExecutionReportTest` 管"报告说什么"、`CbzWriterTest` 管"字节写成什么"），但**没有任何一条用例把三层连起来** ——
   "计划宣称 16 页 + 报告说成功 + 归档里只有 15 张"这种坏成品可以全绿通过。
