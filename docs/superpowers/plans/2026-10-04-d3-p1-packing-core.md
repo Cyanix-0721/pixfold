@@ -496,7 +496,7 @@ cmd.exe /c "D:\Programing\Personal\pixfold\pixfold-d1\run-gradle.bat :app:lintDe
 
 #### 轮 7（2026-10-04 17:5x）— W11 余量加固：条目名撞名守卫 + R3 登记
 
-- 提交：`（见回填行）`
+- 提交：`2fe36ce` fix(d3): 条目名与元数据条目撞名守卫（W11 余量加固 + 登记 R3）
 - 改动：3 files / +93 / −0（**纯增量，零删除**）
   - `pixfold-d1/domain/src/main/kotlin/com/pixfold/d1/domain/pack/CbzWritePlan.kt`（+8）
   - `pixfold-d1/domain/src/test/kotlin/com/pixfold/d1/domain/pack/CbzWritePlanTest.kt`（+38）
@@ -697,7 +697,7 @@ cmd.exe /c "D:\Programing\Personal\pixfold\pixfold-d1\run-gradle.bat clean \
 | 提交 | 类型 | 内容 |
 | --- | --- | --- |
 | `（轮 7 回填）` | docs | 台账回填轮 7 提交号 + R3 登记 |
-| `（轮 7）` | fix | W11：条目名撞名守卫 + R3 诚实记录 |
+| `2fe36ce` | fix | W11：条目名撞名守卫 + R3 诚实记录 |
 | `901baf1` | docs | 台账回填 W9/W10 提交号 |
 | `6682986` | docs | W10：终验读数（带 `clean` 的全量重建 64/64 + 越界逐条核对） |
 | `ea78b3c` | docs | W9：`HANGOFF.md` §9.1 追加「D3 打包核心轮」+ 变异计数口径校正 |
