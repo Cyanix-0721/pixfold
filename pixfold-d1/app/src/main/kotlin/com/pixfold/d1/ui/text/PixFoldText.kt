@@ -309,5 +309,6 @@ private fun TextKey.resId(): Int = when (this) {
 
     // 页码一致性自检
     TextKey.PageIssueCountMismatch -> R.string.domain_page_issue_count_mismatch
+    TextKey.PageIssueMissingFromOrder -> R.string.domain_page_issue_missing_from_order
     TextKey.PageIssueWrongIndex -> R.string.domain_page_issue_wrong_index
 }

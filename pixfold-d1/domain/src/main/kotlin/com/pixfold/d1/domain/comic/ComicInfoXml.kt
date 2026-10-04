@@ -97,10 +97,24 @@ fun previewOf(volume: ComicVolume): ComicPreview = ComicPreview(
 )
 
 /**
- * 校验"页码数量与 ComicInfo.xml 一致"(HANGOFF §10 数据正确性)。
+ * 校验"页序、页表与页码编号彼此自洽"(HANGOFF §10 数据正确性)。
  *
- * 原型阶段 XML 里没有逐页 `<Pages>` 段,故这里校验的是**页数的唯一来源**:
- * 页码预览的项数与卷的页序长度一致,且序号连续从 1 起。
+ * ## 两类检查,各自的两个来源
+ *
+ * **① 页表 ↔ 页序**(`volume.pages` ↔ `volume.pageOrder.order`):
+ * 这两个是**独立**的列表 —— 建卷时同源,但页序会被人工拖拽改动,故它们必须始终
+ * 覆盖**同一批页**。这一条此前是拿 `renumberPages(volume).size` 跟
+ * `volume.pageOrder.order.size` 比 —— 而 `renumberPages` 的返回长度**就是**
+ * `order.size`,等于"列表与自身比长度",恒等 ⇒ 这些原因从来没产出过,
+ * `consistent` 恒真,UI 的告警分支不可达(R4)。
+ * 现在改成比"卷内登记的页"与"页序里排的页":长度不同报数量不符,长度相同但
+ * 成员不同报"有页不在页序里"(人工拖拽只换顺序,故这里比的是**集合**而非位置)。
+ *
+ * **② 编号契约**(`renumberPages` 的产出):序号从 1 起、补零位数随页数自适应、
+ * 扩展名小写。这一条**不是自证**:补零规则在 [renumberPages] 与本函数里各写了一次,
+ * 它校验的是"两份实现是否仍然一致" —— 只改坏其中一处即会报错
+ * (W13 的记录里`页码补零不随页数自适应`正是被这一条捕获的)。
+ *
  * 返回不一致的原因列表(空 = 一致),供 UI 与测试共用。
  *
  * 虽然这是"自检"性质,但 [PackPreviewPage] 会把它显示给用户(「⚠️ 页码与页序不一致：…」),
@@ -108,10 +122,20 @@ fun previewOf(volume: ComicVolume): ComicPreview = ComicPreview(
  */
 fun validatePageConsistency(volume: ComicVolume): List<Msg> {
     val issues = mutableListOf<Msg>()
-    val pages = renumberPages(volume)
-    if (pages.size != volume.pageOrder.order.size) {
-        issues.add(Msg(TextKey.PageIssueCountMismatch, listOf(pages.size, volume.pageOrder.order.size)))
+
+    val listed = volume.pages
+    val order = volume.pageOrder.order
+    if (listed.size != order.size) {
+        issues.add(Msg(TextKey.PageIssueCountMismatch, listOf(listed.size, order.size)))
+    } else {
+        val orderIds = order.map { it.id }.toSet()
+        val missing = listed.count { it.id !in orderIds }
+        if (missing > 0) {
+            issues.add(Msg(TextKey.PageIssueMissingFromOrder, listOf(missing, listed.size)))
+        }
     }
+
+    val pages = renumberPages(volume)
     pages.forEachIndexed { i, p ->
         val expected = (i + 1).toString().padStart(if (pages.size >= 100) 4 else 3, '0')
         if (!p.fileName.startsWith("$expected.")) {

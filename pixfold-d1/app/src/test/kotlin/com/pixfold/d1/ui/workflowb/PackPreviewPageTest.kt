@@ -197,6 +197,43 @@ class PackPreviewPageTest {
         )
     }
 
+    // ================= 页码与页序不一致的告警(R4) =================
+
+    /**
+     * `pack_page_issues` 是「前缀 + %1$s」的形状:领域层给出的问题清单在渲染时
+     * 用 `pack_page_issue_separator` 拼好再填进去。这里照着同样的拼法构造期望文本,
+     * **不写死任何字面量**(改措辞不会误报),同时又能验证"数目真的传对了"。
+     */
+    private fun issueWarning(vararg issueParts: String): String =
+        TestText.raw(R.string.pack_page_issues).substringBefore("%1\$s") +
+            issueParts.joinToString(TestText.raw(R.string.pack_page_issue_separator))
+
+    @Test
+    fun `a volume whose page list and page order disagree is flagged on the preview page`() {
+        // R4 端到端:`validatePageConsistency` 修好后,这里的问题必须真的走到界面上。
+        // 此前 `preview.consistent` 恒真 ⇒ 告警分支不可达 ⇒ 用户在真机上永远看不到这一句。
+        val broken = library.volumes.first { it.id == "aot-1" }.let { it.copy(pages = it.pages.dropLast(1)) }
+        show(listOf(broken) + library.volumes.filter { it.id != "aot-1" })
+        scrollTo(TAG_PAGE_PREVIEW_COUNT)
+        rule.onNodeWithText(
+            issueWarning(TestText.of(R.string.domain_page_issue_count_mismatch, 15, 16)),
+        ).assertIsDisplayed()
+    }
+
+    @Test
+    fun `a healthy volume shows no page issue warning`() {
+        // 反向:告警必须只在真有问题时出现,否则它就是个噪声(用户会学会忽略它)。
+        show()
+        scrollTo(TAG_PAGE_PREVIEW_COUNT)
+        assertTrue(
+            rule.onAllNodesWithText(
+                TestText.raw(R.string.pack_page_issues).substringBefore("%1\$s"),
+                substring = true,
+            ).fetchSemanticsNodes().isEmpty(),
+            "页表与页序一致的卷不该显示页码告警",
+        )
+    }
+
     // ================= 待确认项与输出冲突 =================
 
     @Test

@@ -207,5 +207,6 @@ enum class TextKey {
 
     // ---------------- 页码一致性自检(validatePageConsistency,会显示在打包预览页) ----------------
     PageIssueCountMismatch,
+    PageIssueMissingFromOrder,
     PageIssueWrongIndex,
 }

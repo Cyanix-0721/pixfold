@@ -183,11 +183,17 @@ class ComicMetadataTest {
 
     @Test
     fun `page preview follows the page order, not the raw page list`() {
-        // 页码预览的**唯一来源**是页序(含人工调整),不是 pages 原始列表
+        // 页码预览的**唯一来源**是页序(含人工调整),不是 pages 原始列表。
+        // 这里故意构造"卷自称 18 页、页序只排了 3 页"的分叉:预览仍只画页序里的 3 页,
+        // 同时自检必须把这个分叉报出来(R4 之前它报不出来 —— 那时它拿页序跟自己比)。
         val subset = aot2.copy(pageOrder = pageOrderOf(aot2.pages.take(3)))
         val preview = previewOf(subset)
         assertEquals(3, preview.pages.size)
-        assertTrue(preview.consistent, "页序与页码预览同源,不应报不一致:${preview.pageIssues}")
+        assertEquals(
+            listOf(TextKey.PageIssueCountMismatch),
+            preview.pageIssues.map { it.key },
+            "卷自称的页数与页序项数分叉时必须报出来,实际:${preview.pageIssues}",
+        )
         assertEquals(aot2.pageCount, renumberPages(aot2).size, "整卷页数应与页码项数一致")
     }
 
@@ -429,6 +435,74 @@ class ComicMetadataTest {
         assertEquals("0001.jpg", preview.pages.first().fileName)
         assertEquals(100, preview.pages.size)
         assertTrue(preview.consistent, "整整 100 页时自检不该报警:${preview.pageIssues}")
+        assertEquals(emptyList(), preview.pageIssues)
+    }
+
+    @Test
+    fun `a volume whose page list and page order disagree is reported as inconsistent`() {
+        // R4:`validatePageConsistency` 此前把 `renumberPages(volume)`（它自己的输出）
+        // 与 `volume.pageOrder.order` 比长度 —— 那是**同一个列表与自身比**,恒等。
+        // 真正该问的是:"卷里登记的页"与"页序里排的页"是不是同一批。
+        // 这里少一页(页序仍有 16 项,页表只剩 15 项),自检必须发现。
+        val holed = aot2.copy(pages = aot2.pages.dropLast(1))
+        assertTrue(
+            holed.pages.size != holed.pageOrder.order.size,
+            "前置条件:构造出的卷必须真的两处长度不同,否则本用例什么都没测",
+        )
+        val preview = previewOf(holed)
+        assertFalse(preview.consistent, "页表与页序长度不同时必须判为不一致")
+        assertEquals(
+            listOf(TextKey.PageIssueCountMismatch),
+            preview.pageIssues.map { it.key },
+            "应报告「页数与页序长度不一致」,实际:${preview.pageIssues}",
+        )
+        assertEquals(
+            listOf<Any>(17, 18),
+            preview.pageIssues.single().args,
+            "参数顺序必须是(卷内页数, 页序项数) —— 反了用户就会看到「18 ≠ 17」这种倒过来的描述",
+        )
+    }
+
+    @Test
+    fun `a page that is not in the page order is reported as inconsistent`() {
+        // 长度相同但成员不同也要报:长度检查会漏掉"替换掉一页"这种情形。
+        // 这里把页序的最后一页换成一张页表里没有的页,两者长度都是 16。
+        val stranger = item("stranger")
+        val swapped = aot2.pageOrder.order.dropLast(1) + stranger
+        val volume = aot2.copy(pageOrder = aot2.pageOrder.copy(order = swapped))
+        assertEquals(
+            volume.pages.size,
+            volume.pageOrder.order.size,
+            "前置条件:本用例要测的是**长度相同**但成员不同的情形",
+        )
+        val preview = previewOf(volume)
+        assertFalse(preview.consistent, "有页不在页序里时必须判为不一致")
+        assertEquals(
+            listOf(TextKey.PageIssueMissingFromOrder),
+            preview.pageIssues.map { it.key },
+            "应报告「有页不在页序里」,实际:${preview.pageIssues}",
+        )
+        assertEquals(
+            listOf<Any>(1, 18),
+            preview.pageIssues.single().args,
+            "参数顺序必须是(不在页序里的页数, 卷内总页数)",
+        )
+    }
+
+    @Test
+    fun `a manual reorder alone never makes the preview inconsistent`() {
+        // 手工拖拽**合法地**改变页序(而不改页表),故自检必须是**置换不变**的:
+        // 若改成逐项按位置比对两个列表,用户每拖一次就会看到一条假警告。
+        val moved = moveItemTo(pageOrderOf(aot2.pages), aot2.pages.last().id, 0)
+        val volume = aot2.copy(pageOrder = moved)
+        assertTrue(volume.pageOrder.hasManual, "前置条件:这一卷必须真的被标记为人工调整过")
+        assertEquals(
+            volume.pages.size,
+            volume.pageOrder.order.size,
+            "拖拽只换顺序,不该改变项数",
+        )
+        val preview = previewOf(volume)
+        assertTrue(preview.consistent, "仅仅重排页序不该报警:${preview.pageIssues}")
         assertEquals(emptyList(), preview.pageIssues)
     }
 

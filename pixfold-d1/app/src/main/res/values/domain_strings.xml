@@ -216,6 +216,7 @@
 
     <!-- ============ Page consistency check (shown on the pack preview page) ============ -->
     <string name="domain_page_issue_count_mismatch">Page item count does not match the page order (%1$d ≠ %2$d)</string>
+    <string name="domain_page_issue_missing_from_order" tools:ignore="PluralsCandidate">%1$d of %2$d pages are not in the page order</string>
     <string name="domain_page_issue_wrong_index" tools:ignore="PluralsCandidate">Page %1$d should be %2$s but is %3$s</string>
 
 </resources>

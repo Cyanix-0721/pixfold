@@ -155,6 +155,71 @@ class PixFoldTextTest {
         )
     }
 
+    /**
+     * R4 新增的「有页不在页序里」必须真的解析到**它自己**的文案。
+     *
+     * 与上一条相邻,故这里额外钉死"不能解析成邻居的句子" —— 页码自检的三个键
+     * 长得很像(`count_mismatch` / `missing_from_order` / `wrong_index`),
+     * 映射写串了照样能编译、照样有输出。
+     */
+    @Test
+    fun `the missing from order issue resolves to its own wording`() {
+        val msg = Msg(TextKey.PageIssueMissingFromOrder, listOf(1, 18))
+        val rendered = resolveText(context, msg)
+        assertEquals(TestText.of(R.string.domain_page_issue_missing_from_order, 1, 18), rendered)
+        assertTrue(
+            rendered != resolveText(context, Msg(TextKey.PageIssueCountMismatch, listOf(1, 18))),
+            "三个页码问题键的文案必须彼此不同,否则用户分不清是哪种问题",
+        )
+        assertTrue(
+            rendered != resolveText(context, Msg(TextKey.PageIssueWrongIndex, listOf(1, "018.jpg", "x.jpg"))),
+            "三个页码问题键的文案必须彼此不同,否则用户分不清是哪种问题",
+        )
+    }
+
+    /**
+     * **唯一能看见「这条资源本身写错了」的用例** —— 与改名计划行那条同一个道理。
+     *
+     * 上面那条(以及本文件其余用例)拿 `TestText.of(同一个资源)` 当期望值,
+     * 把资源改坏会**两边同时变**,断言照样绿。实测:把英文的两个占位符删掉、
+     * 或把 `%1$d`/`%2$d` 对调,上面那条都**抓不到**。
+     *
+     * 故这里换一种**看得见的判据**:不比对整句,只断言
+     * ①两个数目都真的出现在句子里(占位符没被删掉);
+     * ②它们**按参数顺序**出现(没被对调)。
+     * 数字是**参数**(数据),不是界面措辞,故这里写死数字不违反"文案不写死"的原则。
+     */
+    @Test
+    fun `the missing from order wording keeps both numbers in argument order`() {
+        val rendered = resolveText(context, Msg(TextKey.PageIssueMissingFromOrder, listOf(3, 47)))
+        assertTrue(rendered.contains("3"), "「有 %1\$d 页」的数目必须出现在句子里:实际 $rendered")
+        assertTrue(rendered.contains("47"), "「共 %2\$d 页」的数目必须出现在句子里:实际 $rendered")
+        assertTrue(
+            rendered.indexOf("3") < rendered.indexOf("47"),
+            "'部分'的数目必须排在'总数'前面,对调后用户会把 47 读成部分数:实际 $rendered",
+        )
+    }
+
+    /**
+     * 中文资源同样必须①是中文 ②两个数目按序 —— 默认 locale 是 `en_US`,
+     * 故中文槽位**不会被任何用例加载**;删掉中文占位符或把中英抄错都抓不到。
+     */
+    @Test
+    @Config(sdk = [34], qualifiers = "zh-rCN")
+    fun `the chinese missing from order wording is chinese and keeps both numbers in order`() {
+        val rendered = resolveText(context, Msg(TextKey.PageIssueMissingFromOrder, listOf(3, 47)))
+        assertTrue(
+            rendered.any { it.code in 0x4E00..0x9FFF },
+            "中文槽位必须真的是中文(把英文抄过来时,中文用户会看到英文):实际 $rendered",
+        )
+        assertTrue(rendered.contains("3"), "「有 %1\$d 页」的数目必须出现在句子里:实际 $rendered")
+        assertTrue(rendered.contains("47"), "「共 %2\$d 页」的数目必须出现在句子里:实际 $rendered")
+        assertTrue(
+            rendered.indexOf("3") < rendered.indexOf("47"),
+            "'部分'的数目必须排在'总数'前面:实际 $rendered",
+        )
+    }
+
     // ================= 改名计划行 =================
 
     /**

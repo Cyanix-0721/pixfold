@@ -38,4 +38,15 @@ object TestText {
     @Suppress("FunctionName")
     fun plural(@PluralsRes id: Int, count: Int, vararg args: Any): String =
         context.resources.getQuantityString(id, count, *args)
+
+    /**
+     * 取 `<string>` 的**原始模板**:占位符原样保留,不做格式化。
+     *
+     * 与 [of] 的区别是"要不要填参数":模板里有 `%1$s` 时,`getString(id)` 不传参
+     * 会抛 `MissingFormatArgumentException` —— 而有些断言想问的正是**模板本身**
+     * (例如"告警前缀是什么"),不是某一次渲染的结果。
+     *
+     * [getText] 只解码字符串、不套用格式化,故 `%1$s` 会原样返回。
+     */
+    fun raw(@StringRes id: Int): String = context.resources.getText(id).toString()
 }

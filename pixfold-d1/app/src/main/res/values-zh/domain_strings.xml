@@ -202,6 +202,7 @@
 
     <!-- ============ 页码一致性自检(validatePageConsistency,显示在打包预览页) ============ -->
     <string name="domain_page_issue_count_mismatch">页码项数与页序长度不一致（%1$d ≠ %2$d）</string>
+    <string name="domain_page_issue_missing_from_order" tools:ignore="PluralsCandidate">有 %1$d 页（共 %2$d 页）不在页序里</string>
     <string name="domain_page_issue_wrong_index" tools:ignore="PluralsCandidate">第 %1$d 项页码应为 %2$s，实际 %3$s</string>
 
 </resources>
