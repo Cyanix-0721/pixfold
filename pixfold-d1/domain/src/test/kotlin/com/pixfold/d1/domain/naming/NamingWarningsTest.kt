@@ -156,6 +156,13 @@ class NamingWarningsTest {
     // ---- L10:超长阈值 180 ----
 
     @Test
+    fun `the too long threshold is the spec value 180`() {
+        // 上面那条用例用的是常量本身(`TOO_LONG_THRESHOLD - extLen`),常量改成 181 它照样过 ——
+        // 阈值数值是规格 §7 的决定,必须用**字面量**钉住,否则"把上限悄悄放宽 1"不会被任何用例发现。
+        assertEquals(180, TOO_LONG_THRESHOLD, "超长阈值是规格 §7 的 180")
+    }
+
+    @Test
     fun `too long triggers only above 180`() {
         // 注意:阈值判的是 **finalName**(含扩展名),不是 baseName。
         // 判定式是 `length > 180`,故恰好 180 不算超长、181 才算。

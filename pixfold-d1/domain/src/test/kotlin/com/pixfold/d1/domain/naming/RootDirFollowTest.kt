@@ -78,6 +78,19 @@ class RootDirFollowTest {
     }
 
     @Test
+    fun `the follow flag stays in sync with the state it reports on`() {
+        // 公开入口会把空串归一成 null(`setRootDirName` / `setRootDirNameOnScheme`),
+        // 但 `NamingState.rootDirNameOverride` 是公开构造参数,直接构造出的空串状态仍然合法。
+        // 此时 `effectiveScheme` 只看 `!= null`,**会真的用这个空串当根目录名** ——
+        // 于是"跟随标志"的判据必须与 `effectiveScheme` 的判据完全一致(同为 `!= null`),
+        // 否则 UI 会显示"跟随集合",而实际生效的根名其实来自那个空串例外(两者已经脱钩)。
+        val a = collection("a", "集合A根名")
+        val blankOverride = NamingState(NamingScheme("初始")).copy(rootDirNameOverride = "")
+        assertTrue(blankOverride.hasRootDirNameOverride, "非 null 的例外就是例外,哪怕它是空串")
+        assertEquals("", effectiveScheme(blankOverride, a).rootDirName, "标志为真时生效根名必须真的来自例外")
+    }
+
+    @Test
     fun `only root dir name follows the collection - the rest stays batch level`() {
         // 组件/补零/扩展名仍是批次级(规格 §6.3);只有根目录名是逐集合的
         val a = collection("a", "A名")
