@@ -121,6 +121,16 @@ class ConfirmFlowTest {
     }
 
     @Test
+    fun `an untouched flow reports no steps and is not on its last step`() {
+        // 未开始态(sequence == null)必须和"已走完"区分开:总步数报 0,而不是 1。
+        // 若 totalSteps 的兜底值写成 1,或 isLastStep 丢掉 isActive 前提,
+        // 一个**尚未开始**的流程就会被读成"已是最后一步" —— UI 会照此渲染按钮文案与可用态。
+        val untouched = ConfirmFlowState()
+        assertEquals(0, untouched.totalSteps, "还没开始时没有可确认的步骤")
+        assertFalse(untouched.isLastStep, "还没开始就谈不上最后一步")
+    }
+
+    @Test
     fun `isLastStep is false while there is a pending danger`() {
         assertTrue(startConfirmFlow(safe).isLastStep, "只有通用确认时它就是最后一步")
         assertFalse(startConfirmFlow(oneDanger).isLastStep, "后面还有危险确认")

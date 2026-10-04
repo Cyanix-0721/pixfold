@@ -217,6 +217,30 @@ class DangerActionTest {
     }
 
     @Test
+    fun `overwrite list names only the files that would really be overwritten`() {
+        // 被跳过的卷**不会**写输出,故其文件不得出现在"将被覆盖"清单里让用户白担心。
+        // 生产路径下 Overwrite 策略不会产生跳过项(跳过只来自 Skip 策略),
+        // 这里直接构造计划,把该契约钉死为**防御性**保证。
+        val live = buildPackagePlans(listOf(op102), conflictPolicy = OutputConflictPolicy.Overwrite).single()
+        val skipped = VolumePackPlan(
+            volume = op102.copy(id = "op-102-skipped"),
+            outputDisplay = live.outputDisplay,
+            pageCount = live.pageCount,
+            skipped = true,
+            skipReason = Msg(TextKey.PackSkipOutputExists, listOf(live.outputPath)),
+            conflictPolicy = OutputConflictPolicy.Overwrite,
+            sourcePolicy = SourcePolicy.Keep,
+        )
+        val plans = listOf(live, skipped)
+        val lines = generalSummaryLines(plans, setOf(DangerAction.OverwriteExisting))
+        assertEquals(
+            Msg(TextKey.SummaryOverwriteCbz, listOf(listOf(live.outputPath))),
+            lines.find(TextKey.SummaryOverwriteCbz),
+            "清单只能列出真会被覆盖的文件,实际 ${lines.keys()}",
+        )
+    }
+
+    @Test
     fun `general summary warns about clean empty dirs only when enabled`() {
         val plans = buildPackagePlans(listOf(aot1))
         assertTrue(TextKey.SummaryCleanEmptyDirsWarning !in generalSummaryLines(plans, emptySet()).keys())

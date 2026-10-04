@@ -127,6 +127,36 @@ class PageOrderTest {
     }
 
     @Test
+    fun `applyRule fills the free slots without duplicating a pinned item`() {
+        // 固定项已单独落位,故它**必须**从规则序里剔除后再去填其余空位。
+        // 若忘记剔除:固定项在规则序中排得较前时会被再填一次 ——
+        // 结果总格数不变(一个重复项 + 一个被挤掉的页面),只断言"首项还在"抓不到。
+        val s0 = pageOrderOf(items(5))
+        val firstId = s0.order.first().id            // 规则序首位
+        val s2 = togglePin(moveItemTo(s0, firstId, 4), firstId) // 拖到末格并固定
+        val s3 = applyRule(s2, defaultRule())
+
+        assertEquals(5, s3.order.size)
+        assertEquals(firstId, s3.order.last().id, "固定项应留在末格")
+        assertEquals(
+            s0.order.map { it.id }.sorted(),
+            s3.order.map { it.id }.sorted(),
+            "其余空位应按规则序填满:不得重复固定项、不得丢页",
+        )
+    }
+
+    @Test
+    fun `togglePin on an unknown id is a silent no-op`() {
+        // 只给页序里真实存在的项打固定标记 —— 否则会写进一个幽灵标记,
+        // 固定计数虚高,而规则重排又找不到对应页面,状态从此对不上。
+        val s = pageOrderOf(items(3))
+        val after = togglePin(s, "nope")
+        assertFalse(after.isPinned("nope"), "不存在的项不得被记上固定标记")
+        assertEquals(0, after.pinnedCount)
+        assertEquals(s.order.map { it.id }, after.order.map { it.id })
+    }
+
+    @Test
     fun `pinned collision falls back to the nearest free slot on the left`() {
         // 归档规则:固定项落位被占时"向左找第一个空位"。
         // 正常路径下记录下标互不相同且升序,slot 不会碰撞 —— 该分支仅在退化状态(页序长于全集)可达。

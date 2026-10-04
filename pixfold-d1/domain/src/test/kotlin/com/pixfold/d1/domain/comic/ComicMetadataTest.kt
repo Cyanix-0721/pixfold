@@ -407,6 +407,44 @@ class ComicMetadataTest {
     }
 
     @Test
+    fun `a preview with a recorded page issue is not consistent`() {
+        // consistent 是 UI 判断"要不要显示 ⚠️ 页码与页序不一致"的唯一开关,
+        // 它必须真的看问题清单,而不是恒真 —— 否则报警分支永远不会触发。
+        val preview = previewOf(aot2)
+        assertTrue(preview.consistent, "正常卷应一致:${preview.pageIssues}")
+        assertFalse(
+            preview.copy(pageIssues = listOf(Msg(TextKey.PageIssueCountMismatch, listOf(1, 2)))).consistent,
+            "有问题的预览必须判为不一致",
+        )
+    }
+
+    @Test
+    fun `a hundred-page volume still reports a consistent preview`() {
+        // 重编号与自检**各自**算补零位数,两处必须保持一致:
+        // 校验侧若把 `>= 100` 写成 `> 100`,整整 100 页时预览就会误报
+        // 「页码与页序不一致」(而页码其实是对的)。这里正好跨过 100 这条边界。
+        val many = (1..100).map { item("p$it") }
+        val volume = aot2.copy(pages = many, pageOrder = pageOrderOf(many))
+        val preview = previewOf(volume)
+        assertEquals("0001.jpg", preview.pages.first().fileName)
+        assertEquals(100, preview.pages.size)
+        assertTrue(preview.consistent, "整整 100 页时自检不该报警:${preview.pageIssues}")
+        assertEquals(emptyList(), preview.pageIssues)
+    }
+
+    @Test
+    fun `writer cleaning ignores an empty cleaned suggestion`() {
+        // 空串 ≠ null:[Suggestion.hasValue] 已把空串视为"没有值",
+        // 清理入口必须同样对待 —— 否则会把作者清成空字符串,还打上"人工已覆盖"标记,
+        // 之后批量设置就再也改不动这一卷了。
+        val blank = aot2.copy(writerCleanedSug = Suggestion("", "空串建议"))
+        val cleaned = applyWriterCleaning(blank)
+        assertEquals(blank, cleaned, "空串建议应原样返回")
+        assertEquals(aot2.writer, cleaned.writer, "不得把作者清空")
+        assertFalse(MetaField.Writer in cleaned.overridden, "空串不该被当成一次清理")
+    }
+
+    @Test
     fun `writer cleaning is a no-op when there is no cleaned suggestion`() {
         val noClean = aot2.copy(writerCleanedSug = Suggestion(null, "无"))
         assertEquals(noClean, applyWriterCleaning(noClean))

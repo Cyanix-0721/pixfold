@@ -138,9 +138,14 @@ cmd.exe /c "D:\Programing\Personal\pixfold\pixfold-d1\run-gradle.bat :app:lintDe
 | `pixfold-d1/domain/src/test/kotlin/com/pixfold/d1/domain/plan/PackingPipelineTest.kt` | **新**：跨层不变式（计划页数 ↔ 归档条目数、成功 ↔ 可写、计划行 ↔ 报告行、撤销 ↔ 已创建） | W8 |
 | `pixfold-d1/domain/src/test/kotlin/com/pixfold/d1/domain/plan/ExecutionReportTest.kt` | 改：W12 补四元组区分度用例（+26） | W12 |
 | `pixfold-d1/domain/src/test/kotlin/com/pixfold/d1/domain/plan/PackagePlanTest.kt` | 改：W12 补前导点边界用例（+20） | W12 |
+| `pixfold-d1/domain/src/test/kotlin/com/pixfold/d1/domain/comic/ComicMetadataTest.kt` | 改：W13 补预览一致性/空串清理用例（+38） | W13 |
+| `pixfold-d1/domain/src/test/kotlin/com/pixfold/d1/domain/sort/PageOrderTest.kt` | 改：W13 补固定项无重复/未知 id 用例（+30） | W13 |
+| `pixfold-d1/domain/src/test/kotlin/com/pixfold/d1/domain/plan/DangerActionTest.kt` | 改：W13 补覆盖清单排除已跳过卷用例（+24） | W13 |
+| `pixfold-d1/domain/src/test/kotlin/com/pixfold/d1/domain/plan/ConfirmFlowTest.kt` | 改：W13 补未开始态用例（+10） | W13 |
 | `pixfold-d1/artifacts/mutate_w8.py` + `artifacts/w8bak/` | 变异脚本与备份（`artifacts/` 已 gitignore，**不入库**） | W8 |
 | `pixfold-d1/artifacts/mutate_w11.py` + `artifacts/w11bak/` | 变异脚本与备份（同样**不入库**） | W11 |
 | `pixfold-d1/artifacts/mutate_w12.py` + `artifacts/w12bak/` | 变异脚本与备份（同样**不入库**） | W12 |
+| `pixfold-d1/artifacts/mutate_w13.py` + `artifacts/w13bak/`（复核用 `mutate_w13b.py` + `artifacts/w13bbak/`） | 变异脚本与备份（同样**不入库**） | W13 |
 | `HANGOFF.md` | 改：§9.1 追加「D3 打包核心轮」小节（**只追加**） | W9 |
 | `docs/superpowers/plans/2026-10-04-d3-p1-packing-core.md` | 本文件（台账） | 全程 |
 
@@ -169,6 +174,7 @@ cmd.exe /c "D:\Programing\Personal\pixfold\pixfold-d1\run-gradle.bat :app:lintDe
 | W10 | 终验：干净工作树重跑四道闸门 + 计数比对 + `git log --oneline dev..d3/p1` 汇总 | 本文件写最终读数 | ✅ 完成（轮 6：**带 `clean` 的全量重建**，64/64 executed，exit 0；读数见 §6） |
 | W11 | 余量加固（§3 余量政策）：条目名与元数据条目撞名守卫 + 新缺陷登记 | 先实测确认漏洞存在，再红→绿；新缺陷只登记不自行修复 | ✅ 完成（轮 7：`CbzWritePlan` 拒 `ComicInfo.xml` 撞名 + 2 用例；**7 组变异全捕获**；**登记 R3**） |
 | W12 | 余量加固（§3 余量政策）：**广扫荡找缺口**——在 W7/W8/W11 未变异过的表达面上投 23 组变异，针对存活者补断言 | 存活变异必须补到全捕获，或按 §0.4 归为等价并写文档说明 | ✅ 完成（轮 8：23 组 → **21 捕获 / 2 存活 / 0 锚点缺失**，2 个存活者补断言后**各自成为该变异的唯一捕获者**；+2 用例 ⇒ domain **350** 项；生产代码零改动） |
+| W13 | 余量加固（§3 余量政策）：**第二次广扫荡**——换 5 个文件（`ComicInfoXml` / `ConfirmFlow` / `DangerAction` / `PageOrder` / `MetaEdit`）投 39 组变异，覆盖 W7/W8/W11/W12 都没碰过的页序校验、确认流边界、危险清单、固定项落位、元数据批量写入 | 存活变异必须补到全捕获，或按 §0.4 **给出可复核的等价性证明**并写文档说明 | ✅ 完成（轮 9：39 组 → **27 捕获 / 12 存活 / 0 锚点缺失**；12 个存活者判定为 **8 真缺口 + 4 已证等价**，8 个真缺口补断言后**全部转为捕获**且每条的捕获者是**它自己的新用例**；4 个等价者重跑**仍存活**，与证明一致；+7 用例 ⇒ domain **357** 项；生产代码零改动） |
 
 **余量处理**：W1–W10 全部完成且仍有轮次 ⇒ **继续加固核心**（更多边界 / 更多变异 / 更多不变式），
 **不越界**到未授权工作面（适配层检查、D2b、真机、UI）。
@@ -674,6 +680,131 @@ W7/W8/W11 都是**先怀疑某处有问题、再去验证**。本轮换成反向
 
 ---
 
+#### 轮 9（2026-10-04 18:2x）— W13 余量加固：第二次广扫荡（换文件、换表达面）
+
+- 提交：`（回填）` test(d3): 补五处未覆盖表达面（W13 广扫荡 39 组 → 12 存活 → 8 真缺口全捕获）
+- 改动：4 files / **+102 / −0**（**纯断言增量，生产代码零改动**，`git diff --name-only` 只列测试文件）
+  - `pixfold-d1/domain/src/test/kotlin/com/pixfold/d1/domain/comic/ComicMetadataTest.kt`（+38）
+  - `pixfold-d1/domain/src/test/kotlin/com/pixfold/d1/domain/sort/PageOrderTest.kt`（+30）
+  - `pixfold-d1/domain/src/test/kotlin/com/pixfold/d1/domain/plan/DangerActionTest.kt`（+24）
+  - `pixfold-d1/domain/src/test/kotlin/com/pixfold/d1/domain/plan/ConfirmFlowTest.kt`（+10）
+  - 工具：`pixfold-d1/artifacts/mutate_w13.py` + `artifacts/w13bak/`，复核用 `mutate_w13b.py` + `artifacts/w13bbak/`
+    （`.gitignore:9` 已忽略，**不入库**）
+- 闸门：`BUILD SUCCESSFUL in 4s` / exit 0 / `62 actionable tasks: 4 executed, 58 up-to-date`；
+  JUnit XML `domain` **25 files / 357 tests / 0F 0E 0S**（350 → 357，**+7**）、
+  `app` **42 files / 399 tests / 0F 0E**（**未变，正确**：本分支一行未改 `app/**`）；
+  lint **0 errors, 0 warnings, 4 hints**（4 条 hint 全为 `AutoboxingStateCreation`，不计入 `warningsAsErrors`）。
+
+##### 本轮方法：第二次广扫荡，且**强制两段式**（先扫、再判定）
+
+W12 只用一次扫描就收敛；本轮把范围扩到 5 个文件、39 组变异，并**把"扫描"与"判定"拆成两步**：
+第一遍 `mutate_w13.py` 只负责找出存活者（不做解释）；第二遍 `mutate_w13b.py` 只重跑那 12 个存活者，
+按**已写死的预期分类**核对（真缺口必须转为捕获、等价者必须仍存活）。这样"变异体存活"不会被
+顺手解释掉，等价性必须**先给出证明**才允许登记。
+
+变异体分布（39 组）：
+
+| 前缀 | 文件 | 组数 | 覆盖的表达面 |
+| --- | --- | --- | --- |
+| R | `comic/ComicInfoXml.kt` | 5 | 页序校验（`validatePageConsistency`）、`ComicPreview.consistent`、补零位数 |
+| C | `plan/ConfirmFlow.kt` | 10 | 确认流状态机：未开始态、推进、取消、`nextDanger`、进度标签 |
+| D | `plan/DangerAction.kt` | 7 | 危险动作集合推导、固定顺序、危险清单、总览句 |
+| O | `sort/PageOrder.kt` | 7 | 固定项落位、人工标记、`togglePin`、越界夹取 |
+| M | `comic/MetaEdit.kt` | 10 | `setMetaValue` 类型分支、`batchApply` 计数/force/标记、`replaceVolume` |
+
+##### 第一遍扫描结果（`python3 pixfold-d1/artifacts/mutate_w13.py`）
+
+**39 组 → 27 捕获 / 12 存活 / 0 锚点缺失**，每组读数均为 `350 tests completed`；
+逐文件 sha256 还原核对全 OK（`ComicInfoXml.kt: 91cc6737f176` / `MetaEdit.kt: 4c77d8adeef4` /
+`ConfirmFlow.kt: f022de3bb920` / `DangerAction.kt: 6255615a1959` / `PageOrder.kt: 6eb3c14d4af3`）。
+
+捕获者（举要，证明 27 个捕获都是**有名字的用例**在抓）：`C8 取消退一步` →
+`cancelling at any step returns to the very beginning`；`D1 末条恒"只写入输出文件"` →
+`general summary never claims it only writes files when source deletion is on`；
+`D6 危险步骤顺序改 Set 迭代序` → `danger sequence is deterministic regardless of set iteration order`；
+`M3 忽略 force` → `L14 force overwrites the per-item exception`；
+`M7 按整对象相等定位` → 7 个用例失败；`O4 撞位改向右` →
+`pinned collision falls back to the nearest free slot on the left`。
+
+12 个存活者：`R1 R2 R3 R5`（页序校验）/ `C1 C2`（未开始态）/ `D5`（覆盖清单）/ `O1 O5 O6`（固定项）/
+`M6 M10`（元数据）。
+
+##### 存活者判定：8 真缺口 + 4 已证等价
+
+**4 个等价者先给证明**（都从源码推出，不是"看不出差别"就登记）：
+
+- **R2**（`pages.size != order.size` → `pages.size > order.size`）：`validatePageConsistency` 的 `pages`
+  就是 `renumberPages(volume)`（`ComicInfoXml.kt:111`），而 `renumberPages` 返回 `order.mapIndexed{…}`
+  （`:66-70`）⇒ `pages.size ≡ volume.pageOrder.order.size` **恒成立** ⇒ 两个写法**都恒假**。
+- **R5**（`!p.fileName.startsWith("$expected.")` → `p.fileName.isEmpty()`）：校验侧
+  `:116 expected = (i+1).padStart(if (pages.size >= 100) 4 else 3, '0')` 与重编号侧
+  `:67 padding = if (order.size >= 100) 4 else 3` / `:69 (i+1).padStart(padding,'0') + "." + ext.lowercase()`
+  **同源同 index** ⇒ `fileName` 恒以 `"$expected."` 开头 ⇒ 原式恒假；变异体 `fileName.isEmpty()`
+  也恒假（`fileName` 至少是 `"001."`）⇒ 等价。
+- **O5**（`if (idx < 0) continue` → `break`）：`idx < 0` 意味着 `slots[0..min(recorded, size-1)]` 全被占，
+  即需 ≥ `min(recorded,size-1)+1` 个已落位固定项；已落位者的 `recorded` **互不相同且都小于**当前
+  `recorded`（`:67` 按 `sortedBy { it.key }` 升序处理）⇒ 若 `min(recorded,size-1) == recorded`
+  则需 `recorded+1` 个不同下标 `< recorded`，只有 `recorded` 个，**矛盾**；故必为
+  `min(recorded,size-1) == size-1`，即**全部 slot 已满**，其后每一项同样失败 ⇒ 结果恒同。
+- **M6**（`volumes.none { it.id == volume.id }` → `volumes.isEmpty()`）：`.none{}` 为真时按 id
+  `map` 逐项都不匹配 ⇒ 返回列表与原列表**逐元素相同**；空列表时两者都返回空 ⇒ 等价。
+
+**8 个真缺口与新增断言**（每个新用例都是该变异的**唯一捕获者**，见下节重跑）：
+
+| 变异 | 缺口本质 | 新增用例（文件） |
+| --- | --- | --- |
+| R1 `consistent` 恒真 | `pageIssues` 非空时没人断言 `consistent` 为假 | `a preview with a recorded page issue is not consistent()`（ComicMetadataTest） |
+| R3 校验侧 `>=100`→`>100` | 100 页卷的一致性从没被断言过 | `a hundred-page volume still reports a consistent preview()`（ComicMetadataTest） |
+| C1 `isLastStep` 丢 `isActive` | 未开始态（`sequence == null`）从没被断言 | `an untouched flow reports no steps and is not on its last step()`（ConfirmFlowTest） |
+| C2 `totalSteps ?: 1` | 同上（同一条用例覆盖两个变异） | 同上 |
+| D5 覆盖清单不排除已跳过卷 | 从没构造过 `skipped = true && outputExists = true` 的计划 | `overwrite list names only the files that would really be overwritten()`（DangerActionTest） |
+| O1 `rest` 不剔除固定项（会重复） | 结果**从没被断言为无重复置换** | `applyRule fills the free slots without duplicating a pinned item()`（PageOrderTest） |
+| O6 `togglePin` 对不存在项也记标记 | 只测过已存在的项 | `togglePin on an unknown id is a silent no-op()`（PageOrderTest） |
+| M10 作者清理空串也当建议 | 只覆盖了 `null` 建议，没覆盖空串 | `writer cleaning ignores an empty cleaned suggestion()`（ComicMetadataTest） |
+
+##### 踩坑记录（下一轮直接复用）
+
+O1 的第一版断言写在既有用例 `pinned item keeps position across applyRule while manual marks clear`
+（`PageOrderTest.kt`）内部 —— 该用例固定的是**规则序首位**项，固定项在规则序里排首位时
+`rest` 剔不剔除都不产生重复，**断言位置抓不到变异**。已撤回，改建专用用例：把规则序首位项
+先拖到末格再固定（`togglePin(moveItemTo(s0, firstId, 4), firstId)`），此时固定项与规则序冲突，
+变异体必然把同一项塞进两个 slot。**教训：断言必须落在变异体的差异真的会经过的那个量上，
+"补在已有用例里"不等于"补到了"。**
+
+##### 重跑确认（8 个真缺口全转捕获；4 个等价者仍存活）
+
+按 §0.4 补断言后**重跑那 12 个变异**（`python3 pixfold-d1/artifacts/mutate_w13b.py`，锚点唯一性检查通过，
+逐文件 sha256 还原一致，同上一组哈希）：
+
+```
+[捕获] R1 ComicPreview.consistent 恒真
+     ComicMetadataTest > a preview with a recorded page issue is not consistent() FAILED
+[捕获] R3 校验侧补零位数 >=100 -> >100
+     ComicMetadataTest > a hundred-page volume still reports a consistent preview() FAILED
+[捕获] C1 isLastStep 丢掉 isActive 前提
+     ConfirmFlowTest > an untouched flow reports no steps and is not on its last step() FAILED
+[捕获] C2 totalSteps 未开始时报 1
+     ConfirmFlowTest > an untouched flow reports no steps and is not on its last step() FAILED
+[捕获] D5 覆盖清单不再排除已跳过的卷
+     DangerActionTest > overwrite list names only the files that would really be overwritten() FAILED
+[捕获] O1 applyRule 不再把固定项从规则序里剔除
+     PageOrderTest > applyRule fills the free slots without duplicating a pinned item() FAILED
+[捕获] O6 togglePin 对不存在的项也记标记
+     PageOrderTest > togglePin on an unknown id is a silent no-op() FAILED
+[捕获] M10 作者清理把空串也当成可清理建议
+     ComicMetadataTest > writer cleaning ignores an empty cleaned suggestion() FAILED
+[存活·符合预期] R2 / R5 / O5 / M6（已证等价）
+```
+
+⇒ **真缺口 8/8 转为捕获**（每次 `357 tests completed, 1 failed`，失败者正是新增的那一条），
+**等价 4/4 仍存活**，与上面的证明一致。
+
+- 结论 / 阻塞 / 待裁决：本轮**未新增待裁决项**（8 个缺口都属"断言不够"，4 个等价者已给出可复核证明，
+  都不是产品语义分歧）；R1/R2/R3 仍未决，均不阻塞。
+  本轮**未改生产代码**、**未新增 TextKey**、**未改 `app/**`**、**未改构建脚本**、**未新增依赖**。
+
+---
+
 ## 4. 待裁决 / 阻塞（越界项写这里，不自行决定）
 
 > 出现下列任一情况，**停止该项**并在此登记，然后继续**下一项**工作：
@@ -685,6 +816,7 @@ W7/W8/W11 都是**先怀疑某处有问题、再去验证**。本轮换成反向
 | R1 | 3（W6） | `UndoOp.RestoreRenamed(from, to)` 在成功项上恒 `from == to`（空操作）—— `executeRenameOp` 成功分支的 `label` 与 `createdPath` 都取 `op.finalName`，报告里**无处**携带原文件名 | 修法有两种且语义不同：①扩 `ExecEntry` 加原名字段；②让 `undoRecordFrom(plan, report)` 从计划取 `op.proposal.image.fileName`（只有它手里有计划）。选哪种、以及 `from`/`to` 的最终语义，都属撤销记录的产品决策；且本轮契约是"既有可观测行为逐字不变" | ⏸ 待用户裁决（不阻塞 W8–W10） |
 | R2 | 3（W7） | `RenamePlannedOp.describe()` 在无原因时只能给 `Msg(TextKey.OpStatusRename)` 一句状态词 | 改名侧**没有**逐项句子契约（`RenamePlanPage` 渲染的是"原名 → 新名"两列 + 状态标签）；要补齐就得**新增 TextKey**，而本轮明令禁止 | ⏸ 待用户裁决（当前行为已够用，非缺陷） |
 | R3 | 7（W11） | `OutputConflictPolicy.Overwrite` + 输出已存在时，报告报 `Succeeded`、`createdPath` = **被替换的那个旧文件**路径，撤销据此推导 `DeleteCreated(该路径)` ⇒ 真执行会**删掉用户原有的 CBZ**，且被覆盖的内容无法恢复 | 「覆盖的撤销」是什么，属产品决策，三种语义完全不同：①当作新建 ⇒ 删掉（现状，会把用户旧文件也删了）②覆盖前先备份 ⇒ 撤销时恢复备份（要给 `ExecEntry` 加"被覆盖路径"字段）③覆盖项标为不可撤销（要把 `OverwriteExisting` 传进 `undoOpsOf`）。**危险动作机制已认识此场景**（`DangerAction.kt` 判 `OverwriteExisting`），只有撤销推导从不查策略。按 §7.1「有歧义先请用户裁决」，故只记录 | ⏸ 待用户裁决（不阻塞余量轮） |
+| R4 | 9（W13） | `validatePageConsistency(volume)` 的输入就是 `renumberPages(volume)` 的**输出**（`ComicInfoXml.kt:111` 调 `:93-97 previewOf`），两者同源 ⇒ ①`pages.size != order.size` 恒假、②校验侧补零位数与重编号侧恒等、③`startsWith("$expected.")` 恒真 ⇒ **`pageIssues` 恒空、`consistent` 恒真**，UI 的告警分支（`app/…/workflowb/PackPreviewPage.kt:204 if (!preview.consistent)`）**不可达** | 要让这两个分支可达，必须改 `validatePageConsistency` 的**输入语义**（例如改成校验"磁盘上真实存在的页"而非"按页序重编号的页"，或校验 `volume.pages` 与 `pageOrder.order` 是否一致）。这改变了"一致性"这个词在 D3 里的含义，且会牵动 UI 告警的触发条件 ⇒ **属产品决策**。本轮只做等价性证明与记录，**不改输入来源** | ⏸ 待用户裁决（不阻塞余量轮；**非本轮引入**，是既有设计） |
 
 **已知的、明确不碰的开放项**（不要在本轮"顺手"处理）：
 - HANGOFF §11 第 12 条：Android 端存储不足的**阈值与提示形态**，明写「待 D2b 真机验证后定」。
@@ -760,6 +892,7 @@ cmd.exe /c "D:\Programing\Personal\pixfold\pixfold-d1\run-gradle.bat clean \
   - `domain` 源码 `@Test` 计数 = **345**，与 XML **完全一致**（无排除项）。
   > ⚠️ 上表是 **W10 终验那一刻**的读数，为历史记录，**不回改**。此后余量轮继续加断言：
   > 轮 7（W11）+3 ⇒ **348**，轮 8（W12）+2 ⇒ **350**（见 §3.1 轮 7/轮 8 与 §6.5）。
+  > 轮 9（W13）+7 ⇒ **357**（见 §3.1 轮 9）。
   > `app` 始终 **399** 未变（本分支一行未改 `app/**`）。
 - 产物：`app/build/outputs/apk/debug/app-debug.apk`（33,385,168 字节，mtime 17:43）⇒ `assembleDebug` 真实产出。
 
@@ -778,18 +911,21 @@ cmd.exe /c "D:\Programing\Personal\pixfold\pixfold-d1\run-gradle.bat clean \
   变异脚本与备份**未入库**。
 
 > ⚠️ 上面这段是 **W10 终验那一刻**的读数（**11 files / 2678 insertions**），为历史记录，**不回改**。
-> 余量轮的增量见各轮小节：轮 7（W11）**+3 files / +93 / −0**；轮 8（W12）**+2 files / +46 / −0**。
+> 余量轮的增量见各轮小节：轮 7（W11）**+3 files / +93 / −0**；轮 8（W12）**+2 files / +46 / −0**；
+> 轮 9（W13）**+4 files / +102 / −0**（也全是测试文件）。
 > 当前实时读数以 `git diff --stat dev...d3/p1` 为准（结论不变：**改动面只有 `domain/**` + `HANGOFF.md` + 本台账**，
 > `pixfold-d1/app/**` 始终 **0 条**）。
 
 ### 6.4 提交拓扑（`git log --oneline dev..d3/p1`）
 
 > **不写死条数**（终验当时为 9；W10 提交与回填提交各 +1）—— 以命令输出为准。
-> 截至 W9/W10 落地的链条如下（最新在上）；**轮 7（W11）与轮 8（W12）的提交与回填见各自小节**：
+> 截至 W9/W10 落地的链条如下（最新在上）；**轮 7（W11）、轮 8（W12）与轮 9（W13）的提交与回填见各自小节**：
 
 | 提交 | 类型 | 内容 |
 | --- | --- | --- |
-| `（轮 8 回填 = 本次提交）` | docs | 台账回填轮 8 提交号（`3c34c75`） |
+| `（轮 9 回填 = 本次提交）` | docs | 台账回填轮 9 提交号 |
+| `（轮 9 = 本次 W13 提交）` | test | W13：二轮广扫荡 39 组 → 12 存活 → 8 真缺口全捕获（+7 用例 ⇒ domain 357） |
+| `（轮 8 回填）` | docs | 台账回填轮 8 提交号（`3c34c75`） |
 | `3c34c75` | test | W12：广扫荡 23 组 → 2 存活 → 补断言（+2 用例 ⇒ domain 350） |
 | `（轮 7 回填）` | docs | 台账回填轮 7 提交号 + R3 登记 |
 | `2fe36ce` | fix | W11：条目名撞名守卫 + R3 诚实记录 |
@@ -810,9 +946,11 @@ cmd.exe /c "D:\Programing\Personal\pixfold\pixfold-d1\run-gradle.bat clean \
 ### 6.5 结论与明确的"未做"
 
 - **完成**：W0–W12 全部 ✅（§3 状态表）；D3 退出条件 1 所要求的**打包领域核心**
-  （`PackagePlan`/`OperationPlan` 语义、`ExecutionReport`、`UndoRecord`）已落地并有 **350** 项单测覆盖。
+  （`PackagePlan`/`OperationPlan` 语义、`ExecutionReport`、`UndoRecord`）已落地并有 **357** 项单测覆盖。
   **余量轮 7（W11）另加**：条目名撞名守卫（真漏洞，已修）+ 2 用例；
-  **余量轮 8（W12）另加**：广扫荡 23 组变异 → 2 存活 → 补断言后全捕获 ⇒ 又 +2 用例（348 → **350**）。
+  **余量轮 8（W12）另加**：广扫荡 23 组变异 → 2 存活 → 补断言后全捕获 ⇒ 又 +2 用例（348 → **350**）；
+  **余量轮 9（W13）另加**：二轮广扫荡 39 组变异（换 5 个文件）→ 12 存活 → 判定出 8 真缺口（补断言后全捕获）
+  + 4 已证等价 ⇒ 又 +7 用例（350 → **357**）。
 - **未做 / 不宣称**（与 HANGOFF 小节一致，勿据此认为 D3 已完成）：
   1. ❌ **真机核对** —— 工作面 100% 领域层，按 §7.4 表第 1 行判定不需要；
   2. ❌ **D3 三项退出条件的正式宣布**；
@@ -826,5 +964,16 @@ cmd.exe /c "D:\Programing\Personal\pixfold\pixfold-d1\run-gradle.bat clean \
   **三项均不阻塞余量轮。**
   **轮 8（W12）未新增待裁决项** —— Q1/Q6 两个存活变异都属"断言区分度不够"，
   语义本身没有分歧（四元组顺序、前导点归属在代码里都是确定的），故直接补断言，无需用户裁决。
+  **轮 9（W13）同样未新增待裁决项** —— 12 个存活者里 8 个是"断言不够"，
+  另 4 个（R2/R5/O5/M6）已给出**可从源码复核的等价性证明**（不是"看不出差别"就登记），
+  两类都不涉及产品语义分歧。
+  > ⚠️ **轮 9 的一个诚实说明**：R2/R5 的等价性**根因是同一处设计**——
+  > `validatePageConsistency` 的输入 `pages` 就是 `renumberPages(volume)` 的输出，两者同源，
+  > 因此"页数不符"与"序号不符"这两个分支在当前实现下**永远不可达**（`pageIssues` 恒空、
+  > `consistent` 恒真）。这意味着 `ComicPreview.consistent` / `pageIssues` 目前**只是恒真恒空**，
+  > UI 侧 `PackPreviewPage.kt:204 if (!preview.consistent)` 的告警分支同理不可达。
+  > **这不是本轮引入的缺陷，也不在本轮授权面内**（要让它们可达就得改 `validatePageConsistency`
+  > 的输入来源，属产品/接口决策），故只记录、不改。
+  > 可在后续轮次作为**候选裁决项**提出（是否让预览基于"磁盘上真实存在的页"而非"重编号结果"）。
 - **诚实性说明**：②③两项本可"顺手写上"，但那属于**替他做产品决策**，按 §7.1 第 1 步**只记录不改**。
 
