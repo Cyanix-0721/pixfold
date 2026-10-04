@@ -596,7 +596,7 @@ PROBE-A undo=[DeleteCreated(path=E:\漫画库\_output\海贼王 第102卷.cbz)]
 
 #### 轮 8（2026-10-04 18:0x）— W12 余量加固：广扫荡找缺口（**不再靠猜**）
 
-- 提交：`（见下方回填行）` test(d3): 补两处未覆盖表达面（W12 广扫荡 23 组 → 2 存活 → 全捕获）
+- 提交：`3c34c75` test(d3): 补两处未覆盖表达面（W12 广扫荡 23 组 → 2 存活 → 全捕获）
 - 改动：2 files / **+46 / −0**（**纯断言增量，生产代码零改动**）
   - `pixfold-d1/domain/src/test/kotlin/com/pixfold/d1/domain/plan/ExecutionReportTest.kt`（+26）
   - `pixfold-d1/domain/src/test/kotlin/com/pixfold/d1/domain/plan/PackagePlanTest.kt`（+20）
@@ -789,8 +789,8 @@ cmd.exe /c "D:\Programing\Personal\pixfold\pixfold-d1\run-gradle.bat clean \
 
 | 提交 | 类型 | 内容 |
 | --- | --- | --- |
-| `（轮 8 回填）` | docs | 台账回填轮 8 提交号 |
-| `（轮 8）` | test | W12：广扫荡 23 组 → 2 存活 → 补断言（+2 用例 ⇒ domain 350） |
+| `（轮 8 回填 = 本次提交）` | docs | 台账回填轮 8 提交号（`3c34c75`） |
+| `3c34c75` | test | W12：广扫荡 23 组 → 2 存活 → 补断言（+2 用例 ⇒ domain 350） |
 | `（轮 7 回填）` | docs | 台账回填轮 7 提交号 + R3 登记 |
 | `2fe36ce` | fix | W11：条目名撞名守卫 + R3 诚实记录 |
 | `901baf1` | docs | 台账回填 W9/W10 提交号 |
