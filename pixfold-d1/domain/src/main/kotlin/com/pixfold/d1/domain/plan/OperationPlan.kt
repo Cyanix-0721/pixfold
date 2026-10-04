@@ -242,6 +242,9 @@ private fun executeRenameOp(item: RenamePlannedOp): ExecEntry {
             label = item.label,
             outcome = ExecOutcome.Succeeded,
             createdPath = op.finalName,
+            // 撤销要"改回原名",而原名只存在于计划里(`op.proposal.image.fileName`)。
+            // 报告若不带它,从报告推导撤销的那条入口就永远取不到 —— 见 ExecEntry.originalPath。
+            originalPath = op.proposal.image.fileName,
         )
     }
 }

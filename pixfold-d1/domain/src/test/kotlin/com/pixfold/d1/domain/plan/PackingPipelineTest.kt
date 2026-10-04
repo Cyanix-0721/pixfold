@@ -243,8 +243,9 @@ class PackingPipelineTest {
         val record = assertNotNull(undoRecordFrom(plan, report))
 
         val created = report.entries.mapNotNull { it.createdPath }.toSet()
-        // 只看 from:它恒为"改名后的名字"(= createdPath)。to 的取值正是待裁决 R1
-        // 的对象(当前 from == to),故这里刻意不钉死方向,否则 R1 一修这条就红。
+        // 只看 from:它恒为"改名后的名字"(= createdPath),是回滚的**起点**。
+        // to 是回滚的**终点**(原文件名),与 from 不同源,故由 UndoAlignmentTest 单独钉死
+        // (R1 修复前两者相等,那条用例当时只能如实记录缺陷)。
         val targeted = record.ops.filterIsInstance<UndoOp.RestoreRenamed>().map { it.from }.toSet()
         assertEquals(created, targeted)
         assertEquals(2, record.ops.size, "跳过项不进撤销记录")

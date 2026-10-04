@@ -124,9 +124,12 @@ class UndoAlignmentTest {
         assertEquals(1, record.opCount, "跳过与失败都不产生副作用")
         val op = record.ops.single()
         assertTrue(op is UndoOp.RestoreRenamed, "改名的撤销是改回原名，实际 $op")
-        // 方向见 `a successful rename undo currently collapses from and to onto the new name`：
-        // 当前 from 与 to 都取自报告里的 label / createdPath（同一个值），此处只钉数量与类型。
-        assertEquals("新名.jpg", op.from, "from 取自报告标签")
+        assertEquals("新名.jpg", op.from, "from = 改后的名字（回滚的起点）")
+        assertEquals(
+            aot1.pages.first().fileName,
+            op.to,
+            "to = 原文件名 —— 跳过与失败项都不该污染它（它们压根不进记录）",
+        )
     }
 
     /** 失败项的 `createdPath` 必须为空 —— 否则撤销会去删一个不存在的东西。 */
@@ -165,50 +168,50 @@ class UndoAlignmentTest {
     }
 
     @Test
-    fun `a successful rename undo currently collapses from and to onto the new name`() {
-        // ⚠️ 这条断言记录的是**既有缺陷**，不是期望行为 —— 见台账「待裁决 R1」。
+    fun `a successful rename undo restores the original file name`() {
+        // 这条用例原名 `a successful rename undo currently collapses from and to onto
+        // the new name`，**如实记录既有缺陷**（台账「待裁决 R1」）。用户已裁决修复，
+        // 故此处翻成**正向断言**。
         //
-        // `UndoOp.RestoreRenamed(from, to)` 的语义是「把改名后的文件改回去」，
-        // 故 `from` 应是新名、`to` 应是**原文件名**。但成功项的 `label` 与
-        // `createdPath` 都是 `op.finalName`（同一个值），于是推导出的记录是
-        // `RestoreRenamed("改后.jpg", "改后.jpg")` —— 一个**空操作**，
-        // 真要按它回滚是回不去的。
+        // 缺陷是什么：`UndoOp.RestoreRenamed(from, to)` 的语义是「把改名后的文件改回去」，
+        // 故 `from` 应是新名、`to` 应是**原文件名**。但成功项的 `label` 与 `createdPath`
+        // 都是 `op.finalName`（同一个值），于是推导出的记录是
+        // `RestoreRenamed("改后.jpg", "改后.jpg")` —— 一个**空操作**，真要按它回滚是回不去的。
         //
         // 为什么 D1 一直没暴露：`performUndo` 恒返回 `applied = false`（原型不触碰
         // 真实文件系统），UI 只显示「已记录 N 项」，从不消费 `from`/`to`。
         // 真机核对（HANGOFF:540 第 17 项）看到的也是同一句话。
         //
-        // 为什么这里**不改实现**：正确取值需要产品决策 —— 撤销记录该携带"原文件名"
-        // （则要扩 `ExecEntry` 或让 `undoRecordFrom` 从计划里取 `op.proposal.image.fileName`），
-        // 还是 `from`/`to` 本就该是别的含义。按 §7.1 第 1 步「有歧义先请用户裁决」，
-        // 本项目夜间无人值守，故只记录、不动行为（本轮契约是"零行为变化"）。
+        // 修复分两步：① `ExecEntry` 补 `originalPath`（本项动手前该位置原本的名字），
+        // 由 `executeRenameOp` 从 `op.proposal.image.fileName` 填；② `undoOpsOf` 的
+        // Rename 分支改从它取 `to`。于是 `from` = 新名（起点）、`to` = 原文件名（终点）。
         //
-        // 顺带解释一个变异结果：把 `from`/`to` 对调的变异**存活**（等价变异）——
-        // 正因为两者当前相等。缺陷一旦修复，该变异会被本文件的正向断言杀死。
+        // 顺带兑现一条变异预测：`from`/`to` 对调的变异在缺陷期**存活**（两者相等 ⇒
+        // 等价变异），修复后会被下面的 `to` 断言杀死。
+        val original = aot1.pages.first().fileName
         val op = undoRecordOf(executeRenamePlan(listOf(renameOp("i1", "改后.jpg"))))!!.ops.single()
         assertTrue(op is UndoOp.RestoreRenamed)
-        assertEquals("改后.jpg", op.from, "from = 报告里的 label（当前 = 新名）")
-        assertEquals(
-            op.from,
-            op.to,
-            "当前 to 也等于新名 ⇒ 撤销是空操作；修复后此断言应改为「to == 原文件名」",
-        )
+        assertEquals("改后.jpg", op.from, "from = 改后的名字（回滚的起点）")
+        assertEquals(original, op.to, "to = 原文件名（回滚的终点）—— 否则这条撤销是空操作")
     }
 
     @Test
-    fun `the undo record cannot recover the original name from the report alone`() {
-        // 支撑上一条的结构性事实：`ExecEntry` 里**没有任何字段**携带原文件名。
-        // 故"从报告推导撤销"这条路径在类型上就取不到原文件名 —— 这不是实现疏忽，
-        // 而是记录里缺字段。`undoRecordFrom(plan, report)` 手里有计划，
-        // 具备修复条件；这正是两个入口**不该**被强行视作完全等价的地方（见台账 R1）。
+    fun `the report carries the original name so undo no longer needs the plan`() {
+        // 这条用例原名 `the undo record cannot recover the original name from the report alone`，
+        // 记录的是**结构性事实**：`ExecEntry` 里没有任何字段携带原文件名，于是
+        // "从报告推导撤销"在类型上就取不到原文件名（见台账 R1）。现在补上了 `originalPath`。
+        //
+        // 为什么 `originalPath` 落在 `ExecEntry` 而不是让 `undoRecordFrom(plan, report)`
+        // 从计划里现取：两个入口（`undoRecordOf(report)` / `undoRecordFrom(plan, report)`）
+        // 必须产出**同一份**记录 —— 这是本文件开头声明的不变量。若只有拿到计划的那个
+        // 入口能取到原名，两个入口就会给出不同的 `to`，"不可能漂移"就成了空话。
+        // 报告自己带上原名，两条路径才真正等价。
         val original = aot1.pages.first().fileName
         val report = executeRenamePlan(listOf(renameOp("i1", "改后.jpg")))
         val e = report.entries.single()
         assertEquals(ExecOutcome.Succeeded, e.outcome)
-        assertTrue(
-            e.label != original,
-            "报告标签是新名；原文件名「$original」在报告里已无处可取",
-        )
+        assertTrue(e.label != original, "报告标签仍是新名（用户要看的是改成了什么）")
+        assertEquals(original, e.originalPath, "原文件名必须能从报告本身取回")
     }
 
     @Test

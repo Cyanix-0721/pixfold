@@ -30,6 +30,10 @@ enum class ExecOutcome(val textKey: TextKey) {
  * [createdPath] 仅在该项**真的产生了输出**时非空 —— 撤销只回滚这些,
  * 不会去动原本就没动过的东西。
  *
+ * [originalPath] 是**本项动手之前,这个位置上原本存在的东西**(文件名或路径);
+ * `null` 表示原位置本来就是空的(纯新建)。它与 [createdPath] 一起才构成一次完整的
+ * "从哪来 → 到哪去",撤销才有的可逆。
+ *
  * [reason] 是 [Msg](键 + 参数);[label] 是**文件名**,不是文案,故仍是 `String`。
  */
 data class ExecEntry(
@@ -38,6 +42,7 @@ data class ExecEntry(
     val outcome: ExecOutcome,
     val reason: Msg? = null,
     val createdPath: String? = null,
+    val originalPath: String? = null,
 ) {
     init {
         // ---- 不变式:只有"成功"才产生输出(createdPath 非空 ⟺ Succeeded) ----
@@ -58,6 +63,11 @@ data class ExecEntry(
         }
         require(outcome != ExecOutcome.Succeeded || createdPath != null) {
             "Succeeded 项必须携带 createdPath —— 否则撤销无从知道要回滚什么"
+        }
+        // [originalPath] 同理:它是"本次动手覆盖掉/改掉的那个旧东西",只有真动过手的
+        // 成功项才可能有。跳过项与失败项什么也没动,带上它就是无中生有。
+        require(outcome == ExecOutcome.Succeeded || originalPath == null) {
+            "$outcome 项不应携带 originalPath（$originalPath）—— 它什么都没改动"
         }
     }
 }
@@ -154,6 +164,17 @@ fun undoRecordOf(report: ExecutionReport): UndoRecord? =
  * 收成一处之后,统一入口 [undoRecordFrom] 与既有的 [undoRecordOf] 不可能再漂移:
  * 两者只差"kind 从哪来"(计划 vs 报告)。
  *
+ * ## 改名:终点必须取自 [ExecEntry.originalPath]
+ *
+ * `RestoreRenamed(from, to)` 是一次**移动**:`from` = 改后的名字(起点),`to` = 原名(终点)。
+ * 早先两者都写 `path`(= `createdPath` = 新名),推出来的记录是
+ * `RestoreRenamed("改后.jpg", "改后.jpg")` —— **空操作**,按它回滚等于什么都没做(缺陷 R1)。
+ *
+ * 这里**回落**而不是 `requireNotNull`:报告的构造不保证每条成功项都带原名
+ * (见 `UndoAlignmentTest` 里"报告 kind 与计划 kind 不一致"那条用例,它刻意用
+ * Package 报告配 Rename 计划)。回落成空操作最坏是"没回滚",而抛异常会连累
+ * 整个撤销入口;删错文件则不可逆 —— 两害相权,取保守的那个。
+ *
  * @return 逆向操作列表;没有可撤销的东西时返回 null
  */
 internal fun undoOpsOf(report: ExecutionReport, kind: ExecKind): List<UndoOp>? {
@@ -162,7 +183,7 @@ internal fun undoOpsOf(report: ExecutionReport, kind: ExecKind): List<UndoOp>? {
         val path = e.createdPath ?: return@mapNotNull null
         when (kind) {
             ExecKind.Package -> UndoOp.DeleteCreated(path)
-            ExecKind.Rename -> UndoOp.RestoreRenamed(from = e.label, to = path)
+            ExecKind.Rename -> UndoOp.RestoreRenamed(from = path, to = e.originalPath ?: path)
         }
     }
 }

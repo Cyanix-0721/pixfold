@@ -230,6 +230,46 @@ class ExecutionReportTest {
         )
     }
 
+    @Test
+    fun `a skipped entry cannot carry an original path`() {
+        // originalPath 是"本次动手覆盖掉/改掉的那个旧东西"。跳过项什么也没动,
+        // 带上它就是无中生有 —— 而且会让"撤销会不会删错东西"的判据失去依据。
+        val ex = assertFailsWith<IllegalArgumentException> {
+            ExecEntry(
+                id = "x",
+                label = "a.cbz",
+                outcome = ExecOutcome.Skipped,
+                originalPath = "old/a.cbz",
+            )
+        }
+        assertTrue("originalPath" in ex.message.orEmpty(), "报错应点明问题所在，实际 ${ex.message}")
+    }
+
+    @Test
+    fun `a failed entry cannot carry an original path`() {
+        assertFailsWith<IllegalArgumentException> {
+            ExecEntry(
+                id = "x",
+                label = "a.cbz",
+                outcome = ExecOutcome.Failed,
+                reason = Msg(TextKey.PackFailNoPages),
+                originalPath = "old/a.cbz",
+            )
+        }
+    }
+
+    @Test
+    fun `a successful entry may omit the original path when the slot was empty`() {
+        // 反向不能堵死:纯新建项原位置本来就是空的,没有"旧东西"可记 —— 合法。
+        val e = ExecEntry(
+            id = "x",
+            label = "a.cbz",
+            outcome = ExecOutcome.Succeeded,
+            createdPath = "out/a.cbz",
+        )
+        assertNull(e.originalPath, "纯新建项不该凭空有原名")
+    }
+
     // ---- 撤销 ----
 
     @Test
@@ -265,7 +305,10 @@ class ExecutionReportTest {
         val record = undoRecordOf(executeRenamePlan(listOf(op("i1", "新名.jpg"))))
         val undo = record!!.ops.single()
         assertTrue(undo is UndoOp.RestoreRenamed)
-        assertEquals("新名.jpg", undo.from)
+        // from = 起点(改后的名字),to = 终点(原文件名)。两者**必须不同源** ——
+        // 都取 createdPath 的话这条撤销就是 `RestoreRenamed("新名.jpg","新名.jpg")` 空操作。
+        assertEquals("新名.jpg", undo.from, "from 是回滚的起点：改后的名字")
+        assertEquals(aot1.pages.first().fileName, undo.to, "to 是回滚的终点：原名")
     }
 
     @Test
