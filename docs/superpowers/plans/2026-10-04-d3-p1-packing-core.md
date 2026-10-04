@@ -159,6 +159,13 @@ cmd.exe /c "D:\Programing\Personal\pixfold\pixfold-d1\run-gradle.bat :app:lintDe
 | `pixfold-d1/domain/src/test/kotlin/com/pixfold/d1/domain/workflowb/WorkflowBStateTest.kt` | **新**：`WorkflowBState` 的全部 12 个公开入口（此前**零领域断言**） | W15 |
 | `pixfold-d1/domain/src/test/kotlin/com/pixfold/d1/domain/naming/NamingWarningsTest.kt` + `…/naming/RootDirFollowTest.kt` | 改：W15 各补 1 条字面量阈值 / 跟随标志用例（+1 / +1） | W15 |
 | `pixfold-d1/artifacts/mutate_w15.py` + `artifacts/w15bak/`（复核用 `mutate_w15b.py` + `artifacts/w15bbak/`） | 变异脚本与备份（同样**不入库**） | W15 |
+| `pixfold-d1/domain/src/test/kotlin/com/pixfold/d1/domain/text/TextKeyMappingTest.kt` | **新**：12 张「枚举 → `TextKey`」映射表 + `DangerAction` 文案三元组**逐项钉死**（此前领域测试对这批键的引用计数全为 0） | W16 |
+| `pixfold-d1/domain/src/test/kotlin/com/pixfold/d1/domain/plan/OperationPlanTest.kt` | 改：W16 补「跳过的改名操作报原因而非状态词」用例（+1） | W16 |
+| `pixfold-d1/domain/src/test/kotlin/com/pixfold/d1/domain/plan/RenameLibraryPlanTest.kt` | 改：W16 补 `collectionNames` 取值与 `counts` 三项用例（+2） | W16 |
+| `pixfold-d1/domain/src/test/kotlin/com/pixfold/d1/domain/pack/CbzWriterTest.kt` | 改：W16 补 `CbzEntry.toString` 契约用例（+1） | W16 |
+| `pixfold-d1/domain/src/test/kotlin/com/pixfold/d1/domain/naming/NamingEvalTest.kt` | 改：W16 补 `clearOverride` 只清一个 id 的用例（+1） | W16 |
+| `pixfold-d1/domain/src/test/kotlin/com/pixfold/d1/domain/comic/ComicMetadataTest.kt` | 改：W16 补 `includedVolumes` 只留勾选卷的用例（+1） | W16 |
+| `pixfold-d1/artifacts/mutate_w16.py` + `artifacts/w16bak/`（复核用 `mutate_w16b.py`） | 变异脚本与备份（同样**不入库**） | W16 |
 | `HANGOFF.md` | 改：§9.1 追加「D3 打包核心轮」小节（**只追加**） | W9 |
 | `docs/superpowers/plans/2026-10-04-d3-p1-packing-core.md` | 本文件（台账） | 全程 |
 
@@ -190,6 +197,7 @@ cmd.exe /c "D:\Programing\Personal\pixfold\pixfold-d1\run-gradle.bat :app:lintDe
 | W13 | 余量加固（§3 余量政策）：**第二次广扫荡**——换 5 个文件（`ComicInfoXml` / `ConfirmFlow` / `DangerAction` / `PageOrder` / `MetaEdit`）投 39 组变异，覆盖 W7/W8/W11/W12 都没碰过的页序校验、确认流边界、危险清单、固定项落位、元数据批量写入 | 存活变异必须补到全捕获，或按 §0.4 **给出可复核的等价性证明**并写文档说明 | ✅ 完成（轮 9：39 组 → **27 捕获 / 12 存活 / 0 锚点缺失**；12 个存活者判定为 **8 真缺口 + 4 已证等价**，8 个真缺口补断言后**全部转为捕获**且每条的捕获者是**它自己的新用例**；4 个等价者重跑**仍存活**，与证明一致；+7 用例 ⇒ domain **357** 项；生产代码零改动） |
 | W14 | 余量加固（§3 余量政策）：**第三次广扫荡**——再换 8 个文件（`NaturalOrder` / `SortItems` / `NamingEval` / `Warnings` / `RenamePlan` / `NamingSummary` / `WorkflowAState` / `PixFoldSettings`）投 **58 组**变异，覆盖前三次都没碰过的自然序解析、排序字段、命名求值、警告参数、改名计划谓词、命名摘要、批次规则与设置默认值 | 存活变异必须补到全捕获，或按 §0.4 **给出可复核的等价性证明**并写文档说明 | ✅ 完成（轮 10：58 组 → **43 捕获 / 15 存活 / 0 锚点缺失 / 0 编译失败**；15 个存活者判定为 **13 真缺口 + 2 已证等价**，13 个真缺口补断言后**全部转为捕获**且每条捕获者是**它自己的新用例**；2 个等价者（N4/R2）重跑**仍存活**，与证明一致；+10 用例 ⇒ domain **367** 项；生产代码零改动） |
 | W15 | 余量加固（§3 余量政策）：**第四次广扫荡**——目标面换成此前六次（W7/W8/W11/W12/W13/W14）**从未投过变异**的整个 `model/` 包 + 从零覆盖的 `workflowb/`，共 9 个文件投 **64 组**变异，覆盖 `hasWarningOnly`/`effectiveScheme` 谓词、`hasValue` 三态、`needsConfirmation`、`isOverridden`、`SortRule` 两条守卫、`sizeLabel` 两个阈值、`relPath`/`fileName`、`WorkflowBState` 全部 12 个入口、内存设置存储与 `Msg` 参数契约 | 存活变异必须补到全捕获，或按 §0.4 **给出可复核的等价性证明**并写文档说明 | ✅ 完成（轮 11：64 组 → **32 捕获 / 32 存活 / 0 锚点缺失 / 0 编译失败**；32 个存活者判定为 **31 真缺口 + 1 已证等价**（N6），31 个真缺口补断言后**全部转为捕获**且每条捕获者是**它自己的新用例**；1 个等价者重跑**仍存活**，与证明一致；+39 用例 ⇒ domain **406** 项；生产代码零改动） |
+| W16 | 余量加固（§3 余量政策）：**第五次广扫荡（收尾轮）**——按 AST 精算出的历史覆盖表，挑历史变异组数最少的文件与**零测试引用**的表达面，共 23 个文件投 **66 组**变异，重点覆盖 12 张「枚举 → `TextKey`」映射表、`DangerAction` 文案三元组、`comicVolumeOf`/`setIncluded`/`includedVolumes`/`updateComponent`/`clearOverride`/`containsIllegalChar`/`compareNaturalTokens` 等生产有调用但测试零引用的函数 | 存活变异必须补到全捕获，或按 §0.4 **给出可复核的等价性证明**并写文档说明 | ✅ 完成（轮 12：66 组 → **42 捕获 / 24 存活 / 0 锚点缺失 / 0 编译失败**；24 个存活者判定为 **23 真缺口 + 1 已证等价**（C5），23 个真缺口补断言后**全部转为捕获**；1 个等价者重跑**仍存活**，与证明一致；+19 用例 ⇒ domain **425** 项；生产代码零改动） |
 
 **余量处理**：W1–W10 全部完成且仍有轮次 ⇒ **继续加固核心**（更多边界 / 更多变异 / 更多不变式），
 **不越界**到未授权工作面（适配层检查、D2b、真机、UI）。
@@ -1058,6 +1066,121 @@ O1 的第一版断言写在既有用例 `pinned item keeps position across apply
 
 ---
 
+#### 轮 12（2026-10-04 20:35）— W16 第五次广扫荡（收尾轮）：12 张映射表 + 零引用表达面
+
+- 提交：`b0f0e88` test(d3): 补二十四处未覆盖表达面断言（W16 广扫荡 66 组 → 24 存活 → 23 真缺口全捕获）
+- 改动：6 files (+318/−0)（5 个既有测试文件 +318 中的 99 行，1 个新建 `TextKeyMappingTest.kt` 219 行；**全是测试文件**）
+- 闸门：app 399 tests / domain 425 tests / 0F 0E / lint 0 errors 0 warnings（旧产物）/ assembleDebug OK
+- 变异：66 组，42 捕获，24 存活 → 23 真缺口全捕获 + 1 已证等价，0 逃逸
+- 结论 / 阻塞 / 待裁决：本轮**未新增待裁决项**；R1/R2/R3/R4 仍未决，均不阻塞。
+  本轮**未改生产代码**、**未新增 TextKey**、**未改 `app/**`**、**未改构建脚本**、**未新增依赖**。
+
+##### 本轮方法：先用 AST 精算历史覆盖面，再挑「投得最少」的面
+
+前七次扫荡（W7/W8/W11/W12/W13/W14/W15）累计约 **250 组**变异，但**从未有一张「每文件投了多少组」的账**。
+本轮开跑前先用 `ast.parse` **静态**解析 `artifacts/mutate_*.py`（⚠️ **绝不用 `exec` 加载**：早期脚本
+（`mutate_round3.py` 等）**顶层就有副作用代码**，加载即真的开跑并会污染禁改的 `app/**`——本轮已因此
+发生一次事故，见下），把每组的第二个元素求值成真实路径后按前缀切出相对路径，得到准确基线：
+
+- 历史共 **266 组 / 28 个生产文件**。
+- **从未投过变异的生产文件只有 2 个**：`model/ImageCollection.kt`（9 行，纯 data class 声明）
+  与 `text/TextKey.kt`（194 行，纯枚举常量）——**没有行为可投**，这是"行为面已 100% 覆盖"的
+  结构性原因，不是漏做。
+- ⇒ W16 的真正新面 = ① 历史组数最少的文件里**剩下的**面；② 生产有调用但**测试零引用**的函数。
+
+零引用面（`grep -rl` 逐键/逐函数在 31 个领域测试文件里复核，引用计数全为 0）：
+
+| 面 | 为什么零引用 | 指错的后果 |
+| --- | --- | --- |
+| 12 张「枚举 → `TextKey`」映射表（50 个键） | 领域层只持有键、**不持有译文**（`model/Sort.kt` KDoc），译文在 app 侧 `PixFoldText.kt` 的 `when` 里补 | **静默串味**：选「大小」显示「文件名」的文字、选「日语」写成「未设置」——不崩溃 |
+| `DangerAction` 的 label/body/button 三元组 | 既有 `DangerActionTest` 只断言「三个动作的键**两两不同**」 | 整个动作的三份文案**错位到另一个动作**，无人察觉 |
+| `comicVolumeOf` / `setIncluded` | 无测试消费者 | 语言/勾选语义被改而测试全绿 |
+| `includedVolumes` | 只有 app 侧 `PackPreviewPage.kt:153` 用 | 计数口径反转 |
+| `updateComponent` / `clearOverride` | 只经 `toggleComponent` / `setOverride` 间接用 | 改组件无效 / 覆盖项清不掉 |
+| `containsIllegalChar` / `compareNaturalTokens` | 只经 `sanitizeName` / `naturalCompare` 间接用 | 控制字符漏网 / 记号数兜底失效 |
+
+##### 事故与修复：`exec` 历史脚本导致 `app/**` 被污染
+
+干跑锚点唯一性时，我用 `exec(src.split("def sha(")[0])` 去"只加载定义"，但早期脚本**顶层就有副作用**，
+于是 `mutate_r3c.py` 真的跑了起来（60s 后被转入后台），并已把
+`pixfold-d1/app/src/main/kotlin/com/pixfold/d1/ui/workflowa/SortAndPreviewPage.kt:761-767` 的
+`textAlign = TextAlign.Center` 改成 `TextAlign.Start`（它的 `M7`）。
+
+- 修复：`job_kill` 掉后台作业 → `cp` 从 `artifacts/SortAndPreviewPage.kt.bak_c` 还原
+  （先 `diff -q` 确认原文件与备份**逐字节相同**）→ `git diff --quiet HEAD` 通过（**WORKTREE CLEAN**）
+  → `git diff --name-only dev...d3/p1 -- pixfold-d1/app/` = 0 条。
+- **教训**：**绝不用 `exec` 加载历史变异脚本**，只用 `ast.parse` 静态分析。
+  变异脚本的"只加载不执行"必须靠 AST，不靠 `split`。
+
+##### 第一遍扫描结果（`python3 pixfold-d1/artifacts/mutate_w16.py`）
+
+```
+共 66 组（A 20 / B 8 / C 38）… 锚点缺失 0 组 ⇒ 全部唯一，可以开跑
+捕获 42 / 存活 24 / 锚点缺失 0 / 编译失败 0
+还原核对：全部逐字节一致
+```
+
+24 个存活者：A 段 **17** 个（全是映射表指到别的项的键）、B 段 **2** 个（`includedVolumes` 取反、
+`clearOverride` 变空操作）、C 段 **5** 个（`RenamePlannedOp.describe` 丢 reason、
+改名成功项 `createdPath` 改用 `item.label`、`collectionNames` 记 `rootDirName`、
+`LibraryRenamePlan.counts` 两数对调、`CbzEntry.toString` 丢字节数）。
+
+##### 存活者判定：23 真缺口 + 1 已证等价
+
+| 存活者 | 判定 | 依据 |
+| --- | --- | --- |
+| A1–A17（17 个映射表错键） | **真缺口** | 键被指到别的项 ⇒ 译文静默串味；领域测试对这批键零引用，故无人捕获 |
+| B4 `includedVolumes` 取反 | **真缺口** | 生产有调用（`PackPreviewPage.kt:153`），测试零引用 |
+| B7 `clearOverride` 变空操作 | **真缺口** | app 侧 `NamingPage.kt:234 onResetOverride` 是唯一调用点，测试零引用 |
+| C4 `describe` 丢 `op.reason` | **真缺口** | 跳过项的跳过理由会退化成状态词 |
+| C5 `createdPath = item.label` | **已证等价** | `RenamePlannedOp.label` 的定义就是 `op.finalName`（`OperationPlan.kt:76`），与 `op.finalName` **恒等** ⇒ §0.4 意义上的等价变异体，复核时必须**仍存活** |
+| C10 `collectionNames` 记 `rootDirName` | **真缺口** | 既有测试只断言 `collectionNames.size`，键数对而值错无人管 |
+| C11 `LibraryRenamePlan.counts` 两数对调 | **真缺口** | `.counts` 的读者只在 `OperationPlanTest`（打包侧），改名侧无断言 |
+| C15 `CbzEntry.toString` 丢字节数 | **真缺口** | 公开契约但**无观测面**（`app/**` 零消费者），故只能由单测钉死 |
+
+##### 补断言（红→绿）
+
+- **新建 `text/TextKeyMappingTest.kt`（13 用例）**：覆盖 A 段 17 个变异所属的 12 张映射表
+  + `DangerAction` 三元组。写法一律
+  `assertEquals(listOf(键…), Enum.entries.map { it.textKey })`（`ExecKind` 用 `.titleKey`），
+  即**逐项钉死**而非"键两两不同"——后者正是既有 `DangerActionTest` 的写法，挡不住整体错位。
+- 5 个既有文件各追加 1–2 条：
+  `OperationPlanTest` +1（跳过的改名操作报原因）、`RenameLibraryPlanTest` +2（`collectionNames` 取值
+  + `counts` 三项；`collectionNames` 那条**额外做了差分断言**——把集合 `copy(rootDirName = "改过的根名")`
+  后重算，因为本组 mock 里集合名与根目录名恰好相同，否则差分恒真、拦不住"记 rootDirName"的写法）、
+  `CbzWriterTest` +1、`NamingEvalTest` +1、`ComicMetadataTest` +1。
+
+domain 闸门：**32 files / 425 tests / 0F 0E 0S**（406 → 425，**+19**）。
+
+##### 第二遍复核（`python3 pixfold-d1/artifacts/mutate_w16b.py`，只重跑 24 个存活者）
+
+复核脚本沿用轮 11 的两段式：先做**前置核对**（每个生产文件 sha256 必须等于 `artifacts/w16bak/` 里的备份，
+否则中止），把每组的分类 `真缺口`/`已证等价` 写死进脚本，末尾按分类分别核对预期。
+
+```
+总数 24 / 捕获 23 / 存活 1 / 锚点缺失 0 / 编译失败 0
+还原核对：全部逐字节一致
+真缺口全部转捕获：是
+等价者仍存活(与证明一致)：是
+```
+
+⇒ **真缺口 23/23 转为捕获**（日志里可见失败者正是新增用例，如
+`TextKeyMappingTest > exec kind maps each option to its own title key() FAILED`、
+`OperationPlanTest > describe of a skipped rename op reports its reason instead of the status word() FAILED`）；
+**等价 1/1（C5）仍存活**，与证明一致。
+
+- 结论 / 阻塞 / 待裁决：本轮**未新增待裁决项**（23 个缺口全属"断言不够"，唯一等价者已给出可复核证明）；
+  R1/R2/R3/R4 仍未决，均不阻塞。
+  本轮**未改生产代码**（`git diff --quiet HEAD -- pixfold-d1/domain/src/main` 通过）、**未新增 TextKey**、
+  **未改 `app/**`**（`git diff --name-only dev...d3/p1 -- pixfold-d1/app/` = 0 条）、**未改构建脚本**、**未新增依赖**。
+- ⚠️ lint 读数是**旧产物**（`app/build/reports/lint-results-debug.txt` mtime 17:44）：
+  本次 `:app:lintDebug` 执行了，但 `lintReportDebug` / `lintAnalyzeDebug` 均为 `UP-TO-DATE`
+  ⇒ 报告未重写。可判定正确（本分支 `app/**` 一行未改），但**不得当作新鲜读数引用**。
+- ⚠️ **收尾轮声明**：本轮是 12 轮上限内的**最后一轮**（goal `maxGoalRounds = 12`）。
+  §3 余量轮政策到此为止；后续若继续加固需用户**重新授权并追加轮次**。
+
+---
+
 ## 4. 待裁决 / 阻塞（越界项写这里，不自行决定）
 
 > 出现下列任一情况，**停止该项**并在此登记，然后继续**下一项**工作：
@@ -1123,6 +1246,19 @@ O1 的第一版断言写在既有用例 `pinned item keeps position across apply
 > `model/`（3 个）、`text/`（1 个）、`settings/`（1 个）、`workflowb/`（1 个）—— 其中 `model/`、`text/`、`workflowb/`
 > 是本轮**新开的测试目录**。
 
+> **轮 12 收工时的实测读数**（同上，供早间直接比对）：
+> `git rev-list --count dev..d3/p1` = 见命令输出（在轮 11 的 21 之上再 +2：W16 测试提交与本次回填提交）；
+> `git status --porcelain` 空、`git stash list` 空；
+> domain `32 files / 425 tests / 0F 0E 0S`（源码 `@Test` 亦为 **425**，**无排除项、两者一致**）、
+> app `42 files / 399 tests / 0F 0E`（**未变**：本分支一行未改 `app/**`）；
+> lint `0 errors, 0 warnings, 4 hints`（⚠️ **旧产物**，mtime 17:44 —— 本次 `:app:lintDebug` 执行了，
+> 但 `lintReportDebug`/`lintAnalyzeDebug` 为 `UP-TO-DATE`，报告未重写）；`assembleDebug` 产出
+> `app/build/outputs/apk/debug/app-debug.apk`（33,405,421 字节）；
+> `git diff --name-only dev...d3/p1 -- pixfold-d1/app/` = **0 条**；
+> 本轮新增的 1 个测试文件在 `text/` 目录下（`TextKeyMappingTest.kt`，13 用例），
+> 其余 5 个既有文件各追加 1–2 条用例 ⇒ domain 406 → **425（+19）**。
+> **本轮是 12 轮上限内的最后一轮**，之后不再有自动续跑。
+
 ---
 
 ## 6. 自检结果
@@ -1168,6 +1304,9 @@ cmd.exe /c "D:\Programing\Personal\pixfold\pixfold-d1\run-gradle.bat clean \
   > 轮 9（W13）+7 ⇒ **357**（见 §3.1 轮 9）。
   > 轮 10（W14）+10 ⇒ **367**（见 §3.1 轮 10）。
   > 轮 11（W15）+39 ⇒ **406**（见 §3.1 轮 11；6 个新建文件共 37 条 + 2 个既有文件各 +1）。
+  > 轮 12（W16）+19 ⇒ **425**（见 §3.1 轮 12；1 个新建 `text/TextKeyMappingTest.kt` 共 13 条
+  > + 5 个既有文件各追加 1–2 条：`ComicMetadataTest` 44 / `NamingEvalTest` 34 / `CbzWriterTest` 21 /
+  > `OperationPlanTest` 25 / `RenameLibraryPlanTest` 13）。
   > `app` 始终 **399** 未变（本分支一行未改 `app/**`）。
 - 产物：`app/build/outputs/apk/debug/app-debug.apk`（33,385,168 字节，mtime 17:43）⇒ `assembleDebug` 真实产出。
 
@@ -1189,6 +1328,8 @@ cmd.exe /c "D:\Programing\Personal\pixfold\pixfold-d1\run-gradle.bat clean \
 > 余量轮的增量见各轮小节：轮 7（W11）**+3 files / +93 / −0**；轮 8（W12）**+2 files / +46 / −0**；
 > 轮 9（W13）**+4 files / +102 / −0**；轮 10（W14）**+4 files / +138 / −0**（也全是测试文件）；
 > 轮 11（W15）**+8 files / +445 / −0**（6 个新建测试文件 + 2 个既有测试文件各 +1 用例，同样全是测试文件）。
+> 轮 12（W16）**+6 files / +318 / −0**（1 个新建 `text/TextKeyMappingTest.kt` 219 行 + 5 个既有测试文件
+> 共 +99 行，**同样全是测试文件**；生产代码零改动，`git diff --quiet HEAD -- pixfold-d1/domain/src/main` 通过）。
 > 当前实时读数以 `git diff --stat dev...d3/p1` 为准（结论不变：**改动面只有 `domain/**` + `HANGOFF.md` + 本台账**，
 > `pixfold-d1/app/**` 始终 **0 条**）。
 
@@ -1199,7 +1340,9 @@ cmd.exe /c "D:\Programing\Personal\pixfold\pixfold-d1\run-gradle.bat clean \
 
 | 提交 | 类型 | 内容 |
 | --- | --- | --- |
-| `（轮 11 回填 = 本次提交）` | docs | 台账回填轮 11 提交号（`8b3e988`） |
+| `（轮 12 回填 = 本次提交）` | docs | 台账回填轮 12 提交号（`b0f0e88`） |
+| `b0f0e88` | test | W16：五次广扫荡 66 组 → 24 存活 → 23 真缺口全捕获（+19 用例 ⇒ domain 425） |
+| `ffd9433` | docs | 台账回填轮 11（W15）提交号与读数 |
 | `8b3e988` | test | W15：四次广扫荡 64 组 → 32 存活 → 31 真缺口全捕获（+39 用例 ⇒ domain 406） |
 | `884c343` | docs | 台账回填轮 10 |
 | `3185b15` | test | W14：三次广扫荡 58 组 → 15 存活 → 13 真缺口全捕获（+10 用例 ⇒ domain 367） |
@@ -1225,8 +1368,8 @@ cmd.exe /c "D:\Programing\Personal\pixfold\pixfold-d1\run-gradle.bat clean \
 
 ### 6.5 结论与明确的"未做"
 
-- **完成**：W0–W15 全部 ✅（§3 状态表）；D3 退出条件 1 所要求的**打包领域核心**
-  （`PackagePlan`/`OperationPlan` 语义、`ExecutionReport`、`UndoRecord`）已落地并有 **406** 项单测覆盖。
+- **完成**：W0–**W16** 全部 ✅（§3 状态表）；D3 退出条件 1 所要求的**打包领域核心**
+  （`PackagePlan`/`OperationPlan` 语义、`ExecutionReport`、`UndoRecord`）已落地并有 **425** 项单测覆盖。
   **余量轮 7（W11）另加**：条目名撞名守卫（真漏洞，已修）+ 2 用例；
   **余量轮 8（W12）另加**：广扫荡 23 组变异 → 2 存活 → 补断言后全捕获 ⇒ 又 +2 用例（348 → **350**）；
   **余量轮 9（W13）另加**：二轮广扫荡 39 组变异（换 5 个文件）→ 12 存活 → 判定出 8 真缺口（补断言后全捕获）
@@ -1240,6 +1383,16 @@ cmd.exe /c "D:\Programing\Personal\pixfold\pixfold-d1\run-gradle.bat clean \
   判定出 **31 真缺口**（补断言后全捕获，且每条捕获者是它自己的新用例）+ **1 已证等价**（N6）
   ⇒ 又 +39 用例（367 → **406**）。
   七次扫荡累计：W7 23 组 / W8 16 组 / W11 7 组 / W12 23 组 / W13 39 组 / W14 58 组 / **W15 64 组**。
+  **余量轮 12（W16，收尾轮）另加**：五次广扫荡 **66 组**变异。开跑前先用 `ast.parse` 精算了历史覆盖面
+  （**266 组 / 28 个生产文件**；从未投过变异的只有 `model/ImageCollection.kt` 与 `text/TextKey.kt` 两个
+  **纯声明**文件 ⇒ 行为面已结构性覆盖满），据此挑面：**12 张「枚举 → `TextKey`」映射表**（50 个键在
+  31 个领域测试文件里引用计数**全为 0**，指错的后果是**静默串味**而非崩溃）+ `DangerAction` 文案三元组
+  + 生产有调用但测试零引用的 `comicVolumeOf`/`setIncluded`/`includedVolumes`/`updateComponent`/
+  `clearOverride`/`containsIllegalChar`/`compareNaturalTokens` 等 → 42 捕获 / 24 存活 → 判定出
+  **23 真缺口**（补断言后全捕获）+ **1 已证等价**（C5：`RenamePlannedOp.label` 的定义就是 `op.finalName`）
+  ⇒ 又 +19 用例（406 → **425**）。
+  八次扫荡累计：W7 23 组 / W8 16 组 / W11 7 组 / W12 23 组 / W13 39 组 / W14 58 组 / W15 64 组 / **W16 66 组**。
+  **W16 为 12 轮上限内的最后一轮**（goal `maxGoalRounds = 12`），后续加固需用户重新授权并追加轮次。
 - **未做 / 不宣称**（与 HANGOFF 小节一致，勿据此认为 D3 已完成）：
   1. ❌ **真机核对** —— 工作面 100% 领域层，按 §7.4 表第 1 行判定不需要；
   2. ❌ **D3 三项退出条件的正式宣布**；
@@ -1262,6 +1415,17 @@ cmd.exe /c "D:\Programing\Personal\pixfold\pixfold-d1\run-gradle.bat clean \
   **轮 11（W15）未新增待裁决项** —— 32 个存活者里 **31 个是"断言不够"**（直接补断言即可），
   另 1 个（N6）已给出**可从源码复核的等价性证明**（`rootDirName` 是非空 `String` ⇒ `if/else` 与 elvis 逐分支同值）；
   本轮**没有**发现新的产品语义分歧。
+  **轮 12（W16，收尾轮）未新增待裁决项** —— 24 个存活者里 **23 个是"断言不够"**（直接补断言即可），
+  另 1 个（C5）已给出**可从源码复核的等价性证明**（`OperationPlan.kt:76` 的 `label` 定义就是 `finalName`）；
+  本轮**没有**发现新的产品语义分歧。R1–R4 四项至此仍未决，**均不阻塞**（本分支不再自动续跑，
+  是否裁决由用户决定）。
+  > ⚠️ **轮 12 的一条覆盖事实，单独记下**：12 张「枚举 → `TextKey`」映射表**共 50 个键**在
+  > 31 个领域测试文件里的引用计数**全为 0**，`DangerAction` 的 36 个 label/body/button 键同理。
+  > 这些键的**正确性完全依赖 app 侧 `ui/text/PixFoldText.kt` 的 `when` 分支**，而领域测试对它们
+  > 一个字都没断言过（W16 之前）。本轮新建的 `text/TextKeyMappingTest.kt` 只钉死"**枚举项 → 哪一个键**"
+  > 这一层；**"键 → 哪一句译文"仍无任何自动化检查**（那需要 app 侧资源测试，且译文属产品文案），
+  > 故这批映射若被改错，领域测试能拦住的只有"指到别的枚举项的键"，拦不住"键本身写错字"。
+  > 这是**已知边界**，不构成缺陷，但值得知道。
   > ⚠️ **轮 11 的一条覆盖事实，单独记下**：`text/Msg.kt` 的两个 `msg(...)` 助手
   > **在全仓生产代码里零调用点**（`grep -rn "msg(" pixfold-d1/*/src/main` 无命中），
   > 只有 app 层测试与领域测试在用 ⇒ 目前它只是一份"参数保序 / 保留类型"的**契约**，
