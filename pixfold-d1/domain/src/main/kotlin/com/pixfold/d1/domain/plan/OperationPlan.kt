@@ -189,29 +189,29 @@ private fun executePackageOp(item: PackagePlannedOp): ExecEntry {
     val v = plan.volume
     return when {
         plan.skipped -> ExecEntry(
-            id = v.id,
-            label = v.cbzFileName,
+            id = item.id,
+            label = item.label,
             outcome = ExecOutcome.Skipped,
             reason = plan.skipReason,
         )
 
         v.pageCount == 0 -> ExecEntry(
-            id = v.id,
-            label = v.cbzFileName,
+            id = item.id,
+            label = item.label,
             outcome = ExecOutcome.Failed,
             reason = Msg(TextKey.PackFailNoPages),
         )
 
         v.outputDir.isBlank() -> ExecEntry(
-            id = v.id,
-            label = v.cbzFileName,
+            id = item.id,
+            label = item.label,
             outcome = ExecOutcome.Failed,
             reason = Msg(TextKey.PackFailEmptyOutputDir),
         )
 
         else -> ExecEntry(
-            id = v.id,
-            label = v.cbzFileName,
+            id = item.id,
+            label = item.label,
             outcome = ExecOutcome.Succeeded,
             createdPath = plan.outputPath,
         )
@@ -222,22 +222,24 @@ private fun executeRenameOp(item: RenamePlannedOp): ExecEntry {
     val op = item.op
     return when {
         op.isSkipped -> ExecEntry(
-            id = op.id,
-            label = op.finalName,
+            id = item.id,
+            label = item.label,
             outcome = ExecOutcome.Skipped,
             reason = op.reason,
         )
 
         op.finalName.isBlank() -> ExecEntry(
-            id = op.id,
+            id = item.id,
+            // ⚠️ 这里**刻意不用** item.label(= finalName):最终名是空白,拿它当标签
+            // 会在报告里显示一个空行,用户根本看不出是哪张图失败了。故回落到原文件名。
             label = op.proposal.image.fileName,
             outcome = ExecOutcome.Failed,
             reason = Msg(TextKey.RenameFailEmptyName),
         )
 
         else -> ExecEntry(
-            id = op.id,
-            label = op.finalName,
+            id = item.id,
+            label = item.label,
             outcome = ExecOutcome.Succeeded,
             createdPath = op.finalName,
         )

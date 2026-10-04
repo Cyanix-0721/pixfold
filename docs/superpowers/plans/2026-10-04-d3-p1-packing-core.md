@@ -156,8 +156,8 @@ cmd.exe /c "D:\Programing\Personal\pixfold\pixfold-d1\run-gradle.bat :app:lintDe
 | W3 | `executeRenamePlan` 同上（`operationPlanOfRenames`） | 既有 `RenamePlan`/`ExecutionReport` 相关测试零改动全绿 | ✅ 完成（`72232c1`；撤销推导收成唯一实现 `undoOpsOf`） |
 | W4 | `pack/CbzWriter.kt`：`write(comicInfoXml, pages, out, timeMillis)` —— **STORED**（依据 `scripts-behavior-matrix.md:267` 参考脚本用 `ZIP_STORED`）、`ComicInfo.xml` **结构上强制第 0 条**、条目名 UTF-8 | 单测用 `ZipInputStream` 回读：条目顺序、`getMethod() == STORED`、名称集合、内容逐字节相等 | ✅ 完成（20 用例，`55408ba`） |
 | W5 | `pack/CbzWritePlan.kt`：`buildCbzWritePlan(volume)` 复用 `ComicInfo.build` + `renumberPages`；`interface PageByteSource { fun bytesOf(itemId: String): ByteArray? }` + `writeCbz(plan, source, out, timeMillis)` 返回 `CbzWriteResult(writtenEntries, missing)` | 单测：页序含人工调整、≥100 页跨 3→4 位补零、缺图 → `missing` 而非抛异常 | ✅ 完成（20 用例，`55408ba`） |
-| W6 | `UndoRecord` / `ExecutionReport` 与新词汇对齐的全路径覆盖 | 单测：Package→`DeleteCreated`、Rename→`RestoreRenamed`、Skipped/Failed 不产生撤销项、`canUndo=false → null` | ⬜ |
-| W7 | 变异清扫（W1–W6 合计 ≥ 20 组） | 0 逃逸；存活变异按 §0.4 处理并记录 | 🔄 已完成 W4 8 组 + W5 12 组（19 捕获 / 1 等价） |
+| W6 | `UndoRecord` / `ExecutionReport` 与新词汇对齐的全路径覆盖 | 单测：Package→`DeleteCreated`、Rename→`RestoreRenamed`、Skipped/Failed 不产生撤销项、`canUndo=false → null` | ✅ 完成（`UndoAlignmentTest` 16 用例，轮 3） |
+| W7 | 变异清扫（W1–W6 合计 ≥ 20 组） | 0 逃逸；存活变异按 §0.4 处理并记录 | ✅ 完成：**合计 30 组，28 捕获 / 2 等价**（等价项理由均写进台账：M5 编码无关、P5 见 R1）。其中 9 组经「补断言」后由存活转为捕获 |
 | W8 | 边界与不变式加固（空卷 / 单页 / 重名跳过 / `isBlank` 输出目录 / 冲突策略矩阵） | 新增断言 + 变异验证 | ⬜ |
 | W9 | 文档回写：`HANGOFF.md` §9.1 追加「D3 打包核心轮」+ 本文件写「早间复核清单」 | **只追加**，不改阶段快照 | ⬜ |
 | W10 | 终验：干净工作树重跑四道闸门 + 计数比对 + `git log --oneline dev..d3/p1` 汇总 | 本文件写最终读数 | ⬜ |
@@ -256,6 +256,78 @@ cmd.exe /c "D:\Programing\Personal\pixfold\pixfold-d1\run-gradle.bat :app:lintDe
      报告必须能与归档实际内容逐条核对。
 - 结论 / 阻塞 / 待裁决：无
 
+#### 轮 3（2026-10-04 18:5x）— W6+W7 撤销全路径对齐 + 变异清扫
+- 改动：`domain/src/test/kotlin/com/pixfold/d1/domain/plan/UndoAlignmentTest.kt`（新，16 用例）、
+  `OperationPlanTest.kt`（+6 用例：runnable 真实读数、label 真实杀伤力、skipReason 契约、
+  失败行回落原名、describe 三条路径）、`OperationPlan.kt`（**仅把 `executePackageOp` /
+  `executeRenameOp` 里的 `v.id` / `op.id` / `v.cbzFileName` / `op.finalName` 换成
+  `item.id` / `item.label`** —— 行为逐字等价，但让 `PlannedOp` 的接口字段真正承重）
+- RED 证据：新增用例首次编译失败三处 `Unresolved reference 'NameProposal'`
+  （`OperationPlanTest.kt:247/261/295`）+ `Unresolved reference 'aot2'` / `assertNull`
+- 闸门：`BUILD SUCCESSFUL in 36s` / `62 actionable tasks: 11 executed, 51 up-to-date` /
+  **app 42 files · 399 tests（未变，正确）/ domain 24 files · 328 tests / 0F 0E / lint 0 告警**
+- 变异：**W7 共 30 组，28 捕获，2 等价**
+  - 第一批 20 组（`/tmp/mutate_w7.py`）：13 捕获 / 6 存活 / 1 锚点缺失
+    （P11 因换行缩进不匹配未命中，已在第二批修正锚点后捕获）
+  - 第二批 10 组（`/tmp/mutate_w7b.py`）：9 捕获 / 1 存活
+  - 逐条：
+    | 编号 | 变异 | 结果 |
+    | --- | --- | --- |
+    | P1 | 打包/改名撤销语义对调 | 捕获（7 条用例） |
+    | P2 | `undoOpsOf` 改读 `report.kind` | 捕获 |
+    | P3 | 去掉 `canUndo` 守卫 | 捕获 |
+    | P4 | 忽略 `createdPath`，所有项都进撤销 | 捕获（4 条） |
+    | **P5** | **`RestoreRenamed` 的 `from`/`to` 对调** | **等价（见下 R1）** |
+    | P6 | 去掉「跳过项不得带 createdPath」require | 捕获（3 条） |
+    | P7 | 去掉「成功项必须带 createdPath」require | 捕获（2 条） |
+    | P8 | `undoRecordFrom` 改读 `report.kind` | 捕获 |
+    | P9 | `executePlan` 反转 op 顺序 | 捕获 |
+    | P10 | `pageCount == 0` 判在 `skipped` 之前 | 捕获（8 条） |
+    | P11 | 去掉同质 `require` | 捕获（第二批修锚点后） |
+    | P12 | `operationPlanOf` 丢危险动作 | 捕获（2 条） |
+    | P13 | `operationPlanOf` 硬编码 `Rename` | 捕获（32 条） |
+    | P14 | `runnable = total + skipped` | 捕获（补断言后） |
+    | P15 | `skipped` 数成"未跳过" | 捕获（2 条） |
+    | P16 | `PackagePlannedOp.label` 改成 `outputDisplay` | 捕获（补断言后） |
+    | P16b | `label` 改成卷 id | 捕获（同一条断言） |
+    | P17 | `RenamePlannedOp.skipReason` 恒非空 | 捕获（补断言后） |
+    | P18 | 失败行标签用 `finalName`（空串） | 捕获（补断言后） |
+    | P19 | `undoRecordFrom` 永不返回 null | 捕获 |
+    | P20 | `PackagePlannedOp.describe()` 返回空 | 捕获（补断言后） |
+    | P20b | `RenamePlannedOp.describe()` 返回空 | 捕获（补断言后） |
+    | P20c | `OperationPlan.describe()` 返回空 | 捕获（补断言后） |
+    | M5 | `toByteArray()` 用平台默认编码（W4 遗留） | 等价（JVM `file.encoding=UTF-8`） |
+  - **补断言前后的对比即"断言有杀伤力"的证据**：P14/P16/P16b/P17/P18/P20/P20b/P20c/P11
+    共 9 组在补断言前**存活**，补断言后全部被捕获。
+- **R1（本轮新发现的既有缺陷，已登记待裁决，未改实现）**：
+  `UndoOp.RestoreRenamed(from, to)` 在成功项上**恒有 `from == to`** ——
+  `executeRenameOp` 的成功分支 `label = op.finalName` 且 `createdPath = op.finalName`，
+  于是 `undoOpsOf` 推出 `RestoreRenamed("改后.jpg", "改后.jpg")`，是个**空操作**。
+  - **不是本轮引入**：`git show 72232c1^:…/plan/Execution.kt` 显示重构前就是同一取值
+    （`label = op.finalName` + `createdPath = op.finalName`），本轮的"零行为变化"要求
+    恰好把它**原样保留**下来。
+  - **为什么一直没暴露**：`performUndo` 恒返回 `applied = false`（D1 不触碰真实文件系统），
+    UI 只显示「已记录 N 项」，从不消费 `from`/`to`；真机核对（HANGOFF:540 第 17 项）
+    看到的也是同一句话。
+  - **为什么不自作主张修**：正确取值要产品决策 —— 撤销记录该携带"原文件名"
+    （需扩 `ExecEntry` 字段，或让 `undoRecordFrom` 从计划取
+    `op.proposal.image.fileName`），还是 `from`/`to` 本就该是别的含义。按 §7.1 第 1 步
+    「有歧义先请用户裁决」，且夜间无人值守，故**只记录、不动行为**。
+  - **变异层面的后果**：P5（`from`/`to` 对调）因此是**等价变异**，不是断言没杀伤力。
+    已把原先那条"钉死方向"的用例改写为
+    `a successful rename undo currently collapses from and to onto the new name`
+    + `the undo record cannot recover the original name from the report alone`，
+    注释里写明这是**既有缺陷**而非期望行为；缺陷修复后该变异会被正向断言杀死。
+- 设计决定（**后续勿推翻**）：
+  1. `executePackageOp`/`executeRenameOp` 改从 `item` 取 `id`/`label` —— 让接口字段承重。
+     这是**唯一**让 P16/P16b 这类变异有意义的前提：字段没人读，改错了也没人发现。
+  2. `executeRenameOp` 的失败分支**刻意不用** `item.label`：最终名是空白，拿它当标签会
+     在报告里显示空行，用户看不出是哪张图失败 —— 故回落到 `op.proposal.image.fileName`。
+     该取舍已写成源码注释（守护 P18）。
+  3. 新测试的破坏性读数必须**写死具体数字**（如 `runnable == 4`）而非复算
+     （`total - skipped`）—— 后者与实现同构，等于没有断言。P14 证实了这一点。
+- 结论 / 阻塞 / 待裁决：**R1 登记待裁决**（不阻塞后续 W8–W10，因为不改行为）
+
 ---
 
 ## 4. 待裁决 / 阻塞（越界项写这里，不自行决定）
@@ -266,7 +338,8 @@ cmd.exe /c "D:\Programing\Personal\pixfold\pixfold-d1\run-gradle.bat :app:lintDe
 
 | # | 轮次 | 事项 | 为什么不能自行决定 | 状态 |
 | --- | --- | --- | --- | --- |
-| — | — | （暂无） | — | — |
+| R1 | 3（W6） | `UndoOp.RestoreRenamed(from, to)` 在成功项上恒 `from == to`（空操作）—— `executeRenameOp` 成功分支的 `label` 与 `createdPath` 都取 `op.finalName`，报告里**无处**携带原文件名 | 修法有两种且语义不同：①扩 `ExecEntry` 加原名字段；②让 `undoRecordFrom(plan, report)` 从计划取 `op.proposal.image.fileName`（只有它手里有计划）。选哪种、以及 `from`/`to` 的最终语义，都属撤销记录的产品决策；且本轮契约是"既有可观测行为逐字不变" | ⏸ 待用户裁决（不阻塞 W8–W10） |
+| R2 | 3（W7） | `RenamePlannedOp.describe()` 在无原因时只能给 `Msg(TextKey.OpStatusRename)` 一句状态词 | 改名侧**没有**逐项句子契约（`RenamePlanPage` 渲染的是"原名 → 新名"两列 + 状态标签）；要补齐就得**新增 TextKey**，而本轮明令禁止 | ⏸ 待用户裁决（当前行为已够用，非缺陷） |
 
 **已知的、明确不碰的开放项**（不要在本轮"顺手"处理）：
 - HANGOFF §11 第 12 条：Android 端存储不足的**阈值与提示形态**，明写「待 D2b 真机验证后定」。
