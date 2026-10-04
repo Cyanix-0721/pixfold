@@ -159,9 +159,9 @@ cmd.exe /c "D:\Programing\Personal\pixfold\pixfold-d1\run-gradle.bat :app:lintDe
 | W4 | `pack/CbzWriter.kt`：`write(comicInfoXml, pages, out, timeMillis)` —— **STORED**（依据 `scripts-behavior-matrix.md:267` 参考脚本用 `ZIP_STORED`）、`ComicInfo.xml` **结构上强制第 0 条**、条目名 UTF-8 | 单测用 `ZipInputStream` 回读：条目顺序、`getMethod() == STORED`、名称集合、内容逐字节相等 | ✅ 完成（20 用例，`55408ba`） |
 | W5 | `pack/CbzWritePlan.kt`：`buildCbzWritePlan(volume)` 复用 `ComicInfo.build` + `renumberPages`；`interface PageByteSource { fun bytesOf(itemId: String): ByteArray? }` + `writeCbz(plan, source, out, timeMillis)` 返回 `CbzWriteResult(writtenEntries, missing)` | 单测：页序含人工调整、≥100 页跨 3→4 位补零、缺图 → `missing` 而非抛异常 | ✅ 完成（20 用例，`55408ba`） |
 | W6 | `UndoRecord` / `ExecutionReport` 与新词汇对齐的全路径覆盖 | 单测：Package→`DeleteCreated`、Rename→`RestoreRenamed`、Skipped/Failed 不产生撤销项、`canUndo=false → null` | ✅ 完成（`UndoAlignmentTest` 16 用例，轮 3） |
-| W7 | 变异清扫（W1–W6 合计 ≥ 20 组） | 0 逃逸；存活变异按 §0.4 处理并记录 | ✅ 完成：**合计 30 组，28 捕获 / 2 等价**（等价项理由均写进台账：M5 编码无关、P5 见 R1）。其中 9 组经「补断言」后由存活转为捕获 |
+| W7 | 变异清扫（W1–W6 合计 ≥ 20 组） | 0 逃逸；存活变异按 §0.4 处理并记录 | ✅ 完成：**23 个不同变异体 / 30 次运行，逃逸 0**；W7 自身等价变异仅 **P5 一个**（见 R1）。**曾存活 9 个（M5/M6/N5/P5/P14/P16/P17/P18/P20），其中等价 2、真正经「补断言」由存活转为捕获 7 个**（口径详见轮 3 小节加的 ⚠️ 校正） |
 | W8 | 边界与不变式加固（空卷 / 单页 / 重名跳过 / `isBlank` 输出目录 / 冲突策略矩阵） | 新增断言 + 变异验证 | ✅ 完成（`PackingPipelineTest` 17 用例，轮 4；**16 组变异全捕获**，其中 4 组只可能由本轮新增用例捕获 ⇒ 补的是真缺口） |
-| W9 | 文档回写：`HANGOFF.md` §9.1 追加「D3 打包核心轮」+ 本文件写「早间复核清单」 | **只追加**，不改阶段快照 | ⬜ |
+| W9 | 文档回写：`HANGOFF.md` §9.1 追加「D3 打包核心轮」+ 本文件写「早间复核清单」 | **只追加**，不改阶段快照 | ✅ 完成（轮 5：`HANGOFF.md:2611` 起追加；台账 §5 早间复核清单同步补写） |
 | W10 | 终验：干净工作树重跑四道闸门 + 计数比对 + `git log --oneline dev..d3/p1` 汇总 | 本文件写最终读数 | ⬜ |
 
 **余量处理**：W1–W10 全部完成且仍有轮次 ⇒ **继续加固核心**（更多边界 / 更多变异 / 更多不变式），
@@ -222,7 +222,12 @@ cmd.exe /c "D:\Programing\Personal\pixfold\pixfold-d1\run-gradle.bat :app:lintDe
   `:85 Unresolved reference 'buildCbzWritePlan'`（共 31 处未解析引用）
 - 闸门：`BUILD SUCCESSFUL` / exit 0 / app 42 files · 399 tests（未变，正确）/ 
   domain 23 files · 305 tests / 0F 0E / lint 0 告警 / assembleDebug OK
-- 变异：**20 组，19 捕获，1 等价**
+- 变异：**23 个不同变异体 / 25 次运行，逃逸 0**（其中 1 个等价变异 M5 ⇒ 22 个被断言捕获）
+  > ⚠️ **口径校正（轮 4 复核时发现）**：本节标题原先写"20 组，19 捕获，1 等价"，
+  > 与下方的逐条枚举对不上 —— 逐条数出来是 6+7+10+2 = **25 次运行**，其中 M6 与 N5
+  > 各重跑一次用于验证补断言是否生效，故**不同变异体 = 23 个**。
+  > 差额来自"轮次"与"变异体"两个口径混用（第一轮 + 第二轮合计并不等于 20）。
+  > HANGOFF 的 D3 小节已按下面这套逐条枚举为准重述，此处保留原始记录并加注。
   - W4 第一轮 6 组：M1 排序 ✓、M2 改 DEFLATED ✓、M3 忽略 timeMillis ✓、
     M4 去掉 require ✓、**M5 `toByteArray()` 平台默认编码 —— 存活**、
     **M6 `close()` 替 `finish()` —— 存活**
@@ -260,6 +265,9 @@ cmd.exe /c "D:\Programing\Personal\pixfold\pixfold-d1\run-gradle.bat :app:lintDe
 
 #### 轮 3（2026-10-04 18:5x）— W6+W7 撤销全路径对齐 + 变异清扫
 - 提交：`e82cdb9` test(d3): 撤销/报告全路径对齐 + 30 组变异清扫（28 捕获 / 2 等价）
+  > 注：**提交标题里的数字按上表口径读作「30 次运行」**，不可与"不同变异体"混用
+  > （不同变异体 = 23；且"2 等价"里的 M5 是 W4 遗留项，见本节 ⚠️ 校正）。
+  > 提交标题是历史记录，**不改写已有的 commit message**，此处加注即可。
 - 改动：`domain/src/test/kotlin/com/pixfold/d1/domain/plan/UndoAlignmentTest.kt`（新，16 用例）、
   `OperationPlanTest.kt`（+6 用例：runnable 真实读数、label 真实杀伤力、skipReason 契约、
   失败行回落原名、describe 三条路径）、`OperationPlan.kt`（**仅把 `executePackageOp` /
@@ -269,7 +277,13 @@ cmd.exe /c "D:\Programing\Personal\pixfold\pixfold-d1\run-gradle.bat :app:lintDe
   （`OperationPlanTest.kt:247/261/295`）+ `Unresolved reference 'aot2'` / `assertNull`
 - 闸门：`BUILD SUCCESSFUL in 36s` / `62 actionable tasks: 11 executed, 51 up-to-date` /
   **app 42 files · 399 tests（未变，正确）/ domain 24 files · 328 tests / 0F 0E / lint 0 告警**
-- 变异：**W7 共 30 组，28 捕获，2 等价**
+- 变异：**W7 共 23 个不同变异体 / 30 次运行，逃逸 0**（其中 1 个等价变异 P5 ⇒ 22 个被断言捕获）
+  > ⚠️ **口径校正（轮 4 复核时发现）**：本节标题原先写"共 30 组，28 捕获，2 等价"，
+  > 把三个口径混在了一起：①"30"是**运行次数**（20+10），而 P5 与 P11 各跑两次
+  > （P5 第一批存活→第二批复测仍存活；P11 第一批锚点未命中→第二批修锚点后捕获），
+  > 故**不同变异体 = 23 个**（P1–P20 + P16b + P20b + P20c）。②"2 等价"里的第二个其实是
+  > 表内那一行 **M5，属 W4 遗留项的复验**，不是 W7 的变异体。③因此 W7 的等价变异只有 **P5 一个**。
+  > HANGOFF 的 D3 小节已按下面这套逐条枚举为准重述，此处保留原始记录并加注。
   - 第一批 20 组（`/tmp/mutate_w7.py`）：13 捕获 / 6 存活 / 1 锚点缺失
     （P11 因换行缩进不匹配未命中，已在第二批修正锚点后捕获）
   - 第二批 10 组（`/tmp/mutate_w7b.py`）：9 捕获 / 1 存活
@@ -300,8 +314,13 @@ cmd.exe /c "D:\Programing\Personal\pixfold\pixfold-d1\run-gradle.bat :app:lintDe
     | P20b | `RenamePlannedOp.describe()` 返回空 | 捕获（补断言后） |
     | P20c | `OperationPlan.describe()` 返回空 | 捕获（补断言后） |
     | M5 | `toByteArray()` 用平台默认编码（W4 遗留） | 等价（JVM `file.encoding=UTF-8`） |
-  - **补断言前后的对比即"断言有杀伤力"的证据**：P14/P16/P16b/P17/P18/P20/P20b/P20c/P11
-    共 9 组在补断言前**存活**，补断言后全部被捕获。
+  - **补断言前后的对比即"断言有杀伤力"的证据**：**曾经存活**的变异体共 9 个
+    （M5、M6、N5、P5、P14、P16、P17、P18、P20），其中 M5 与 P5 是等价变异（原理上杀不掉），
+    **其余 7 个（M6/N5/P14/P16/P17/P18/P20）全部靠补断言转为捕获**（M6 属 W4、N5 属 W5）。
+    > ⚠️ **口径校正（轮 4 复核时发现）**：本行原先写"P14/P16/P16b/P17/P18/P20/P20b/P20c/P11
+    > 共 9 组在补断言前存活"，把两类东西混了进来 —— **P16b/P20b/P20c 是在第二批首次引入、
+    > 当场就被捕获**（并非"先存活后捕获"），**P11 是脚本锚点未命中**（换行缩进不匹配，
+    > 属工具缺陷而非存活的变异体）。真正的"存活→补断言→捕获"是 7 个，不是 9 个。
 - **R1（本轮新发现的既有缺陷，已登记待裁决，未改实现）**：
   `UndoOp.RestoreRenamed(from, to)` 在成功项上**恒有 `from == to`** ——
   `executeRenameOp` 的成功分支 `label = op.finalName` 且 `createdPath = op.finalName`，
@@ -397,6 +416,45 @@ cmd.exe /c "D:\Programing\Personal\pixfold\pixfold-d1\run-gradle.bat :app:lintDe
      bash 侧看不到），落工作区内的忽略目录才是可靠做法。
 - 结论 / 阻塞 / 待裁决：无新增待裁决项（R1/R2 仍未决，不阻塞）。
   源码**零改动**（只新增测试文件），故本轮不存在行为变化风险。
+
+---
+
+#### 轮 5（2026-10-04 17:3x）— W9 文档回写（`HANGOFF.md` 只追加）
+
+- 提交：（见下方回填行）
+- 改动：`HANGOFF.md`（**仅追加一个小节**，插在 `### D1.1` 末尾 `**已提交** `3ca85b0`…` 之后、
+  `### D2：平台能力验证`（`:2688` 附近）之前 —— 即 `HANGOFF.md:2611` 起的
+  `#### ✅ D3 打包核心轮:统一操作词汇 + CBZ 字节生成(2026-10-04 分支 `d3/p1`,**未合并、未推送**)`）
+  + 本台账（W9 状态、本轮记录、§6 自检结果、§3 口径校正）。
+- **只追加的证据**：`git diff --numstat` 应为纯新增（`+N −0`），且 `git diff` 中**不得出现**
+  `> 进度(` 行、门槛表 `| D3 |` 行、`## 9` 顶部任何行的改动。**阶段快照三处同步（`HANGOFF.md` §9 顶
+  + `AGENTS.md` 头 + `README.md`）本轮一律不做** —— 那是"宣布阶段状态"的产品决策，超出授权。
+- 小节内容（7 块）：性质声明（**只是 D3 退出条件 1 的领域层交付,不是 D3 阶段完成**）、动因
+  （2026-09-19 重定义后打包是四类核心唯一未交付项）、交付面表（5 行）、**6 条关键设计决定**、
+  验证读数（四道闸门 + domain 247→345 / app 399 未变）、`domain/` 零 Android 依赖说明
+  （只用 `java.util.zip`/`java.io`，未改 `build.gradle.kts`，但**退出条件 2 的可执行检查仍未落地**）、
+  **R1/R2 两处待裁决**、**未做/不宣称**清单（❌真机 ❌三项退出条件正式宣布 ❌门槛表/阶段快照三处同步
+  ❌适配层可执行检查 ❌D2b 五项 ❌§11 第 12 条空间阈值 ❌`app/**` 一行未改）、lint 诚实例外、台账指引。
+- **本轮顺带纠正了两处台账口径笔误（重要，属"诚实的验证读数"要求）**：
+  1. 轮 2 小节标题「20 组」与自己的逐条枚举（6+7+10+2 = **25 次运行 / 23 个不同变异体**）对不上。
+  2. 轮 3 小节标题「30 组，28 捕获，2 等价」把三个口径混用：30 是**运行次数**（20+10，其中 P5/P11 各跑两次），
+     不同变异体 = **23**（P1–P20 + P16b + P20b + P20c）；且「2 等价」里的第二个是表内那行 **M5（W4 遗留复验）**，
+     故 W7 自身等价变异只有 **P5 一个**。
+  3. 轮 3 小节「共 9 组在补断言前存活」把**新引入即被捕获**的 P16b/P20b/P20c 与**锚点未命中的 P11**
+     （工具缺陷，非存活变异体）混了进来 ⇒ 真相：**曾存活 9 个**（M5/M6/N5/P5/P14/P16/P17/P18/P20），
+     其中等价 2（M5/P5），**真正"存活→补断言→捕获" = 7 个**（M6/N5/P14/P16/P17/P18/P20）。
+  - 三处均已就地加 ⚠️ 注（**原始记录保留、不改写历史；提交标题里的历史数字也不改写**），
+    并同步进 `HANGOFF.md` 的小节，口径统一为「**逐条枚举为准**」。
+  - 累计口径（以逐条枚举为准）：**71 次运行 / 62 个不同变异体，逃逸 0**；其中 **2 个等价变异**
+    ⇒ **60 个被断言捕获**。
+- 闸门：文档轮，**未改任何 Kotlin**；仍按 §0.3 跑一次四道闸门确认未受影响（读数见 §6）。
+- 设计决定（**后续勿推翻**）：
+  1. **不改写历史数字**。已提交的 commit message 与既往轮次记录一律保留原样、就地加注 ——
+     改写会让"当时的读数"消失，那正是最需要留痕的东西。
+  2. `HANGOFF.md` 采用 `#### ✅ <主题>（日期）` 的既有格式，**不新造标题层级**。
+  3. 小节里显式写「**不是 D3 阶段完成**」与「**未做/不宣称**」清单：文档回写最容易变成
+     无声的阶段宣称，必须把边界写在同一个小节里，读者才不会误读。
+- 结论 / 阻塞 / 待裁决：无新增待裁决项（R1/R2 仍未决，不阻塞）。
 
 ---
 

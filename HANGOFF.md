@@ -2608,6 +2608,107 @@ options.forEachIndexed { index, option ->
 
 **已提交** `3ca85b0`(8 files,+692/−86,**直接提交到 `dev`、无独立分支、未推送**)。
 
+#### ✅ D3 打包核心轮:统一操作词汇 + CBZ 字节生成(2026-10-04 分支 `d3/p1`,**未合并、未推送**)
+
+> **性质**:这是 **D3 退出条件 1「打包核心落地并单测通过」的领域层交付**,**不是** D3 阶段完成的宣布。
+> 退出条件 2(适配层零 Android 依赖的**可执行检查**)与"四类核心基线连续"的正式确认**均未做**;
+> 三项退出条件的正式判定、以及门槛表上 D3 的状态改动,**留待白天由用户裁决**(见下"未做/不宣称")。
+
+**动因**:2026-09-19 把 D3 由"重新实现领域核心"改为"**验证与固化**"后,四类核心里的
+排序/命名/元数据已由 D1 的 P1–P5 交付,**打包**是唯一未交付项(§9 D3 现状对照表:
+「打包 ⬜ 未交付 —— D1 是交互原型、不连真实文件系统;P5 只做 XML 文本预览」)。
+本轮把"打包"从**UI 内的交互原型**提升为**可在正式工程承接的领域核心**。
+
+**交付面**(分支 `d3/p1`,截至本轮写入共 8 个提交,改动**只在 `domain/**`** + 本轮台账;
+最新提交拓扑以 `git log --oneline dev..d3/p1` 为准,**此处不锁死数字**):
+
+| 新增/改动 | 文件 | 内容 |
+| --- | --- | --- |
+| 新 | `domain/plan/OperationPlan.kt`(257 行) | `sealed interface PlannedOp`(`PackagePlannedOp`/`RenamePlannedOp`)+ `OperationPlan(kind, ops, dangerActions)`;`operationPlanOf(plans)` / `operationPlanOfRenames(ops)` / `executePlan(plan)` / `undoRecordFrom(plan, report)` |
+| 新 | `domain/pack/CbzWriter.kt`(128 行) | ZIP 字节原语:全 **STORED**、`ComicInfo.xml` **结构上强制第 0 条**、`timeMillis` 显式入参(保证可复现)、自定义 `CbzEntry`(按字节内容比较) |
+| 新 | `domain/pack/CbzWritePlan.kt`(139 行) | `CbzWritePlan` + `fun interface PageByteSource` + `buildCbzWritePlan(volume)` + `writeCbz(plan, source, out, timeMillis)`:缺图 → `CbzWriteResult.missing`(不抛异常、**一个字节都不写**) |
+| 改 | `domain/plan/Execution.kt`(−107 行) | `executePackagePlans` / `executeRenamePlan` 改为**一行薄委托** `executePlan(operationPlanOf…())`;撤销推导收成唯一实现 `undoOpsOf(report, kind)` |
+| 新(测试) | `domain/plan/OperationPlanTest.kt`、`pack/CbzWriterTest.kt`、`pack/CbzWritePlanTest.kt`、`plan/UndoAlignmentTest.kt`、`plan/PackingPipelineTest.kt` | 合计 +98 用例 |
+
+**关键设计决定**(后续勿推翻,理由随附):
+
+1. **旧入口保留为薄委托,而非删除** —— `executePackagePlans`/`executeRenamePlan` 的既有调用点
+   (`app/ui/workflowa/WorkflowASteps.kt:352`、`app/ui/workflowb/WorkflowBSteps.kt:234`)本轮**一个字不改**;
+   既有 `PackagePlanTest`/`ExecutionReportTest` 也**零改动**全绿。即"统一词汇"是**加法**,
+   可观测行为逐字不变 —— 这使本轮风险被限制在新增文件内。
+2. **改写路径上"复制"而非"桥接"** —— `executePlan` 内部两个私有分支的判定顺序
+   (skipped → 无页 → 空输出目录 → 成功)是**逐字复刻**旧实现的,不是重新推导的。
+3. **`OperationPlan.dangerActions` 是计划级字段,不从 `ops` 推导** —— 若把"清理空目录"
+   做成一个 `PlannedOp`,计划行数会凭空多一行,导致**计划行与报告行错位**。
+4. **`require(ops.all { it.kind == kind })` 拒绝混合种类** —— 撤销语义按 `ExecKind` 分叉
+   (`DeleteCreated` vs `RestoreRenamed`),混在一起会挑错回滚方式。
+5. **`PlannedOp.id`/`label` 必须真的被读** —— 首版实现里 `executePackageOp` 直接取
+   `v.id`/`v.cbzFileName`,导致接口字段**无人消费**;已改为一律从 `item` 取。
+   教训:**接口字段没人读,改错了也没人发现**(该变异原本存活)。
+6. **`executeRenameOp` 的失败分支刻意不用 `item.label`** —— 最终名是空白,拿它当标签会在
+   报告里显示空行,用户看不出是哪张图失败 ⇒ 回落到原文件名。该取舍已写成源码注释。
+
+**验证方式与读数**:
+
+- **四道闸门**(`run-gradle.bat :app:lintDebug :app:testDebugUnitTest :domain:test :app:assembleDebug`,
+  仅在 Windows 侧跑):`BUILD SUCCESSFUL` / exit 0 / lint **0 告警** / `assembleDebug` OK。
+  测试计数(JUnit XML):`domain` 由 **20 files / 247 tests** → **25 files / 345 tests**(+98);
+  `app` 全程 **42 files / 399 tests 未变**(正确 —— 本分支从未改动 `app/**`)。
+- **变异验证三轮累计 71 次运行 / 62 个不同变异体,逃逸 0**(口径 = 逐条枚举,见下):
+  - 轮 2(W4+W5)**23 个变异体**(M1–M11 + M5b + N1–N11;共 25 次运行,其中 M6/N5 各重跑一次验证);
+  - 轮 3(W6+W7)**23 个变异体**(P1–P20 + P16b + P20b + P20c;表内另列的 M5 是轮 2 的遗留项,不重复计);
+  - 轮 4(W8)**16 个变异体**(M1–M16,与轮 2 的同名项作用点不同);
+  - **合计 62 个变异体中 2 个为等价变异**(见下),即 **60 个被断言捕获**。
+  - > ⚠️ **口径校正**:台账轮 2 小节标题写的"20 组"与该小节自己的逐条枚举(6+7+10+2=25 次运行、
+  > 23 个不同变异体)对不上,属标题笔误。此处**以逐条枚举为准**;"逃逸 0"的结论不受影响。
+- **补断言是变异驱动的,不是先写后凑**:三轮里 **9 个变异体曾经存活**(M5/M6/N5/P14/P16/P17/P18/P20/P5),
+  其中 2 个是等价变异(M5/P5,原理上杀不掉),**其余 7 个(M6/N5/P14/P16/P17/P18/P20)全部靠补断言转为捕获** ——
+  这正是"断言原本没有杀伤力、补了才有"的直接证据。
+  轮 4 则是**纯补断言、实现未改**,故首跑即绿属预期,其断言有效性由"16 个变异体全捕获"证明
+  (其中 M1/M2/M3/M6 的**唯一**捕获者就是轮 4 新增的用例 ⇒ 补的是真缺口,不是重复断言)。
+  > ⚠️ **口径校正 2**:台账轮 3 小节写的"共 9 组在补断言前存活"把**新引入的变异体**
+  > (P16b/P20b/P20c 在第二批首次引入即被捕获)与**锚点未命中**(P11 是脚本换行不匹配,
+  > 属工具缺陷而非存活的变异体)混了进来。此处以逐条记录为准:曾存活 = 9,其中等价 2,
+  > 真正"存活→补断言→捕获" = **7**。两处口径均已在台账中加注校正。
+- **2 个等价变异**:①`toByteArray()` 与 `toByteArray(Charsets.UTF_8)` 在 Gradle 测试 JVM
+  上不可区分(`file.encoding` 本机即 UTF-8);断言本身有效,已用显式 `ISO_8859_1` 变异体证实。
+  ②`RestoreRenamed` 的 `from`/`to` 对调 —— 因成功项上两者恒等(见下 R1),对调后行为不变。
+
+**`domain/` 零 Android 依赖**:本轮新增代码**只依赖 `java.util.zip` / `java.io` 与既有 domain 类型**,
+未新增任何依赖,`domain/build.gradle.kts` 未改动。但**退出条件 2 要求的"可执行检查"仍未落地**
+(全仓无依赖断言,目前仅靠模块结构 + 代码评审约束)—— 见下"未做"。
+
+**⚠️ 本轮发现两处待用户裁决项(已记录、**未自行修改**)**:
+
+- **R1(既有缺陷)**:`UndoOp.RestoreRenamed(from, to)` 在成功项上**恒 `from == to`**,
+  是个**空操作**。根因:`executeRenameOp` 成功分支的 `label` 与 `createdPath` 都取 `op.finalName`,
+  **报告里无处携带原文件名**。`git show 72232c1^` 证实**重构前就是同一取值,非本轮引入**;
+  一直未暴露是因为 `performUndo` 恒 `applied = false`(D1 不触碰真实文件系统),
+  UI 只显示「已记录 N 项」,从不消费 `from`/`to`。修法两种且语义不同
+  (①扩 `ExecEntry` 加原名字段 ②让 `undoRecordFrom` 从计划取 `op.proposal.image.fileName`),
+  **属产品决策**,故按 §7.1 第 1 步只记录不改。
+- **R2(非缺陷)**:`RenamePlannedOp.describe()` 在无原因时只能给一句状态词
+  (`Msg(TextKey.OpStatusRename)`)—— 改名侧没有逐项句子契约(计划页渲染的是"原名 → 新名"两列)。
+  补齐需**新增 `TextKey`**,而本轮明令禁止新增键(会牵动 `PixFoldText.kt` 的穷尽 `when`
+  与双语资源,把 lint 风险引入无人值守窗口)。
+
+**未做 / 不宣称**(边界,勿据此认为 D3 已完成):
+
+- ❌ **真机核对** —— 本轮工作面 100% 在领域层,按 §7.4 边界表第 1 行("领域逻辑 → domain 单测")
+  判定**不需要**真机;真机依赖项仍按原样挂起。
+- ❌ **D3 三项退出条件的正式宣布**、❌ **门槛表/阶段快照的状态改动**(需三处同步改:§9.1 + `AGENTS.md` + `README.md`)。
+- ❌ **适配层可执行检查**(退出条件 2)、❌ **D2b 五项**、❌ **§11 第 12 条空间阈值**。
+- ❌ **`app/**` 一行未改**,故**没有任何 UI 层变化**;`W9`/`W10` 的文档与终验读数见台账。
+
+**⚠️ lint 读数的一处诚实例外**:`:app:lintDebug` 的报告文件仍是 **2026-09-29 的旧产物**
+(`0 errors, 0 warnings, 4 hints`,4 个 hint 均为 `AutoboxingStateCreation`),
+因为 `lintAnalyzeDebug` 长期 `UP-TO-DATE`。已用
+`git diff --name-only dev...d3/p1 -- pixfold-d1/app/`(输出为空,本分支从未改动 `app/**`)
+确认 **UP-TO-DATE 是正确行为而非假绿**,但后续**不应**把它当作"新鲜读数"引用。
+
+**台账**:`docs/superpowers/plans/2026-10-04-d3-p1-packing-core.md`(含逐轮 RED 证据、变异逐条表、
+睡前/早间清单)。**分支持续保留,未推送、未合并 `dev`** —— 是否并回由用户决定。
+
 ### D2：平台能力验证
 
 **目标**:优先 Android SAF。重点验证最容易推翻技术选型的能力,不先做完整业务。
