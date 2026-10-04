@@ -291,16 +291,24 @@ class OperationPlanTest {
     }
 
     @Test
-    fun `describe of a rename plan falls back to the rename status key`() {
+    fun `describe of a rename plan spells out the original and the new name`() {
+        // 打包侧每项能说清"要做什么"(创建 CBZ → X / 写 ComicInfo / 打包 N 张),
+        // 改名侧原先只有一句状态词「将重命名」—— 用户看完一整列也不知道会改成什么。
+        // 这里钉的是两个参数的**方向**:先原名,后新名。
         val op = RenameOp(
             proposal = NameProposal(image = aot1.pages.first(), proposedName = "x.jpg"),
             status = OpStatus.Ok,
             reason = null,
         )
         assertEquals(
-            listOf(Msg(TextKey.OpStatusRename)),
+            listOf(
+                Msg(
+                    TextKey.RenamePlanRename,
+                    listOf(aot1.pages.first().fileName, "x.jpg"),
+                ),
+            ),
             operationPlanOfRenames(listOf(op)).describe(),
-            "无原因时给出该行在计划页上的状态词,而不是空列表",
+            "未跳过项必须给出「原名 → 新名」,而不是一句状态词",
         )
     }
 
@@ -319,6 +327,24 @@ class OperationPlanTest {
             listOf(reason),
             operationPlanOfRenames(listOf(op)).describe(),
             "有原因时必须原样给出原因,而不是回退到状态词",
+        )
+    }
+
+    @Test
+    fun `a skipped rename op without a reason falls back to the skip status word`() {
+        // 回落方向必须是「将跳过」而不是「将重命名」:
+        // 计划页上说"会重命名"、执行时却跳过,是比"没话说"更坏的误导。
+        // 构造上 buildRenamePlan 给跳过项必配 reason,故这条只能手工造出来 ——
+        // 但它正是 describe() 的穷尽性守卫:新增状态时这里会先红。
+        val op = RenameOp(
+            proposal = NameProposal(image = aot1.pages.first(), proposedName = "x.jpg"),
+            status = OpStatus.Skipped,
+            reason = null,
+        )
+        assertEquals(
+            listOf(Msg(TextKey.OpStatusSkip)),
+            operationPlanOfRenames(listOf(op)).describe(),
+            "无原因的跳过项应回落到「将跳过」,而不是「将重命名」",
         )
     }
 }

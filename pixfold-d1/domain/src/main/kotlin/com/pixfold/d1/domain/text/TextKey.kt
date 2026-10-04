@@ -21,8 +21,8 @@ package com.pixfold.d1.domain.text
  * 前缀即所属域,便于在资源文件里分组,也便于 grep:
  * `Sort*` / `NameKind*` / `CasePolicy*` / `ExtPolicy*` / `Warn*` / `Lang*` /
  * `MetaField*` / `OpStatus*` / `Outcome*` / `ExecKind*` / `Conflict*` / `Source*` /
- * `Danger*` / `Summary*` / `Pack*` / `Exec*` / `NamingSummary*` / `RenameSummary*` /
- * `Confirm*` / `Pending*` / `Unnamed*` / `PageIssue*` / `List*`。
+ * `Danger*` / `Summary*` / `Pack*` / `RenamePlan*` / `Exec*` / `NamingSummary*` /
+ * `RenameSummary*` / `Confirm*` / `Pending*` / `Unnamed*` / `PageIssue*` / `List*`。
  *
  * ## 开发者诊断不算在内
  *
@@ -150,6 +150,23 @@ enum class TextKey {
     PackValueEmpty,
     PackValueNotWritten,
     PackSkipOutputExists,
+
+    // ---------------- 改名计划行(RenamePlannedOp.describe) ----------------
+    /**
+     * 「把 `%1$s` 改成 `%2$s`」—— 两个参数都是**文件名字符串**,无数量变格。
+     *
+     * ## 为什么这一条必须存在
+     *
+     * 打包侧 [PackCreateCbz] 等句子说明"这一项具体要做什么";改名侧原先只有
+     * [OpStatusRename] 一句状态词(「将重命名」),用户看完一整列也不知道**会改成什么**。
+     * 计划页(`RenamePlanPage`)渲的是"原名 → 新名"两列,那是 UI 自己的布局;
+     * 而 `describe()` 是领域层给"计划必须可解释"留的契约(见 `PackagePlan.kt` 里的说明),
+     * 缺了这条,两个入口解释同一批操作的能力就不对等。
+     *
+     * ⚠️ 第 1 个参数是**改之前**的名字(`op.proposal.image.fileName`),
+     * 第 2 个是**改之后**的(`op.finalName`)—— 顺序反了句子仍然通顺,但意思全错。
+     */
+    RenamePlanRename,
 
     // ---------------- 执行报告文本 ----------------
     ExecSummary,

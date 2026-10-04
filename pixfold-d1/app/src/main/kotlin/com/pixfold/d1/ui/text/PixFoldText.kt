@@ -213,6 +213,9 @@ private fun TextKey.resId(): Int = when (this) {
     TextKey.OpStatusRename -> R.string.domain_op_status_rename
     TextKey.OpStatusSkip -> R.string.domain_op_status_skip
 
+    // 改名计划行
+    TextKey.RenamePlanRename -> R.string.domain_rename_plan_rename
+
     // 执行结果
     TextKey.OutcomeSucceeded -> R.string.domain_outcome_succeeded
     TextKey.OutcomeSkipped -> R.string.domain_outcome_skipped

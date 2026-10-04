@@ -21,8 +21,8 @@ import com.pixfold.d1.domain.text.TextKey
  * ## 与既有公开契约的关系
  *
  * **零行为变化**:[executePackagePlans] / [executeRenamePlan] 保留原签名,改为
- * 经由本文件的 [executePlan] 薄委托;既有测试一行不改也必须全绿。
- * 本文件**不新增任何 [TextKey]** —— 计划行文案沿用打包侧既有的 `describe()` 契约。
+ * 经由本文件的 [executePlan] 薄委托;既有测试一行不改也必须全绿
+ * (例外:[RenamePlannedOp.describe] 于轮 14 补上逐项句子契约,见该处 KDoc)。
  */
 
 /**
@@ -77,14 +77,18 @@ data class RenamePlannedOp(val op: RenameOp) : PlannedOp {
     /**
      * 计划行文案。
      *
-     * 改名侧**没有**逐项句子契约:`RenamePlanPage` 渲染的是"原名 → 新名"两列与状态标签,
-     * 不是计划句。故这里只能给出该行**为什么在那儿**的那一条:
-     *  - 跳过项 → 它自己的冲突原因(与执行报告里 `reason` 同一条,不是另算一份);
-     *  - 其余 → [TextKey.OpStatusRename](「将重命名」),它就是该行在计划页上的状态词。
-     *
-     * **有意不新造文案键**:见本文件头部「不新增任何 TextKey」。
+     *  - 未跳过 → 「把 `原名` 改成 `新名`」([TextKey.RenamePlanRename])。
+     *    打包侧每项都能说清"要做什么",改名侧也必须能:只给一句「将重命名」,
+     *    用户看完一整列也不知道会改成什么。
+     *  - 跳过 → 它自己的冲突原因(与执行报告里 `reason` 同一条,不是另算一份);
+     *    万一没有原因(构造上 `buildRenamePlan` 必配),回落到「将跳过」
+     *    ([TextKey.OpStatusSkip])—— 说"会重命名"却跳过,比没话说更误导。
      */
-    fun describe(): List<Msg> = listOf(op.reason ?: Msg(TextKey.OpStatusRename))
+    fun describe(): List<Msg> = if (op.isSkipped) {
+        listOf(op.reason ?: Msg(TextKey.OpStatusSkip))
+    } else {
+        listOf(Msg(TextKey.RenamePlanRename, listOf(op.proposal.image.fileName, op.finalName)))
+    }
 }
 
 /**

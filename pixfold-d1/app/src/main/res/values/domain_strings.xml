@@ -149,6 +149,10 @@
     <string name="domain_pack_value_not_written">not written</string>
     <string name="domain_pack_skip_output_exists">Output already exists: %1$s</string>
 
+    <!-- ============ Rename plan lines (RenamePlannedOp.describe) ============ -->
+    <!-- %1$s = the name before the change, %2$s = the name after it -->
+    <string name="domain_rename_plan_rename">Rename %1$s → %2$s</string>
+
     <!-- ============ Execution report text ============ -->
     <plurals name="domain_exec_summary">
         <item quantity="one">%1$d item: %2$d succeeded · %3$d skipped · %4$d failed</item>

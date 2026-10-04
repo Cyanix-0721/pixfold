@@ -4,6 +4,11 @@ import android.content.Context
 import androidx.test.core.app.ApplicationProvider
 import com.pixfold.d1.R
 import com.pixfold.d1.TestText
+import com.pixfold.d1.domain.mock.MockDataB
+import com.pixfold.d1.domain.model.NameProposal
+import com.pixfold.d1.domain.naming.OpStatus
+import com.pixfold.d1.domain.naming.RenameOp
+import com.pixfold.d1.domain.plan.operationPlanOfRenames
 import com.pixfold.d1.domain.text.Msg
 import com.pixfold.d1.domain.text.TextKey
 import org.junit.Test
@@ -147,6 +152,112 @@ class PixFoldTextTest {
         assertEquals(
             TestText.of(R.string.domain_page_issue_wrong_index, 1, "a.png", "b.png"),
             resolveText(context, msg),
+        )
+    }
+
+    // ================= 改名计划行 =================
+
+    /**
+     * 改名计划行(R2)必须解析出「原名 → 新名」,且**方向**不能反。
+     *
+     * ⚠️ **本组唯一能看见"资源内容写错"的用例。**
+     *
+     * 本文件其余全部用例都拿 `TestText.of(同一个资源)` 当期望值 —— 那是刻意的:
+     * 期望值与界面走**同一条解析路径**,故与语言无关、不钉死措辞。
+     * 代价是:它们只能证明"`Msg` → 资源"这一步没错,**证明不了资源本身写对了**。
+     * 实证(轮 14 W18):把英文资源改成只有一个占位符 `Rename %1$s`
+     * (第二个文件名被静默吞掉),同组的比对型断言**全部照常通过**,
+     * 因为两边读的是同一份坏资源。
+     *
+     * 故这里兼用**句子的可观测形状**判据 —— 不碰措辞、不碰语言:
+     * 句子必须同时提到两个名字,且原名排在新名之前。
+     *  - 少一个占位符 ⇒ 有一个名字根本没出现(`indexOf == -1`);
+     *  - 两个占位符写反 ⇒ 顺序断言失败;
+     *  - 两侧写成同一个占位符 ⇒ 缺一个名字。
+     * 顺序这一条正是 [TextKey.RenamePlanRename] 的 KDoc 里写下的那个 ⚠️ 契约。
+     */
+    @Test
+    fun `rename plan line mentions both names with the original first`() {
+        val original = "第01卷_p001.jpg"
+        val renamed = "进击的巨人 第01卷 001.jpg"
+        val text = resolveText(context, Msg(TextKey.RenamePlanRename, listOf(original, renamed)))
+        assertEquals(
+            TestText.of(R.string.domain_rename_plan_rename, original, renamed),
+            text,
+            "改名计划行必须由 domain_rename_plan_rename 渲染",
+        )
+        val atOriginal = text.indexOf(original)
+        val atRenamed = text.indexOf(renamed)
+        assertTrue(atOriginal >= 0, "句子里必须出现原名,实际渲染为「$text」")
+        assertTrue(atRenamed >= 0, "句子里必须出现新名,实际渲染为「$text」")
+        assertTrue(
+            atOriginal < atRenamed,
+            "原名必须排在新名前面(「改之前 → 改之后」),实际渲染为「$text」",
+        )
+    }
+
+    /**
+     * 领域层**真造出来**的改名计划句必须能在此解析,且参数个数与资源占位符对得上。
+     *
+     * 与上一条的区别:上一条手工拼 `Msg`,这条走完整链路
+     * (`RenameOp` → `operationPlanOfRenames(...).describe()` → `resolveText`)。
+     * 它能抓住手工拼 `Msg` 抓不到的错:领域层少传一个参数
+     * (资源要两个而只给一个 ⇒ 抛 `MissingFormatArgumentException`)。
+     */
+    @Test
+    fun `the rename plan line produced by the domain resolves with both real file names`() {
+        val page = MockDataB.library.volumes.first { it.id == "aot-1" }.pages.first()
+        val renamed = "进击的巨人 第01卷 001.jpg"
+        val op = RenameOp(
+            proposal = NameProposal(image = page, proposedName = renamed),
+            status = OpStatus.Ok,
+            reason = null,
+        )
+        val line = operationPlanOfRenames(listOf(op)).describe().single()
+        assertEquals(
+            TestText.of(R.string.domain_rename_plan_rename, page.fileName, renamed),
+            resolveText(context, line),
+            "领域层产出的那条计划句必须正好填满资源的两个占位符",
+        )
+        // 同一条"可观测形状"守卫在**真实链路**上也必须成立,而不只在手工拼的 Msg 上。
+        val text = resolveText(context, line)
+        val atOriginal = text.indexOf(page.fileName)
+        val atRenamed = text.indexOf(renamed)
+        assertTrue(
+            atOriginal >= 0 && atRenamed >= 0 && atOriginal < atRenamed,
+            "真实链路渲染出的句子也必须「原名在前、新名在后」,实际为「$text」",
+        )
+    }
+
+    /**
+     * 中文槽位的那份资源也必须守住同一个形状契约。
+     *
+     * **为什么必须单独钉**:Robolectric 默认 locale 是 `en_US`,英文在默认槽位 `values/` ——
+     * 故本文件其余用例跑的全是**英文**那一份,`values-zh/` 的内容一行都不会被读到。
+     * 实证(轮 14 W18):把中文资源写成 `重命名 %2$s → %1$s`(方向反了)或
+     * `重命名 %1$s → %1$s`(原名被新名顶掉),不钉中文的断言**全部照常通过** ——
+     * 中文用户看到的是反的句子,而测试全绿。
+     *
+     * 判据仍是**与语言无关的形状**(两个名字都在、原名在前),不写死中文措辞。
+     */
+    @Test
+    @Config(sdk = [34], qualifiers = "zh-rCN")
+    fun `the chinese rename plan line keeps both names with the original first`() {
+        val original = "第01卷_p001.jpg"
+        val renamed = "进击的巨人 第01卷 001.jpg"
+        val text = resolveText(context, Msg(TextKey.RenamePlanRename, listOf(original, renamed)))
+        assertEquals(
+            TestText.of(R.string.domain_rename_plan_rename, original, renamed),
+            text,
+            "中文槽位也必须由 domain_rename_plan_rename 渲染",
+        )
+        val atOriginal = text.indexOf(original)
+        val atRenamed = text.indexOf(renamed)
+        assertTrue(atOriginal >= 0, "中文句子里必须出现原名,实际渲染为「$text」")
+        assertTrue(atRenamed >= 0, "中文句子里必须出现新名,实际渲染为「$text」")
+        assertTrue(
+            atOriginal < atRenamed,
+            "中文句子也必须是「原名在前、新名在后」,实际渲染为「$text」",
         )
     }
 }

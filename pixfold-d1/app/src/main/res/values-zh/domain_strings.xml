@@ -140,6 +140,10 @@
     <string name="domain_pack_value_not_written">不写入</string>
     <string name="domain_pack_skip_output_exists">输出已存在 %1$s</string>
 
+    <!-- ============ 改名计划行(RenamePlannedOp.describe) ============ -->
+    <!-- %1$s = 改之前的名,%2$s = 改之后的名 -->
+    <string name="domain_rename_plan_rename">重命名 %1$s → %2$s</string>
+
     <!-- ============ 执行报告文本 ============ -->
     <!-- 复数键 -->
     <plurals name="domain_exec_summary">
