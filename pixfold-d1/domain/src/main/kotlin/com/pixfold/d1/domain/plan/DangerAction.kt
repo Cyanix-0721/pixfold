@@ -103,7 +103,7 @@ fun effectiveDangerActions(
     if (plans.any { !it.skipped && it.sourcePolicy == SourcePolicy.Delete }) {
         add(DangerAction.DeleteSourceDir)
     }
-    if (plans.any { !it.skipped && it.conflictPolicy == OutputConflictPolicy.Overwrite && it.volume.outputExists }) {
+    if (plans.any { it.overwritesExisting }) {
         add(DangerAction.OverwriteExisting)
     }
     if (cleanEmptyDirs) add(DangerAction.CleanEmptyDirs)

@@ -215,50 +215,92 @@ class UndoAlignmentTest {
     }
 
     @Test
-    fun `an overwritten file is recorded as created and so undo would delete it`() {
-        // ⚠️ 这条断言记录的是**既有缺陷**，不是期望行为 —— 见台账「待裁决 R3」。
+    fun `an overwritten file is not something this run created and safe undo must not delete it`() {
+        // 这条用例原名 `an overwritten file is recorded as created and so undo would delete it`，
+        // 记录的是**既有缺陷 R3**：`Overwrite` 策略 + 输出已存在时，报告报 `Succeeded`，
+        // `createdPath` 取的却是**本该被覆盖的那个旧文件**的路径。撤销据此推导出
+        // `DeleteCreated(该路径)` —— 可那个文件**不是本次创建的**，是被**替换**的。
+        // 真要执行撤销，会把用户原有的 CBZ 删掉，而被覆盖掉的内容已经找不回来了。
         //
-        // `Overwrite` 策略 + 输出已存在时，报告报 `Succeeded`，`createdPath` 取的却是
-        // **本该被覆盖的那个旧文件**的路径。撤销据此推导出 `DeleteCreated(该路径)` ——
-        // 可那个文件**不是本次创建的**，是被**替换**的。真要执行撤销，会把用户
-        // 原有的 CBZ 删掉，而被覆盖掉的内容已经找不回来了。
-        //
-        // 为什么这属于"撤销记录骗人"：`canUndo` / 「已记录 N 项」把这一项算作
-        // "本次新增、可删除"。对 Skip 策略一切都对（跳过 = 什么都没产生，不进记录）；
-        // 唯独 Overwrite 这一个策略下，"created" 与"被替换"是两回事。
-        //
-        // 危险动作机制其实**已经**认识这个场景（`DangerAction.kt` 用
-        // `conflictPolicy == Overwrite && volume.outputExists` 判定 `OverwriteExisting`，
-        // 界面上会专门警告一次），但撤销推导走的是另一条路径，**从不查策略**。
-        //
-        // 为什么这里不改实现：先要产品裁决"覆盖的撤销"到底是什么 ——
-        // ①当作新建 ⇒ 删掉（现状，会把用户的旧文件也删了）
-        // ②覆盖前先备份 ⇒ 撤销时恢复备份（要给 `ExecEntry` 加"被覆盖路径"字段）
-        // ③覆盖项干脆不可撤销（要把 `OverwriteExisting` 传进 `undoOpsOf`）。
-        // 三种语义不同，按 §7.1 第 1 步「有歧义先请用户裁决」，本项目夜间无人值守，
-        // 故只记录、不动行为。
+        // 现在的语义（用户 m04079 第③项裁决）：撤销前先警告，由用户选
+        // 「只回滚本次新建的」还是「连被覆盖的一起删」。**默认（安全）档只回滚本次新建的**，
+        // 而"这个位置上原本有没有东西"由 `ExecEntry.originalPath` 承载 ——
+        // 它是**报告自己**的事实，不需要回头去查计划（两个撤销入口共用 `undoOpsOf`，
+        // 只有一个入口拿得到计划，靠计划就意味着两条路径会漂移）。
         val plans = buildPackagePlans(listOf(op102), conflictPolicy = OutputConflictPolicy.Overwrite)
         val report = executePackagePlans(plans)
         val e = report.entries.single()
         assertEquals(ExecOutcome.Succeeded, e.outcome, "前置:Overwrite 下照常执行")
+        assertEquals(plans.single().outputPath, e.createdPath)
         assertEquals(
             plans.single().outputPath,
-            e.createdPath,
-            "createdPath 指向的那个文件是**覆盖前就存在**的，不是本次创建的",
+            e.originalPath,
+            "覆盖项必须在报告里留下「这个位置原本有东西」的痕迹 —— " +
+                "否则撤销无从区分「本次新建」与「替换掉别人的」",
         )
-        val op = undoRecordOf(report)!!.ops.single()
-        assertTrue(op is UndoOp.DeleteCreated, "撤销被推成「删除」，实际 $op")
+        // 成功率没有变：这一项**确实成功执行了**，界面照常报成功、撤销按钮照常可用。
+        assertTrue(report.canUndo, "覆盖也是一次成功的执行,不能因此把撤销入口关掉")
+        // 但**安全档**没有任何可回滚的东西：本次没有新建任何文件。
+        assertNull(
+            undoRecordOf(report),
+            "安全档只回滚本次新建的东西;这里唯一的成功项是「替换」,不属于本次新建",
+        )
+        // 报告必须自己说得出"有几项是覆盖",界面据此决定要不要弹警告。
+        assertEquals(1, report.overwrittenCount, "报告要能报出被覆盖的项数")
+        assertTrue(report.needsUndoWarning, "有覆盖项 ⇒ 撤销前必须先警告(用户 m04079 第③项)")
+        // 显式选了「全部删除」才产生删除项,且**类型上**与"删除本次新建"分开 ——
+        // 这一删会连用户原有的内容一起抹掉,不能混成同一个 UndoOp。
+        val everything = assertNotNull(
+            undoRecordOf(report, UndoScope.Everything),
+            "危险档下覆盖项是可删的",
+        )
         assertEquals(
-            e.createdPath,
-            op.path,
-            "撤销会去删这个路径 —— 对 Overwrite 而言那是用户原有的文件（修复后此断言应改变）",
+            listOf(UndoOp.DeleteOverwritten(e.createdPath!!)),
+            everything.ops,
+            "危险档删的是「被覆盖掉的那个路径」,与删除本次新建分开成两个类型",
         )
-        // 反向守卫:同一卷换成 Skip 策略就什么都不产生、不进撤销记录 ——
+        assertEquals(1, everything.overwrittenOpCount, "记录要能报出其中几项是危险的")
+        // 反向守卫一:同一卷换成 Skip 策略就什么都不产生、不进撤销记录 ——
         // 说明问题只出在 Overwrite 这一个分支上,不是"凡是已存在的输出都记错"。
         val skipReport = executePackagePlans(
             buildPackagePlans(listOf(op102), conflictPolicy = OutputConflictPolicy.Skip),
         )
         assertNull(undoRecordOf(skipReport), "Skip 策略下没有创建任何东西，不该有撤销记录")
+        // 反向守卫二:**Rename** 策略 + 输出已存在 ⇒ 新文件**另起一名**(`… (1).cbz`),
+        // 谁也没被覆盖 ⇒ 不是覆盖项,是普通新增,安全档照常回滚,界面也不该弹警告。
+        // 这一条防的是"凡 `outputExists` 就算覆盖"这种偷懒判据。
+        val renamePlans = buildPackagePlans(listOf(op102), conflictPolicy = OutputConflictPolicy.Rename)
+        val renameReport = executePackagePlans(renamePlans)
+        val renamed = renameReport.entries.single()
+        assertNull(renamed.originalPath, "Rename 另起一名,没有覆盖任何东西")
+        assertEquals(
+            listOf(UndoOp.DeleteCreated(renamePlans.single().outputPath)),
+            undoRecordOf(renameReport)!!.ops,
+            "Rename 策略下这就是一次纯新建,安全档照常删它",
+        )
+    }
+
+    @Test
+    fun `renaming never counts as overwriting`() {
+        // `ExecKind.Rename` 的撤销语义是「把改名后的文件改回去」(移动),不是"删除"。
+        // 改名到已存在的名字属于**冲突/警告**(`ProposalWarningType.Duplicate`),
+        // 不是覆盖 —— 计划层根本不会执行它。故改名侧**恒无覆盖项**,
+        // 界面也就永远不该为改名执行报弹撤销警告。
+        val report = executeRenamePlan(listOf(renameOp("i1", "新名.jpg")))
+        assertEquals(ExecKind.Rename, report.kind)
+        assertEquals(1, report.succeededCount, "前置:应有一项成功")
+        // 原来的"把原名改回去"照旧;改名是**移动**,没有"被覆盖的旧文件"可删,
+        // 所以两个档位在这里必须给出同一份记录。
+        val op = undoRecordOf(report)!!.ops.single()
+        assertTrue(op is UndoOp.RestoreRenamed, "改名的撤销是改回原名,实际 $op")
+        assertEquals(renameOp("i1", "新名.jpg").proposal.image.fileName, op.to, "终点是原名")
+        // ⚠️ 改名的 `originalPath` 是**本文件原来的名字**(撤销靠它改回去,R1),
+        // 不是"被覆盖"的痕迹 —— 同一个字段在两种工作流下含义不同,故"是否覆盖"
+        // 必须按 kind 分叉判断,不能只看字段非空。
+        assertEquals(0, report.overwrittenCount, "改名不产生覆盖项")
+        assertTrue(!report.needsUndoWarning, "改名执行不该弹撤销警告")
+        // 两档在这条路径上必须给出**同一份**记录:改名没有"被覆盖的旧文件"可删。
+        assertEquals(undoRecordOf(report), undoRecordOf(report, UndoScope.Everything))
     }
 
     // ---- UndoRecord 自身的计数与可执行性 ----

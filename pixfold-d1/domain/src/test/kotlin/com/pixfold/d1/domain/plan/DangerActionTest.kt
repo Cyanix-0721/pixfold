@@ -222,15 +222,7 @@ class DangerActionTest {
         // 生产路径下 Overwrite 策略不会产生跳过项(跳过只来自 Skip 策略),
         // 这里直接构造计划,把该契约钉死为**防御性**保证。
         val live = buildPackagePlans(listOf(op102), conflictPolicy = OutputConflictPolicy.Overwrite).single()
-        val skipped = VolumePackPlan(
-            volume = op102.copy(id = "op-102-skipped"),
-            outputDisplay = live.outputDisplay,
-            pageCount = live.pageCount,
-            skipped = true,
-            skipReason = Msg(TextKey.PackSkipOutputExists, listOf(live.outputPath)),
-            conflictPolicy = OutputConflictPolicy.Overwrite,
-            sourcePolicy = SourcePolicy.Keep,
-        )
+        val skipped = skippedOverwritePlan(live)
         val plans = listOf(live, skipped)
         val lines = generalSummaryLines(plans, setOf(DangerAction.OverwriteExisting))
         assertEquals(
@@ -239,6 +231,50 @@ class DangerActionTest {
             "清单只能列出真会被覆盖的文件,实际 ${lines.keys()}",
         )
     }
+
+    /**
+     * **跳过的卷不算"会覆盖"** —— `overwritesExisting` 里的 `!skipped` 那一条。
+     *
+     * ## 为什么必须单独有一条
+     *
+     * `skipped` 为真意味着**这一卷根本不会执行**,当然也就覆盖不了任何东西。
+     * 生产路径下 Overwrite 策略不产生跳过项(跳过只来自 Skip),
+     * 所以上面那条用例里 `live` 本来就true、`skipped` 加不加都不改变结论 ——
+     * **`!skipped` 这一条合取项在真实数据上无从证伪**(W19 的 M3 变异正因此存活)。
+     *
+     * 那就直接构造:计划列表里**只有**一个"策略是 Overwrite、但被跳过"的卷。
+     * 此时若丢掉 `!skipped`,界面就会为一个根本不会发生的覆盖弹危险确认框 ——
+     * 用户被要求确认一件不会发生的事,这正是本仓库一贯要避免的噪音。
+     */
+    @Test
+    fun `a skipped volume is never counted as overwriting`() {
+        val live = buildPackagePlans(listOf(op102), conflictPolicy = OutputConflictPolicy.Overwrite).single()
+        val skipped = skippedOverwritePlan(live)
+        assertEquals(
+            OutputConflictPolicy.Overwrite,
+            skipped.conflictPolicy,
+            "前置:策略仍是 Overwrite(否则测不到 !skipped 那一条)",
+        )
+        assertTrue(skipped.volume.outputExists, "前置:输出确实已存在")
+        assertTrue(skipped.skipped, "前置:这一卷被跳过")
+
+        assertFalse(skipped.overwritesExisting, "跳过的卷什么都没做,不可能覆盖任何东西")
+        assertFalse(
+            DangerAction.OverwriteExisting in effectiveDangerActions(listOf(skipped)),
+            "不该为一个不会发生的覆盖要求用户做危险确认",
+        )
+    }
+
+    /** 直接造一个「策略 Overwrite + 输出已存在 + 被跳过」的计划(生产路径造不出来)。 */
+    private fun skippedOverwritePlan(live: VolumePackPlan) = VolumePackPlan(
+        volume = live.volume.copy(id = live.volume.id + "-skipped"),
+        outputDisplay = live.outputDisplay,
+        pageCount = live.pageCount,
+        skipped = true,
+        skipReason = Msg(TextKey.PackSkipOutputExists, listOf(live.outputPath)),
+        conflictPolicy = OutputConflictPolicy.Overwrite,
+        sourcePolicy = SourcePolicy.Keep,
+    )
 
     @Test
     fun `general summary warns about clean empty dirs only when enabled`() {

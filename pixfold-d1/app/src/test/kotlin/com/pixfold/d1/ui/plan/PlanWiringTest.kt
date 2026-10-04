@@ -238,6 +238,52 @@ class PlanWiringTest {
         rule.onNodeWithTag(TAG_PLAN_SUMMARY).assertExists()
     }
 
+    /**
+     * **端到端**:Overwrite 策略 → 两次确认 → 报告页 → 点撤销 → 弹出范围警告。
+     *
+     * 前面那些用例各自只守一段(策略选择触发危险确认、报告页会弹范围框),
+     * 这条把整条**真实生产路径**串起来:`WorkflowBSteps` 里选的 `conflictPolicy`
+     * 必须真的变成报告里的「覆盖痕迹」,否则界面永远不会警告 ——
+     * 而领域层的单测照样全绿(它们直接构造计划,不经过界面选策略那一步)。
+     *
+     * 这正是用户 m04079 第③项要的那条路:覆盖时先问清楚"只撤销本次生成的"还是
+     * "全部删除(含被覆盖的)"。
+     */
+    @Test
+    fun `workflow B overwrite run warns about undo scope end to end`() {
+        openWorkflowBPackStep()
+        rule.onNodeWithTag("policy-conflict-" + OutputConflictPolicy.Overwrite.name).performClick()
+        clickBPackConfirm()
+        rule.onNodeWithTag(TAG_CONFIRM_OK).performClick()
+        rule.onNodeWithTag(TAG_CONFIRM_DANGER).assertIsDisplayed()
+        rule.onNodeWithTag(TAG_CONFIRM_OK).performClick()
+
+        // 到了报告页:整库都成功了,撤销按钮可用
+        rule.onNodeWithTag(TAG_REPORT_PAGE).assertIsDisplayed()
+        rule.onNodeWithTag(TAG_UNDO_SCOPE_DIALOG).assertDoesNotExist()
+        rule.onNodeWithTag(TAG_REPORT_UNDO).performClick()
+
+        // 计划里有覆盖项 ⇒ 必须先问范围,而不是直接回滚
+        rule.onNodeWithTag(TAG_UNDO_SCOPE_DIALOG).assertIsDisplayed()
+        rule.onNodeWithTag(TAG_UNDO_SCOPE_THIS_RUN).assertIsDisplayed()
+        rule.onNodeWithTag(TAG_UNDO_SCOPE_EVERYTHING).assertIsDisplayed()
+        rule.onNodeWithTag(TAG_UNDO_SCOPE_CANCEL).assertIsDisplayed()
+    }
+
+    /** 反向守卫:默认 Rename 策略下没有任何覆盖 ⇒ 点撤销**直接执行**,不弹框。 */
+    @Test
+    fun `workflow B default run undoes without a scope warning`() {
+        openWorkflowBPackStep()
+        clickBPackConfirm()
+        rule.onNodeWithTag(TAG_CONFIRM_OK).performClick()
+
+        rule.onNodeWithTag(TAG_REPORT_PAGE).assertIsDisplayed()
+        rule.onNodeWithTag(TAG_REPORT_UNDO).performClick()
+
+        rule.onNodeWithTag(TAG_UNDO_SCOPE_DIALOG).assertDoesNotExist()
+        rule.onNodeWithTag(TAG_REPORT_UNDO_MESSAGE).assertIsDisplayed()
+    }
+
     @Test
     fun `workflow B clean empty toggle is off by default and adds a danger step when on`() {
         openWorkflowBPackStep()

@@ -175,7 +175,7 @@ class IssueFilterTest {
     @Test
     fun `report page filters to non-succeeded rows and keeps their original row tags`() {
         val report = threeClassReport()
-        rule.setContent { ExecutionReportPage(report = report, undoMessage = null, onUndo = {}, onDone = {}) }
+        rule.setContent { ExecutionReportPage(report = report, undoMessage = null, onUndoScope = {}, onDone = {}) }
 
         // 默认「全部」:三类都在(验收第 17 项)
         rule.onNodeWithTag(reportRowTag(0)).assertExists()
@@ -200,7 +200,7 @@ class IssueFilterTest {
         val allSucceeded = executePackagePlans(buildPackagePlans(listOf(library.volumes.first { it.id == "aot-2" })))
         assertTrue(allSucceeded.failedCount == 0 && allSucceeded.skippedCount == 0)
         rule.setContent {
-            ExecutionReportPage(report = allSucceeded, undoMessage = null, onUndo = {}, onDone = {})
+            ExecutionReportPage(report = allSucceeded, undoMessage = null, onUndoScope = {}, onDone = {})
         }
 
         rule.onNodeWithTag(TAG_REPORT_FILTER_ISSUES).performClick()

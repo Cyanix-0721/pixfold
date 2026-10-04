@@ -92,6 +92,27 @@ data class ExecutionReport(val entries: List<ExecEntry>, val kind: ExecKind) {
 
     /** 是否有可撤销的动作(没有成功项就没什么可撤销的)。 */
     val canUndo: Boolean get() = succeededCount > 0
+
+    /**
+     * 本次执行**替换掉了原本已有的文件**的项数。
+     *
+     * 为什么它是**独立于 [succeededCount]** 的一个数:一次成功的执行可能是
+     * ①**新建**(那个位置上原本什么都没有),也可能是 ②**覆盖**(那个位置上原本有用户的文件)。
+     * 两者都算"成功",但撤销的**代价完全不同** —— 新建的删掉只是撤销,
+     * 覆盖的删掉是**把用户原有的内容也一并抹掉**(被覆盖的内容已经找不回来了)。
+     * 撤销入口若不区分这两者,就会把②当成①来删(缺陷 R3)。
+     *
+     * 界面据此决定"点撤销时要不要先警告"(见 [needsUndoWarning])。
+     */
+    val overwrittenCount: Int get() = entries.count { it.isOverwrite(kind) }
+
+    /**
+     * 撤销前是否**必须**先让用户选范围(用户 m04079 第③项)。
+     *
+     * 判据就是"有没有覆盖项":没有覆盖项时两种范围的结果**完全一样**,
+     * 弹一个只有"确定/取消"的框只是多一次点击 —— 用户明确抱怨过这种无谓打扰。
+     */
+    val needsUndoWarning: Boolean get() = overwrittenCount > 0
 }
 
 /** 报告属于哪条工作流(文案与撤销语义不同)。 */
@@ -99,6 +120,43 @@ enum class ExecKind(val titleKey: TextKey) {
     Rename(TextKey.ExecKindRename),
     Package(TextKey.ExecKindPackage),
 }
+
+/**
+ * 撤销的**范围**(用户 m04079 第③项:「仅选择当前操作生成的撤销还是全部删除还是取消」)。
+ *
+ * 两个档位只在"本次覆盖掉了别人的东西"时才有区别,其余情况结果逐字相同。
+ */
+enum class UndoScope {
+    /**
+     * **只回滚本次新建的**东西(安全档,默认)。
+     *
+     * 覆盖项在本次没有**新建**任何文件 —— 它替换掉的那个位置本来就有东西,
+     * 所以这一档**不碰**它:不删,也就不会毁掉任何本次之前就存在的内容。
+     */
+    ThisRun,
+
+    /**
+     * **连被覆盖掉的那些位置一起删**(危险档)。
+     *
+     * ⚠️ 它删掉的不只是本次的产物:那个路径上原本是用户的文件,内容已被本次覆盖,
+     * **删了无法恢复**。故界面必须先用 [ExecutionReport.needsUndoWarning] 警告并让用户选。
+     */
+    Everything,
+}
+
+/**
+ * 本项是否「替换掉了原本已有的文件」——**唯一**判据,[ExecutionReport.overwrittenCount]
+ * 与 [undoOpsOf] 共用,不允许各写一份(两份判据一旦漂移,"警告了却仍然删错"就没人挡得住)。
+ *
+ * 为什么按 [ExecKind] 分叉:同一个 [ExecEntry.originalPath] 在两种工作流下含义不同 ——
+ *  - **打包**:输出已存在且策略是 `Overwrite` ⇒ 这一项**替换**了用户的旧 CBZ;
+ *  - **改名**:`originalPath` 是本文件**原来的名字**,改名是**移动**(旧位置变空,
+ *    没有谁的内容被抹掉)。改名撞名属于冲突/警告,计划层根本不会执行它。
+ *
+ * 所以"覆盖"只可能发生在打包侧;改名侧恒为 false。
+ */
+private fun ExecEntry.isOverwrite(kind: ExecKind): Boolean =
+    kind == ExecKind.Package && originalPath != null
 
 /**
  * 执行打包计划(模拟)。
@@ -136,6 +194,16 @@ sealed interface UndoOp {
     /** 删除本次新建的文件。 */
     data class DeleteCreated(val path: String) : UndoOp
 
+    /**
+     * 删除**被本次覆盖掉**的那个位置上的文件([UndoScope.Everything] 才产生)。
+     *
+     * ⚠️ 与 [DeleteCreated] 分开成两个类型,而不是复用同一个:这个删除是
+     * **毁掉本次之前就存在的内容**(已被覆盖,删了找不回来)。让它在类型上就与
+     * "撤销本次新建"不同,界面与正式版执行器才有机会对它区别对待 ——
+     * 混成一个类型的话,"哪些项是真的危险"就只剩注释在说。
+     */
+    data class DeleteOverwritten(val path: String) : UndoOp
+
     /** 把改名后的文件改回去。 */
     data class RestoreRenamed(val from: String, val to: String) : UndoOp
 }
@@ -148,11 +216,29 @@ sealed interface UndoOp {
  */
 data class UndoRecord(val ops: List<UndoOp>, val kind: ExecKind) {
     val opCount: Int get() = ops.size
+
+    /**
+     * 其中**会删掉本次之前就存在的文件**的项数。
+     *
+     * 全为 0 时这次撤销是纯粹的回退(怎么删都只删本次产物);
+     * 不为 0 时它同时抹掉用户原有的内容 —— 界面/日志据此给出更重的措辞。
+     */
+    val overwrittenOpCount: Int get() = ops.count { it is UndoOp.DeleteOverwritten }
 }
 
-/** 从报告推导撤销记录;没有成功项时返回 null(没有可撤销的东西)。 */
-fun undoRecordOf(report: ExecutionReport): UndoRecord? =
-    undoOpsOf(report, report.kind)?.let { UndoRecord(it, report.kind) }
+/**
+ * 从报告推导撤销记录;没有成功项时返回 null(没有可撤销的东西)。
+ *
+ * [scope] 默认取**安全档** [UndoScope.ThisRun]。默认值刻意选保守的那一侧:
+ * 若某处忘了显式声明范围,结果是"少删了"而不是"把用户的旧文件删了" ——
+ * 少删可以再点一次,删错不可逆(与 [undoOpsOf] 用回落而非 `requireNotNull` 同一取舍)。
+ * ⚠️ 用户明确选择"全部删除"的那条路径**必须显式传** [UndoScope.Everything],
+ * 否则界面上选了危险档却什么也没多删。
+ */
+fun undoRecordOf(
+    report: ExecutionReport,
+    scope: UndoScope = UndoScope.ThisRun,
+): UndoRecord? = undoOpsOf(report, report.kind, scope)?.let { UndoRecord(it, report.kind) }
 
 /**
  * 撤销动作的**唯一**推导实现(按 [kind] 选回滚语义)。
@@ -175,17 +261,34 @@ fun undoRecordOf(report: ExecutionReport): UndoRecord? =
  * Package 报告配 Rename 计划)。回落成空操作最坏是"没回滚",而抛异常会连累
  * 整个撤销入口;删错文件则不可逆 —— 两害相权,取保守的那个。
  *
+ * ## 打包的覆盖项:安全档**不产生**撤销项
+ *
+ * `Overwrite` 策略 + 输出已存在时,`createdPath` 指向的那个文件**覆盖前就存在**,
+ * 它是被**替换**的,不是本次创建的。安全档([UndoScope.ThisRun])因此把它**跳过**:
+ * 推成 `DeleteCreated` 就等于"撤销时把用户原有的 CBZ 删掉"(缺陷 R3)。
+ *
+ * 显式选了 [UndoScope.Everything] 才为它推 [UndoOp.DeleteOverwritten] ——
+ * **类型上与普通删除分开**,因为这一删会连用户原有的内容一起抹掉。
+ *
  * @return 逆向操作列表;没有可撤销的东西时返回 null
  */
-internal fun undoOpsOf(report: ExecutionReport, kind: ExecKind): List<UndoOp>? {
-    if (!report.canUndo) return null
-    return report.entries.mapNotNull { e ->
+internal fun undoOpsOf(
+    report: ExecutionReport,
+    kind: ExecKind,
+    scope: UndoScope = UndoScope.ThisRun,
+): List<UndoOp>? {
+    val ops = report.entries.mapNotNull { e ->
         val path = e.createdPath ?: return@mapNotNull null
-        when (kind) {
-            ExecKind.Package -> UndoOp.DeleteCreated(path)
-            ExecKind.Rename -> UndoOp.RestoreRenamed(from = path, to = e.originalPath ?: path)
+        val overwritten = e.isOverwrite(kind)
+        // 安全档跳过覆盖项:本次没新建任何东西,删它只会删掉用户原有的文件。
+        if (overwritten && scope == UndoScope.ThisRun) return@mapNotNull null
+        when {
+            overwritten -> UndoOp.DeleteOverwritten(path)
+            kind == ExecKind.Package -> UndoOp.DeleteCreated(path)
+            else -> UndoOp.RestoreRenamed(from = path, to = e.originalPath ?: path)
         }
     }
+    return ops.ifEmpty { null }
 }
 
 /** 撤销结果。D1 为 mock,故 [applied] 恒为 false,由 [message] 说明原因。 */

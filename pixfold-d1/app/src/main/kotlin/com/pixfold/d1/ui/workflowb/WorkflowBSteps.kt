@@ -37,6 +37,7 @@ import com.pixfold.d1.domain.plan.executePackagePlans
 import com.pixfold.d1.domain.plan.generalSummaryLines
 import com.pixfold.d1.domain.plan.performUndo
 import com.pixfold.d1.domain.plan.startConfirmFlow
+import com.pixfold.d1.domain.plan.UndoScope
 import com.pixfold.d1.domain.plan.undoRecordOf
 import com.pixfold.d1.domain.text.Msg
 import com.pixfold.d1.domain.workflowb.WorkflowBState
@@ -197,7 +198,11 @@ fun WorkflowBSteps(
                             ExecutionReportPage(
                                 report = currentReport,
                                 undoMessage = undoMessage,
-                                onUndo = { undoMessage = performUndo(undoRecordOf(currentReport)).message },
+                                onUndoScope = { scope ->
+                                    // 用户选的档位必须传到领域层:危险档多删的就是
+                                    // 「被本次覆盖掉的那些位置」(见 UndoScope)。
+                                    undoMessage = performUndo(undoRecordOf(currentReport, scope)).message
+                                },
                                 onDone = {
                                     // 同 WorkflowASteps:用 pop 让 [Metadata, Pack] 整体出栈
                                     report = null

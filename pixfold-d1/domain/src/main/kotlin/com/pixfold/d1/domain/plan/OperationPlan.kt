@@ -218,6 +218,15 @@ private fun executePackageOp(item: PackagePlannedOp): ExecEntry {
             label = item.label,
             outcome = ExecOutcome.Succeeded,
             createdPath = plan.outputPath,
+            // 覆盖项必须留下"这个位置原本有东西"的痕迹(缺陷 R3):`createdPath` 与
+            // `originalPath` 在这里**是同一个路径**,但含义相反 —— 前者说"产物在这",
+            // 后者说"这地方原来是别人的"。撤销据此把它与"纯新建"区分开,
+            // 否则安全档会把它当新建删掉,连带毁掉用户原有的 CBZ。
+            //
+            // 判据复用 `VolumePackPlan.overwritesExisting`(与 `DangerAction` 的
+            // `OverwriteExisting` 同一处判断),不另写一份 —— 两份判据漂移的后果是
+            // "界面警告了覆盖、撤销却仍按新建删"。
+            originalPath = if (plan.overwritesExisting) plan.outputPath else null,
         )
     }
 }

@@ -185,7 +185,7 @@ class PlanUiTest {
         assertEquals(1, report.skippedCount)
         assertEquals(1, report.failedCount)
 
-        rule.setContent { ExecutionReportPage(report = report, undoMessage = null, onUndo = {}, onDone = {}) }
+        rule.setContent { ExecutionReportPage(report = report, undoMessage = null, onUndoScope = {}, onDone = {}) }
 
         rule.onNodeWithTag(TAG_REPORT_SUMMARY).assertTextEquals(resolveText(context, report.summary))
         // 三类结果标签都在
@@ -205,7 +205,7 @@ class PlanUiTest {
         val op102 = library.volumes.first { it.id == "op-102" }
         val plans = buildPackagePlans(listOf(op102), conflictPolicy = OutputConflictPolicy.Skip)
         val report = executePackagePlans(plans)
-        rule.setContent { ExecutionReportPage(report = report, undoMessage = null, onUndo = {}, onDone = {}) }
+        rule.setContent { ExecutionReportPage(report = report, undoMessage = null, onUndoScope = {}, onDone = {}) }
         rule.onNodeWithTag(TAG_REPORT_UNDO).assertIsNotEnabled()
         rule.onNodeWithText(context.getString(R.string.report_nothing_to_undo)).assertIsDisplayed()
     }
@@ -213,7 +213,11 @@ class PlanUiTest {
     @Test
     fun `undo is honest that it is a mock and never claims success`() {
         val aot1 = library.volumes.first { it.id == "aot-1" }
+        // aot-1 的输出**原本不存在**(outputExists = false)⇒ 本次执行只新建、没覆盖,
+        // 于是撤销**不弹范围对话框**,直接走安全档。这条用例同时钉住了这个前提:
+        // 若哪天它开始弹框,下面的 performClick 之后的断言会立刻失败。
         val report = executePackagePlans(buildPackagePlans(listOf(aot1)))
+        assertTrue(!report.needsUndoWarning, "aot-1 不该被算成覆盖项")
         rule.setContent {
             // undoMessage 必须是 **Compose 状态**,否则点撤销后界面不会重组,
             // 「显示在哪里」就无从断言(这正是本项目"状态持有器"约定要防的错)。
@@ -221,10 +225,11 @@ class PlanUiTest {
             ExecutionReportPage(
                 report = report,
                 undoMessage = message,
-                onUndo = { message = performUndo(undoRecordOf(report)).message },
+                onUndoScope = { scope -> message = performUndo(undoRecordOf(report, scope)).message },
                 onDone = {},
             )
         }
+        rule.onNodeWithTag(TAG_UNDO_SCOPE_DIALOG).assertDoesNotExist()
         rule.onNodeWithTag(TAG_REPORT_UNDO).performClick()
         rule.onNodeWithTag(TAG_REPORT_UNDO_MESSAGE).assertIsDisplayed()
         // 不能出现"已撤销"的假结论 —— 撤销在 D1 是 mock,只报"已记录 N 项逆向操作"
@@ -239,7 +244,7 @@ class PlanUiTest {
         var done = false
         val aot1 = library.volumes.first { it.id == "aot-1" }
         val report = executePackagePlans(buildPackagePlans(listOf(aot1)))
-        rule.setContent { ExecutionReportPage(report = report, undoMessage = null, onUndo = {}, onDone = { done = true }) }
+        rule.setContent { ExecutionReportPage(report = report, undoMessage = null, onUndoScope = {}, onDone = { done = true }) }
         rule.onNodeWithText(context.getString(R.string.report_done)).performClick()
         assertTrue(done)
     }

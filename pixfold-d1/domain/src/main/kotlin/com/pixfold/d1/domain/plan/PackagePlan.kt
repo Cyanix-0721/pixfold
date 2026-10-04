@@ -45,6 +45,23 @@ data class VolumePackPlan(
 ) {
     /** 输出全路径(展示与"跳过原因"文案共用)。 */
     val outputPath: String get() = "${volume.outputDir}/$outputDisplay"
+
+    /**
+     * 本次执行会不会**覆盖掉一个已经存在的文件**。
+     *
+     * **唯一判据**,由三处共用:计划层的危险动作([effectiveDangerActions] 的
+     * `OverwriteExisting`)、报告层的覆盖计数([ExecutionReport.overwrittenCount])、
+     * 以及撤销的安全档([undoOpsOf])。
+     *
+     * 为什么要收成一处:三者问的是**同一个问题**("这次是不是要盖掉别人的东西"),
+     * 各写一份 `conflictPolicy == Overwrite && volume.outputExists` 的话,
+     * 一旦有一处漏改,后果是"界面警告了覆盖、撤销却仍按新建删掉"—— 那正是缺陷 R3
+     * 最贵的部分(被覆盖的内容已经找不回来)。[skipped] 的卷根本没执行,不算。
+     */
+    val overwritesExisting: Boolean
+        get() = !skipped &&
+            conflictPolicy == OutputConflictPolicy.Overwrite &&
+            volume.outputExists
 }
 
 /**

@@ -36,4 +36,17 @@
     <string name="report_outcome_cd">Result: %1$s</string>
     <string name="report_reason">Reason: %1$s</string>
 
+    <!-- ============ Undo scope warning (UndoScopeDialog) ============ -->
+    <!-- 用户 2026-10-04(m04079 第③项):「添加警告，仅选择当前操作生成的撤销还是
+         全部删除还是取消，记得按钮颜色要区分开，把取消放到最后边」。
+         只有「本次覆盖了原本已存在的文件」时才弹这个框 —— 没有覆盖项时两种范围
+         结果完全一样,弹框只是多一次无谓点击。 -->
+    <string name="report_undo_warning_title">⚠️ Some files were already there and this run overwrote them</string>
+    <plurals name="report_undo_warning_body">
+        <item quantity="one">%1$d file was replaced. What it held before is already gone, so deleting it cannot be undone.</item>
+        <item quantity="other">%1$d files were replaced. What they held before is already gone, so deleting them cannot be undone.</item>
+    </plurals>
+    <string name="report_undo_this_run">Undo only what this run created</string>
+    <string name="report_undo_everything">Delete everything, overwritten included</string>
+
 </resources>

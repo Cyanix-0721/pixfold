@@ -41,6 +41,7 @@ import com.pixfold.d1.domain.plan.executeRenamePlan
 import com.pixfold.d1.domain.plan.performUndo
 import com.pixfold.d1.domain.plan.renameSummaryLines
 import com.pixfold.d1.domain.plan.startConfirmFlow
+import com.pixfold.d1.domain.plan.UndoScope
 import com.pixfold.d1.domain.plan.undoRecordOf
 import com.pixfold.d1.domain.plan.workflowADangerActions
 import com.pixfold.d1.domain.text.Msg
@@ -314,7 +315,11 @@ fun WorkflowASteps(
                             ExecutionReportPage(
                                 report = currentReport,
                                 undoMessage = undoMessage,
-                                onUndo = { undoMessage = performUndo(undoRecordOf(currentReport)).message },
+                                onUndoScope = { scope ->
+                                    // 用户选的档位必须传到领域层:危险档多删的就是
+                                    // 「被本次覆盖掉的那些位置」(见 UndoScope)。
+                                    undoMessage = performUndo(undoRecordOf(currentReport, scope)).message
+                                },
                                 onDone = {
                                     // 执行完回到步骤 1:报告是一次执行的终点,不该留在计划页
                                     // 让用户误以为还能再执行一次。
