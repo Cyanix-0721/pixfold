@@ -202,6 +202,7 @@ cmd.exe /c "D:\Programing\Personal\pixfold\pixfold-d1\run-gradle.bat :app:lintDe
 | W18 | **R2 补齐（用户裁决「改吧」后授权新增 `TextKey`）**：改名侧逐项句子契约 —— 新增 `TextKey.RenamePlanRename` + 双语 `domain_rename_plan_rename` + `PixFoldText.resId()` 映射；`RenamePlannedOp.describe()` 未跳过项改给「原名 → 新名」，跳过项无原因时回落 `OpStatusSkip`（原为 `OpStatusRename`，等于说"会重命名"却跳过） | 红→绿；**首次改 `app/**`**（资源 + 映射）；变异含**资源内容**变异（占位符数量/方向/重复）且必须全捕获 | ✅ 完成（轮 14：**10 组变异全捕获 / 0 存活 / 0 锚点缺失 / 0 编译失败**；两遍结论一致；domain **429**、app **402**；生产代码 +5 文件 含 2 个双语资源） |
 | W19 | **R3 修复（用户 `m04079` 第③项授权）**：覆盖的撤销给出**三选一警告** —— 领域层新增 `UndoScope{ThisRun,Everything}` + `UndoOp.DeleteOverwritten`（与 `DeleteCreated` 类型可分）+ `ExecutionReport.overwrittenCount/needsUndoWarning` + `VolumePackPlan.overwritesExisting`（计划层唯一判据，报告计数与撤销推导共用）；UI 底栏撤销按钮在**有覆盖项时先弹框**（三个按钮各带色：两个执行档实心红、取消无底色 `TextButton`、**取消排在最后**），`onUndo` ⇒ `onUndoScope: (UndoScope) -> Unit`（**无默认值**，逼每个调用点表态） | 红→绿；**安全档绝不删用户原有文件**；变异含**资源内容**变异（占位符/重复文案/中文侧）且必须全捕获 | ✅ 完成（轮 15：**31 组变异两遍一致全捕获 / 0 存活 / 0 锚点缺失 / 0 编译失败**；第一遍曾 3 存活 + 2 编译失败，全部归因为**我的测试/变异设计错**并补强后转捕获 —— 其中 3 处是真测试缺口；domain **431**、app **420**；生产 5 文件 含 2 个双语资源） |
 | W20 | **R4 修复（用户 `m04079` 第④项「想一想怎么修」）**：让页码自检真的能报出不一致 —— `validatePageConsistency` 此前拿 `renumberPages(volume).size` 跟 `volume.pageOrder.order.size` 比长度，而 `renumberPages` 的返回长度**就是** `order.size`（等于列表与自身比，恒等）⇒ `pageIssues` 恒空、`consistent` 恒真 ⇒ `PackPreviewPage.kt:204` 的告警分支**不可达**。改为比「卷内登记的页 `volume.pages`」与「页序里排的页 `pageOrder.order`」：长度不同报 `PageIssueCountMismatch`，长度相同但成员不同报**新增键** `PageIssueMissingFromOrder`（+ 双语资源 + `resId()` 映射）—— 判据是**集合/成员**而非位置，故人工拖拽（只改 `order` 不改 `images`）不会误报。补零交叉校验**保留**：它在 `renumberPages` 与校验侧各写一次，是同一规则的两份**独立拷贝**，只改坏一处即被捕获（非自证） | 红→绿；两类检查各自的两个来源必须**不同源**；置换不变性必须有断言；变异含**资源内容**变异（占位符数量/方向/中英抄错）且必须全捕获 | ✅ 完成（轮 16：**21 组变异两遍一致全捕获 / 0 存活 / 0 锚点缺失 / 0 编译失败**；第一遍 7 存活 + 0 编译失败，全部归因为**我的测试设计错**并补强后转捕获 —— 其中 5 处是真测试缺口（同源期望值盲区）、2 处是我自己的等价变异设计错；**同时发现并修正一条既有测试**：`page preview follows the page order, not the raw page list` 原先断言「分叉卷也一致」，那是骑在坏检查上的；现在改为断言必须报出分叉。domain **434**、app **425**；生产 3 文件 含 2 个双语资源） |
+| W21 | **i18n 自动化（用户 `m04079` 第⑤项）**：补「键 → 译文」的结构契约测试，并复查既有 i18n 是否要调整 —— 新增 `app/src/test/…/ui/text/TranslationCoverageTest.kt`（5 条契约，**不经 `resId()`**，改按命名约定 `TextKey.FooBar → domain_foo_bar` 独立反查资源，同进程内中英对拍：①逐键覆盖 ②占位符下标+类型+顺序逐位对等 ③渲染逐字相等 ④复数档由数量参数选中 + **各档占位符同形** ⑤跨语言可辨 + 键间不撞句，两个白名单逐字写死）；另有只读审计脚本（`artifacts/i18n_audit.py` + `i18n_table.tsv` + `i18n_render.tsv`，107 键 × 两语言） | 红→绿；**必须证明新测试有杀伤力** —— 专门复活 W20 曾存活的 4 类变异（占位符删/对调/中英抄错），且必须全捕获 | ✅ 完成（轮 17：**16 组变异两遍** —— 第一遍 **15 捕获 / 1 存活**（M14 复数 `one` 档占位符被删：期望值与实际值**同源**，是 W20 记录的同源期望值盲区**第三次命中**），补一条「复数各档占位符同形」契约后第二遍 **16 捕获 / 0 存活 / 0 锚点缺失 / 0 编译失败**，3 个文件还原**逐字节一致**；app **425 → 430**（+5，新建 1 个测试文件）；**生产代码零改动**） |
 
 **余量处理**：W1–W10 全部完成且仍有轮次 ⇒ **继续加固核心**（更多边界 / 更多变异 / 更多不变式），
 **不越界**到未授权工作面（适配层检查、D2b、真机、UI）。
@@ -1736,6 +1737,111 @@ CHANGED M31: ★存活★ -> 捕获      其余 26 组两遍均为"捕获"
 
 ---
 
+#### 轮 17（2026-10-05 01:2x）— W21 **i18n 自动化**：键 → 译文的结构契约 + 既有 i18n 复查
+
+- **用户授权原文**（`m04079` 第⑤项）：「这属于 i18n 内容，顺带实现了，然后看下前面相关 i18n 的要不要调整」。
+  （授权本就包含两件事：**实现**键→译文自动化 + **复查**既有 i18n 是否需要调整。）
+- **为什么必须另起一组测试（既有两组都看不见）** —— 这不是"再加几条断言"，是补一个**盲区**：
+  1. `PixFoldTextTest` 的期望值一律经 `TestText.of(同一个资源)` 从**被测的那份资源**里取 ⇒
+     资源文案改坏时实际值与期望值**一起变**，断言恒真。这正是 W20 里 M15–M18（中英占位符
+     被删/对调）、M21（中文文案抄成英文）**全部存活**的根因，也是轮 14 记录的同一个根因。
+  2. `resId()` 是**穷尽 `when` + `private`**，只保证「每个键都有个资源」，**不保证指向正确的那一个**。
+     把两条相邻映射互换（如 `PageIssueMissingFromOrder` 指到 `PageIssueCountMismatch`），
+     编译、lint、既有单测**全都照旧通过** —— 因为没有任何一处**独立地**知道「这个键该是哪条资源」。
+  3. 故本组测试**完全不碰 `resId()`/`pluralQuantityIndex()`**，改从**命名约定**这一侧独立反查：
+     `TextKey.FooBar` → `domain_foo_bar`（107/107 成立，0 例外；枚举名**不含数字** ⇒ snake 往返无歧义）。
+     一侧按名字取模板、另一侧按键走映射渲出来，再逐字对拍 —— 两侧各自成立，才第一次让
+     「映射指错 / 复数档取错 / 翻译漏了」可观测。
+- **新增文件**：`pixfold-d1/app/src/test/kotlin/com/pixfold/d1/ui/text/TranslationCoverageTest.kt`
+  （**313 行 / 5 条契约**，`@RunWith(RobolectricTestRunner::class) @Config(sdk = [34])`）：
+
+  | # | 用例 | 断言什么 |
+  |---|---|---|
+  | 1 | `every_key_resolves_to_the_resource_named_after_it_in_both_languages` | 每个键在**中英两侧**都存在按约定命名的 `string`/`plurals`；两侧 kind 相同；占位符 `List<Slot(下标,类型)>` **逐位相同**且下标从 1 起按出现顺序连续；再 `resolveText` 渲染并与**按名字取到的模板**逐字相等 |
+  | 2 | `every_plural_key_selects_its_variant_with_the_quantity_argument` | 11 个复数键必须**由数量参数选中档位**（先断言 `one != other` 否则无判别力，再把**所有**数量参数一起取同一值，验证不取决于数量下标排第几个）；并用 `assertEquals(PLURAL_KEYS, covered)` 钉死复数键集合 |
+  | 3 | `every_plural_variant_keeps_the_same_placeholder_shape` | **各档占位符同形**（英 `one` / 英 `other` / 中 `other` 三处签名一致）—— 由本轮 M14 存活逼出来，见下 |
+  | 4 | `only_the_documented_keys_read_the_same_in_both_languages` | 中英渲染相同的键**必须**恰为白名单 `SAME_IN_BOTH_LANGUAGES`（5 个 `MetaField*` + `WarnIllegalCharSeparator`） |
+  | 5 | `only_the_documented_keys_share_the_same_english_wording` | 英文撞句的键组**必须**恰为白名单 `SHARED_ENGLISH_WORDING`（`CasePolicy*`/`ExtPolicy*` 三对） |
+
+- **实现要点（都是踩出来的）**：
+  - **同进程切语言**：`english.createConfigurationContext(Configuration(base.resources.configuration).apply { setLocale(Locale.SIMPLIFIED_CHINESE) })`
+    ⇒ 中英可在**同一条断言内**对拍，不必为中文单开 `@Config(qualifiers=…)` 配置类。
+  - **渲染逐字相等比"首尾前缀/后缀"强**：差异若落在句子中间（`ExecSummary` 的 `item:`/`items:`），
+    只看首尾是看不见的。`format` 写死 `Locale.ROOT` 免得受运行环境默认 locale 影响。
+  - ⚠️ **`data class` 不能省**：`Slot`/`Template` 起初写成普通 `class`，`assertEquals` 退化成
+    **引用比较**，任何两串都判不等（`artifacts/i18n_contract_run2.log`：
+    `Expected <[…Slot@1cfb99c5…]>, actual <[…Slot@1a7ab85e…]>`）。改 `data class` 即绿。
+  - ⚠️ **Kotlin 模板变量后紧跟 CJK 会被吞进标识符**（CJK 是合法标识符字符）：
+    `"$key:在$language资源里…"` 里 `$language资源里找不到为` 被当成**一个变量名** ⇒
+    `Unresolved reference 'language资源里找不到为'`（`artifacts/i18n_contract_run1.log`，首次编译失败）。
+    修法：写成 `${language}`。
+  - 两个白名单**逐字写死**是刻意的：它们是「这里允许相同」的**人工裁决记录**，
+    不是从资源里算出来的；新增一项都必须写明理由，否则就是漏翻或抄串了。
+- **红→绿**：新测试是**纯新增文件**，先编译失败（上面的 CJK 坑，是真 RED 的一种形态），
+  再 `Slot` 非 `data class` 失败，修好后 **5 用例 GREEN / 0 failures / 0 errors**
+  （`TEST-com.pixfold.d1.ui.text.TranslationCoverageTest.xml tests=5`，`artifacts/i18n_contract_run3.log`）。
+- **W21 变异扫荡（16 组，两遍，`artifacts/mutate_w21.py` / `w21_run_pass*.log`）** ——
+  **目的不是"再扫一遍"，而是证明新测试有杀伤力**：专门复活 W20 曾存活的变异型。
+  第一遍 **15 捕获 / 1 存活 / 0 锚点缺失 / 0 编译失败**；第二遍 **16 捕获 / 0 存活**；
+  3 个文件还原**逐字节一致**（`PixFoldText.kt e4aa68ce3ea7` / `values/domain_strings.xml 63d03d98feb8` /
+  `values-zh/domain_strings.xml 921b3a4e4a74`）。覆盖五面：
+
+  | 面 | 组 | 结果 |
+  |---|---|---|
+  | `resId()` **映射指错**（此前从未有测试能看见） | M1–M3 | 全捕获（M1/M3 由新测试，M2 由既有 `PixFoldTextTest`） |
+  | 占位符删/对调/类型改（**W20 M15–M18 同型，当时全存活**） | M4–M8 | **全捕获** —— 新测试的直接价值 |
+  | 中英槽位互串 / 中文抄英文（**W20 M21 同型，当时存活**） | M9–M10 | 全捕获 |
+  | 复数：两档同文 / 数量下标改错 / 漏配复数键 | M11–M13 | 全捕获 |
+  | 复数各档占位符 / 键间撞句 | M14–M16 | M14 第一遍存活 → 补契约后捕获；M15/M16 捕获 |
+
+  - **M14 的归因（第三遍命中同一个根因，如实记下）**：变异「英文 `warn_too_long` 的 `one` 档删掉
+    第 2 个占位符」第一遍**存活**。原因是**期望值与实际值同源**：对数量为 1 的情形，
+    契约 ④ 的期望值取自 `one` 档模板、实际值也由 `one` 档渲染，两边同时变 ⇒ 断言恒真。
+    这与 W20 的 M15–M18、轮 14 记录的盲区是**同一个根因的第三次命中**。
+    **修法**：加契约 ③ `every_plural_variant_keeps_the_same_placeholder_shape`，
+    拿**另一档**当独立的一侧 —— `other` 档的占位符签名与 `one` 档无关。
+    定点复核确认 M14 现在**恰好**由这条新用例捕获，随后才跑第二遍全量。
+  - ⚠️ **本契约只管形状，不管词形**：`1 item` vs `1 items` 哪个才对需要词典，机械判定不了；
+    词形正确性靠契约 ② 的 `one != other` + 人工评审。**边界如实记在此处，不夸大覆盖率。**
+- **既有 i18n 复查（授权原文的后半句「看下前面相关 i18n 的要不要调整」）**：
+  结论 = **既有 i18n 无需调整**，依据是两条正交的普查 + 一次人工裁决核对：
+  - **资源面**（只读审计脚本 `artifacts/i18n_audit.py`，六类可疑 `UNMAPPED` / `SNAKE-MISMATCH` /
+    `MISSING-EN` / `MISSING-ZH` / `DUP-RES` / `SAME-TEXT`）⇒ **全部为 0**。
+    数据面：`TextKey` **107** 条 ↔ `resId()` 映射 **107** 条 ↔ 按约定命名的资源 **107/107** 命中；
+    中英占位符「下标+类型」集合 **107/107 相同**、相对顺序 **107/107 相同**；
+    非位置占位符 **0**；全仓无 `values-en/`（英文就在默认槽位）。
+  - **生产层**（CJK 字面量普查 + Compose 语义槽裸字面量普查，13 处）⇒ **无用户可见文案漏翻**：
+    命中全是 ①KDoc 注释、②`mock/` 的**模拟数据**（`"旅行照片"` 等 —— 是数据不是文案）、
+    ③开发者可见的 `require` 消息（`Sort.kt`、`CbzWritePlan.kt`、`CbzWriter.kt`）、
+    ④`MetaEdit.kt:46` 的磁盘文件名模板、⑤**符号前缀**（`· `/`→ `/`← `/`⛔ `）与数据插值。
+  - **一次人工裁决核对**：`ui/plan/PlanComponents.kt:229` 的危险弹框正文写死 `"⛔ $body"`，
+    而同文件 `:150` 的同类前缀走资源键（`plan_skip_reason_prefix`）。仓库**三处注释**已裁决
+    「符号前缀不属于文案」（`ui/workflowa/ProposalTable.kt:173`、
+    `values-zh/strings_plan.xml:23`、`values-zh/strings_workflowa.xml:143`）⇒
+    **不构成漏翻**，只是同一约定有两种写法（一处成键、一处写死）。**如实记为观察项，不改**。
+  - 另一处同类观察：`ui/HomeScreen.kt:67` 与 `ui/settings/LicensesScreen.kt:198` 直接写死
+    `"PixFold"` 而未引用 `R.string.app_name`（`values/strings.xml:3`，`translatable="false"`，
+    代码里**零引用**；`AndroidManifest.xml:28` 用了）。值与资源**逐字相同**，不是漏翻。
+- **四道闸门**（`artifacts/gates_i18n.log`，`--rerun-tasks` 全量，`RC=0`、`BUILD SUCCESSFUL in 42s`、
+  `62 actionable tasks: 62 executed`；跑前 `rm -rf` 了两个 `test-results` 目录以保证不是陈旧 XML）：
+  - domain **32 files / 434 tests / 0F 0E 0S**（源码 `@Test` = 434，与 XML 一致）；
+  - app **45 files / 430 tests / 0F 0E 0S**（源码 `@Test` = 431，差 1 恒为 `NegativeControlTest`）；
+  - lint **0 errors, 0 warnings, 4 hints**（4 条 hint 全是既有的 `AutoboxingStateCreation`，
+    位点 `DragReorderGrid.kt:175-176` 与 `DragReorderList.kt:94-95`，与本轮无关）；
+  - APK `app/build/outputs/apk/debug/app-debug.apk` **33,420,916 bytes**、mtime `2026-10-05 01:21`，
+    `find app/src/main domain/src/main -newer <apk>` 为空 ⇒ 比所有源文件新。
+- **边界核对**：`domain/build.gradle.kts`、`app/build.gradle.kts`、`build.gradle.kts`、
+  `settings.gradle.kts`、`gradle/libs.versions.toml`、`.mise.toml`、`AGENTS.md`、`README.md`、
+  `HANGOFF.md` 逐条 `git diff --quiet HEAD -- <f>` ⇒ **全部 unchanged**。
+  `git diff --stat HEAD -- domain/src/main app/src/main` ⇒ **空**（生产代码零改动）。
+  本轮改动面 = **1 个新测试文件**（`TranslationCoverageTest.kt`，313 行），未新增依赖、
+  未改构建脚本、未改 `HANGOFF.md`、未连真机、未 push。
+- ⚠️ **临时探针已删除**：`app/src/test/kotlin/com/pixfold/d1/_ProbeLocale.kt`（locale 机制验证 +
+  107 键 × 两语言渲染全量对拍用的探针）已 `rm -f`，确认不存在。它**从未入库**。
+- **i18n 一项关闭**。§4 表格新增 i18n 行并标记 ✅（见下）。
+
+---
+
 ## 4. 待裁决 / 阻塞（越界项写这里，不自行决定）
 
 > 出现下列任一情况，**停止该项**并在此登记，然后继续**下一项**工作：
@@ -1748,6 +1854,7 @@ CHANGED M31: ★存活★ -> 捕获      其余 26 组两遍均为"捕获"
 | R2 | 3（W7） | `RenamePlannedOp.describe()` 在无原因时只能给 `Msg(TextKey.OpStatusRename)` 一句状态词 | 改名侧**没有**逐项句子契约（`RenamePlanPage` 渲染的是"原名 → 新名"两列 + 状态标签）；要补齐就得**新增 TextKey**，而本轮明令禁止 | ✅ **已修复**（轮 14 / W18：用户 `m04081`「改吧」授权新增 `TextKey.RenamePlanRename` —— 未跳过项给出「原名 → 新名」逐项句子，双语资源 + `PixFoldText` 映射同步补齐；顺带修掉跳过项无原因时回落到 `OpStatusRename` 的错误方向；10 组变异全捕获，含 4 组资源内容变异；详见 §3.1 轮 14） |
 | R3 | 7（W11） | `OutputConflictPolicy.Overwrite` + 输出已存在时，报告报 `Succeeded`、`createdPath` = **被替换的那个旧文件**路径，撤销据此推导 `DeleteCreated(该路径)` ⇒ 真执行会**删掉用户原有的 CBZ**，且被覆盖的内容无法恢复 | 「覆盖的撤销」是什么，属产品决策，三种语义完全不同：①当作新建 ⇒ 删掉（现状，会把用户旧文件也删了）②覆盖前先备份 ⇒ 撤销时恢复备份（要给 `ExecEntry` 加"被覆盖路径"字段）③覆盖项标为不可撤销（要把 `OverwriteExisting` 传进 `undoOpsOf`）。**危险动作机制已认识此场景**（`DangerAction.kt` 判 `OverwriteExisting`），只有撤销推导从不查策略。按 §7.1「有歧义先请用户裁决」，故只记录 | ✅ **已修复**（轮 15 / W19：用户 `m04079` 第③项裁决「添加警告，仅选择当前操作生成的撤销还是全部删除还是取消，记得按钮颜色要区分开，把取消放到最后边」—— 取的是**①的安全版**：默认档 `UndoScope.ThisRun` **永不删被覆盖的文件**，只有用户在弹框里显式选了 `Everything` 才会推导出 `DeleteOverwritten`；`VolumePackPlan.overwritesExisting` 收成全仓唯一判据，报告计数/危险动作/撤销推导共用同源；31 组变异两遍全捕获；详见 §3.1 轮 15） |
 | R4 | 9（W13） | `validatePageConsistency(volume)` 的输入就是 `renumberPages(volume)` 的**输出**（`ComicInfoXml.kt:111` 调 `:93-97 previewOf`），两者同源 ⇒ ①`pages.size != order.size` 恒假、②校验侧补零位数与重编号侧恒等、③`startsWith("$expected.")` 恒真 ⇒ **`pageIssues` 恒空、`consistent` 恒真**，UI 的告警分支（`app/…/workflowb/PackPreviewPage.kt:204 if (!preview.consistent)`）**不可达** | 要让这两个分支可达，必须改 `validatePageConsistency` 的**输入语义**（例如改成校验"磁盘上真实存在的页"而非"按页序重编号的页"，或校验 `volume.pages` 与 `pageOrder.order` 是否一致）。这改变了"一致性"这个词在 D3 里的含义，且会牵动 UI 告警的触发条件 ⇒ **属产品决策**。本轮只做等价性证明与记录，**不改输入来源** | ✅ **已修复**（轮 16 / W20：用户 `m04079` 第④项「想一想怎么修」授权 —— 取的是登记里的**第②种修法**：校验 `volume.pages` 与 `pageOrder.order` 是否一致。第①种（改看「磁盘上真实存在的页」）要碰文件系统，与原型「不碰真实文件系统」的既定约束冲突（`performUndo` 恒 `applied=false` 即该约束的体现），故未取。修后：数量检查改比「卷内登记的页」与「页序里排的页」，长度不同报 `PageIssueCountMismatch`，长度相同但成员不同报**新增键** `PageIssueMissingFromOrder`（+ 双语资源 + `resId()` 映射）；判据是**集合/成员**而非位置 ⇒ 人工拖拽只改 `order` 不改 `images`，不会误报（有专门用例钉死置换不变性）。补零交叉校验**保留**——本轮同时**纠正**了本行原措辞里的一处不准确：③`startsWith("$expected.")`**并不恒真**，`expected` 的补零宽度用 `pages.size`、`renumberPages` 用 `order.size`，是同一规则的**两份独立拷贝**，只改坏一处即被捕获（W13 的变异「页码补零不随页数自适应」正是被它抓住的）；**真正恒假的只有数量检查**。21 组变异两遍全捕获；同时修正一条骑在坏检查上的既有断言（详见 §3.1 轮 16）。⚠️ 诚实范围声明：生产路径下 `ComicVolume` 构造点唯一且类型级默认值就是 `pageOrderOf(pages)`，故这两者**目前永不分叉**，新检查是**防御性**的（防未来新增的 `copy(pages=…)` 路径），它解决的是「修复前告警分支不可达」这一点。 |
+| i18n | 15（W19） | 见 `m04079` 第⑤项：「键 → 译文」这条链**没有任何独立的一侧** —— `PixFoldTextTest` 的期望值经 `TestText.of(同一个资源)` 取得（**同源**，资源改坏时两边一起变）；`resId()` 是 `private` 穷尽 `when`，只保证「有资源」不保证「指对」。两处叠加的直接后果：W20 的 M15–M18（中英占位符删/对调）、M21（中文抄成英文）**全部存活** | 要补自动化就得**另立一侧**（按命名约定反查资源 + 同进程切语言对拍），而这需要新增测试文件、并决定「哪些键允许中英相同 / 允许撞句」——后者是**人工裁决**（写成白名单即等于给译文立规），不是能从代码里算出来的 | ✅ **已完成**（轮 17 / W21：用户 `m04079` 第⑤项「这属于 i18n 内容，顺带实现了」授权 —— 新增 `app/…/ui/text/TranslationCoverageTest.kt`（5 条契约，不经 `resId()`，按 `TextKey.FooBar → domain_foo_bar` 独立反查，同进程内中英对拍）；16 组变异**两遍**（第一遍 15 捕获 / 1 存活 M14 = 同源期望值盲区**第三次命中**，补「复数各档占位符同形」契约后第二遍 16 捕获 / 0 存活），3 文件还原逐字节一致；app +5 ⇒ **430**；**生产代码零改动**。既有 i18n 复查结论 = **无需调整**（资源面六类可疑项全 0；生产层无漏翻文案；唯一不一致是符号前缀「一处成键、一处写死」，仓库三处注释已裁决符号前缀不属于文案，如实记为观察项）；详见 §3.1 轮 17） |
 
 **已知的、明确不碰的开放项**（不要在本轮"顺手"处理）：
 - HANGOFF §11 第 12 条：Android 端存储不足的**阈值与提示形态**，明写「待 D2b 真机验证后定」。
@@ -1954,6 +2061,13 @@ cmd.exe /c "D:\Programing\Personal\pixfold\pixfold-d1\run-gradle.bat clean \
 > 当格式串**当场格式化**并抛 `MissingFormatArgumentException`；要拿"模板本身"必须用
 > `context.resources.getText(id).toString()`（只解码不格式化）。这是本轮踩到并修掉的坑。
 > ⚠️ 与轮 15 不同：本轮**未改 UI 布局**，只改领域判据 + 新增一条文案 + 映射与资源。
+> 轮 17（W21 / i18n 自动化）**+1 file / +313 / −0** —— 改动面**只有一个新建测试文件**
+> （`app/src/test/kotlin/com/pixfold/d1/ui/text/TranslationCoverageTest.kt`，313 行 5 用例）。
+> `git diff --stat HEAD -- domain/src/main app/src/main` ⇒ **空** ⇒ **生产代码零改动**，
+> 这是本分支自轮 13 以来**改动面最小的一轮**；既未新增依赖、未改构建脚本，
+> 也未改 `HANGOFF.md`（本轮的授权面是「补自动化 + 复查既有 i18n」，不涉及阶段快照）。
+> 只读审计产物（`artifacts/i18n_audit.py` / `i18n_table.tsv` / `i18n_render.tsv`）与
+> 变异脚本 `artifacts/mutate_w21.py` 均在 `pixfold-d1/.gitignore:9` 忽略的 `artifacts/` 下，**未入库**。
 
 ### 6.4 提交拓扑（`git log --oneline dev..d3/p1`）
 
@@ -1962,6 +2076,8 @@ cmd.exe /c "D:\Programing\Personal\pixfold\pixfold-d1\run-gradle.bat clean \
 > 截至 W9/W10 落地的链条如下（最新在上）；**轮 7（W11）至轮 11（W15）的提交与回填见各自小节**：
 
 | 提交 | 类型 | 内容 |
+| `（轮 17 回填 = 本次提交）` | docs | 台账回填轮 17（W21 / i18n）提交号与读数 |
+| `（本次 W21 提交）` | test | W21 / i18n：键 → 译文结构契约 `TranslationCoverageTest.kt`（5 契约 / 313 行；16 组变异两遍全捕获；app 425 → 430；生产零改动） |
 | `（轮 16 回填 = 本次提交）` | docs | 台账回填轮 16（W20 / R4）提交号与读数 |
 | `df02823` | fix | W20 / R4：页码自检从「与自身比」改为「页表 ↔ 页序」（+1 `TextKey`、双语资源、映射；判据为集合/成员以保置换不变；domain 434 / app 425） |
 | `（轮 15 回填）` | docs | 台账回填轮 15（W19 / R3）提交号与读数（`fc1084f`） |
@@ -1998,7 +2114,7 @@ cmd.exe /c "D:\Programing\Personal\pixfold\pixfold-d1\run-gradle.bat clean \
 
 ### 6.5 结论与明确的"未做"
 
-- **完成**：W0–**W20** 全部 ✅（§3 状态表）；D3 退出条件 1 所要求的**打包领域核心**
+- **完成**：W0–**W21** 全部 ✅（§3 状态表）；D3 退出条件 1 所要求的**打包领域核心**
   **轮 13（W17）另加**：R1 真缺陷修复（撤销 `from == to` 空操作 ⇒ `ExecEntry.originalPath`），6 组变异全捕获，
   +3 用例（425 → **428**）。
   **轮 14（W18）另加**：R2 补齐（新增 `TextKey.RenamePlanRename` + 双语资源 + `resId()` 映射，
@@ -2054,6 +2170,30 @@ cmd.exe /c "D:\Programing\Personal\pixfold\pixfold-d1\run-gradle.bat clean \
    `model/Metadata.kt:92` 的类型级默认值就是 `pageOrderOf(pages)`，故这两者**目前永不分叉** ——
    新检查是**防御性**的，它解决的是"修复前告警分支不可达"，而不是"用户马上会看到新告警"。
   十次扫荡累计：W7 23 / W8 16 / W11 7 / W12 23 / W13 39 / W14 58 / W15 64 / W16 66 / W19 31 / **W20 21 组**（W20 = R4 修复面，两遍一致全捕获）。
+  **轮 17（W21）另加**：i18n 自动化（用户 `m04079` 第⑤项）—— 新增「键 → 译文」结构契约测试
+  `app/…/ui/text/TranslationCoverageTest.kt`（**5 条契约 / 313 行**），关键是**另立独立的一侧**：
+  既有 `PixFoldTextTest` 的期望值一律经 `TestText.of(同一个资源)` 取得（资源改坏时两边一起变 ⇒ 断言恒真），
+  而 `resId()` 是 private 穷尽 `when`，只保证「有资源」不保证「指对」；新测试**完全不碰 `resId()`**，
+  改按命名约定 `TextKey.FooBar → domain_foo_bar`（107/107 成立、0 例外）反查资源，
+  并在**同进程内**切出中文 `Context` 与英文逐字对拍 —— 于是「映射指错 / 复数档取错 / 翻译漏了 / 抄成另一种语言」
+  第一次全部可观测。16 组变异**两遍**（第一遍 15 捕获 / 1 存活，第二遍 16 捕获 / 0 存活 / 0 锚点缺失 /
+  0 编译失败；3 个文件还原**逐字节一致**）。app +5 ⇒ **430**；**生产代码零改动**。
+  ⚠️ **第一遍的唯一存活者 M14 值得单独记下**：变异「英文 `warn_too_long` 的 `one` 档删掉第 2 个占位符」存活，
+  根因是**期望值与实际值同源**（数量为 1 时期望取自 `one` 档、实际也由 `one` 档渲染 ⇒ 两边同时变）
+  —— 这与 W20 的 M15–M18、轮 14 记录的盲区是**同一个根因的第三次命中**。补的契约是
+  「**各档占位符同形**」（拿**另一档** `other` 当独立的一侧，英 `one`/英 `other`/中 `other` 三处签名一致），
+  定点复核确认 M14 现在**恰好**由这条新用例捕获后才跑第二遍全量。
+  ⚠️ **契约边界如实记**：该契约只管**形状**不管**词形**（`1 item` vs `1 items` 哪个对需要词典，机械判定不了），
+  词形正确性靠「各档文本必须不同」这一条 + 人工评审 ⇒ **不夸大成「译文已自动校验」**。
+  ⚠️ **既有 i18n 复查结论 = 无需调整**，依据两条正交普查：①资源面只读审计脚本六类可疑项
+  （`UNMAPPED`/`SNAKE-MISMATCH`/`MISSING-EN`/`MISSING-ZH`/`DUP-RES`/`SAME-TEXT`）**全部为 0**；
+  ②生产层 CJK 字面量普查 + Compose 语义槽裸字面量普查（13 处）⇒ 命中全是 KDoc 注释、`mock/` 模拟数据、
+  开发者可见的 `require` 消息、磁盘文件名模板、**符号前缀**（`· `/`→ `/`← `/`⛔ `）与数据插值，
+  **无用户可见文案漏翻**。两处外观不一致如实记为**观察项、不改**：
+  `ui/plan/PlanComponents.kt:229` 危险弹框正文写死 `“⛔ $body”` 而同文件 `:150` 同类前缀走资源键
+  （仓库三处注释已裁决「符号前缀不属于文案」⇒ 不构成漏翻）；`ui/HomeScreen.kt:67` 与
+  `ui/settings/LicensesScreen.kt:198` 写死 `“PixFold”` 而未引用 `R.string.app_name`（值与资源逐字相同）。
+  十一次扫荡累计：W7 23 / W8 16 / W11 7 / W12 23 / W13 39 / W14 58 / W15 64 / W16 66 / W19 31 / W20 21 / **W21 16 组**。
 - **未做 / 不宣称**（与 HANGOFF 小节一致，勿据此认为 D3 已完成）：
   1. ❌ **真机核对** —— 工作面 100% 领域层，按 §7.4 表第 1 行判定不需要；
   2. ❌ **D3 三项退出条件的正式宣布**；
@@ -2068,6 +2208,8 @@ cmd.exe /c "D:\Programing\Personal\pixfold\pixfold-d1\run-gradle.bat clean \
   `consistent` 恒真、`PackPreviewPage.kt:204` 的告警分支不可达；修法要改"一致性"的输入语义，属产品决策。
   **其中 R1 已于轮 13（W17）关闭、R2 已于轮 14（W18）关闭、R3 已于轮 15（W19）关闭**；
    **R4 已于轮 16（W20）关闭**（用户 `m04079` 第④项「想一想怎么修」授权后，取登记里的第②种修法）；**四项全部关闭，§4 已无待裁决项**。
+   **i18n（§4 新增行）已于轮 17（W21）关闭**（用户 `m04079` 第⑤项「这属于 i18n 内容，顺带实现了」授权后落地）
+   ⇒ **§4 五项（R1/R2/R3/R4/i18n）全部关闭，已无任何待裁决项**。
   **轮 15（W19）未新增待裁决项** —— 31 组变异两遍全捕获，无存活者（第一遍的 3 个存活者与
   2 个编译失败已逐条归因为测试/变异设计错，并以补强断言消除）；R3 是用户 `m04079` 第③项
   裁决后按"默认安全档 + 显式弹框选择 + 判据收成一处"这条最小授权面落地。
