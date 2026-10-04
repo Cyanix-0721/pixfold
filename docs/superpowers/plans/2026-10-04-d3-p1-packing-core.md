@@ -201,6 +201,7 @@ cmd.exe /c "D:\Programing\Personal\pixfold\pixfold-d1\run-gradle.bat :app:lintDe
 | W17 | **R1 修复（用户裁决「细说 R1」后授权）**：让撤销记录能恢复原文件名 —— `ExecEntry` 增 `originalPath`（+ 第三条不变量）、`executeRenameOp` 成功分支从 `op.proposal.image.fileName` 填、`undoOpsOf` 的 Rename 分支改取它作 `to` | 红→绿；`from` = 新名（起点）、`to` = 原名（终点）**不同源**；变异验证 0 逃逸 | ✅ 完成（轮 13：**6 组变异全捕获 / 0 存活 / 0 锚点缺失 / 0 编译失败**；两条"如实记录缺陷"用例翻成正向断言 ⇒ +3 用例，domain **428** 项；生产代码 +26 行） |
 | W18 | **R2 补齐（用户裁决「改吧」后授权新增 `TextKey`）**：改名侧逐项句子契约 —— 新增 `TextKey.RenamePlanRename` + 双语 `domain_rename_plan_rename` + `PixFoldText.resId()` 映射；`RenamePlannedOp.describe()` 未跳过项改给「原名 → 新名」，跳过项无原因时回落 `OpStatusSkip`（原为 `OpStatusRename`，等于说"会重命名"却跳过） | 红→绿；**首次改 `app/**`**（资源 + 映射）；变异含**资源内容**变异（占位符数量/方向/重复）且必须全捕获 | ✅ 完成（轮 14：**10 组变异全捕获 / 0 存活 / 0 锚点缺失 / 0 编译失败**；两遍结论一致；domain **429**、app **402**；生产代码 +5 文件 含 2 个双语资源） |
 | W19 | **R3 修复（用户 `m04079` 第③项授权）**：覆盖的撤销给出**三选一警告** —— 领域层新增 `UndoScope{ThisRun,Everything}` + `UndoOp.DeleteOverwritten`（与 `DeleteCreated` 类型可分）+ `ExecutionReport.overwrittenCount/needsUndoWarning` + `VolumePackPlan.overwritesExisting`（计划层唯一判据，报告计数与撤销推导共用）；UI 底栏撤销按钮在**有覆盖项时先弹框**（三个按钮各带色：两个执行档实心红、取消无底色 `TextButton`、**取消排在最后**），`onUndo` ⇒ `onUndoScope: (UndoScope) -> Unit`（**无默认值**，逼每个调用点表态） | 红→绿；**安全档绝不删用户原有文件**；变异含**资源内容**变异（占位符/重复文案/中文侧）且必须全捕获 | ✅ 完成（轮 15：**31 组变异两遍一致全捕获 / 0 存活 / 0 锚点缺失 / 0 编译失败**；第一遍曾 3 存活 + 2 编译失败，全部归因为**我的测试/变异设计错**并补强后转捕获 —— 其中 3 处是真测试缺口；domain **431**、app **420**；生产 5 文件 含 2 个双语资源） |
+| W20 | **R4 修复（用户 `m04079` 第④项「想一想怎么修」）**：让页码自检真的能报出不一致 —— `validatePageConsistency` 此前拿 `renumberPages(volume).size` 跟 `volume.pageOrder.order.size` 比长度，而 `renumberPages` 的返回长度**就是** `order.size`（等于列表与自身比，恒等）⇒ `pageIssues` 恒空、`consistent` 恒真 ⇒ `PackPreviewPage.kt:204` 的告警分支**不可达**。改为比「卷内登记的页 `volume.pages`」与「页序里排的页 `pageOrder.order`」：长度不同报 `PageIssueCountMismatch`，长度相同但成员不同报**新增键** `PageIssueMissingFromOrder`（+ 双语资源 + `resId()` 映射）—— 判据是**集合/成员**而非位置，故人工拖拽（只改 `order` 不改 `images`）不会误报。补零交叉校验**保留**：它在 `renumberPages` 与校验侧各写一次，是同一规则的两份**独立拷贝**，只改坏一处即被捕获（非自证） | 红→绿；两类检查各自的两个来源必须**不同源**；置换不变性必须有断言；变异含**资源内容**变异（占位符数量/方向/中英抄错）且必须全捕获 | ✅ 完成（轮 16：**21 组变异两遍一致全捕获 / 0 存活 / 0 锚点缺失 / 0 编译失败**；第一遍 7 存活 + 0 编译失败，全部归因为**我的测试设计错**并补强后转捕获 —— 其中 5 处是真测试缺口（同源期望值盲区）、2 处是我自己的等价变异设计错；**同时发现并修正一条既有测试**：`page preview follows the page order, not the raw page list` 原先断言「分叉卷也一致」，那是骑在坏检查上的；现在改为断言必须报出分叉。domain **434**、app **425**；生产 3 文件 含 2 个双语资源） |
 
 **余量处理**：W1–W10 全部完成且仍有轮次 ⇒ **继续加固核心**（更多边界 / 更多变异 / 更多不变式），
 **不越界**到未授权工作面（适配层检查、D2b、真机、UI）。
@@ -1619,6 +1620,119 @@ CHANGED M31: ★存活★ -> 捕获      其余 26 组两遍均为"捕获"
   且 `channelDistance(cancel, safe) >= 40` 保证两者可分辨。
   ⚠️ 对话框是**独立窗口**，`captureToImage` 必须对对话框节点自身截图，再把子节点 root 坐标
   翻译成位图坐标；直接对页面截图量不到对话框像素。
+#### 轮 16（2026-10-05 00:2x）— W20 **R4 修复**：页码自检从「与自身比」改为「页表 ↔ 页序」
+
+- **用户授权原文**（`m04079` 第④项）：「想一想怎么修」。
+- **修的是哪个缺陷**：§4 R4 行登记的 `validatePageConsistency(volume)`。
+  它的输入是 `renumberPages(volume)` 的**输出**（`ComicInfoXml.kt` 里 `previewOf` 同时调两者），
+  而 `renumberPages` 的返回长度**就是** `volume.pageOrder.order.size`：
+  ```kotlin
+  // 修前（:110-113）
+  val pages = renumberPages(volume)
+  if (pages.size != volume.pageOrder.order.size) { ... }   // 列表与自身比长度 ⇒ 恒假
+  ```
+  ⇒ `pageIssues` **恒空**、`consistent` **恒真**、`PackPreviewPage.kt:204 if (!preview.consistent)`
+  的告警分支**不可达** —— 用户在真机上永远看不到那一句。
+- **两种登记过的修法与取舍**：§4 R4 行给了两条路 —— ①改看「磁盘上真实存在的页」；
+  ②校验 `volume.pages` 与 `pageOrder.order` 是否一致。**取第②条**：第①条要碰文件系统，
+  与原型「不碰真实文件系统」的既定约束冲突（`performUndo` 恒返回 `applied = false` 即该约束的体现）。
+  这是**在被授权的两个选项之间做选择**，不是新立产品决策。
+- **⚠️ 对 §4 R4 行「恒真」措辞的一处纠正（重要，防后人误读）**：
+  该行说「②校验侧补零位数与重编号侧恒等、③`startsWith("$expected.")` 恒真」——
+  **③ 并不恒真**。`expected` 的补零宽度用 `pages.size`、`renumberPages` 用 `order.size`，
+  是**同一规则的两份独立拷贝**（两侧各写了一次 `if (size >= 100) 4 else 3`）。
+  只改坏其中一处即会报错 —— W13 记录的变异「页码补零不随页数自适应(恒 3 位)」
+  正是被这一条抓住的。故本轮**保留**该检查，并在 KDoc 里写明它为何不是自证。
+  **真正恒假的只有数量检查**（列表与自身比长度），本轮修的就是它。
+- **修法（生产 3 文件）**：
+  ```kotlin
+  // 修后（:126-136）
+  val listed = volume.pages
+  val order = volume.pageOrder.order
+  if (listed.size != order.size) {
+      issues.add(Msg(TextKey.PageIssueCountMismatch, listOf(listed.size, order.size)))
+  } else {
+      val orderIds = order.map { it.id }.toSet()
+      val missing = listed.count { it.id !in orderIds }
+      if (missing > 0) {
+          issues.add(Msg(TextKey.PageIssueMissingFromOrder, listOf(missing, listed.size)))
+      }
+  }
+  ```
+  - **置换不变性是硬约束**：人工拖拽**合法地**改 `order` 而不改 `pages`
+    （`sort/PageOrder.kt` 的 `moveItemTo`/`applyRule` 只改 `order` 与 manual/pinned 集合，
+    **从不改 `images`**）。故判据必须是**集合/成员**比较，绝不能逐位置比对 ——
+    否则用户每拖一次就看到一条假警告。这一点有专门用例钉死。
+  - **新增 `TextKey.PageIssueMissingFromOrder`** + 双语资源 `domain_page_issue_missing_from_order`
+    （en `%1$d of %2$d pages are not in the page order` / zh `有 %1$d 页（共 %2$d 页）不在页序里`）
+    + `PixFoldText.resId()` 映射（穷尽 `when`，不加即编译失败）。
+    长度相同但成员不同是数量检查覆盖不到的一类，故值得单独一句文案。
+  - 两类检查的**两个来源必须不同源**是本轮的核心不变量，已写进 KDoc。
+- **⚠️ 本轮同时改了一条既有测试（必须记下，不是顺手改的）**：
+  `ComicMetadataTest` 的 `page preview follows the page order, not the raw page list`（`:185`）
+  原先构造「卷自称 18 页、页序只排了 3 页」的分叉卷，却断言 `preview.consistent` ——
+  那条断言**是骑在坏检查上的**（因为坏检查恒真，它才绿）。修好检查后它立刻变红。
+  它的**核心断言**（预览只画页序里的 3 页）仍然有效且保留；
+  `assertTrue(preview.consistent)` 改为断言**必须报出分叉**。
+  诚实说明：这不是「测试挡路就改测试」，而是那条断言本身在断言一个**错误的行为**。
+- **红→绿**（两层都取了真 RED，见 `artifacts/red_r4.log`）：
+  - 领域 RED：`433 tests completed, 1 failed` /
+    `ComicMetadataTest > a volume whose page list and page order disagree is reported as inconsistent() FAILED` /
+    `org.opentest4j.AssertionFailedError: 页表与页序长度不同时必须判为不一致`；
+    XML `ComicMetadataTest tests=46 failures=1 errors=0`。
+  - UI RED：`422 tests completed, 1 failed` /
+    `PackPreviewPageTest > a volume whose page list and page order disagree is flagged on the preview page` /
+    `AssertionError: ... contains '⚠️ Page numbers do not match the page order: Page item count does not match the page order (15 ≠ 16)' ... is not displayed!`；
+    XML `PackPreviewPageTest tests=21 failures=1 errors=0`。
+  - GREEN：领域 `434 → 0 failed`；app `425 → 0 failed`（`artifacts/green_r4.log`）。
+- **W20 变异扫荡（21 组，两遍，`artifacts/mutate_w20.py` / `w20_run_pass*.log`）**：
+  第一遍 **14 捕获 / 7 存活 / 0 锚点缺失 / 0 编译失败**；补强后第二遍
+  **21 捕获 / 0 存活 / 0 锚点缺失 / 0 编译失败**，还原核对 5 个文件**逐字节一致**。
+  覆盖：数量检查的输入来源/条件/参数顺序、成员检查的存在性/判据/参数顺序/键选择、
+  补零交叉校验的两处分叉、新键的三个资源面（占位符数量、占位符方向、中英抄错）、
+  映射串到两个邻居。
+  - **7 个存活者的归因（全部是「我的测试/变异设计错」，不是生产缺陷）**：
+
+    | 存活者 | 归因 | 处置 |
+    |---|---|---|
+    | M11 编号检查恒真 / M12 丢掉 `.` 分隔符 | **我的变异是等价变异**：`renumberPages` 产出的名字恒为 `NNN.ext`，故 `startsWith("")` 与 `startsWith("$expected")` 在该数据集上与原式同判 | 换成两个**非等价**变异（无条件触发 / 序号从 0 起），均被捕获 |
+    | M15–M18 英文与中文资源占位符删掉/对调 | **真测试缺口**：期望值用 `TestText.of(同一个资源)` 算出 ⇒ 资源改坏时两边同时变，断言照样绿（与轮 14 记录的同源期望值盲区同一个根因） | 新增 2 条**形状断言**用例（见下） |
+    | M21 中文文案抄成英文 | **真测试缺口**：Robolectric 默认 locale 是 `en_US`，中文槽位**不会被任何用例加载** | 新增用例带 `@Config(qualifiers = "zh-rCN")` |
+
+  - **补强的 2 条新用例**（`app/src/test/kotlin/com/pixfold/d1/ui/text/PixFoldTextTest.kt`）：
+    `the missing from order wording keeps both numbers in argument order` 与
+    `the chinese missing from order wording is chinese and keeps both numbers in order`。
+    判据刻意**不比对整句**，只断言 ①两个数目都真的出现在句子里（占位符没被删）
+    ②它们**按参数顺序**出现（没被对调）③中文槽位真的是中文（含 CJK 码点）。
+    用 `listOf(3, 47)` 而不是 `listOf(1, 18)`：两个数目互不为子串，`indexOf` 才有判别力。
+    数字是**参数**（数据）而非界面措辞，故写死数字不违反「文案不写死」原则。
+  - 这是轮 14 记录的同源期望值盲区的**第二次命中**，也是 i18n 那一项（`m04079` 第⑤项）
+    要系统解决的问题的第一手证据。
+- **四道闸门**（`artifacts/gates_r4.log`，`--rerun-tasks` 全量，`RC=0`、`BUILD SUCCESSFUL in 44s`、
+  `62 actionable tasks: 62 executed`）：
+  - domain **32 files / 434 tests / 0F 0E 0S**（源码 `@Test` = 434，与 XML 一致）；
+  - app **44 files / 425 tests / 0F 0E 0S**（源码 `@Test` = 426，差 1 恒为 `NegativeControlTest`）；
+  - lint **0 errors, 0 warnings, 4 hints**（4 条 hint 全是既有的 `AutoboxingStateCreation`，
+    位点在 `DragReorderList.kt`，与本轮无关；`warningsAsErrors` 仍为零告警）；
+  - APK `pixfold-d1/app/build/outputs/apk/debug/app-debug.apk` **33,420,916 bytes**、
+    mtime `2026-10-05 00:22`，`find app/src/main domain/src/main -newer <apk>` 为空 ⇒ 比所有源文件新；
+    `resources.arsc` 里新串**三种形态逐一复核为 YES**（键名、英文、中文），
+    另加 `domain_page_issue_count_mismatch` 中英各一条。
+- **边界核对**：`pixfold-d1/domain/build.gradle.kts`、`pixfold-d1/app/build.gradle.kts`、
+  `pixfold-d1/build.gradle.kts`、`pixfold-d1/settings.gradle.kts`、
+  `pixfold-d1/gradle/libs.versions.toml`、`.mise.toml`、`AGENTS.md`、`README.md`、`HANGOFF.md`
+  逐条 `git diff --quiet HEAD -- <f>` ⇒ **全部 unchanged**。
+  未新增依赖、未改构建脚本、未改 `HANGOFF.md`、未连真机、未 push。
+  本轮改动面 **9 files, +223 / −8**（生产 3 文件：`ComicInfoXml.kt` / `TextKey.kt` /
+  `PixFoldText.kt` + 2 个双语资源；其余为测试与本轮新增的测试助手 `TestText.raw`）。
+- **R4 关闭**。§4 表格 R4 行状态改为「✅ 已修复（轮 16 / W20）」。
+- **一处诚实的范围声明**：本轮修的是「页表 ↔ 页序分叉**能被报出来**」。
+  但生产路径下 `ComicVolume` 的构造点唯一（`MetaEdit.kt:81 comicVolumeOf`，`:101 pageOrder = pageOrderOf(pages)`
+  与 `pages = pages` 同源），且 `model/Metadata.kt:92` 的**类型级默认值**就是 `pageOrderOf(pages)`，
+  故**生产路径下这两者目前永不分叉** —— 新检查在当前代码里是**防御性的**，
+  它防的是未来新增的 `copy(pages = …)` 路径与测试构造。这一点写在这里，避免后人误以为
+  「修好之后用户马上就会看到新告警」。真正不可达的是**修复前**的告警分支；修复后它可达，
+  只是当前生产数据触发不到。这与 §4 R4 行「非本轮引入，是既有设计」的记录一致。
 
 ---
 
@@ -1633,7 +1747,7 @@ CHANGED M31: ★存活★ -> 捕获      其余 26 组两遍均为"捕获"
 | R1 | 3（W6） | `UndoOp.RestoreRenamed(from, to)` 在成功项上恒 `from == to`（空操作）—— `executeRenameOp` 成功分支的 `label` 与 `createdPath` 都取 `op.finalName`，报告里**无处**携带原文件名 | 修法有两种且语义不同：①扩 `ExecEntry` 加原名字段；②让 `undoRecordFrom(plan, report)` 从计划取 `op.proposal.image.fileName`（只有它手里有计划）。选哪种、以及 `from`/`to` 的最终语义，都属撤销记录的产品决策；且本轮契约是"既有可观测行为逐字不变" | ✅ **已修复**（轮 13 / W17：用户 `m04081` 采纳第 ① 种修法 —— `ExecEntry` 增 `originalPath`、`executeRenameOp` 从计划填、`undoOpsOf` 改取它作 `to`；6 组变异全捕获；详见 §3.1 轮 13） |
 | R2 | 3（W7） | `RenamePlannedOp.describe()` 在无原因时只能给 `Msg(TextKey.OpStatusRename)` 一句状态词 | 改名侧**没有**逐项句子契约（`RenamePlanPage` 渲染的是"原名 → 新名"两列 + 状态标签）；要补齐就得**新增 TextKey**，而本轮明令禁止 | ✅ **已修复**（轮 14 / W18：用户 `m04081`「改吧」授权新增 `TextKey.RenamePlanRename` —— 未跳过项给出「原名 → 新名」逐项句子，双语资源 + `PixFoldText` 映射同步补齐；顺带修掉跳过项无原因时回落到 `OpStatusRename` 的错误方向；10 组变异全捕获，含 4 组资源内容变异；详见 §3.1 轮 14） |
 | R3 | 7（W11） | `OutputConflictPolicy.Overwrite` + 输出已存在时，报告报 `Succeeded`、`createdPath` = **被替换的那个旧文件**路径，撤销据此推导 `DeleteCreated(该路径)` ⇒ 真执行会**删掉用户原有的 CBZ**，且被覆盖的内容无法恢复 | 「覆盖的撤销」是什么，属产品决策，三种语义完全不同：①当作新建 ⇒ 删掉（现状，会把用户旧文件也删了）②覆盖前先备份 ⇒ 撤销时恢复备份（要给 `ExecEntry` 加"被覆盖路径"字段）③覆盖项标为不可撤销（要把 `OverwriteExisting` 传进 `undoOpsOf`）。**危险动作机制已认识此场景**（`DangerAction.kt` 判 `OverwriteExisting`），只有撤销推导从不查策略。按 §7.1「有歧义先请用户裁决」，故只记录 | ✅ **已修复**（轮 15 / W19：用户 `m04079` 第③项裁决「添加警告，仅选择当前操作生成的撤销还是全部删除还是取消，记得按钮颜色要区分开，把取消放到最后边」—— 取的是**①的安全版**：默认档 `UndoScope.ThisRun` **永不删被覆盖的文件**，只有用户在弹框里显式选了 `Everything` 才会推导出 `DeleteOverwritten`；`VolumePackPlan.overwritesExisting` 收成全仓唯一判据，报告计数/危险动作/撤销推导共用同源；31 组变异两遍全捕获；详见 §3.1 轮 15） |
-| R4 | 9（W13） | `validatePageConsistency(volume)` 的输入就是 `renumberPages(volume)` 的**输出**（`ComicInfoXml.kt:111` 调 `:93-97 previewOf`），两者同源 ⇒ ①`pages.size != order.size` 恒假、②校验侧补零位数与重编号侧恒等、③`startsWith("$expected.")` 恒真 ⇒ **`pageIssues` 恒空、`consistent` 恒真**，UI 的告警分支（`app/…/workflowb/PackPreviewPage.kt:204 if (!preview.consistent)`）**不可达** | 要让这两个分支可达，必须改 `validatePageConsistency` 的**输入语义**（例如改成校验"磁盘上真实存在的页"而非"按页序重编号的页"，或校验 `volume.pages` 与 `pageOrder.order` 是否一致）。这改变了"一致性"这个词在 D3 里的含义，且会牵动 UI 告警的触发条件 ⇒ **属产品决策**。本轮只做等价性证明与记录，**不改输入来源** | ⏸ 待用户裁决（不阻塞余量轮；**非本轮引入**，是既有设计） |
+| R4 | 9（W13） | `validatePageConsistency(volume)` 的输入就是 `renumberPages(volume)` 的**输出**（`ComicInfoXml.kt:111` 调 `:93-97 previewOf`），两者同源 ⇒ ①`pages.size != order.size` 恒假、②校验侧补零位数与重编号侧恒等、③`startsWith("$expected.")` 恒真 ⇒ **`pageIssues` 恒空、`consistent` 恒真**，UI 的告警分支（`app/…/workflowb/PackPreviewPage.kt:204 if (!preview.consistent)`）**不可达** | 要让这两个分支可达，必须改 `validatePageConsistency` 的**输入语义**（例如改成校验"磁盘上真实存在的页"而非"按页序重编号的页"，或校验 `volume.pages` 与 `pageOrder.order` 是否一致）。这改变了"一致性"这个词在 D3 里的含义，且会牵动 UI 告警的触发条件 ⇒ **属产品决策**。本轮只做等价性证明与记录，**不改输入来源** | ✅ **已修复**（轮 16 / W20：用户 `m04079` 第④项「想一想怎么修」授权 —— 取的是登记里的**第②种修法**：校验 `volume.pages` 与 `pageOrder.order` 是否一致。第①种（改看「磁盘上真实存在的页」）要碰文件系统，与原型「不碰真实文件系统」的既定约束冲突（`performUndo` 恒 `applied=false` 即该约束的体现），故未取。修后：数量检查改比「卷内登记的页」与「页序里排的页」，长度不同报 `PageIssueCountMismatch`，长度相同但成员不同报**新增键** `PageIssueMissingFromOrder`（+ 双语资源 + `resId()` 映射）；判据是**集合/成员**而非位置 ⇒ 人工拖拽只改 `order` 不改 `images`，不会误报（有专门用例钉死置换不变性）。补零交叉校验**保留**——本轮同时**纠正**了本行原措辞里的一处不准确：③`startsWith("$expected.")`**并不恒真**，`expected` 的补零宽度用 `pages.size`、`renumberPages` 用 `order.size`，是同一规则的**两份独立拷贝**，只改坏一处即被捕获（W13 的变异「页码补零不随页数自适应」正是被它抓住的）；**真正恒假的只有数量检查**。21 组变异两遍全捕获；同时修正一条骑在坏检查上的既有断言（详见 §3.1 轮 16）。⚠️ 诚实范围声明：生产路径下 `ComicVolume` 构造点唯一且类型级默认值就是 `pageOrderOf(pages)`，故这两者**目前永不分叉**，新检查是**防御性**的（防未来新增的 `copy(pages=…)` 路径），它解决的是「修复前告警分支不可达」这一点。 |
 
 **已知的、明确不碰的开放项**（不要在本轮"顺手"处理）：
 - HANGOFF §11 第 12 条：Android 端存储不足的**阈值与提示形态**，明写「待 D2b 真机验证后定」。
@@ -1768,6 +1882,19 @@ cmd.exe /c "D:\Programing\Personal\pixfold\pixfold-d1\run-gradle.bat clean \
   > `find app/src/main domain/src/main -newer <apk>` 为空 ⇒ APK 比所有源文件新（读数新鲜）；
   > `resources.arsc` 内含全部 6 条新串（英/中各 3 条含 `<plurals>` 的 `one`/`other` 变格）
   > 与 `%1$d file` 占位符。
+> 轮 16 读数（`--rerun-tasks` 全量重建）：domain **32 files / 434 tests / 0F 0E 0S**、
+> app **44 files / 425 tests / 0F 0E 0S**、lint **0 errors, 0 warnings, 4 hints**；
+> `RC=0`、`BUILD SUCCESSFUL in 44s`、`62 actionable tasks: 62 executed`；先 `rm -rf` 了两个
+> `test-results` 目录以保证不是陈旧 XML。
+> 计数口径：`domain` 源码 `@Test` **434** = XML **434**；`app` 源码 `@Test` **426**、
+> XML **425**，差 1 恒为 `NegativeControlTest`。
+> 轮 16 增量：domain **431 → 434**（+3：分叉卷报数量不符、成员不同报缺失、以及既有
+> `page preview follows the page order, not the raw page list` 的断言翻正 —— 详见 §3.1 轮 16）；
+> app **420 → 425**（+5：`PackPreviewPageTest` +2、`PixFoldTextTest` +3）。
+> 产物：**33,420,916 字节**，mtime **2026-10-05 00:22**；
+> `find app/src/main domain/src/main -newer <apk>` 为空 ⇒ APK 比所有源文件新；
+> `resources.arsc` 复核新串**三种形态**（键名 / 英文 / 中文）逐一 **YES**，
+> 另加 `domain_page_issue_count_mismatch` 中英各一条。
 
 ### 6.3 改动面与越界核对
 
@@ -1815,6 +1942,18 @@ cmd.exe /c "D:\Programing\Personal\pixfold\pixfold-d1\run-gradle.bat clean \
 > 但**未改构建脚本、未新增依赖、未改 `HANGOFF.md`**。
 > ⚠️ `app/**` 的"0 条"结论**从轮 14 起不再成立**，本轮进一步扩大；两条都属**用户授权范围**
 > （`m04081` 授权 R2、`m04079` 第③项授权 R3）。
+> 轮 16（W20 / R4 修复）**+9 files / +223 / −8** —— 生产 5 个文件
+> （`domain/…/comic/ComicInfoXml.kt` +30/−6 重写 `validatePageConsistency` 与 KDoc、
+> `domain/…/text/TextKey.kt` +1 新键、`app/…/ui/text/PixFoldText.kt` +1 映射、
+> `app/src/main/res/values/domain_strings.xml` +1、`app/src/main/res/values-zh/domain_strings.xml` +1）；
+> 测试 4 个（`app/src/test/…/TestText.kt` +11 新增 `raw()` 助手 —— 见下、
+> `app/src/test/…/ui/text/PixFoldTextTest.kt` +65 三条新用例、
+> `app/src/test/…/ui/workflowb/PackPreviewPageTest.kt` +37 两条新用例 + 助手、
+> `domain/src/test/…/comic/ComicMetadataTest.kt` +76/−2 两条新用例 + 一条既有断言翻正）。
+> ⚠️ **`TestText.raw()` 的存在理由**：`TestText.of(id)` 走 `getString(id)`，会把 `%1$s`
+> 当格式串**当场格式化**并抛 `MissingFormatArgumentException`；要拿"模板本身"必须用
+> `context.resources.getText(id).toString()`（只解码不格式化）。这是本轮踩到并修掉的坑。
+> ⚠️ 与轮 15 不同：本轮**未改 UI 布局**，只改领域判据 + 新增一条文案 + 映射与资源。
 
 ### 6.4 提交拓扑（`git log --oneline dev..d3/p1`）
 
@@ -1823,8 +1962,9 @@ cmd.exe /c "D:\Programing\Personal\pixfold\pixfold-d1\run-gradle.bat clean \
 > 截至 W9/W10 落地的链条如下（最新在上）；**轮 7（W11）至轮 11（W15）的提交与回填见各自小节**：
 
 | 提交 | 类型 | 内容 |
-| --- | --- | --- |
-| `（轮 15 回填 = 本次提交）` | docs | 台账回填轮 15（W19 / R3）提交号与读数 |
+| `（轮 16 回填 = 本次提交）` | docs | 台账回填轮 16（W20 / R4）提交号与读数 |
+| `df02823` | fix | W20 / R4：页码自检从「与自身比」改为「页表 ↔ 页序」（+1 `TextKey`、双语资源、映射；判据为集合/成员以保置换不变；domain 434 / app 425） |
+| `（轮 15 回填）` | docs | 台账回填轮 15（W19 / R3）提交号与读数（`fc1084f`） |
 | `b83098d` | fix | W19 / R3：覆盖的撤销先警告并让用户选范围（+2 `UndoScope` 档位、`DeleteOverwritten`、双语资源与弹框；`onUndo` ⇒ `onUndoScope`；domain 431 / app 420） |
 | `（轮 14 回填）` | docs | 台账回填轮 14（W18 / R2）提交号与读数（`dc2e28e`） |
 | `759ef68` | fix | W18 / R2：改名计划行给出「原名 → 新名」（+1 `TextKey`、双语资源、映射；domain 429 / app 402） |
@@ -1858,7 +1998,7 @@ cmd.exe /c "D:\Programing\Personal\pixfold\pixfold-d1\run-gradle.bat clean \
 
 ### 6.5 结论与明确的"未做"
 
-- **完成**：W0–**W19** 全部 ✅（§3 状态表）；D3 退出条件 1 所要求的**打包领域核心**
+- **完成**：W0–**W20** 全部 ✅（§3 状态表）；D3 退出条件 1 所要求的**打包领域核心**
   **轮 13（W17）另加**：R1 真缺陷修复（撤销 `from == to` 空操作 ⇒ `ExecEntry.originalPath`），6 组变异全捕获，
   +3 用例（425 → **428**）。
   **轮 14（W18）另加**：R2 补齐（新增 `TextKey.RenamePlanRename` + 双语资源 + `resId()` 映射，
@@ -1898,7 +2038,22 @@ cmd.exe /c "D:\Programing\Personal\pixfold\pixfold-d1\run-gradle.bat clean \
   31 组变异**两遍一致全捕获**（第一遍 3 存活 + 2 编译失败全部归因为测试/变异设计错，补强后转捕获），
   domain +2 ⇒ **431**、app +18 ⇒ **420**。
   ⚠️ 本轮是本分支**首次改动 UI 布局与交互**（此前轮 14 只动资源与映射）——用户 `m04079` 第③项授权范围内。
-  九次扫荡累计：W7 23 / W8 16 / W11 7 / W12 23 / W13 39 / W14 58 / W15 64 / W16 66 / **W19 31 组**。
+   **轮 16（W20）另加**：R4 真缺陷修复（页码自检拿"自己的输出"跟"页序长度"比 ⇒ 恒等 ⇒
+   `pageIssues` 恒空、`consistent` 恒真、UI 告警分支不可达）—— `validatePageConsistency` 改为比
+   「卷内登记的页 `volume.pages`」与「页序里排的页 `pageOrder.order`」：长度不同报
+   `PageIssueCountMismatch`，长度相同但成员不同报**新增键** `PageIssueMissingFromOrder`
+   （+ 双语资源 + `resId()` 映射）；判据是**集合/成员**而非位置 ⇒ 人工拖拽（只改 `order` 不改
+   `images`）不会误报，有专门用例钉死置换不变性。补零交叉校验**保留**——它在本轮同时**纠正**了
+   §4 R4 行原措辞的一处不准确：`startsWith("$expected.")` 并**不**恒真，`expected` 的补零宽度用
+   `pages.size`、`renumberPages` 用 `order.size`，是同一规则的**两份独立拷贝**。
+   21 组变异**两遍一致全捕获**（第一遍 7 存活全部归因为测试/变异设计错，其中 5 处是真测试缺口
+   —— 同源期望值盲区 + 中文槽位在默认 locale 下不被加载；补了 2 条形状断言用例后转捕获）。
+   domain +3 ⇒ **434**、app +5 ⇒ **425**。
+   ⚠️ 本轮**未改 UI 布局**，只改领域判据 + 新增一条文案 + 映射与资源。
+   ⚠️ **诚实范围声明**：生产路径下 `ComicVolume` 构造点唯一（`MetaEdit.kt:81`）且
+   `model/Metadata.kt:92` 的类型级默认值就是 `pageOrderOf(pages)`，故这两者**目前永不分叉** ——
+   新检查是**防御性**的，它解决的是"修复前告警分支不可达"，而不是"用户马上会看到新告警"。
+  十次扫荡累计：W7 23 / W8 16 / W11 7 / W12 23 / W13 39 / W14 58 / W15 64 / W16 66 / W19 31 / **W20 21 组**（W20 = R4 修复面，两遍一致全捕获）。
 - **未做 / 不宣称**（与 HANGOFF 小节一致，勿据此认为 D3 已完成）：
   1. ❌ **真机核对** —— 工作面 100% 领域层，按 §7.4 表第 1 行判定不需要；
   2. ❌ **D3 三项退出条件的正式宣布**；
@@ -1912,7 +2067,7 @@ cmd.exe /c "D:\Programing\Personal\pixfold\pixfold-d1\run-gradle.bat clean \
   **R4**（轮 9 新登记）页序自检的两个分支**永不可达**（校验输入与重编号输出同源）⇒
   `consistent` 恒真、`PackPreviewPage.kt:204` 的告警分支不可达；修法要改"一致性"的输入语义，属产品决策。
   **其中 R1 已于轮 13（W17）关闭、R2 已于轮 14（W18）关闭、R3 已于轮 15（W19）关闭**；
-  **R4 仍未决**，不阻塞。
+   **R4 已于轮 16（W20）关闭**（用户 `m04079` 第④项「想一想怎么修」授权后，取登记里的第②种修法）；**四项全部关闭，§4 已无待裁决项**。
   **轮 15（W19）未新增待裁决项** —— 31 组变异两遍全捕获，无存活者（第一遍的 3 个存活者与
   2 个编译失败已逐条归因为测试/变异设计错，并以补强断言消除）；R3 是用户 `m04079` 第③项
   裁决后按"默认安全档 + 显式弹框选择 + 判据收成一处"这条最小授权面落地。
