@@ -162,7 +162,7 @@ cmd.exe /c "D:\Programing\Personal\pixfold\pixfold-d1\run-gradle.bat :app:lintDe
 | W7 | 变异清扫（W1–W6 合计 ≥ 20 组） | 0 逃逸；存活变异按 §0.4 处理并记录 | ✅ 完成：**23 个不同变异体 / 30 次运行，逃逸 0**；W7 自身等价变异仅 **P5 一个**（见 R1）。**曾存活 9 个（M5/M6/N5/P5/P14/P16/P17/P18/P20），其中等价 2、真正经「补断言」由存活转为捕获 7 个**（口径详见轮 3 小节加的 ⚠️ 校正） |
 | W8 | 边界与不变式加固（空卷 / 单页 / 重名跳过 / `isBlank` 输出目录 / 冲突策略矩阵） | 新增断言 + 变异验证 | ✅ 完成（`PackingPipelineTest` 17 用例，轮 4；**16 组变异全捕获**，其中 4 组只可能由本轮新增用例捕获 ⇒ 补的是真缺口） |
 | W9 | 文档回写：`HANGOFF.md` §9.1 追加「D3 打包核心轮」+ 本文件写「早间复核清单」 | **只追加**，不改阶段快照 | ✅ 完成（轮 5：`HANGOFF.md:2611` 起追加；台账 §5 早间复核清单同步补写） |
-| W10 | 终验：干净工作树重跑四道闸门 + 计数比对 + `git log --oneline dev..d3/p1` 汇总 | 本文件写最终读数 | ⬜ |
+| W10 | 终验：干净工作树重跑四道闸门 + 计数比对 + `git log --oneline dev..d3/p1` 汇总 | 本文件写最终读数 | ✅ 完成（轮 6：**带 `clean` 的全量重建**，64/64 executed，exit 0；读数见 §6） |
 
 **余量处理**：W1–W10 全部完成且仍有轮次 ⇒ **继续加固核心**（更多边界 / 更多变异 / 更多不变式），
 **不越界**到未授权工作面（适配层检查、D2b、真机、UI）。
@@ -458,6 +458,41 @@ cmd.exe /c "D:\Programing\Personal\pixfold\pixfold-d1\run-gradle.bat :app:lintDe
 
 ---
 
+#### 轮 6（2026-10-04 17:4x）— W10 终验（**带 `clean` 的全量重建**）
+
+- 提交：（见下方回填行）
+- 改动：**仅本台账**（§3 W10 状态、本轮记录、`## 6. 自检结果` 全部填写）。
+  **未改任何 Kotlin、未改 `HANGOFF.md`** ⇒ 本轮不可能影响闸门读数。
+- 做法：前置条件 = 工作树干净（`git status --porcelain` 空、`git stash list` 空），
+  然后跑 **`clean` + 四道闸门**，而不是直接跑四道闸门。
+  > **为什么加 `clean`**：前几轮的闸门读数大量命中 `up-to-date`，尤其 `:app:lintDebug`
+  > 的报告文件长期停在 **2026-09-29 的旧产物**（§3.1 轮 5 已记录该"诚实例外"）。
+  > 加 `clean` 后 **64/64 任务全部真实执行**（`64 actionable tasks: 64 executed`），
+  > 由此得到的才是**全新鲜读数**，也顺便**关闭了 lint 陈旧读数这个悬置疑点**。
+- 读数（详见 §6.2）：
+  - `BUILD SUCCESSFUL in 56s` / exit 0 / **64 actionable tasks: 64 executed**（无 up-to-date 命中）；
+  - lint **0 errors, 0 warnings, 4 hints**（XML 逐条复核：4 条**全为 Hint** 级
+    `AutoboxingStateCreation`，hint 不计入 `warningsAsErrors`）；**报告 mtime 2026-10-04 17:44 ⇒ 新鲜**；
+  - JUnit XML：`domain` **25 files / 345 tests / 0F 0E**、`app` **42 files / 399 tests / 0F 0E**；
+  - 源码 `@Test` 计数：`domain` **345**（与 XML 一致）、`app` **400**（比 XML 多 **1** ⇒
+    正是被 `exclude("**/NegativeControlTest.class")` 默认排除的 `NegativeControlTest`，
+    **399 是正确的，不是丢测**）；
+  - 产物 `app/build/outputs/apk/debug/app-debug.apk` = 33,385,168 字节（mtime 17:43）。
+- 越界核对（§6.3）：`git diff --stat dev...d3/p1` = **11 files / +2678 / −74**，
+  11 条路径**逐条在白名单内**；`git diff --name-only dev...d3/p1 -- pixfold-d1/app/` = **0 条**；
+  `domain/build.gradle.kts`/`libs.versions.toml`/`app/build.gradle.kts`/`.mise.toml`/`AGENTS.md`/`README.md`
+  逐条 `git diff --quiet` 确认未改；`git ls-tree` 确认**无残留变异备份**入库。
+- 设计决定（**后续勿推翻**）：
+  1. **终验必须带 `clean`**。只跑四道闸门很容易得到一串 `up-to-date`，那只证明"缓存还在"，
+     不证明"当前代码真的能过"；`clean` 后 `64/64 executed` 才有资格当终验读数。
+  2. **计数一律解析 JUnit XML**，不看 Gradle 控制台的汇总行；并**用源码 `@Test` 计数交叉核对**，
+     把已知的 1 项排除（`NegativeControlTest`）显式写进台账 —— 否则下次读者会把 399↔400 当成丢测。
+  3. **不写死提交数**（用 `git rev-list --count dev..d3/p1`）：每次回填提交都会 +1，
+     写死必然立刻过期（§6.1 已如此标注）。
+- 结论 / 阻塞 / 待裁决：无新增待裁决项（R1/R2 仍未决，不阻塞并回）。
+
+---
+
 ## 4. 待裁决 / 阻塞（越界项写这里，不自行决定）
 
 > 出现下列任一情况，**停止该项**并在此登记，然后继续**下一项**工作：
@@ -505,4 +540,84 @@ cmd.exe /c "D:\Programing\Personal\pixfold\pixfold-d1\run-gradle.bat :app:lintDe
 
 ## 6. 自检结果
 
-（W9/W10 收工时填写）
+### 6.1 终验环境
+
+- 分支：`d3/p1`（`git rev-parse --abbrev-ref HEAD`）；提交数 `git rev-list --count dev..d3/p1` = **9**
+  （**不写死数字**，以命令输出为准；每次回填提交后会 +1）。
+- 工作树：`git status --porcelain` 空、`git stash list` 空（终验**在干净工作树上跑**）。
+- 时间：`2026-10-04 17:43–17:45 (+08:00)`。
+
+### 6.2 四道闸门（**带 `clean` 的全量重建**）
+
+```
+cmd.exe /c "D:\Programing\Personal\pixfold\pixfold-d1\run-gradle.bat clean \
+  :app:lintDebug :app:testDebugUnitTest :domain:test :app:assembleDebug"
+```
+
+- 读数：**`BUILD SUCCESSFUL in 56s`**，**`64 actionable tasks: 64 executed`**，**exit 0**。
+  > ⚠️ 这次刻意加了 `clean`：此前几轮的闸门多为 `up-to-date` 命中，
+  > 且 `:app:lintDebug` 的报告文件长期停留在 **2026-09-29 的旧产物**
+  > （详见 §3.1 轮 5 与 HANGOFF 的"lint 诚实例外"）。`clean` 后 **64/64 全部真实执行**，
+  > 读数不再是缓存命中 ⇒ 这是整套验证里**唯一一次"全新鲜"的读数**。
+- lint：`0 errors, 0 warnings, 4 hints`（XML 逐条复核：4 条 **全为 `Hint`** 级
+  `AutoboxingStateCreation`，位置 `app/src/main/kotlin/…/ui/components/DragReorderGrid.kt:175,176`
+  与 `…/DragReorderList.kt:94,95`）。hint 不计入 `warningsAsErrors`；
+  报告 mtime **2026-10-04 17:44**（新鲜）。
+- 测试计数（JUnit XML 解析，非 Gradle 控制台）：
+
+  | 模块 | 文件数 | 用例数 | 失败 | 错误 | 基线对照 |
+  | --- | --- | --- | --- | --- | --- |
+  | `domain` | 25 | **345** | 0 | 0 | 起点 20 files / 247 tests ⇒ **+98** |
+  | `app` | 42 | **399** | 0 | 0 | 起点 42 / 399 ⇒ **未变（正确）** |
+
+  - `app` 源码 `@Test` 计数 = **400**，比 XML 多 **1** —— 多出的正是 `NegativeControlTest`，
+    被 `app/build.gradle.kts` 的 `unitTests.all { exclude("**/NegativeControlTest.class") }`
+    默认排除。**因此 399 是正确的，不是丢测。**
+  - `domain` 源码 `@Test` 计数 = **345**，与 XML **完全一致**（无排除项）。
+- 产物：`app/build/outputs/apk/debug/app-debug.apk`（33,385,168 字节，mtime 17:43）⇒ `assembleDebug` 真实产出。
+
+### 6.3 改动面与越界核对
+
+- `git diff --stat dev...d3/p1` = **11 files changed, 2678 insertions(+), 74 deletions(-)**。
+- 路径白名单逐条核对（**11 条全在允许面内**）：`HANGOFF.md`、本台账、
+  `domain/…/plan/OperationPlan.kt`、`domain/…/pack/CbzWriter.kt`、`domain/…/pack/CbzWritePlan.kt`、
+  `domain/…/plan/Execution.kt`，以及 5 个 domain 测试文件。
+- **越界检查全部通过**：
+  - `git diff --name-only dev...d3/p1 -- pixfold-d1/app/` ⇒ **0 条**（本分支一行未改 `app/**`）；
+  - `domain/build.gradle.kts`、`libs.versions.toml`、`app/build.gradle.kts`、`.mise.toml`、
+    `AGENTS.md`、`README.md` ⇒ 逐条 `git diff --quiet` 确认**均未改动**。
+- **无残留变异备份**：`git ls-tree -r --name-only d3/p1 | grep -Ei '\.(bak|orig|rej)$|w7bak|w8bak|~$'`
+  ⇒ 无命中；`pixfold-d1/artifacts/` 被 `pixfold-d1/.gitignore:9` 忽略（`git check-ignore -v` 已证实），
+  变异脚本与备份**未入库**。
+
+### 6.4 提交拓扑（`git log --oneline dev..d3/p1`，9 条）
+
+| 提交 | 类型 | 内容 |
+| --- | --- | --- |
+| `ea78b3c` | docs | W9：`HANGOFF.md` §9.1 追加「D3 打包核心轮」+ 变异计数口径校正 |
+| `4359761` | docs | 台账回填轮 4 |
+| `a22a12a` | test | W8 跨层不变式（17 用例 / 16 变异全捕获） |
+| `9e1fd41` | docs | 台账回填轮 3 |
+| `e82cdb9` | test | W6+W7 撤销全路径对齐 + 变异清扫 |
+| `15cc10e` | docs | 台账回填 W1–W5 |
+| `55408ba` | feat | W4+W5 CBZ 字节生成与写入计划 |
+| `72232c1` | feat | W1–W3 统一操作词汇 `OperationPlan` |
+| `8d1aa5d` | docs | 夜间计划与台账 |
+
+**未推送、未合并 `dev`**（`git log origin/dev..d3/p1` 与本地一致；是否并回由用户决定）。
+
+### 6.5 结论与明确的"未做"
+
+- **完成**：W0–W10 全部 ✅（§3 状态表）；D3 退出条件 1 所要求的**打包领域核心**
+  （`PackagePlan`/`OperationPlan` 语义、`ExecutionReport`、`UndoRecord`）已落地并有 345 项单测覆盖。
+- **未做 / 不宣称**（与 HANGOFF 小节一致，勿据此认为 D3 已完成）：
+  1. ❌ **真机核对** —— 工作面 100% 领域层，按 §7.4 表第 1 行判定不需要；
+  2. ❌ **D3 三项退出条件的正式宣布**；
+  3. ❌ **门槛表/阶段快照的同步改动**（需 `HANGOFF.md` §9 顶 + `AGENTS.md` 头 + `README.md` 三处
+     一致修改，属产品决策）；本分支对 `AGENTS.md`/`README.md` **零改动**已核对；
+  4. ❌ **退出条件 2 的"适配层零 Android 依赖"可执行检查**（如 Gradle 依赖断言）—— 未授权，未做；
+  5. ❌ D2b 五项、§11 第 12 条空间阈值。
+- **待用户裁决**（§4）：**R1** 撤销 `from == to` 空操作（既有缺陷，非本轮引入，修法二选一）；
+  **R2** 改名计划描述缺逐项句子（补齐需新增 `TextKey`，本轮禁止）。**两项均不阻塞并回。**
+- **诚实性说明**：②③两项本可"顺手写上"，但那属于**替他做产品决策**，按 §7.1 第 1 步**只记录不改**。
+
