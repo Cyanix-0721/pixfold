@@ -1987,6 +1987,19 @@ CHANGED M31: ★存活★ -> 捕获      其余 26 组两遍均为"捕获"
   改完单独跑了一次四闸门：**`RC=0`、`BUILD SUCCESSFUL in 55s`、`62 executed`，读数与上同**；
   并确认**不需要重建 APK**（`:app:compileDebugKotlin` `UP-TO-DATE`，`:app:assembleDebug`
   复跑 `41 actionable tasks: 41 up-to-date`）。
+- **第 6 处注释腐化（补记）**：全树复扫（`grep -rn '⚠️\|⛔' app/src domain/src`，约 110 处命中）
+  逐处确认**全部落在注释/KDoc/资源头注释内、无一处是真实 UI 文案**；其中
+  `app/…/ui/plan/ExecutionReportPage.kt:265` 的 KDoc 仍在断言
+  「**警告**:标题带 ⚠️、正文说清"覆盖掉的内容已经找不回来了"」—— 已被本轮改动证伪
+  （标题的警示改由 `ic_warning_triangle` 矢量图标承担，资源里已无 ⚠️ 前缀）。
+  前 5 处由 `artifacts/edit_w22_comments.py` 按**字面前缀**匹配批量修掉，第 6 处写的是
+  **关于前缀的断言**、形态不同故漏网；本处直接改措辞
+  `标题带 ⚠️` ⇒ `标题带警示图标`。提交 = **`02503be`** docs(d3)（纯注释，1 file / +1 / −1）。
+- **补记后重跑四闸门**（`--rerun-tasks` 全量，`artifacts/gates_w22_final4.log`）：
+  **`RC=0`、`BUILD SUCCESSFUL in 39s`、`62 actionable tasks: 62 executed`**；
+  domain **32 files / 434 tests / 0F 0E 0S**、app **50 files / 456 tests / 0F 0E 0S**、
+  lint **0 errors, 0 warnings, 4 hints**（仍是既有 `AutoboxingStateCreation`）、
+  APK **33,437,589 字节** —— 与改动前**逐项一致** ⇒ 纯注释改动零行为影响，由读数证实。
 - **未做 / 不宣称**：① `· `/`→ `/`← ` 符号前缀**按既有裁决不动**；
   ② 两个退化键的**删除**是「去前缀后无文案」的直接后果，不是产品决策；
   ③ 真机上**未验证** R2 的逐项句子（不可达，见 R5）与 R4 的页码告警
@@ -2277,8 +2290,10 @@ cmd.exe /c "D:\Programing\Personal\pixfold\pixfold-d1\run-gradle.bat clean \
 > 缺哈希行均已回填（`257e0e1` / `288309b` / `3185b15` / `b190bb6` 等），历史占位**已清零**：
 
 | 提交 | 类型 | 内容 |
+| `02503be` | docs | 轮 18 补记：修正报告页 KDoc 里已证伪的「标题带 ⚠️」措辞（第 6 处注释腐化；纯注释 1 file / +1 / −1） |
+| `（轮 18 回填）` | docs | 台账回填轮 18（W22 / 第⑥项 图标）提交号与读数（`6c02b26`） |
+| `e491acd` | docs | 轮 18 / W22 台账回写：§3 W22 行、§3.1 轮 18 小节、§4 R5 登记、§6.2 读数、§6.3 增量、§6.5 收尾（1 file / +208 / −2） |
 | `fb4a656` | feat | W22 / 第⑥项：警告 emoji ⇒ 矢量图标（+2 drawable、`WarnIcon.kt` 映射表与 `WarnLine`、13 键去前缀 + 删 2 退化键、7 处调用点接线、21 组变异两遍、真机 10 面 + i18n 对照；app 430 → 456） |
-| `（轮 18 回填 = 本次提交）` | docs | 台账回填轮 18（W22 / 第⑥项 图标）提交号与读数 |
 | `（轮 17 回填）` | docs | 台账回填轮 17（W21 / i18n）提交号与读数（`7b56499`） |
 | `339d9fa` | test | W21 / i18n：键 → 译文结构契约 `TranslationCoverageTest.kt`（5 契约 / 313 行；16 组变异两遍全捕获；app 425 → 430；生产零改动） |
 | `（轮 16 回填）` | docs | 台账回填轮 16（W20 / R4）提交号与读数（`ee7fb12`） |
