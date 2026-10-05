@@ -203,6 +203,7 @@ cmd.exe /c "D:\Programing\Personal\pixfold\pixfold-d1\run-gradle.bat :app:lintDe
 | W19 | **R3 修复（用户 `m04079` 第③项授权）**：覆盖的撤销给出**三选一警告** —— 领域层新增 `UndoScope{ThisRun,Everything}` + `UndoOp.DeleteOverwritten`（与 `DeleteCreated` 类型可分）+ `ExecutionReport.overwrittenCount/needsUndoWarning` + `VolumePackPlan.overwritesExisting`（计划层唯一判据，报告计数与撤销推导共用）；UI 底栏撤销按钮在**有覆盖项时先弹框**（三个按钮各带色：两个执行档实心红、取消无底色 `TextButton`、**取消排在最后**），`onUndo` ⇒ `onUndoScope: (UndoScope) -> Unit`（**无默认值**，逼每个调用点表态） | 红→绿；**安全档绝不删用户原有文件**；变异含**资源内容**变异（占位符/重复文案/中文侧）且必须全捕获 | ✅ 完成（轮 15：**31 组变异两遍一致全捕获 / 0 存活 / 0 锚点缺失 / 0 编译失败**；第一遍曾 3 存活 + 2 编译失败，全部归因为**我的测试/变异设计错**并补强后转捕获 —— 其中 3 处是真测试缺口；domain **431**、app **420**；生产 5 文件 含 2 个双语资源） |
 | W20 | **R4 修复（用户 `m04079` 第④项「想一想怎么修」）**：让页码自检真的能报出不一致 —— `validatePageConsistency` 此前拿 `renumberPages(volume).size` 跟 `volume.pageOrder.order.size` 比长度，而 `renumberPages` 的返回长度**就是** `order.size`（等于列表与自身比，恒等）⇒ `pageIssues` 恒空、`consistent` 恒真 ⇒ `PackPreviewPage.kt:204` 的告警分支**不可达**。改为比「卷内登记的页 `volume.pages`」与「页序里排的页 `pageOrder.order`」：长度不同报 `PageIssueCountMismatch`，长度相同但成员不同报**新增键** `PageIssueMissingFromOrder`（+ 双语资源 + `resId()` 映射）—— 判据是**集合/成员**而非位置，故人工拖拽（只改 `order` 不改 `images`）不会误报。补零交叉校验**保留**：它在 `renumberPages` 与校验侧各写一次，是同一规则的两份**独立拷贝**，只改坏一处即被捕获（非自证） | 红→绿；两类检查各自的两个来源必须**不同源**；置换不变性必须有断言；变异含**资源内容**变异（占位符数量/方向/中英抄错）且必须全捕获 | ✅ 完成（轮 16：**21 组变异两遍一致全捕获 / 0 存活 / 0 锚点缺失 / 0 编译失败**；第一遍 7 存活 + 0 编译失败，全部归因为**我的测试设计错**并补强后转捕获 —— 其中 5 处是真测试缺口（同源期望值盲区）、2 处是我自己的等价变异设计错；**同时发现并修正一条既有测试**：`page preview follows the page order, not the raw page list` 原先断言「分叉卷也一致」，那是骑在坏检查上的；现在改为断言必须报出分叉。domain **434**、app **425**；生产 3 文件 含 2 个双语资源） |
 | W21 | **i18n 自动化（用户 `m04079` 第⑤项）**：补「键 → 译文」的结构契约测试，并复查既有 i18n 是否要调整 —— 新增 `app/src/test/…/ui/text/TranslationCoverageTest.kt`（5 条契约，**不经 `resId()`**，改按命名约定 `TextKey.FooBar → domain_foo_bar` 独立反查资源，同进程内中英对拍：①逐键覆盖 ②占位符下标+类型+顺序逐位对等 ③渲染逐字相等 ④复数档由数量参数选中 + **各档占位符同形** ⑤跨语言可辨 + 键间不撞句，两个白名单逐字写死）；另有只读审计脚本（`artifacts/i18n_audit.py` + `i18n_table.tsv` + `i18n_render.tsv`，107 键 × 两语言） | 红→绿；**必须证明新测试有杀伤力** —— 专门复活 W20 曾存活的 4 类变异（占位符删/对调/中英抄错），且必须全捕获 | ✅ 完成（轮 17：**16 组变异两遍** —— 第一遍 **15 捕获 / 1 存活**（M14 复数 `one` 档占位符被删：期望值与实际值**同源**，是 W20 记录的同源期望值盲区**第三次命中**），补一条「复数各档占位符同形」契约后第二遍 **16 捕获 / 0 存活 / 0 锚点缺失 / 0 编译失败**，3 个文件还原**逐字节一致**；app **425 → 430**（+5，新建 1 个测试文件）；**生产代码零改动**） |
+| W22 | **第⑥项：警告图标去 emoji，改用矢量图标（用户 `m00673`）**：把 `⚠️ `/`⛔ ` 两类**警示前缀**从文案里彻底移除（13 个键：5 个 `TextKey` + 6 个纯资源键 + 1 个 `<plurals>` + **2 个去前缀后只剩裸 `%1$s` 的退化键，直接删除**），改由**矢量图标**承担视觉警示 —— 新建 2 个 `vector` drawable（`ic_warning_triangle` 实心警告 / `ic_forbidden` 空心禁止，**靠形状不靠颜色**区分）+ `app/src/main/kotlin/com/pixfold/d1/ui/text/WarnIcon.kt`（`WARN_ICONS: Map<Int, Int>` **按资源 id 索引** —— 13 键横跨 `TextKey`/纯资源键/plurals 三种命名空间，只有资源 id 全覆盖；`TextKey` 那半经 `resId()` 折入同一张表，避免两处漂移；另有 `@Composable WarnLine`）+ 调用点 7 处接线（`PlanComponents` / `ExecutionReportPage` / `NamingPage` / `RenamePlanPage` / `PackPreviewPage` / `ProposalTable`）；**`· `/`→ `/`← ` 符号前缀按仓库既有裁决不动** | 红→绿；**必须证明守卫有杀伤力** —— ①新建 `EmojiFreeSourceTest`（扫 `res/` 29 个 XML + `app/src/main/kotlin` 43 个文件）在改前必须真红、改后必须绿；②图标**长得对**不能只断言"节点存在"（像素级渲染断言）；③变异含**图标几何退化**（子路径缺失 ⇒ 退化成实心块）且必须全捕获 | ✅ 完成（轮 18：**21 组变异两遍 / 0 逃逸** —— 第一遍 8 捕获 / 2 存活，存活者 M6/M7 = 删 `fillType="evenOdd"`，**已证等价**（`grid_base.txt` 与 `grid_mut.txt` 整幅 24×24 网格 `cmp` **逐字节 IDENTICAL**：三角与感叹号绕向相反 ⇒ `nonZero`/`evenOdd` 同值），第二遍改测 KDoc 写明的**真正失败模式**（子路径缺失 ⇒ 退化成实心块）4 捕获 / 0 存活；9 个备份文件与工作树**逐文件 sha256 SAME**；domain **434**（不变）、app **430 → 456**（+23 新用例 +3 既有）；**真机 10 个警示面 + i18n 中英对照全部通过**；**新发现 R2 键在生产路径不可达 ⇒ §4 新增 R5**） |
 
 **余量处理**：W1–W10 全部完成且仍有轮次 ⇒ **继续加固核心**（更多边界 / 更多变异 / 更多不变式），
 **不越界**到未授权工作面（适配层检查、D2b、真机、UI）。
@@ -1841,6 +1842,157 @@ CHANGED M31: ★存活★ -> 捕获      其余 26 组两遍均为"捕获"
   107 键 × 两语言渲染全量对拍用的探针）已 `rm -f`，确认不存在。它**从未入库**。
 - **i18n 一项关闭**。§4 表格新增 i18n 行并标记 ✅（见下）。
 
+#### 轮 18（2026-10-05 11:2x）— W22 **第⑥项：警告图标去 emoji，改用矢量图标**（用户 `m00673`）
+
+- **用户原话**（`m00673`，逐字）：「警告图标你直接用的emoji不好看，没有更好看的矢量图吗」。
+  这是继 ①`m04079` 解释 R1、②`m04081` 新增 `TextKey`、③`m04079` 三选一撤销警告、
+  ④`m04079` 修不可达校验分支、⑤`m04079` i18n 之后的**第六项用户指令**。
+- **勘察结论（先查后改）**：
+  - 全仓 emoji 分两种载体 —— **资源串里的前缀**（`⚠️ ` 11 处、`⛔ ` 2 处，跨 8 个 `values*` 文件）
+    与 **Kotlin 字面量**（`app/…/ui/plan/PlanComponents.kt:229` 的 `text = "⛔ $body"`）。
+  - 涉及 **13 个键**，但只有 **5 个是 `TextKey`**（`DangerDialogTitle`/`SummaryCleanEmptyDirsWarning`/
+    `SummaryOverwriteCbz`/`SummaryDeleteSourceDirWarning`/`RenameSummaryCleanEmptyDirs`），
+    另有 6 个**纯资源键** + 1 个 `<plurals>`（`a_naming_conflicts`）+ 2 个**退化键**（见下）。
+    ⇒ `TranslationCoverageTest`（枚举 `TextKey.entries`）**只能覆盖那 5 个** ——
+    这是它管不到第⑥项的原因，**不是它的缺陷**。
+  - **仓库既有裁决**：`· `/`→ `/`← ` 这类**符号前缀不属于文案**（三处注释已明写）⇒
+    本轮**只处理 `⚠️`/`⛔` 两类警示前缀**，`· ` 一律不动（4 处既有断言逐字保持：
+    `ui/plan/PlanUiTest.kt:81`/`:135`、`ui/plan/PlanWiringTest.kt:207`、`ui/workflowa/NamingPageTest.kt:586`）。
+- **两个「退化键」的处置（本轮最容易做错的一步）**：`plan_skip_reason_prefix`（英/中）与
+  `a_plan_skip_reason`（英/中）去掉 `⛔ ` 后**只剩 `%1$s`**，即**不再承载任何文案**。
+  故处置是**删除键本身**，而不是留一个空壳 —— 保留会让「键存在」这个信号变成噪声，
+  且 `TranslationCoverageTest` 第③条（渲染逐字相等）对它们已无意义。
+  **踩坑记录**：第一版资源脚本只删了英文侧两个键，**中文侧两个键被漏掉** ⇒
+  新写的 `EmojiFreeSourceTest` 跨文件扫描**当场报出这个不对称**
+  （`values-zh/strings_plan.xml:24` / `values-zh/strings_workflowa.xml:144`），补第二个锚点脚本修正。
+  **这是新增守卫的第一个真实战果：人工脚本漏改，守卫抓住。**
+- **实现（三层，全部零新依赖、零构建脚本改动）**：
+  1. **资源层**：`artifacts/edit_w22_res.py` **25 处替换 / 8 个文件**，逐处 `count(old) == 1`
+     否则 `ANCHOR-MISS` 整体不写盘；备份 `artifacts/w22bak/`（保留相对路径）。
+     补 `artifacts/edit_w22_res2.py` **4 处**（2 个中文退化键 + 2 处已失实注释），备份 `w22bak2/`。
+  2. **图标层**：新建 2 个 `vector` drawable（`ic_warning_triangle` / `ic_forbidden`，
+     Material Symbols 几何，Apache-2.0 已在 `ui/settings/LicensesScreen.kt:49` 声明）。
+     **为何两个而不是一个**：`⚠️`（警告）与 `⛔`（禁止）语义不同，区分**靠形状不靠颜色**
+     （实心警告三角 vs 空心禁止环）—— 与 `PinToggle` 的 filled/outlined 同判，色盲用户也能分辨。
+     断言取值纪律：只描述「正确的图标长什么样」，且只取 alpha 稳定为 0/255 的点
+     （`(12,12)=240`、`(17,17)=80` 是反锯齿边缘，不可用于断言）。
+  3. **组件层**：新建 `app/src/main/kotlin/com/pixfold/d1/ui/text/WarnIcon.kt`（**106 行**）——
+     `const val TAG_WARN_ICON` + `val WARN_ICONS: Map<Int, Int>`（**键是资源 id**）
+     + `warnIcon(resId: Int): Int?` / `warnIcon(msg: Msg): Int?`
+     + `@Composable fun WarnLine(icon, text, style, color, modifier, iconSize, textModifier)`。
+     为让 `warnIcon(msg)` 复用映射，`app/…/ui/text/PixFoldText.kt:159` 的 `TextKey.resId()`
+     由 `private` 放宽为 `internal`（**不是**新开第二张表 —— 两张表必然漂移）。
+     `WarnLine` 用 `contentDescription = null`（图标语义正文里已用文字说清，避免读屏念两遍，
+     与 `SchemeEditor`/`PinToggle` 同判）；**需要按文本断言的 testTag 必须走 `textModifier`**，
+     挂 `Row` 上会让 `assertTextEquals` 找不到文本节点。
+- **11 个映射条目**：5 个 `TextKey`（经 `resId()` 折入）+ `plan_danger_action` +
+  `report_undo_warning_title` + `<plurals name="a_naming_conflicts">` + `pack_page_issues` +
+  `pack_delete_warning` + `pack_excluded_warning` —— **全部 → `ic_warning_triangle`**；
+  `ic_forbidden` 只用于两处 `⛔` 语义（`PlanComponents.kt` 的危险弹框正文与跳过行原因）。
+  `ic_exclamation_circle` **已被 `SchemeEditor.kt:413` 占用**（语义 = 「润色信息」按钮）⇒ 不复用。
+- **调用点接线 7 处**：`ui/plan/PlanComponents.kt`（危险动作行 / 跳过行 / `ConfirmStep.General`
+  摘要行 / 危险弹框正文 / 弹框标题）、`ui/plan/ExecutionReportPage.kt`（撤销范围对话框标题，
+  `iconSize = 24.dp` 与 `headlineSmall` 齐平）、`ui/workflowa/NamingPage.kt`（冲突计数）、
+  `ui/workflowa/RenamePlanPage.kt`（跳过原因）、`ui/workflowb/PackPreviewPage.kt`（页码告警 /
+  删除源目录告警 / 未勾选告警）、`ui/workflowa/ProposalTable.kt`（注释）。
+  ⚠️ **`describe()` 行保持裸 `Text` 是有意的**：它渲染的 5 个键
+  （`PackCreateCbz`/`PackWriteComicInfo`/`PackPackPages`/`PackDeleteSourceDir`/`PackSkipOutputExists`）
+  **不在 `WARN_ICONS` 里**（它们不是警示文案）⇒ 不该长图标。
+  ⚠️ `TAG_CONFIRM_DANGER_TITLE` 必须留在 `Text` 上而非移到 `Row`（`ui/plan/PlanUiTest.kt:140`
+  做的是 `assertTextEquals`）—— 全仓唯一有文本断言的警示 tag。
+- **测试（新建 5 个文件 / 23 条用例；改 2 个既有文件 +3 条）**：
+  - `app/src/test/kotlin/com/pixfold/d1/EmojiFreeSourceTest.kt`（**332 行 / 6 用例**）——
+    **这是守卫，不是图标测试**：扫 `res/` 下全部 XML（29 文件）与 `app/src/main/kotlin`（43 文件），
+    断言「警示 emoji 一个都不剩」+「退化键被删除而非留空壳」。
+    **①资源与②Kotlin 必须是两条用例**（合一起时资源断言先失败会**短路**掉 Kotlin 扫描 ⇒ 假绿）；
+    另有 4 条**自检**用例防「扫描空转」（阈值 `res.files ≥ 20` / `res.stringTags ≥ 300` /
+    `kt.files ≥ 30`；检测器必须认得它替换掉的两种 emoji，且**不得**误报 `→`/`·`/`%1$s`；
+    注释遮蔽必须**保留换行** —— 首版把换行也吃掉，报出的行号整体偏移）。
+  - `ui/text/WarningIconRenderTest.kt`（**3 用例**）/ `ForbiddenIconRenderTest.kt`（**4 用例**）——
+    **像素级断言**（`SIZE = 96`、`SCALE = 4`，采样每格中心）：不只断言「节点存在」，
+    而是断言**图标长得对**（三角内实心、感叹号真挖空、禁止环有缝）。
+    KDoc 记下教训：「语义层断言『节点存在』不等于『图标看得见』，更不等于『图标长得对』」。
+  - `ui/text/WarnIconMappingTest.kt`（**6 用例**）—— 11 个键逐一有映射、无多余键、
+    `TextKey` 半边与资源 id 半边一致。
+  - `ui/text/WarnLineTest.kt`（**4 用例**）—— 组件契约（图标画出、`contentDescription = null`、
+    `textModifier` 落在 `Text` 上而非 `Row` 上）。
+  - 既有：`ui/plan/PlanUiTest.kt` **10 → 11**、`ui/workflowb/PackPreviewPageTest.kt` **21 → 23**。
+  - 临时探针 `_ProbeIconShape.kt` **已删除**（转正为上面两个渲染测试）。
+- **变异清扫 21 组 / 两遍 / 0 逃逸**（`artifacts/mutate_w22.py` M1–M10 + `mutate_w22b.py` M11–M14）：
+  - 第一遍 **8 捕获 / 2 存活**（M6/M7 = 删 drawable 的 `fillType="evenOdd"`）。
+    **判定为「已证等价的变异设计错」，不是测试缺口**，证据可复核：
+    `artifacts/grid_base.txt` 与 `grid_mut.txt` 是整幅 24×24 像素网格，`cmp` **逐字节 IDENTICAL**
+    —— 因为三角与感叹号**绕向相反**，`nonZero` 与 `evenOdd` 在该形状上等价。
+  - 第二遍换测 **KDoc 里写明的真正失败模式**（子路径缺失 ⇒ 图标退化成实心块）：
+    M11 删感叹号子路径 / M12 删禁止环子路径 / M13 映射指向不存在的 drawable /
+    M14 映射 11 条全改指一个图标 ⇒ **4 捕获 / 0 存活**。
+  - **累计 21 组两遍 / 0 逃逸**。9 个备份文件与工作树**逐文件 sha256 SAME** ⇒ 无变异残留。
+- **四道闸门（`--rerun-tasks` 全量重建，`artifacts/gates_w22_final3.log`）**：
+  **`RC=0`、`BUILD SUCCESSFUL in 55s`、`62 actionable tasks: 62 executed`**（跑前删了两个
+  `test-results` 目录以保证不是陈旧 XML）；domain **32 files / 434 tests / 0F 0E 0S**、
+  app **50 files / 456 tests / 0F 0E 0S**、lint **0 errors, 0 warnings, 4 hints**（4 条为既有
+  `AutoboxingStateCreation`）；APK **33,437,589 字节**、mtime 2026-10-05 11:53:09。
+  计数口径：app 源码 `@Test`（**已排除 `NegativeControlTest`**）**456** = XML **456**；
+  逐项对账 `431(HEAD 含 NC) − 1(NC) + 23(5 个新文件) + 1(PlanUiTest) + 2(PackPreviewPageTest) = 456`，
+  **无残差**。类名对拍：源码 52 类 / XML 50 类，「有源码无 XML」恰为
+  `NegativeControlTest` + `TestText`（助手），**无孤儿测试类**。
+  ⚠️ 口径修正：轮 16 记的「app 源码 = XML + 1」在本轮**不再成立** —— 本轮已先把
+  `NegativeControlTest` 从源码计数里排除，两边**直接相等**。
+- **真机核对（第⑥项是 UI 面改动，按 §7.4 必须过）—— 10 个警示面全部通过**：
+  设备 PJX110 / Android 16 / 1264×2780 px = 361dp×794dp / 系统语言 zh-CN，
+  新 APK 已重装（`adb install -r` ⇒ `Success`，`lastUpdateTime=2026-10-05 11:25:12`）。
+  逐面取证（dump 与像素读数见下）：
+  ①A 线通用确认框（`artifacts/cfA1.xml`）：无 `⚠️`，图标 `[156,1484][212,1540]` = **56×56 px = 16dp**；
+  ②A 线危险确认框（`artifacts/cfA2.xml`）：标题与正文两处均无 emoji，图标列 `x=156`，
+  **对照空白 `[96,1176][152,1232]` 为纯 `(0,0,0)`** ⇒ 图标确在图标列、非背景噪声；
+  ③B 线 `pack_delete_warning` + `plan_danger_action`（`artifacts/b2del.xml`）：两行各有图标
+  （`[42,1260]` / `[42,1407]`），其下空白对照区无图标；
+  ④B 线普通确认 `domain_summary_delete_source_dir_warning`（`artifacts/bcf1.xml`）：图标 `[206,1484][262,1540]`；
+  ⑤B 线覆盖路径 `domain_summary_overwrite_cbz`（`artifacts/bcf3.xml`）：图标 `[156,1453][212,1509]`，
+  且路径参数正确渲染；
+  ⑥报告页（`artifacts/brep.xml`）：「共 5 项：成功 5 · 跳过 0 · 失败 0」；
+  ⑦撤销范围对话框标题（`artifacts/bundo2.xml`）：图标 **96×96 px = 24dp**（标题是 `headlineSmall`
+  故放大），对话框 `[72,802][1192,2118]` **未溢出**，三按钮顺序未变（取消仍在最后）；
+  ⑧A 线改名计划页危险动作行：无 `⚠️`；⑨B 线打包页源目录处置：无 `⚠️`；
+  ⑩英文模式复核（见下）。
+  像素读数（`artifacts/pngprobe.py --top`）：图标区典型值 `(242,184,181)`（错误色淡化后）
+  或 `(187,166,167)`，**与「无图标」对照空白区（纯 `(0,0,0)` / `(248,224,225)`）可分**。
+- **i18n 中英对照真机复查（一并完成）**：设置 → 语言 → `English`，走通 A 线全流程
+  （`artifacts/en_a1.xml` / `en_a3.xml` / `en_a4.xml` / `en_a4d.xml` / `en_cf1.xml` / `en_cf2.xml`）：
+  `Step 1 Sort and preview` / `Dangerous action: Clean up empty folders (needs a separate
+  confirmation before running)` / `Confirm dangerous action` / `“Clean up empty folders” is checked; ...`
+  —— **全部无 emoji 且图标照常绘制**（`artifacts/w22_en_cf2.png`）。
+  语言已复原为「跟随系统」（`artifacts/langrestored.xml` 全中文）。
+  ⚠️ 注意：mock 数据（`旅行照片`、`进击的巨人`）本身是中文，**那是数据不是 UI 文案**。
+  ⇒ 6 个 `TranslationCoverageTest` 覆盖不到的**纯资源键**在英文下也渲染正确。
+- **本轮新发现（⇒ §4 新登记 R5）**：**R2 的键在生产路径上不可达**。
+  `OperationPlan.describe()`（`domain/…/plan/OperationPlan.kt:137`）是
+  `RenamePlannedOp.describe()`（`:87`，产 `Msg(TextKey.RenamePlanRename, ...)`）的**唯一调用者**，
+  而 `OperationPlan` 在 `app/src/main` **零引用**；app 侧唯一 `describe()` 调用点
+  `app/…/ui/plan/PlanComponents.kt:144` 的 `PlanRow` 形参类型是 **`VolumePackPlan`**
+  （`PlanComponents.kt:107`，唯一调用点 `app/…/ui/workflowb/PackPreviewPage.kt:351`）⇒
+  走 `domain/…/plan/PackagePlan.kt:82 fun VolumePackPlan.describe()`，**产不出 `RenamePlanRename`**。
+  `app/…/ui/workflowa/RenamePlanPage.kt` 完全不消费 `describe()`。
+  ⇒ **R2「已修复」但用户在真机上永远看不到**（真机实测证实）；真机 dump 里出现的
+  `→ 旅行照片_001.jpg` 是 2026-09-27 的**旧镜像**，早于 R2 提交（10-04 22:24），不能当作 R2 已测的证据。
+  **修法二选一属产品决策，记 §4 R5 不自行改。**
+- **守卫边界如实记**：`EmojiFreeSourceTest` **只扫 `app/src/main/kotlin`，不含 `domain/`**
+  （emoji 只在 app 侧，有意为之）⇒ 该守卫全绿**不等于**全仓注释没腐化。
+  本轮据此单独做了一轮**注释腐化修正**：`artifacts/edit_w22_comments.py` 修掉 5 处仍写着 `⚠️` 的注释
+  （`domain/…/comic/ComicInfoXml.kt:120`、`domain/…/text/TextKey.kt:33`、
+  `domain/…/plan/DangerAction.kt:52`、`domain/src/test/…/plan/DangerActionTest.kt:142`、
+  `domain/src/test/…/comic/ComicMetadataTest.kt:417`），备份 `artifacts/w22cbak/`，
+  `git diff --stat` = **5 files / +5 / −5**（纯注释，不改行为）。
+  改完单独跑了一次四闸门：**`RC=0`、`BUILD SUCCESSFUL in 55s`、`62 executed`，读数与上同**；
+  并确认**不需要重建 APK**（`:app:compileDebugKotlin` `UP-TO-DATE`，`:app:assembleDebug`
+  复跑 `41 actionable tasks: 41 up-to-date`）。
+- **未做 / 不宣称**：① `· `/`→ `/`← ` 符号前缀**按既有裁决不动**；
+  ② 两个退化键的**删除**是「去前缀后无文案」的直接后果，不是产品决策；
+  ③ 真机上**未验证** R2 的逐项句子（不可达，见 R5）与 R4 的页码告警
+  （mock 数据自身一致，需专门造分叉卷才能触发）；
+  ④ 未改构建脚本、未新增依赖、未改 `HANGOFF.md`/`AGENTS.md`/`README.md`
+  （三处阶段快照仍不同步，属产品决策）。
+
 ---
 
 ## 4. 待裁决 / 阻塞（越界项写这里，不自行决定）
@@ -1856,6 +2008,7 @@ CHANGED M31: ★存活★ -> 捕获      其余 26 组两遍均为"捕获"
 | R3 | 7（W11） | `OutputConflictPolicy.Overwrite` + 输出已存在时，报告报 `Succeeded`、`createdPath` = **被替换的那个旧文件**路径，撤销据此推导 `DeleteCreated(该路径)` ⇒ 真执行会**删掉用户原有的 CBZ**，且被覆盖的内容无法恢复 | 「覆盖的撤销」是什么，属产品决策，三种语义完全不同：①当作新建 ⇒ 删掉（现状，会把用户旧文件也删了）②覆盖前先备份 ⇒ 撤销时恢复备份（要给 `ExecEntry` 加"被覆盖路径"字段）③覆盖项标为不可撤销（要把 `OverwriteExisting` 传进 `undoOpsOf`）。**危险动作机制已认识此场景**（`DangerAction.kt` 判 `OverwriteExisting`），只有撤销推导从不查策略。按 §7.1「有歧义先请用户裁决」，故只记录 | ✅ **已修复**（轮 15 / W19：用户 `m04079` 第③项裁决「添加警告，仅选择当前操作生成的撤销还是全部删除还是取消，记得按钮颜色要区分开，把取消放到最后边」—— 取的是**①的安全版**：默认档 `UndoScope.ThisRun` **永不删被覆盖的文件**，只有用户在弹框里显式选了 `Everything` 才会推导出 `DeleteOverwritten`；`VolumePackPlan.overwritesExisting` 收成全仓唯一判据，报告计数/危险动作/撤销推导共用同源；31 组变异两遍全捕获；详见 §3.1 轮 15） |
 | R4 | 9（W13） | `validatePageConsistency(volume)` 的输入就是 `renumberPages(volume)` 的**输出**（`ComicInfoXml.kt:111` 调 `:93-97 previewOf`），两者同源 ⇒ ①`pages.size != order.size` 恒假、②校验侧补零位数与重编号侧恒等、③`startsWith("$expected.")` 恒真 ⇒ **`pageIssues` 恒空、`consistent` 恒真**，UI 的告警分支（`app/…/workflowb/PackPreviewPage.kt:204 if (!preview.consistent)`）**不可达** | 要让这两个分支可达，必须改 `validatePageConsistency` 的**输入语义**（例如改成校验"磁盘上真实存在的页"而非"按页序重编号的页"，或校验 `volume.pages` 与 `pageOrder.order` 是否一致）。这改变了"一致性"这个词在 D3 里的含义，且会牵动 UI 告警的触发条件 ⇒ **属产品决策**。本轮只做等价性证明与记录，**不改输入来源** | ✅ **已修复**（轮 16 / W20：用户 `m04079` 第④项「想一想怎么修」授权 —— 取的是登记里的**第②种修法**：校验 `volume.pages` 与 `pageOrder.order` 是否一致。第①种（改看「磁盘上真实存在的页」）要碰文件系统，与原型「不碰真实文件系统」的既定约束冲突（`performUndo` 恒 `applied=false` 即该约束的体现），故未取。修后：数量检查改比「卷内登记的页」与「页序里排的页」，长度不同报 `PageIssueCountMismatch`，长度相同但成员不同报**新增键** `PageIssueMissingFromOrder`（+ 双语资源 + `resId()` 映射）；判据是**集合/成员**而非位置 ⇒ 人工拖拽只改 `order` 不改 `images`，不会误报（有专门用例钉死置换不变性）。补零交叉校验**保留**——本轮同时**纠正**了本行原措辞里的一处不准确：③`startsWith("$expected.")`**并不恒真**，`expected` 的补零宽度用 `pages.size`、`renumberPages` 用 `order.size`，是同一规则的**两份独立拷贝**，只改坏一处即被捕获（W13 的变异「页码补零不随页数自适应」正是被它抓住的）；**真正恒假的只有数量检查**。21 组变异两遍全捕获；同时修正一条骑在坏检查上的既有断言（详见 §3.1 轮 16）。⚠️ 诚实范围声明：生产路径下 `ComicVolume` 构造点唯一且类型级默认值就是 `pageOrderOf(pages)`，故这两者**目前永不分叉**，新检查是**防御性**的（防未来新增的 `copy(pages=…)` 路径），它解决的是「修复前告警分支不可达」这一点。 |
 | i18n | 15（W19） | 见 `m04079` 第⑤项：「键 → 译文」这条链**没有任何独立的一侧** —— `PixFoldTextTest` 的期望值经 `TestText.of(同一个资源)` 取得（**同源**，资源改坏时两边一起变）；`resId()` 是 `private` 穷尽 `when`，只保证「有资源」不保证「指对」。两处叠加的直接后果：W20 的 M15–M18（中英占位符删/对调）、M21（中文抄成英文）**全部存活** | 要补自动化就得**另立一侧**（按命名约定反查资源 + 同进程切语言对拍），而这需要新增测试文件、并决定「哪些键允许中英相同 / 允许撞句」——后者是**人工裁决**（写成白名单即等于给译文立规），不是能从代码里算出来的 | ✅ **已完成**（轮 17 / W21：用户 `m04079` 第⑤项「这属于 i18n 内容，顺带实现了」授权 —— 新增 `app/…/ui/text/TranslationCoverageTest.kt`（5 条契约，不经 `resId()`，按 `TextKey.FooBar → domain_foo_bar` 独立反查，同进程内中英对拍）；16 组变异**两遍**（第一遍 15 捕获 / 1 存活 M14 = 同源期望值盲区**第三次命中**，补「复数各档占位符同形」契约后第二遍 16 捕获 / 0 存活），3 文件还原逐字节一致；app +5 ⇒ **430**；**生产代码零改动**。既有 i18n 复查结论 = **无需调整**（资源面六类可疑项全 0；生产层无漏翻文案；唯一不一致是符号前缀「一处成键、一处写死」，仓库三处注释已裁决符号前缀不属于文案，如实记为观察项）；详见 §3.1 轮 17） |
+| R5 | 18（W22） | **R2 的键在生产路径上不可达**（第⑥项真机核实时发现）：R2（轮 14）新增的 `TextKey.RenamePlanRename` 由 `RenamePlannedOp.describe()`（`domain/…/plan/OperationPlan.kt:87`）产出，而它的**唯一调用者** `OperationPlan.describe()`（`:137`）在 `app/src/main` **零引用**；app 侧唯一 `describe()` 调用点 `app/…/ui/plan/PlanComponents.kt:144` 的 `PlanRow` 形参类型是 **`VolumePackPlan`**（`PlanComponents.kt:107`，唯一调用点 `app/…/ui/workflowb/PackPreviewPage.kt:351`）⇒ 走 `PackagePlan.kt:82 fun VolumePackPlan.describe()`，**产不出 `RenamePlanRename`**。`app/…/ui/workflowa/RenamePlanPage.kt` 又完全不消费 `describe()`（`:274 text = "→ ${op.finalName}"` 是代码里的符号前缀，状态词走 `R.string.a_plan_status_rename`/`a_plan_status_skip`）⇒ **键与映射齐备、domain+app 测试全绿，但用户在真机上永远看不到**（真机实测证实：改名计划页只有 `→ 旅行照片_001.jpg`，无「重命名 原名 → 新名」逐项句子） | 修法二选一且语义不同：①**接通** —— 让 `RenamePlanPage` 改走 `describe()`（或把 `PlanRow` 泛化到 `OperationPlan`），改动 UI 布局与交互；②**删除** —— 承认该键无用途，删键 + 双语资源 + `resId()` 映射 + 相关测试。选哪种、以及「改名计划页要不要逐项句子」本身，都是**产品决策**（UI 呈现形态），按 §7.1「有歧义先请用户裁决」只记录不改 | ⏳ **待裁决**（轮 18 新登记。注意：这是**测试全绿但功能不可达**的形态 —— 与 R1–R4 的"分支不可达"同类，但落点在生产路径的**接线缺失**而非判据错误） |
 
 **已知的、明确不碰的开放项**（不要在本轮"顺手"处理）：
 - HANGOFF §11 第 12 条：Android 端存储不足的**阈值与提示形态**，明写「待 D2b 真机验证后定」。
@@ -2004,6 +2157,23 @@ cmd.exe /c "D:\Programing\Personal\pixfold\pixfold-d1\run-gradle.bat clean \
 > `resources.arsc` 复核新串**三种形态**（键名 / 英文 / 中文）逐一 **YES**，
 > 另加 `domain_page_issue_count_mismatch` 中英各一条。
 
+
+> 轮 18 读数（`--rerun-tasks` 全量重建，`artifacts/gates_w22_final3.log`）：domain **32 files / 434 tests / 0F 0E 0S**、
+> app **50 files / 456 tests / 0F 0E 0S**；lint **0 errors, 0 warnings, 4 hints**（4 条为既有
+> `AutoboxingStateCreation`，见 `app/build/reports/lint-results-debug.txt` 末行）。
+> `RC=0`、`BUILD SUCCESSFUL in 55s`、`62 actionable tasks: 62 executed`；先 `rm -rf` 了两个
+> `test-results` 目录以保证不是陈旧 XML。
+> 计数口径（**本轮已修正**）：app 源码 `@Test` **456**（**先排除 `NegativeControlTest`**）= XML **456**、
+> 文件数 50 = 50 ⇒ 轮 16 记的「源码 = XML + 1」**不再适用**；逐项对账
+> `431(HEAD 含 NC) − 1(NC) + 23(5 个新文件) + 1(PlanUiTest) + 2(PackPreviewPageTest) = 456`，**无残差**。
+> 类名对拍：源码 52 类 / XML 50 类，「有源码无 XML」恰为 `NegativeControlTest` + `TestText`（助手）。
+> 轮 18 增量：domain **434 → 434**（+0，第⑥项不碰领域判据）；app **430 → 456**（+26：
+> `EmojiFreeSourceTest` +6、`WarningIconRenderTest` +3、`ForbiddenIconRenderTest` +4、
+> `WarnIconMappingTest` +6、`WarnLineTest` +4、`PlanUiTest` +1、`PackPreviewPageTest` +2）。
+> 产物：**33,437,589 字节**，mtime **2026-10-05 11:53:09**。
+> 真机：PJX110 / Android 16 / 1264×2780 px = 361dp×794dp；新 APK 已装（`lastUpdateTime=2026-10-05 11:25:12`），
+> **10 个警示面 + i18n 中英对照全部通过**（逐面取证见 §3.1 轮 18）。
+
 ### 6.3 改动面与越界核对
 
 - `git diff --stat dev...d3/p1` = **11 files changed, 2678 insertions(+), 74 deletions(-)**。
@@ -2070,6 +2240,34 @@ cmd.exe /c "D:\Programing\Personal\pixfold\pixfold-d1\run-gradle.bat clean \
 > 只读审计产物（`artifacts/i18n_audit.py` / `i18n_table.tsv` / `i18n_render.tsv`）与
 > 变异脚本 `artifacts/mutate_w21.py` 均在 `pixfold-d1/.gitignore:9` 忽略的 `artifacts/` 下，**未入库**。
 
+> 轮 18（W22 / 第⑥项 图标）**共 30 个文件：22 个已跟踪改动（+176 / −56）+ 8 个新建**。
+> 其中**生产侧 21 个**：`ui/text/WarnIcon.kt`（**新建** 106 行）、
+> `res/drawable/ic_warning_triangle.xml`（**新建** 25 行）、`res/drawable/ic_forbidden.xml`（**新建** 24 行）、
+> `ui/plan/PlanComponents.kt`、`ui/plan/ExecutionReportPage.kt`、`ui/text/PixFoldText.kt`（`resId()` 放宽为 `internal`）、
+> `ui/workflowa/NamingPage.kt`、`ui/workflowa/ProposalTable.kt`（注释）、`ui/workflowa/RenamePlanPage.kt`、
+> `ui/workflowb/PackPreviewPage.kt`、8 个双语资源（`values/` 与 `values-zh/` 各 4 个：
+> `domain_strings.xml`、`strings_plan.xml`、`strings_workflowa.xml`、`strings_workflowb.xml`）、
+> 以及 3 个 domain 文件的**纯注释**修正（`comic/ComicInfoXml.kt`、`text/TextKey.kt`、`plan/DangerAction.kt`）。
+> 测试侧 **9 个**：新建 `ui/text/…/EmojiFreeSourceTest.kt`（332 行）+
+> `ui/text/{WarningIconRenderTest,ForbiddenIconRenderTest,WarnIconMappingTest,WarnLineTest}.kt`，
+> 既有 `ui/plan/PlanUiTest.kt` +1 用例、`ui/workflowb/PackPreviewPageTest.kt` +2 用例，
+> 以及 2 个 domain 测试文件的**纯注释**修正（`plan/DangerActionTest.kt`、`comic/ComicMetadataTest.kt`）。
+> ⇒ **21 + 9 = 30**。
+> `git diff --stat HEAD -- pixfold-d1/domain/src/main pixfold-d1/app/src/main` = **18 files / +106 / −53**
+> （已跟踪部分的生产改动面）。
+> ⚠️ **资源层的 13 键去前缀不是"改文案"而是"删前缀"**：13 个键的**可见文案一字未改**
+> （如 `⚠️ 已有同名 CBZ 将被覆盖：%1$s` → `已有同名 CBZ 将被覆盖：%1$s`），
+> 另有 **2 个退化键被整体删除**（去前缀后只剩裸 `%1$s`，`plan_skip_reason_prefix` / `a_plan_skip_reason`，
+> 英中各一条 ⇒ 共 4 个元素）。**占位符数量与下标一位未动** ⇒ `TranslationCoverageTest`
+> 的契约①②③④⑤全部照常成立（该测试只枚举 `TextKey.entries`，13 键里只有 5 个在枚举范围内，
+> 且这 5 个的前缀删除对"渲染逐字相等"是**同步**的 ⇒ 不触发白名单漂移）。
+> ⚠️ **边界文件逐条 `git diff --quiet HEAD` 全部 unchanged**：`app/build.gradle.kts`、
+> `domain/build.gradle.kts`、`build.gradle.kts`、`settings.gradle.kts`、`gradle/libs.versions.toml`、
+> `.mise.toml`、`AGENTS.md`、`README.md`、`HANGOFF.md` ⇒ **未改构建脚本、未新增依赖、未动阶段快照**。
+> ⚠️ 变异脚本与备份（`artifacts/mutate_w22.py`、`mutate_w22b.py`、`w22bak/`、`w22bak2/`、`w22cbak/`、
+> `w22mutbak/`、`w22mutbak2/`、`grid_base.txt`、`grid_mut.txt`、`pngprobe.py`、`adbx.sh` 等）
+> 均在 `pixfold-d1/.gitignore:9` 忽略的 `artifacts/` 下，**未入库**。
+
 ### 6.4 提交拓扑（`git log --oneline dev..d3/p1`）
 
 > **不写死条数**（终验当时为 9；W10 提交与回填提交各 +1）—— 以命令输出为准。
@@ -2078,6 +2276,8 @@ cmd.exe /c "D:\Programing\Personal\pixfold\pixfold-d1\run-gradle.bat clean \
 > 缺哈希行均已回填（`257e0e1` / `288309b` / `3185b15` / `b190bb6` 等），历史占位**已清零**：
 
 | 提交 | 类型 | 内容 |
+| `（本次 W22 提交）` | feat | W22 / 第⑥项：警告 emoji ⇒ 矢量图标（+2 drawable、`WarnIcon.kt` 映射表与 `WarnLine`、13 键去前缀 + 删 2 退化键、7 处调用点接线、21 组变异两遍、真机 10 面 + i18n 对照；app 430 → 456） |
+| `（轮 18 回填 = 本次提交）` | docs | 台账回填轮 18（W22 / 第⑥项 图标）提交号与读数 |
 | `（轮 17 回填）` | docs | 台账回填轮 17（W21 / i18n）提交号与读数（`7b56499`） |
 | `339d9fa` | test | W21 / i18n：键 → 译文结构契约 `TranslationCoverageTest.kt`（5 契约 / 313 行；16 组变异两遍全捕获；app 425 → 430；生产零改动） |
 | `（轮 16 回填）` | docs | 台账回填轮 16（W20 / R4）提交号与读数（`ee7fb12`） |
@@ -2196,8 +2396,12 @@ cmd.exe /c "D:\Programing\Personal\pixfold\pixfold-d1\run-gradle.bat clean \
   （仓库三处注释已裁决「符号前缀不属于文案」⇒ 不构成漏翻）；`ui/HomeScreen.kt:67` 与
   `ui/settings/LicensesScreen.kt:198` 写死 `“PixFold”` 而未引用 `R.string.app_name`（值与资源逐字相同）。
   十一次扫荡累计：W7 23 / W8 16 / W11 7 / W12 23 / W13 39 / W14 58 / W15 64 / W16 66 / W19 31 / W20 21 / **W21 16 组**。
+  十二次扫荡累计：W7 23 / W8 16 / W11 7 / W12 23 / W13 39 / W14 58 / W15 64 / W16 66 / W19 31 / W20 21 / W21 16 / **W22 21 组**（W22 = 第⑥项 图标面，两遍一致：8 捕获 + 2 已证等价 ⇒ 4 捕获）。
 - **未做 / 不宣称**（与 HANGOFF 小节一致，勿据此认为 D3 已完成）：
-  1. ❌ **真机核对** —— 工作面 100% 领域层，按 §7.4 表第 1 行判定不需要；
+  1. ⚠️ **真机核对** —— 领域核心工作面（W0–W21）按 §7.4 表第 1 行判定不需要；
+     **轮 18（W22 / 第⑥项）是 UI 面改动，已在真机上核对完毕**（10 个警示面 + i18n 中英对照，
+     逐面取证见 §3.1 轮 18）；真机上**仍未验证**的两处：R2 的逐项句子（键不可达，见 §4 R5）、
+     R4 的页码自检告警（mock 数据自身一致，需专门造分叉卷才能触发）；
   2. ❌ **D3 三项退出条件的正式宣布**；
   3. ❌ **门槛表/阶段快照的同步改动**（需 `HANGOFF.md` §9 顶 + `AGENTS.md` 头 + `README.md` 三处
      一致修改，属产品决策）；本分支对 `AGENTS.md`/`README.md` **零改动**已核对；
@@ -2211,7 +2415,9 @@ cmd.exe /c "D:\Programing\Personal\pixfold\pixfold-d1\run-gradle.bat clean \
   **其中 R1 已于轮 13（W17）关闭、R2 已于轮 14（W18）关闭、R3 已于轮 15（W19）关闭**；
    **R4 已于轮 16（W20）关闭**（用户 `m04079` 第④项「想一想怎么修」授权后，取登记里的第②种修法）；**四项全部关闭，§4 已无待裁决项**。
    **i18n（§4 新增行）已于轮 17（W21）关闭**（用户 `m04079` 第⑤项「这属于 i18n 内容，顺带实现了」授权后落地）
-   ⇒ **§4 五项（R1/R2/R3/R4/i18n）全部关闭，已无任何待裁决项**。
+   ⇒ **§4 五项（R1/R2/R3/R4/i18n）全部关闭**。
+   **R5 为轮 18（W22）新登记**（第⑥项真机核实时发现）：R2 的键**在生产路径上不可达** ⇒
+   **§4 重新出现 1 项待裁决**（修法二选一：接通 `describe()` 到改名计划页 vs 删除该键，属产品决策）。
   **轮 15（W19）未新增待裁决项** —— 31 组变异两遍全捕获，无存活者（第一遍的 3 个存活者与
   2 个编译失败已逐条归因为测试/变异设计错，并以补强断言消除）；R3 是用户 `m04079` 第③项
   裁决后按"默认安全档 + 显式弹框选择 + 判据收成一处"这条最小授权面落地。
