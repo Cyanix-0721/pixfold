@@ -2177,6 +2177,151 @@ CHANGED M31: ★存活★ -> 捕获      其余 26 组两遍均为"捕获"
 
 ---
 
+#### 轮 21（2026-10-05 20:03–21:0x）— W25 D3 退出条件 ② 的可执行检查 + 三处阶段快照同步
+
+- 提交：（见下方回填行）
+- 改动：新增 `domain/src/test/kotlin/com/pixfold/d1/domain/boundary/AdapterBoundaryTest.kt`（19,285 字节 /
+  5 个测试）；三处阶段快照同步（`HANGOFF.md` ×3 处 + `AGENTS.md` 头 + `README.md` 状态行）；
+  `HANGOFF.md` 4 处就地订正。**`pixfold-d1/app/**` 一行未改**。
+- 闸门：app 456 tests / domain 439 tests / 0F 0E / lint `0 errors, 0 warnings, 4 hints` / assembleDebug OK
+  （`62 actionable tasks: 62 executed`，APK 与干净基线**逐字节相同**）
+- 变异：4 次**真实注入**（3 次违规注入 + 1 次带探针的取证复跑），四层全部可红，0 逃逸
+  （其中**注入 A 查出第 2 层假绿**并修复）
+- 结论 / 阻塞 / 待裁决：D3 三项退出条件逐条达成并取证；三处阶段快照已同步；**无新增待裁决项**。
+
+**授权来源**：用户 `m04274`（逐字两项）「① 先补 D3 退出条件的可执行检查」「② 再改那五处阶段快照」。
+触发点是 `m04360` 的质疑（逐字）「你好像一直没真机校验啊，这么就已完成了」—— 查证后确认
+**真机校验确实做过、但只覆盖 2 轮**（轮 18 / 轮 19），且**打包核心从未真机端到端跑过**
+（原型不连真实文件系统）⇒ 该质疑**部分成立**，本轮把这条边界写进 §6.5 与 `HANGOFF.md` D3 节。
+本轮定位 = **收口轮**：补上 D3 最后一项缺失的退出条件证据，并把三项条件的达成同步到阶段快照。
+
+##### ① 退出条件 ② 的可执行检查（新增测试文件，非文档承诺）
+
+- 新增 `pixfold-d1/domain/src/test/kotlin/com/pixfold/d1/domain/boundary/AdapterBoundaryTest.kt`
+  （**19,285 字节 / 5 个测试**），把「`domain/` 零 Android 依赖」从**自觉**变成**可执行检查**。
+- **为什么不是 Gradle 依赖断言**：退出条件 ② 原文举例「如 Gradle 依赖断言」，但那需要改
+  `domain/build.gradle.kts`（本轮冻结、且属环境类改动）。改用**测试**实现同一判据，
+  好处是它**随 `:domain:test` 每轮常跑**，不依赖任何人记得去跑一条额外命令。
+- **四层判据 + 一层自检**（5 个 `@Test`）：
+  1. `android_classes_are_not_loadable_from_the_domain_module()` —— 6 个探针 FQN 在 domain 的
+     测试类加载器上必须**加载失败**（`Class.forName(fqn, false, …)`）：`android.content.Context`、
+     `android.net.Uri`、`android.graphics.Bitmap`、`android.os.Build`、`androidx.annotation.Keep`
+     （**诱饵** —— 最容易被随手加进来的那个）、`androidx.compose.runtime.Composable`。
+  2. `no_android_artifacts_on_the_domain_test_classpath()` —— 从 `java.class.path` 解析，
+     既要认 Gradle 缓存的坐标组名（`/files-2.1/` 之后那一段），也要有**不依赖该标记的兜底判据**；
+     另加 `entries.size >= 5` 的**防假绿下限**。
+  3. `no_android_or_app_layer_imports_in_domain_sources()` —— 扫 `src/main/kotlin` 的**非注释**部分
+     （先 `maskBlockComments` + `stripLineComment` 把注释抹成空白、**保留换行**以免行号漂移），
+     另加 `scanned >= 30` 的防假绿下限。
+  4. `domain_module_is_not_an_android_module()` —— 读 `build.gradle.kts`，拒绝 `com.android` /
+     `androidx.` / `android.jar` / `^\s*(android|androidx)\s*\{`。
+  5. `self_check_the_detectors_flag_synthetic_violations()` —— 用**合成样本**验证四个检测器
+     真的会报警（含合法样本不得误伤的反向断言）。
+- **诚实的射程限制**（已写进类 KDoc）：唯一能编译通过的越界路径是"往 `domain/build.gradle.kts` 加
+  Android 依赖"；第 3 层是**文本级**判据。
+
+##### ② §7.1 步骤 ③ 变异验证 —— 真实注入，四层全红
+
+> 一个不会变红的检查没有价值。本轮不只做合成自检，而是**真的把违规注入进去**看它红不红。
+
+| 注入 | 注入内容 | 日志 / 读数 | 结果 |
+| --- | --- | --- | --- |
+| A | `domain/build.gradle.kts` 加 `implementation("androidx.annotation:annotation-jvm:1.9.1")` | `mut_boundary1.log` · `439 tests / 2 failed` | **仅第 1、4 层红；第 2 层假绿** ⚠️ |
+| A′ | **同一注入 + 一个临时探针测试**（复跑取证，**不是**一次新变异） | `probe_cp2.txt` + `mut_boundary2.log` · `440 tests / 2 failed` | 探针证明那条 androidx jar **确在类路径上**（`entries = 14`、`anyAndroidxInCp = true`、`androidx.annotation.Keep = LOADABLE`），而第 2 层**仍绿** ⇒ **假绿确证**（失败者与行号与 A 逐字相同） |
+| B | 修复后**重放注入 A** | `mut_boundary3.log` · `439 tests / 3 failed` | 第 1、2、4 层红 ⇒ **第 2 层已能变红** |
+| C | 修复后 + 给 `domain/.../text/TextKey.kt` 加 `import androidx.annotation.Keep` | `mut_boundary4.log` · `439 tests / 4 failed` | **四层全红**，仅自检绿 |
+
+> ⚠️ **本节首稿把账目记错了，同轮（提交前）已订正**：首稿写成「3 组真实注入 / M1–M3」，并把
+> `mut_boundary2.log` 说成「修复后重放同一注入」。**实际不是** —— mut2 用的仍是**修复前**的代码，
+> 只是多挂了一个临时探针；失败者与行号（`AdapterBoundaryTest.kt:154` 第 4 层 / `:73` 第 1 层）
+> 与 mut1 **逐字相同**即是证据。真实账目是 **4 次注入**：A / A′ 在**修复前**（A′ 带探针），
+> B / C 在**修复后**；行号亦印证（修复前 `:73`/`:154`，修复后 `:81`/`:99`/`:136`/`:162`）。
+
+- **M1 查出第 2 层曾是假绿（本轮最重要的发现）**：Gradle 交给 test worker 的 `java.class.path`
+  里 Windows 反斜杠是**成对**的（探针 `artifacts/probe_cp2.txt` 的 `od -c` 显示 `C : \ \ U s e r s \ \ …`）。
+  旧实现只做 `entry.replace('\\','/')` ⇒ 得到 `…//files-2.1//androidx.annotation//…`，
+  标记串 `/files-2.1/` 只匹配到 `//files-2.1//` 的**后半**，`substringAfter(marker)` 以 `/` 开头
+  ⇒ `substringBefore('/')` 解析出**空串** ⇒ `isAndroidGroup("")` 为 false ⇒ 明明在类路径上也判「非 Android 构件」。
+  **同一缺陷下 `entries = 14`（含那条 androidx jar）、`anyAndroidxInCp = true`、
+  `androidx.annotation.Keep = LOADABLE`** —— 所以第 1 层能红，第 2 层却绿。
+- **修法**：`normalizeSlashes(entry) = entry.replace('\\','/').replace(Regex("/{2,}"), "/")`；
+  并加**兜底判据** —— 路径含 `/.gradle/caches/` 时把其后各段逐个用 `isAndroidGroup` 判，
+  **不依赖 `files-2.1` 标记**，缓存布局变化时仍有效。
+- **补 4 条回归自检钉住该缺陷**：双反斜杠 androidx 须判违例（注释逐字：「这一条对应 2026-10-05
+  那次真实注入查出的假绿 —— 少了它，同样的缺陷会再悄悄回来」）、双反斜杠 kotlin-stdlib 不得误伤、
+  单反斜杠 kotlin-stdlib 不得误伤、`…\.gradle\caches\8.0\androidx.core\core-1.0.jar` 兜底判据须生效。
+- **教训（已写进类 KDoc）**：「修复前的『全绿』不代表边界成立，这正是『一个不会变红的检查没有价值』的实例。」
+- **还原**：四次注入（含取证复跑）后均从备份 `cp` 还原并比 sha256 —— `domain/build.gradle.kts` 复原为
+  **`fa08fafa6ca734de2a0bff1c7684d5fc9da991fbe64ed1b10d71fbb44e03f708`**（= 基线）、
+  `TextKey.kt` 复原为 **`a205e4a5d25ef0fd4fb6928234ab49e32256cfbc0ee9ed854340d3be6bfbef9e`**；
+  **零新增依赖**（收工树里 `domain/build.gradle.kts` 与基线逐字节相同）。
+- **顺带记录一次编译失败（已修）**：首版 `:domain:compileTestKotlin FAILED`，报
+  `Unresolved reference 'classpathArtifacts'` / `'isAndroidArtifact'` / `'FORBIDDEN_REFERENCE'` /
+  `'androidBuildScriptViolations'`、`Cannot infer type for type parameter 'T'`。
+  根因 = 类 KDoc 里写的 `` `build/classes/kotlin/*` `` 中的 `/*` **在 KDoc 内部开了嵌套块注释**
+  （Kotlin 支持嵌套块注释），把 `:294` 起的每个方法都吞了 ⇒ 改为 `` `build/classes/kotlin/` ``。
+  **同类坑本分支已第二次踩**（前一次是 KDoc 里的 `res/values*/`）。
+
+##### ③ 退出条件 ③ 的证据（基线连续）
+
+- `git diff --diff-filter=D --name-only 9a20002..09fc863` = **空** ⇒ 整条分支**零文件删除**；
+- `domain/src/test` 测试文件数 32 → **33**（只增不减）；`domain` 单测 **434 → 439**（+5 = 本轮新增的 5 个）；
+- 历史唯一一次 domain 测试文件删除是 `5244cd4`（2026-09-16，`PlaceholderTest.kt`），**在本分支范围之外**。
+
+##### ④ 三处阶段快照同步（用户 `m04274` 授权「选项 ①」）
+
+- **五处改动**：`HANGOFF.md:432`（§9 顶部新增 `> 进度(2026-10-05)` 行）、`:452`（门槛表 D3 行
+  `🔄 部分已由 D1 提前交付` ⇒ `✅ **完成**(2026-10-05)`）、`:2912`（§9 D3「现状对照」打包行
+  `⬜ **未交付**` ⇒ `✅ **已交付**(2026-10-05)`）、`AGENTS.md:5`（头部快照
+  `当前阶段(2026-09-27)` ⇒ `(2026-10-05)`）、`README.md:5`（状态行前缀）。
+- **并在 `HANGOFF.md` 追加**：§9 D3 退出条件后新增「**✅ 三项退出条件达成(2026-10-05)**」取证块；
+  原「**未做 / 不宣称**」块（`:2842-2853`）就地改为「**边界与后续**」，把原第 1、2 条标为**已完成**、
+  并保留仍然成立的边界（D2b 五项、未推送、**真机验证层级**）。
+- **订正两小节的自我矛盾（同轮补记）**：`HANGOFF.md` 里 2026-10-04 小节与 2026-10-05 追记小节
+  都写着「三项退出条件的正式判定与门槛表/阶段快照的状态改动**留待用户裁决**」「退出条件 2 仍未落地」
+  —— 裁决已落地后这些句子**自相矛盾**。按本仓「保留原文 + 就地加 `> ⚠️` 订正」惯例处理：
+  新增 2 处「**⚠️ 2026-10-05 再订正**」块（`:2637`、`:2750`）、2 处 `~~删除线~~` 就地订正
+  （`:2707` 的「可执行检查仍未落地」、`:2719-2721` 的「未做」三条），**未删除任何历史陈述**。
+  复核：残留 `留待用户裁决` 2 处 / `仍未落地` 2 处 / `仍然不是 D3 阶段完成的宣布` 1 处
+  **全部位于订正注自身之内**。Markdown 结构完整（`` ``` `` 计数偶数、CRLF 0 / bare CR 0）。
+- **旧串彻底消失已验**：`🔄 部分已由 D1 提前交付` = 0、`| ⬜ **未交付** | D1 是交互原型` = 0、
+  `当前阶段(2026-09-27)` = 0。
+- **写盘方式**：`artifacts/ledger_w25_snapshots.py` 与 `artifacts/ledger_w25_hangoff_fix.py`（均两遍制；
+  干跑 + `--apply`；锚点 `count == 1` 断言；备份 `artifacts/w25bak/`；`HANGOFF.md` 自下而上编辑以免行号漂移）。
+- **文件规模变化**：`HANGOFF.md` 3438→3492 行 / 320,687→327,328 字节 / sha256
+  `30ed30d25117`→`e10ea2c090ab`；`AGENTS.md` 166 行 / 23,341 字节 / `dd1a2c249a92`；
+  `README.md` 132 行 / 71,933 字节 / `908847f926c6`。
+- **脚本踩坑（教训）**：`ledger_w25_snapshots.py` 首版有 ① 一处 Python 字符串漏写收尾引号
+  （`SyntaxError: unterminated string literal`）② 一处行号差 1（报 `AssertionError: line 2896 unexpected:`）。
+  两遍制的 dry-run 两次都当场拦住，**未污染文件**。
+
+##### ⑤ 闸门（`--rerun-tasks` 全量，先删两个 `test-results`）
+
+- `artifacts/gates_w24_boundary4.log`：`RC=0` / `BUILD SUCCESSFUL in 47s` / **`62 actionable tasks: 62 executed`**；
+  `domain` **33 files / 439 tests / 0F 0E 0S**；`app` **50 files / 456 tests / 0F 0E 0S**；
+  lint **`0 errors, 0 warnings, 4 hints`**（4 个 hint 均为既有的 `AutoboxingStateCreation`）；
+  APK **33,437,589 字节**、sha256 **`1a2164ea74a298575e3937fa06b38bd6f4f37c2fb2d3adeabec8bbf7151983d1`**
+  —— 与干净基线 `artifacts/w24bak/app-debug.clean.apk` **逐字节相同**；
+  源码 `@Test` 计数 `domain` **439** == XML **439**、`app` **456** == XML **456**；
+  `find app/src domain/src -newer <log>` = **0**。
+- **APK 未变是预期**：本轮唯一新增物是**测试文件**，不进 APK。
+- **变异日志**：`artifacts/mut_boundary1.log`（`439 tests / 2 failed`）、`mut_boundary2.log`
+  （`440 tests / 2 failed`）、`mut_boundary3.log`（`439 tests / 3 failed`）、
+  `mut_boundary4.log`（`439 tests / 4 failed`）；闸门 `gates_w24_boundary1/2/3.log`
+  （`1` = 首次编译失败、`2`/`3` = `SUCCESSFUL in 5s`）。
+
+##### ⑥ 真机核对：未做（本轮工作面 100% 在领域层与文档层）
+
+- 按 §7.4 表第 1 行「领域逻辑 ✅ 领域单测」判定**不需要真机**；本轮改动 = 新增 domain 测试文件 +
+  三处文档，**`app/**` 一行未改**、APK 逐字节未变。
+- **但借此把真机账目讲清楚**（回应 `m04360`）：整条 `d3/p1` 分支**只有 2 轮**真机核对 ——
+  轮 18（W22：10 个警示面 + i18n 中英对照）与轮 19（W23：R4 分叉卷探针取证 + 干净包反向对照）；
+  轮 16/17 是领域层轮次（按 §7.4 表第 1 行**正当跳过**）；轮 14/15 当时未连设备，
+  由轮 18 的清单**事后覆盖**（⑦ 撤销弹框、⑧ 改名计划页）。**D3 打包核心从未真机端到端跑过** ——
+  原型不连真实文件系统、B 线走 mock 数据，真实文件端到端属 **D4b**。
+
+---
+
 ## 4. 待裁决 / 阻塞（越界项写这里，不自行决定）
 
 > 出现下列任一情况，**停止该项**并在此登记，然后继续**下一项**工作：
@@ -2413,6 +2558,21 @@ cmd.exe /c "D:\Programing\Personal\pixfold\pixfold-d1\run-gradle.bat clean \
 > ⇒ **五次读数**（轮 19 / 轮 20 / 补记① / 补记② / **本次**）**完全一致**
 > （domain 434 / app 456 / lint 0-0-4）—— 本轮的文档改动对构建与测试**零影响**。
 
+> 轮 21 补记（**新增 `AdapterBoundaryTest` 之后的第一次闸门复跑**）的读数
+> （`artifacts/gates_w24_boundary4.log`，mtime **2026-10-05 20:19:21**、`--rerun-tasks` 全量、先删两个 `test-results`）：
+> `RC=0` / `BUILD SUCCESSFUL in 47s` / **`62 actionable tasks: 62 executed`**（无 `up-to-date`）；
+> `domain:test` = **33 files / 439 tests / 0F / 0E / 0S**（轮 20 是 32 / 434，+1 文件 / +5 测试）；
+> `app:testDebugUnitTest` = **50 files / 456 tests / 0F / 0E / 0S**（与轮 20 相同）；
+> `:app:lintDebug` = **`0 errors, 0 warnings, 4 hints`**（4 个 hint 均为此前既有的 `AutoboxingStateCreation`）；
+> `:app:assembleDebug` ⇒ APK **33,437,589 字节**、
+> sha256 **`1a2164ea74a298575e3937fa06b38bd6f4f37c2fb2d3adeabec8bbf7151983d1`** ——
+> 与干净基线 `artifacts/w24bak/app-debug.clean.apk` **逐字节相同**；
+> 新鲜度：`find app/src domain/src -type f -newer artifacts/gates_w24_boundary4.log` = **0**；
+> 源码 `@Test` 计数：`domain` **439** == XML **439**、`app` **456** == XML **456**。
+> ⇒ **APK 逐字节未变是预期**：本轮唯一新增物是**测试文件**（不进 APK），文档改动对构建零影响。
+> 六次读数（轮 19 / 轮 20 / 补记① / 补记② / 终笔前 / **本次**）中，**`app` 456 与 lint 0-0-4 完全一致**，
+> `domain` 由 434 增至 **439**（= 本轮新增 5 个边界测试）。
+
 
 ### 6.3 改动面与越界核对
 
@@ -2540,6 +2700,28 @@ cmd.exe /c "D:\Programing\Personal\pixfold\pixfold-d1\run-gradle.bat clean \
 > **零删除行**；**除 `HANGOFF.md` 外本轮未动任何文件**，`AGENTS.md` / `README.md`
 > 与阶段快照三处**仍逐条 unchanged**。
 
+> 轮 21 补记（用户 `m04274` 授权的收口轮）的改动面：`git diff --numstat HEAD` =
+> `AGENTS.md` **2 / 1**、`HANGOFF.md` **73 / 20**、`README.md` **1 / 1**、
+> 本台账 **167 / 5**；另有**新增文件**（未跟踪）
+> `pixfold-d1/domain/src/test/kotlin/com/pixfold/d1/domain/boundary/AdapterBoundaryTest.kt`
+> （402 行 / 19,285 字节 / sha256 `7e447bbe4f63…`）。
+> ⚠️ 与轮 20 不同：**本轮 `AGENTS.md` 与 `README.md` 不再是"逐条 unchanged"的边界文件**
+> —— 这是**有意为之**，且正是 `AGENTS.md:49` 变更路由要求的（阶段/状态变化须三处一致）。
+> **`pixfold-d1/app/**` 一行未改**；**未改任何构建脚本**；**未新增依赖**。
+> 改动面读数：`git status --porcelain` = ` M AGENTS.md` / ` M HANGOFF.md` / ` M README.md` /
+> ` M docs/superpowers/plans/2026-10-04-d3-p1-packing-core.md` /
+> `?? pixfold-d1/domain/src/test/kotlin/com/pixfold/d1/domain/boundary/`。
+> 边界文件逐条 `git diff --quiet HEAD` **全部 unchanged**：`pixfold-d1/app/build.gradle.kts`、
+> `pixfold-d1/domain/build.gradle.kts`、`pixfold-d1/gradle/libs.versions.toml`、
+> `pixfold-d1/settings.gradle.kts`、`pixfold-d1/build.gradle.kts`、`pixfold-d1/gradle.properties`、`.mise.toml`。
+> 文件规模（HEAD → 收工态）：`HANGOFF.md` 3438 → **3491 行** / 320,687 → **327,328 字节** /
+> sha256 `30ed30d25117…` → **`e10ea2c090ab…`**；`AGENTS.md` 165 → **166 行** / 22,444 → **23,341 字节** /
+> `e96d61ba002c…` → **`dd1a2c249a92…`**；`README.md` 132 行（不变）/ 71,322 → **71,933 字节** /
+> `d817461bbb7d…` → **`908847f926c6…`**；本台账 2781 → **2943 行** / 270,055 → **286,205 字节** /
+> `057f5d1d9c34…` → **`dd3e22e33336…`**（CRLF 0 / bare CR 0 均维持）。
+> 越界核对：本轮**无越界项**；`domain/build.gradle.kts` 在变异注入后已 `cp` 还原并比 sha256
+> 复原为基线 **`fa08fafa6ca7…`**，`TextKey.kt` 复原为 **`a205e4a5d25e…`** ⇒ **零新增依赖**。
+
 
 ### 6.4 提交拓扑（`git log --oneline dev..d3/p1`）
 
@@ -2564,6 +2746,8 @@ cmd.exe /c "D:\Programing\Personal\pixfold\pixfold-d1\run-gradle.bat clean \
 > `3458d29`（回填 `63a33b9`）与 `74928f3`（§6.4 收口）：
 
 | 提交 | 类型 | 内容 |
+| `（见下方回填行）` | `feat(d3)` | 轮 21 W25：D3 退出条件 ② 的可执行检查 `AdapterBoundaryTest`（四层断言 + 自检）+ 真实注入变异验证四层皆可红 |
+| `（见下方回填行）` | `docs(d3)` | 轮 21 W25：三处阶段快照同步（`HANGOFF.md` §9 进度行/门槛表 D3 行/打包行 + `AGENTS.md` 头部 + `README.md` 状态行） |
 | `74928f3` | docs | 台账 §6.4 收口：填实 `（轮 19/20 回填 = 本次提交）` 两个残留占位行，订正「历史占位**已清零**」这句已失真的表述与 `ad4cca0` 行描述（1 file / +8 / −4） |
 | `1767739` | docs | 轮 20 终笔：更正 §6.2 补记① 对闸门复跑**时点**的误标（`gates_w24b_fix.log` mtime 18:29:19 早于首次订正提交 `3ff135e` 18:40:25）并补记两次订正之后的权威复跑 `gates_w24d_final.log`（**1 file / +13 / −1**，唯一删除行即旧误标行） |
 | `ad4cca0` | docs | 轮 20 终笔台账回写：§3.1「终笔」段 + §6.2 终态闸门第五次读数 + §6.4 `1767739` 行（1 file / +33 / −0） |
@@ -2698,16 +2882,29 @@ cmd.exe /c "D:\Programing\Personal\pixfold\pixfold-d1\run-gradle.bat clean \
   `ui/settings/LicensesScreen.kt:198` 写死 `“PixFold”` 而未引用 `R.string.app_name`（值与资源逐字相同）。
   十一次扫荡累计：W7 23 / W8 16 / W11 7 / W12 23 / W13 39 / W14 58 / W15 64 / W16 66 / W19 31 / W20 21 / **W21 16 组**。
   十二次扫荡累计：W7 23 / W8 16 / W11 7 / W12 23 / W13 39 / W14 58 / W15 64 / W16 66 / W19 31 / W20 21 / W21 16 / **W22 21 组**（W22 = 第⑥项 图标面，两遍一致：8 捕获 + 2 已证等价 ⇒ 4 捕获）。
-- **未做 / 不宣称**（与 HANGOFF 小节一致，勿据此认为 D3 已完成）：
+- **未做 / 不宣称**（**2026-10-05 订正**：`HANGOFF.md` 对应块已改为「**边界与后续**」；下列 1 条仍成立、2/3/4 条已就地划删除线并订正，保留原文备查）：
   1. ⚠️ **真机核对** —— 领域核心工作面（W0–W21）按 §7.4 表第 1 行判定不需要；
      **轮 18（W22 / 第⑥项）是 UI 面改动，已在真机上核对完毕**（10 个警示面 + i18n 中英对照，
      逐面取证见 §3.1 轮 18）；**轮 19（W23）补上了 R4 页码自检告警的真机取证**（临时注入分叉卷探针 ⇒
      中/英各截到一次告警，再用干净包反向对照证明告警消失 + 布局回流 56 px，逐面取证见 §3.1 轮 19）；
      真机上**仍未验证**的只剩 **R2 的逐项句子** —— 它已由用户 `m02554` **裁决为刻意保留**（键不可达，
      见 §4 R5），属**设计如此**而非待办；
-  2. ❌ **D3 三项退出条件的正式宣布**；
-  3. ❌ **门槛表/阶段快照的同步改动**（需 `HANGOFF.md` §9 顶 + `AGENTS.md` 头 + `README.md` 三处
-     一致修改，属产品决策）；本分支对 `AGENTS.md`/`README.md` **零改动**已核对；
+     ⚠️ **轮 21 补记（真机账目，回应 `m04360`）**：整条 `d3/p1` 分支的真机核对**只有 2 轮** ——
+     轮 18（W22：10 个警示面 + i18n 中英对照）与轮 19（W23：R4 分叉卷探针取证 + 干净包反向对照）；
+     轮 16/17 是领域层轮次（按 §7.4 表第 1 行**正当跳过**）；轮 14/15 当时未连设备，
+     由轮 18 的清单**事后覆盖**（⑦ 撤销弹框、⑧ 改名计划页）。
+     **仍然成立且不可高估**：**D3 打包核心从未在真机上端到端跑过** —— 原型不连真实文件系统
+     （`HANGOFF.md` §9 D3 执行注）、B 线走 mock 数据，故 D3 的验证层级是
+     「**领域单测 + UI 渲染链**」，**不是**端到端；真实文件端到端属 **D4b**（依赖 D2b）。
+  2. ~~❌ **D3 三项退出条件的正式宣布**~~（**2026-10-05 订正：已做** —— `HANGOFF.md` §9 D3 节新增「**✅ 三项退出条件达成(2026-10-05)**」取证块，含三项逐条证据与 ⚠️ 验证层级不可高估）；
+  3. ~~❌ **门槛表/阶段快照的同步改动**（需 `HANGOFF.md` §9 顶 + `AGENTS.md` 头 + `README.md` 三处
+     一致修改，属产品决策）；本分支对 `AGENTS.md`/`README.md` **零改动**已核对；~~
+     （**2026-10-05 订正：已做五处** —— 用户 `m04274` 授权「选项 ①」后落地：`HANGOFF.md` §9 顶新增
+     `> 进度(2026-10-05)` 行、门槛表 `| D3 |` 行 ⇒ `✅ **完成**(2026-10-05)`、
+     `| **打包** |` 行 ⇒ `✅ **已交付**(2026-10-05)`；`AGENTS.md:5` 头部快照日期 ⇒ `(2026-10-05)`
+     并记「D3 已不再是 D4b 的阻塞项，剩余的 D4b 前置只有 D2b」；`README.md:5` 状态行同步。
+     **旧串已验彻底消失**：`🔄 部分已由 D1 提前交付` = 0、`| ⬜ **未交付** | D1 是交互原型` = 0、
+     `当前阶段(2026-09-27)` = 0。下面两条轮 20 补充是**订正前的历史读数**，保留备查：）
      ⚠️ **轮 20 补充**：`HANGOFF.md` §9.1 的 D3 小节**已回写**（就地订正 + 追记，纯追加 `+131 / −0`，
      `768bec7`）—— 但那是**小节内的内容补记**，**不是阶段状态改动**：三处阶段快照
      （§9 顶 `> 进度(` 行 / 门槛表 `| D3 |` 行 / `| **打包** | ⬜ **未交付** |` 行）与
@@ -2716,7 +2913,9 @@ cmd.exe /c "D:\Programing\Personal\pixfold\pixfold-d1\run-gradle.bat clean \
      （`dev == d3/p1` / `[ahead 42]`），已就地加注订正（`HANGOFF.md:2755` 与 `:2836`，
      纯追加 `11 0`）；订正注本身第一版写死了提交数、**又立刻自我过期**，
      已改为**时间无关表述**（`3ff135e`）。**三处阶段快照逐字未动的结论不变。**
-  4. ❌ **退出条件 2 的"适配层零 Android 依赖"可执行检查**（如 Gradle 依赖断言）—— 未授权，未做；
+  4. ~~❌ **退出条件 2 的"适配层零 Android 依赖"可执行检查**（如 Gradle 依赖断言）—— 未授权，未做；~~
+     （**2026-10-05 订正：已做** —— 新增 `AdapterBoundaryTest`（四层判据 + 一层自检，随 `:domain:test` 每轮常跑），并以 **4 次真实注入（3 次违规注入 + 1 次带探针的取证复跑）**变异验证四层皆可红；
+    其中**注入 A 查出第 2 层曾假绿**（`java.class.path` 里 Windows 反斜杠成对 ⇒ 组名解析成空串）并修复 + 补 4 条回归自检；`domain/build.gradle.kts` 收工 sha256 复原基线，**零新增依赖**）；
   5. ❌ D2b 五项、§11 第 12 条空间阈值。
 - **待用户裁决**（§4）：**R1** 撤销 `from == to` 空操作（既有缺陷，非本轮引入，修法二选一）；
   **R2** 改名计划描述缺逐项句子（补齐需新增 `TextKey`，本轮禁止）；
