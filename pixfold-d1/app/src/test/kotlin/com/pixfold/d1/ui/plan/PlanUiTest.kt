@@ -11,6 +11,7 @@ import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
@@ -36,6 +37,7 @@ import com.pixfold.d1.domain.plan.startConfirmFlow
 import com.pixfold.d1.domain.plan.undoRecordOf
 import com.pixfold.d1.domain.text.Msg
 import com.pixfold.d1.domain.text.TextKey
+import com.pixfold.d1.ui.text.TAG_WARN_ICON
 import com.pixfold.d1.ui.text.resolveText
 import org.junit.Rule
 import org.junit.Test
@@ -141,6 +143,24 @@ class PlanUiTest {
             .assertTextEquals(context.getString(R.string.domain_danger_dialog_title))
         rule.onNodeWithText(resolveText(context, DangerAction.DeleteSourceDir.buttonKey)).performClick()
         assertTrue(executed, "两次确认都通过后才执行")
+    }
+
+    @Test
+    fun `the danger dialog draws the vector icons that replaced the emoji prefixes`() {
+        // 回归(用户 2026-10-05,m00673):标题与正文原本靠文案里的 `⚠️` / `⛔` 前缀表意,
+        // 前缀删除后改由矢量图标承担。**这一步最容易漏**:文案去掉 emoji 后
+        // 测试仍按文本断言,谁也不查图标有没有真的画上去 —— 于是"警告看起来像普通提示"
+        // 而全绿。这里数出至少两枚图标(标题一枚 + 正文一枚)。
+        rule.setContent { ConfirmFlowHost(sourcePolicy = SourcePolicy.Delete) }
+
+        rule.onNodeWithTag(TAG_PLAN_CONFIRM).performClick()
+        rule.onNodeWithText(context.getString(R.string.domain_general_confirm_ok)).performClick()
+        rule.onNodeWithTag(TAG_CONFIRM_DANGER).assertIsDisplayed()
+
+        assertTrue(
+            rule.onAllNodesWithTag(TAG_WARN_ICON).fetchSemanticsNodes().size >= 2,
+            "危险确认的标题与正文各自都应带矢量警示图标(标题一枚 + 正文一枚)",
+        )
     }
 
     @Test

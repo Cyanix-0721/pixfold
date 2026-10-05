@@ -155,8 +155,11 @@ private fun TextKey.pluralQuantityIndex(): Int? = when (this) {
  * ③资源文件的重命名只需改这一处。
  *
  * 与 `SettingsScreen.kt` 里「枚举 -> 文案」的做法一致。
+ *
+ * 可见性为 `internal`(而非 `private`):[warnIcon] 需要用它把 `TextKey` 折进
+ * 「资源 id -> 警示图标」那张表,好让 `TextKey` 与纯资源键**共用同一份**判定。
  */
-private fun TextKey.resId(): Int = when (this) {
+internal fun TextKey.resId(): Int = when (this) {
     // 排序字段
     TextKey.SortNaturalName -> R.string.domain_sort_natural_name
     TextKey.SortFileName -> R.string.domain_sort_file_name

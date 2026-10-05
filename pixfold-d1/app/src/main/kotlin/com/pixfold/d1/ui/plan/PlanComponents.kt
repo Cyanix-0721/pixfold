@@ -26,8 +26,10 @@ import com.pixfold.d1.domain.plan.PlanCounts
 import com.pixfold.d1.domain.plan.VolumePackPlan
 import com.pixfold.d1.domain.plan.describe
 import com.pixfold.d1.domain.text.TextKey
+import com.pixfold.d1.ui.text.WarnLine
 import com.pixfold.d1.ui.text.textOf
 import com.pixfold.d1.ui.text.textOfOrNull
+import com.pixfold.d1.ui.text.warnIcon
 
 const val TAG_PLAN_LIST = "plan-list"
 const val TAG_PLAN_SUMMARY = "plan-summary"
@@ -81,7 +83,10 @@ fun PlanHeader(
             )
         } else {
             dangers.forEach { d ->
-                Text(
+                // 警示靠矢量图标承担(2026-10-05 用户要求),文案里不再有 emoji 前缀。
+                // `plan_danger_action` 是纯资源键(不是 `TextKey`),故按资源 id 查表。
+                WarnLine(
+                    icon = warnIcon(R.string.plan_danger_action) ?: return@forEach,
                     text = stringResource(R.string.plan_danger_action, textOf(d.labelKey)),
                     style = MaterialTheme.typography.labelMedium,
                     color = MaterialTheme.colorScheme.error,
@@ -146,8 +151,11 @@ fun PlanRow(
         }
 
         if (plan.skipped) {
-            Text(
-                text = stringResource(R.string.plan_skip_reason_prefix, textOfOrNull(plan.skipReason).orEmpty()),
+            // 原 `plan_skip_reason_prefix`(⛔ + 裸占位符)已整键删除 —— 去掉符号前缀后
+            // 它不承载任何文案。禁止语义改由 `ic_forbidden` 承担(与 `⚠️` 系区分)。
+            WarnLine(
+                icon = R.drawable.ic_forbidden,
+                text = textOfOrNull(plan.skipReason).orEmpty(),
                 style = MaterialTheme.typography.labelMedium,
                 color = MaterialTheme.colorScheme.error,
                 modifier = Modifier.testTag(planSkipTag(index)),
@@ -186,7 +194,21 @@ fun ConfirmDialog(
                 text = {
                     Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
                         ConfirmStepLabel(stepIndex, totalSteps)
-                        step.summaryLines.forEach { Text("· ${textOf(it)}", style = MaterialTheme.typography.bodySmall) }
+                        step.summaryLines.forEach { line ->
+                            // 警示行由图标标注,且**不再叠加 `"· "`**(图标就是它的符号前缀)。
+                            // 非警示行保持原样,`PlanUiTest`/`PlanWiringTest` 对 `"· "` 的
+                            // 断言正是打在那些行上(如 `SummarySourceDirPrefix`)。
+                            val icon = warnIcon(line)
+                            if (icon == null) {
+                                Text("· ${textOf(line)}", style = MaterialTheme.typography.bodySmall)
+                            } else {
+                                WarnLine(
+                                    icon = icon,
+                                    text = textOf(line),
+                                    style = MaterialTheme.typography.bodySmall,
+                                )
+                            }
+                        }
                     }
                 },
                 confirmButton = {
@@ -216,17 +238,24 @@ fun ConfirmDialog(
             AlertDialog(
                 onDismissRequest = onCancel,
                 title = {
-                    Text(
+                    // `domain_danger_dialog_title` 去 emoji 后由矢量图标承担警示;图标放在
+                    // `Text` 外面的 `Row` 里,而 testTag 经 `textModifier` 仍钉在 `Text` 上 ——
+                    // 因为 `TAG_CONFIRM_DANGER_TITLE` 是**唯一**要求按文本断言的 tag
+                    // (`PlanUiTest` 的 `assertTextEquals`),tag 挪到 `Row` 会让它找不到文本节点。
+                    WarnLine(
+                        icon = warnIcon(R.string.domain_danger_dialog_title) ?: R.drawable.ic_warning_triangle,
                         text = stringResource(R.string.domain_danger_dialog_title),
                         color = MaterialTheme.colorScheme.error,
-                        modifier = Modifier.testTag(TAG_CONFIRM_DANGER_TITLE),
+                        textModifier = Modifier.testTag(TAG_CONFIRM_DANGER_TITLE),
                     )
                 },
                 text = {
                     Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
                         ConfirmStepLabel(stepIndex, totalSteps)
-                        Text(
-                            text = "⛔ $body",
+                        // 原 `"⛔ $body"` 里的字形前缀改由 `ic_forbidden` 承担。
+                        WarnLine(
+                            icon = R.drawable.ic_forbidden,
+                            text = body,
                             style = MaterialTheme.typography.bodyMedium,
                         )
                     }

@@ -16,13 +16,13 @@
     </plurals>
     <string name="plan_summary_skipped" tools:ignore="PluralsCandidate">\u0020· 跳过 %1$d 卷</string>
     <string name="plan_no_danger">无危险动作：源文件保留，不删除任何文件</string>
-    <string name="plan_danger_action">⚠️ 危险动作：%1$s（执行前需独立二次确认）</string>
+    <string name="plan_danger_action">危险动作：%1$s（执行前需独立二次确认）</string>
     <string name="plan_will_run">将执行</string>
 
     <!-- ============ 计划行(PlanRow) ============ -->
-    <!-- 「· 」「⛔ 」是符号前缀,不属于文案,故保留在代码里 -->
-    <string name="plan_skip_reason_prefix">⛔ %1$s</string>
-
+    <!-- 「· 」是符号前缀,不属于文案,故保留在代码里;
+         「⛔ 」已按此判改为矢量图标(见 ui/text/WarnIcon.kt),不再留在文案里 -->
+    
     <!-- ============ 确认对话框(ConfirmDialog) ============ -->
     <string name="plan_confirm_progress_cd">第 %1$d 步，共 %2$d 步</string>
     <string name="common_cancel">取消</string>
@@ -40,7 +40,7 @@
          全部删除还是取消，记得按钮颜色要区分开，把取消放到最后边」。
          只有「本次覆盖了原本已存在的文件」时才弹这个框 —— 没有覆盖项时两种范围
          结果完全一样,弹框只是多一次无谓点击。 -->
-    <string name="report_undo_warning_title">⚠️ 有些文件本来就在那里，本次执行把它们覆盖了</string>
+    <string name="report_undo_warning_title">有些文件本来就在那里，本次执行把它们覆盖了</string>
     <plurals name="report_undo_warning_body">
         <item quantity="other">共 %1$d 个文件被替换掉了。它们原来的内容在覆盖时就没了，所以删掉之后找不回来。</item>
     </plurals>

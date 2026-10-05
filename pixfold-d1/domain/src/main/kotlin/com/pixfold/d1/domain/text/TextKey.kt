@@ -30,7 +30,7 @@ package com.pixfold.d1.domain.text
  * 继续保持中文字面量,不建键。
  *
  * ⚠️ 与 `ComicPreview.pageIssues` **不同**:后者虽然也是"自检"性质,但
- * `PackPreviewPage` 会把它显示给用户(「⚠️ 页码与页序不一致：…」),
+ * `PackPreviewPage` 会把它显示给用户(「页码与页序不一致：…」——前缀是矢量图标),
  * 故那两条**是**用户文案,走 `PageIssue*` 键。
  */
 enum class TextKey {

@@ -93,7 +93,7 @@
         <item quantity="other">Page preview (renumbered in the current order, %1$d items)</item>
     </plurals>
     <string name="pack_page_hint">(Numbers start at 001 and extensions are lowercased; pages marked "Manually adjusted" were dragged)</string>
-    <string name="pack_page_issues">⚠️ Page numbers do not match the page order: %1$s</string>
+    <string name="pack_page_issues">Page numbers do not match the page order: %1$s</string>
     <string name="pack_page_issue_separator">;\u0020</string>
     <string name="pack_page_manual">Manually adjusted</string>
     <string name="pack_plan_title">Execution plan</string>
@@ -101,13 +101,13 @@
     <string name="pack_source_policy_title">Source folder handling</string>
     <string name="pack_clean_empty_on">Clean empty folders: on (dangerous)</string>
     <string name="pack_clean_empty_off">Clean empty folders: off (default)</string>
-    <string name="pack_delete_warning">⚠️ Source folder deletion is selected: needs a separate confirmation before running</string>
+    <string name="pack_delete_warning">Source folder deletion is selected: needs a separate confirmation before running</string>
     <string name="pack_confirm">Confirm package</string>
     <string name="pack_confirm_cd">Confirm package</string>
     <string name="pack_output">Output: %1$s</string>
     <string name="pack_output_exists">\u0020(a file with the same name already exists)</string>
     <string name="pack_language_iso">LanguageISO: %1$s</string>
-    <string name="pack_excluded_warning">⚠️ This volume is excluded and will not be packaged (re-include it from the volume header in step 1 or 2)</string>
+    <string name="pack_excluded_warning">This volume is excluded and will not be packaged (re-include it from the volume header in step 1 or 2)</string>
     <plurals name="pack_included_count">
         <item quantity="one">%1$d of %2$d volume will be packaged</item>
         <item quantity="other">%1$d of %2$d volumes will be packaged</item>

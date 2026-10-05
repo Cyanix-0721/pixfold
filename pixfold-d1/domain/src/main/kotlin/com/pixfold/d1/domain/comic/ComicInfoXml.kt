@@ -117,7 +117,7 @@ fun previewOf(volume: ComicVolume): ComicPreview = ComicPreview(
  *
  * 返回不一致的原因列表(空 = 一致),供 UI 与测试共用。
  *
- * 虽然这是"自检"性质,但 [PackPreviewPage] 会把它显示给用户(「⚠️ 页码与页序不一致：…」),
+ * 虽然这是"自检"性质,但 [PackPreviewPage] 会把它显示给用户(「页码与页序不一致：…」——前缀是矢量图标,不再是 emoji),
  * 故这些原因**是用户文案**,与 `Suggestion.source` 的处置相反 —— 走 [Msg] 而非字面量。
  */
 fun validatePageConsistency(volume: ComicVolume): List<Msg> {

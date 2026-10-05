@@ -8,6 +8,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
@@ -19,11 +20,13 @@ import com.pixfold.d1.domain.comic.renumberPages
 import com.pixfold.d1.domain.mock.MockDataB
 import com.pixfold.d1.domain.model.ComicVolume
 import com.pixfold.d1.domain.model.LangChoice
+import com.pixfold.d1.domain.plan.SourcePolicy
 import com.pixfold.d1.domain.model.MetaField
 import com.pixfold.d1.domain.model.MetaValue
 import com.pixfold.d1.domain.comic.setMetaValue
 import com.pixfold.d1.domain.sort.moveItemTo
 import com.pixfold.d1.domain.workflowb.workflowBStateOf
+import com.pixfold.d1.ui.text.TAG_WARN_ICON
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -54,13 +57,22 @@ class PackPreviewPageTest {
      * 最小状态持有器 —— 传 `onLibraryChange = {}` 会让切卷点了没反应,
      * 那是测试脚手架的问题,不是页面的问题(且正是"数据变了界面不动"的假象来源)。
      */
-    private fun show(volumes: List<ComicVolume> = library.volumes) {
+    private fun show(
+        volumes: List<ComicVolume> = library.volumes,
+        sourcePolicy: SourcePolicy = SourcePolicy.Keep,
+        showPlanSection: Boolean = false,
+    ) {
         rule.setContent {
             var state by remember { mutableStateOf(workflowBStateOf(library.rootPath, volumes)) }
             PackPreviewPage(
                 libraryState = state,
                 onLibraryChange = { state = it },
                 contentInsets = WindowInsets(0, 0, 0, 0),
+                sourcePolicy = sourcePolicy,
+                // 默认 false:计划区会连带渲染底栏的「确认打包」按钮,而
+                // `the preview page does not offer a fake execute button` 正是反着钉这一点的
+                // (P5 只有预览)。需要策略卡片的用例显式打开。
+                showPlanSection = showPlanSection,
             )
         }
     }
@@ -354,6 +366,41 @@ class PackPreviewPageTest {
         assertTrue(
             rule.onAllNodesWithText(TestText.of(R.string.pack_confirm)).fetchSemanticsNodes().isEmpty(),
             "P5 不应出现执行按钮(执行属 P6)",
+        )
+    }
+
+    // ================= 警示行改用矢量图标后,图标必须真的画上去 =================
+
+    @Test
+    fun `the exclusion warning draws a vector icon and no emoji prefix`() {
+        // 回归(用户 2026-10-05,m00673):文案里的 `⚠️` 前缀删除后,警示语义由图标承担。
+        // 本用例同时钉两头:①图标节点真的在树里;②文案里**没有**再用 emoji 顶替。
+        // 只测①会漏"图标加了但文案里还留着 emoji",只测②会漏"emoji 删了但图标没加"。
+        val volumes = library.volumes.map { if (it.id == "aot-1") it.copy(included = false) else it }
+        show(volumes)
+        scrollTo(TAG_PACK_EXCLUDED)
+        assertTrue(
+            rule.onAllNodesWithTag(TAG_WARN_ICON).fetchSemanticsNodes().isNotEmpty(),
+            "未勾选卷的警告行应显示矢量图标",
+        )
+        val warning = TestText.of(R.string.pack_excluded_warning)
+        assertTrue(
+            !warning.contains("\u26A0") && !warning.contains("\uFE0F"),
+            "警告文案里不应再有 emoji 前缀(现值:「$warning」)",
+        )
+    }
+
+    @Test
+    fun `the delete source warning draws a vector icon only when deletion is selected`() {
+        // 负向对照:默认 Keep 时不该有删除警告,切到 Delete 才出现 ——
+        // 否则"图标常驻"也能让上面那条用例绿。
+        // 策略卡片(含"删除源目录"警告)只在计划区里渲染 —— 关掉它这条警告根本不在树上,
+        // 而 WorkflowBSteps 的真实接法就是 `showPlanSection = true`(见 WorkflowBSteps.kt:246)。
+        show(sourcePolicy = SourcePolicy.Delete, showPlanSection = true)
+        rule.onNodeWithTag(TAG_DELETE_WARNING).assertIsDisplayed()
+        assertTrue(
+            rule.onAllNodesWithTag(TAG_WARN_ICON).fetchSemanticsNodes().isNotEmpty(),
+            "选中删除源目录后,警示行应显示矢量图标",
         )
     }
 }

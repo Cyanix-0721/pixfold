@@ -139,7 +139,7 @@ class DangerActionTest {
     fun `each danger action has its own distinct wording`() {
         // 每个危险动作的三份文案必须两两不同 —— 否则两个动作会弹出字面相同的框,
         // 用户无法从文字上分辨自己正在放行哪一个不可恢复动作。
-        // (标题「⚠️ 危险操作独立确认」是共享的,故这里只查动作自有的 label/body/button。)
+        // (标题「危险操作独立确认」是共享的,故这里只查动作自有的 label/body/button。)
         for (keySelector in listOf(
             { a: DangerAction -> a.labelKey },
             { a: DangerAction -> a.bodyKey },

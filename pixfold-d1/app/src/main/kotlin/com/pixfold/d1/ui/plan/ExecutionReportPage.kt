@@ -39,8 +39,10 @@ import com.pixfold.d1.domain.plan.UndoScope
 import com.pixfold.d1.domain.text.Msg
 import com.pixfold.d1.ui.components.IssueFilterRow
 import com.pixfold.d1.ui.components.PageActionBar
+import com.pixfold.d1.ui.text.WarnLine
 import com.pixfold.d1.ui.text.textOf
 import com.pixfold.d1.ui.text.textOfOrNull
+import com.pixfold.d1.ui.text.warnIcon
 import com.pixfold.d1.ui.theme.dangerActionButtonColors
 
 const val TAG_REPORT_PAGE = "report-page"
@@ -303,10 +305,15 @@ private fun UndoScopeDialog(
                 modifier = Modifier.padding(24.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
-                Text(
+                // 警示由矢量图标承担(2026-10-05 用户要求,资源里已无 ⚠️ 前缀)。
+                // 标题是 `headlineSmall`,故图标放大到 24dp 与之齐平;`Text` 节点本身
+                // 仍只含标题文本,`UndoScopeDialogTest` 的 `onNodeWithText` 不受影响。
+                WarnLine(
+                    icon = warnIcon(R.string.report_undo_warning_title) ?: R.drawable.ic_warning_triangle,
                     text = title,
                     style = MaterialTheme.typography.headlineSmall,
                     color = MaterialTheme.colorScheme.error,
+                    iconSize = 24.dp,
                 )
                 Text(text = body, style = MaterialTheme.typography.bodyMedium)
                 // 顺序即语义:安全 → 危险 → 取消(用户明说"取消放到最后边")。

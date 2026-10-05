@@ -49,7 +49,7 @@ sealed interface ConfirmStep {
     data class General(val summaryLines: List<Msg>) : ConfirmStep
 
     /**
-     * 独立危险确认:标题固定为 `⚠️ 危险操作独立确认`,一次只处理**一个**动作。
+     * 独立危险确认:标题固定为 `危险操作独立确认`(前缀是矢量图标),一次只处理**一个**动作。
      * 有多个危险动作时逐个确认 —— 不合并成一个"全部确认",否则用户一次点击
      * 就放行了多个不可恢复动作。
      */

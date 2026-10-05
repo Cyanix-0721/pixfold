@@ -111,7 +111,7 @@
     <string name="domain_danger_overwrite_existing_button">Overwrite</string>
 
     <!-- ============ Separate confirmation dialogs ============ -->
-    <string name="domain_danger_dialog_title">⚠️ Confirm dangerous action</string>
+    <string name="domain_danger_dialog_title">Confirm dangerous action</string>
     <string name="domain_general_confirm_title">Confirm?</string>
     <string name="domain_general_confirm_cancel">Not now</string>
     <string name="domain_general_confirm_ok">Run</string>
@@ -129,9 +129,9 @@
     <string name="domain_summary_source_dir_prefix">Source folder: %1$s</string>
     <string name="domain_summary_source_dir_delete">delete (dangerous)</string>
     <string name="domain_summary_source_dir_keep">keep</string>
-    <string name="domain_summary_clean_empty_dirs_warning">⚠️ “Clean up empty folders” is checked; empty folders will be deleted afterwards</string>
-    <string name="domain_summary_overwrite_cbz">⚠️ Existing CBZ files will be overwritten: %1$s</string>
-    <string name="domain_summary_delete_source_dir_warning">⚠️ The source folder will be deleted after packing and cannot be recovered</string>
+    <string name="domain_summary_clean_empty_dirs_warning">“Clean up empty folders” is checked; empty folders will be deleted afterwards</string>
+    <string name="domain_summary_overwrite_cbz">Existing CBZ files will be overwritten: %1$s</string>
+    <string name="domain_summary_delete_source_dir_warning">The source folder will be deleted after packing and cannot be recovered</string>
     <string name="domain_summary_write_only">This only writes output files; no source files will be deleted</string>
     <!-- Separator between list items when a message enumerates several paths -->
     <string name="domain_list_separator">,\u0020</string>
@@ -209,7 +209,7 @@
         <item quantity="other">Will rename %1$d items (%2$d conflicts skipped)</item>
     </plurals>
     <string name="domain_rename_summary_source_kept">Source files are kept; nothing is deleted</string>
-    <string name="domain_rename_summary_clean_empty_dirs">⚠️ “Clean up empty folders” is checked; empty folders will be deleted after moving</string>
+    <string name="domain_rename_summary_clean_empty_dirs">“Clean up empty folders” is checked; empty folders will be deleted after moving</string>
 
     <!-- ============ Confirmation flow progress (ConfirmFlowState.progressLabel) ============ -->
     <string name="domain_confirm_progress">Step %1$d of %2$d</string>

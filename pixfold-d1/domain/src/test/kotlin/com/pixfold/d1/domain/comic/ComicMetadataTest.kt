@@ -414,7 +414,7 @@ class ComicMetadataTest {
 
     @Test
     fun `a preview with a recorded page issue is not consistent`() {
-        // consistent 是 UI 判断"要不要显示 ⚠️ 页码与页序不一致"的唯一开关,
+        // consistent 是 UI 判断"要不要显示「页码与页序不一致」"的唯一开关,
         // 它必须真的看问题清单,而不是恒真 —— 否则报警分支永远不会触发。
         val preview = previewOf(aot2)
         assertTrue(preview.consistent, "正常卷应一致:${preview.pageIssues}")

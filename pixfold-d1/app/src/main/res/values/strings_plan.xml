@@ -18,12 +18,11 @@
     </plurals>
     <string name="plan_summary_skipped" tools:ignore="PluralsCandidate">\u0020· %1$d skipped</string>
     <string name="plan_no_danger">No dangerous action: source files are kept, nothing is deleted</string>
-    <string name="plan_danger_action">⚠️ Dangerous action: %1$s (needs a separate confirmation before running)</string>
+    <string name="plan_danger_action">Dangerous action: %1$s (needs a separate confirmation before running)</string>
     <string name="plan_will_run">Will run</string>
 
     <!-- ============ Plan row (PlanRow) ============ -->
-    <string name="plan_skip_reason_prefix">⛔ %1$s</string>
-
+    
     <!-- ============ Confirmation dialog (ConfirmDialog) ============ -->
     <string name="plan_confirm_progress_cd">Step %1$d of %2$d</string>
     <string name="common_cancel">Cancel</string>
@@ -41,7 +40,7 @@
          全部删除还是取消，记得按钮颜色要区分开，把取消放到最后边」。
          只有「本次覆盖了原本已存在的文件」时才弹这个框 —— 没有覆盖项时两种范围
          结果完全一样,弹框只是多一次无谓点击。 -->
-    <string name="report_undo_warning_title">⚠️ Some files were already there and this run overwrote them</string>
+    <string name="report_undo_warning_title">Some files were already there and this run overwrote them</string>
     <plurals name="report_undo_warning_body">
         <item quantity="one">%1$d file was replaced. What it held before is already gone, so deleting it cannot be undone.</item>
         <item quantity="other">%1$d files were replaced. What they held before is already gone, so deleting them cannot be undone.</item>

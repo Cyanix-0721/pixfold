@@ -120,7 +120,7 @@
         <item quantity="other">命名结构 · %1$s（%2$d 张）</item>
     </plurals>
     <plurals name="a_naming_conflicts">
-        <item quantity="other">⚠️ 有 %1$d 项存在冲突，执行时将跳过（见下表红字）</item>
+        <item quantity="other">有 %1$d 项存在冲突，执行时将跳过（见下表红字）</item>
     </plurals>
     <string name="a_naming_empty_issues">没有冲突或警告项</string>
     <string name="a_naming_empty_images">没有可命名的图片</string>
@@ -140,9 +140,9 @@
     <string name="a_plan_confirm_cd">确认执行</string>
     <string name="a_plan_status_rename">将重命名</string>
     <string name="a_plan_status_skip">将跳过</string>
-    <!-- 「⛔ 」是符号前缀,不属于文案,故留在资源里成键(与 plan_skip_reason_prefix 同形) -->
-    <string name="a_plan_skip_reason">⛔ %1$s</string>
-
+    <!-- 原「a_plan_skip_reason」(⛔ + 裸占位符)已删除:去前缀后只剩 %1$s,
+         该键不再承载任何文案;跳过原因由矢量图标标注(见 ui/text/WarnIcon.kt) -->
+    
     <!-- ============ 步骤容器(WorkflowASteps) ============ -->
     <string name="a_step_label_sort">步骤1 排序与预览</string>
     <string name="a_step_label_naming">步骤2 命名结构</string>

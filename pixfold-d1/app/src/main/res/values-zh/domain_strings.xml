@@ -102,7 +102,7 @@
     <string name="domain_danger_overwrite_existing_button">确认覆盖</string>
 
     <!-- ============ 独立确认对话框 ============ -->
-    <string name="domain_danger_dialog_title">⚠️ 危险操作独立确认</string>
+    <string name="domain_danger_dialog_title">危险操作独立确认</string>
     <string name="domain_general_confirm_title">确认执行？</string>
     <string name="domain_general_confirm_cancel">再看看</string>
     <string name="domain_general_confirm_ok">执行</string>
@@ -120,9 +120,9 @@
     <string name="domain_summary_source_dir_prefix">源目录：%1$s</string>
     <string name="domain_summary_source_dir_delete">删除（危险）</string>
     <string name="domain_summary_source_dir_keep">保留</string>
-    <string name="domain_summary_clean_empty_dirs_warning">⚠️ 勾选了「清理空目录」，执行后空目录将被删除</string>
-    <string name="domain_summary_overwrite_cbz">⚠️ 已有同名 CBZ 将被覆盖：%1$s</string>
-    <string name="domain_summary_delete_source_dir_warning">⚠️ 打包完成后源目录将被删除，且不可恢复</string>
+    <string name="domain_summary_clean_empty_dirs_warning">勾选了「清理空目录」，执行后空目录将被删除</string>
+    <string name="domain_summary_overwrite_cbz">已有同名 CBZ 将被覆盖：%1$s</string>
+    <string name="domain_summary_delete_source_dir_warning">打包完成后源目录将被删除，且不可恢复</string>
     <string name="domain_summary_write_only">本操作只写入输出文件；不会删除任何源文件</string>
     <!-- 列表项之间的分隔符(领域文案里枚举多条路径时用) -->
     <string name="domain_list_separator">、</string>
@@ -195,7 +195,7 @@
         <item quantity="other">将重命名 %1$d 项（跳过 %2$d 项冲突）</item>
     </plurals>
     <string name="domain_rename_summary_source_kept">源文件保留，不删除任何文件</string>
-    <string name="domain_rename_summary_clean_empty_dirs">⚠️ 勾选了「清理空目录」，移动后空目录将被删除</string>
+    <string name="domain_rename_summary_clean_empty_dirs">勾选了「清理空目录」，移动后空目录将被删除</string>
 
     <!-- ============ 确认流程进度(ConfirmFlowState.progressLabel) ============ -->
     <string name="domain_confirm_progress">第 %1$d / %2$d 步确认</string>

@@ -42,7 +42,9 @@ import com.pixfold.d1.domain.naming.namingSummaryLine
 import com.pixfold.d1.domain.naming.setOverride
 import com.pixfold.d1.domain.sort.PageOrderState
 import com.pixfold.d1.ui.components.PageActionBar
+import com.pixfold.d1.ui.text.WarnLine
 import com.pixfold.d1.ui.text.textOf
+import com.pixfold.d1.ui.text.warnIcon
 
 const val TAG_NAMING_PAGE = "naming-page"
 const val TAG_NAMING_TITLE = "naming-title"
@@ -170,7 +172,10 @@ fun NamingPage(
         )
 
         if (skipped > 0) {
-            Text(
+            // 警示由矢量图标承担(2026-10-05);`padding` 留在外层 `Row` 上,
+            // 使排版位置与改前一致(原来 padding 挂在 `Text` 上)。
+            WarnLine(
+                icon = warnIcon(R.plurals.a_naming_conflicts) ?: R.drawable.ic_warning_triangle,
                 text = pluralStringResource(R.plurals.a_naming_conflicts, skipped, skipped),
                 style = MaterialTheme.typography.labelMedium,
                 color = MaterialTheme.colorScheme.error,

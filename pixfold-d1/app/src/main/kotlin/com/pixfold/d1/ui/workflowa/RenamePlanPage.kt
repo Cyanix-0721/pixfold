@@ -43,6 +43,7 @@ import com.pixfold.d1.domain.sort.PageOrderState
 import com.pixfold.d1.ui.components.IssueFilterRow
 import com.pixfold.d1.ui.components.PageActionBar
 import com.pixfold.d1.ui.plan.ConfirmDialog
+import com.pixfold.d1.ui.text.WarnLine
 import com.pixfold.d1.ui.plan.PlanHeader
 import com.pixfold.d1.ui.plan.planLineTag
 import com.pixfold.d1.ui.plan.planRowTag
@@ -276,8 +277,12 @@ private fun RenamePlanRow(op: RenameOp, index: Int, collectionName: String?) {
             modifier = Modifier.testTag(planLineTag(index, 0)),
         )
         if (op.isSkipped && reason != null) {
-            Text(
-                text = stringResource(R.string.a_plan_skip_reason, reason),
+            // 原 `a_plan_skip_reason`(⛔ + 裸占位符)已整键删除 —— 去前缀后它不承载文案。
+            // 禁止语义改由 `ic_forbidden` 承担;tag 留在 `Text` 上(经 `textModifier`),
+            // 因为 `PlanUiTest` 只按 tag 断言"显示",而 `Row` 上挂 tag 也可,但 `Text` 上更稳。
+            WarnLine(
+                icon = R.drawable.ic_forbidden,
+                text = reason,
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.error,
                 modifier = Modifier.testTag(planSkipTag(index)),

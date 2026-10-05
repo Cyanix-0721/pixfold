@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  警告三角牌(用户 2026-10-05 裁决:「警告图标你直接用的emoji不好看,没有更好看的矢量图吗」)。
+
+  几何来自 Material Symbols 的 `warning`(Apache-2.0,见 LicensesScreen 的 ICONS_NOTE)。
+  与 ic_exclamation_circle 同策略:官方矢量资源 + painterResource,不引入 material-icons 依赖。
+
+  实现要点:外层实心三角 + 内部"感叹号"两个子路径(短杠 + 圆点)。
+  挖空靠**绕向相反**(三角为一向、感叹号为反向),故默认的 `nonZero` 即可挖空;
+  保留 `fillType="evenOdd"` 是把意图写明,并对后续改动三角走向更稳。
+
+  真正的失败模式是**感叹号子路径缺失、或与三角同向填充** —— 那时图标退化成
+  "只有一个实心三角",警示力度大打折扣。由 WarningIconRenderTest 的
+  "三角内应有洞"断言守住。
+-->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <path
+        android:fillColor="#FF000000"
+        android:fillType="evenOdd"
+        android:pathData="M1,21h22L12,2 1,21zM13,18h-2v-2h2v2zM13,14h-2v-4h2v4z" />
+</vector>

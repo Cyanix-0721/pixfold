@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  禁止/不可用(用户 2026-10-05 裁决:警告图标改用矢量图)。
+
+  几何来自 Material Symbols 的 `block`(Apache-2.0,见 LicensesScreen 的 ICONS_NOTE)。
+  与 ic_exclamation_circle 同策略:官方矢量资源 + painterResource,不引入 material-icons 依赖。
+
+  与 ic_warning_triangle 的分工:**实心警告 vs 空心禁止** —— 形状本身就不同,
+  不只靠颜色区分(与 PinToggle 的 filled/outlined 同判),色盲用户也能分辨。
+
+  实现要点:外圈实心圆 + 两个"半月"子路径;两半月的绕向与外圆相反,
+  于是被挖空的部分正好是**中间斜穿的那条缝**,剩下的就是 ⊘ 的形状。
+  由 ForbiddenIconRenderTest 的"外圈在、中间斜缝通"断言守住。
+-->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <path
+        android:fillColor="#FF000000"
+        android:fillType="evenOdd"
+        android:pathData="M12,2C6.48,2 2,6.48 2,12s4.48,10 10,10 10,-4.48 10,-10S17.52,2 12,2zM4,12c0,-4.42 3.58,-8 8,-8 1.85,0 3.55,0.63 4.9,1.69L5.69,16.9C4.63,15.55 4,13.85 4,12zM12,20c-1.85,0 -3.55,-0.63 -4.9,-1.69L18.31,7.1C19.37,8.45 20,10.15 20,12c0,4.42 -3.58,8 -8,8z" />
+</vector>

@@ -48,7 +48,9 @@ import com.pixfold.d1.domain.model.LangChoice
 import com.pixfold.d1.domain.workflowb.WorkflowBState
 import com.pixfold.d1.domain.workflowb.selectVolume
 import com.pixfold.d1.ui.components.PageActionBar
+import com.pixfold.d1.ui.text.WarnLine
 import com.pixfold.d1.ui.text.textOf
+import com.pixfold.d1.ui.text.warnIcon
 
 const val TAG_PACK_PAGE = "pack-page"
 const val TAG_PACK_LIST = "pack-list"
@@ -207,7 +209,8 @@ fun PackPreviewPage(
                         // transform 是普通 lambda,里面调不了 @Composable。
                         val issueSeparator = stringResource(R.string.pack_page_issue_separator)
                         val issues = preview.pageIssues.map { textOf(it) }.joinToString(issueSeparator)
-                        Text(
+                        WarnLine(
+                            icon = warnIcon(R.string.pack_page_issues) ?: R.drawable.ic_warning_triangle,
                             text = stringResource(R.string.pack_page_issues, issues),
                             style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.error,
@@ -333,7 +336,8 @@ fun PackPreviewPage(
                                 modifier = Modifier.testTag(TAG_CLEAN_EMPTY_TOGGLE),
                             )
                             if (sourcePolicy == SourcePolicy.Delete) {
-                                Text(
+                                WarnLine(
+                                    icon = warnIcon(R.string.pack_delete_warning) ?: R.drawable.ic_warning_triangle,
                                     text = stringResource(R.string.pack_delete_warning),
                                     style = MaterialTheme.typography.labelMedium,
                                     color = MaterialTheme.colorScheme.error,
@@ -436,7 +440,8 @@ private fun PackHeader(volume: ComicVolume, includedCount: Int, totalCount: Int)
         )
         if (!volume.included) {
             // 未勾选 = 本次不打包。必须显式说明,否则"能看到预览"会被当成"会被打包"。
-            Text(
+            WarnLine(
+                icon = warnIcon(R.string.pack_excluded_warning) ?: R.drawable.ic_warning_triangle,
                 text = stringResource(R.string.pack_excluded_warning),
                 style = MaterialTheme.typography.labelMedium,
                 color = MaterialTheme.colorScheme.error,

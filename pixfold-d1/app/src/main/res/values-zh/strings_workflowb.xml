@@ -86,7 +86,7 @@
         <item quantity="other">页码预览（按当前页序重编号，共 %1$d 项）</item>
     </plurals>
     <string name="pack_page_hint">（序号从 001 起，扩展名统一小写；标「人工调整」的页被拖拽过）</string>
-    <string name="pack_page_issues">⚠️ 页码与页序不一致：%1$s</string>
+    <string name="pack_page_issues">页码与页序不一致：%1$s</string>
     <string name="pack_page_issue_separator">；</string>
     <string name="pack_page_manual">人工调整</string>
     <string name="pack_plan_title">执行计划</string>
@@ -94,13 +94,13 @@
     <string name="pack_source_policy_title">源目录处置</string>
     <string name="pack_clean_empty_on">清理空目录：开（危险）</string>
     <string name="pack_clean_empty_off">清理空目录：关（默认）</string>
-    <string name="pack_delete_warning">⚠️ 已选择删除源目录：执行前需独立二次确认</string>
+    <string name="pack_delete_warning">已选择删除源目录：执行前需独立二次确认</string>
     <string name="pack_confirm">确认打包</string>
     <string name="pack_confirm_cd">确认打包</string>
     <string name="pack_output">输出：%1$s</string>
     <string name="pack_output_exists">（已存在同名文件）</string>
     <string name="pack_language_iso">LanguageISO：%1$s</string>
-    <string name="pack_excluded_warning">⚠️ 本卷未勾选，本次不会打包（在步骤 1 或步骤 2 的卷头可重新勾选）</string>
+    <string name="pack_excluded_warning">本卷未勾选，本次不会打包（在步骤 1 或步骤 2 的卷头可重新勾选）</string>
     <plurals name="pack_included_count">
         <item quantity="other">本次将打包 %1$d / %2$d 卷</item>
     </plurals>

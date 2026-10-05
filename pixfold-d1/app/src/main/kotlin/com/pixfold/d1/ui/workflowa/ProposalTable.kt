@@ -170,7 +170,8 @@ fun ProposalRow(
             ) {
                 proposal.warnings.forEach { w ->
                     Text(
-                        // 「· 」是符号前缀,不属于文案(与 plan_skip_reason_prefix 同判)
+                        // 「· 」是符号前缀,不属于文案 —— 与已删除的 `plan_skip_reason_prefix`
+                        // 同一判法(那两处改用了矢量图标,这里保留文字圆点,故仍拼接)。
                         text = "· ${textOf(w.message)}",
                         style = MaterialTheme.typography.labelSmall,
                         // 会导致跳过 -> error 色;仅警告 -> 次级色(视觉分级)

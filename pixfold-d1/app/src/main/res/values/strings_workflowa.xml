@@ -117,8 +117,8 @@
         <item quantity="other">Naming structure · %1$s (%2$d images)</item>
     </plurals>
     <plurals name="a_naming_conflicts">
-        <item quantity="one">⚠️ %1$d item has conflicts and will be skipped (see the red text below)</item>
-        <item quantity="other">⚠️ %1$d items have conflicts and will be skipped (see the red text below)</item>
+        <item quantity="one">%1$d item has conflicts and will be skipped (see the red text below)</item>
+        <item quantity="other">%1$d items have conflicts and will be skipped (see the red text below)</item>
     </plurals>
     <string name="a_naming_empty_issues">No conflicts or warnings</string>
     <string name="a_naming_empty_images">No images to name</string>
@@ -138,8 +138,7 @@
     <string name="a_plan_confirm_cd">Confirm run</string>
     <string name="a_plan_status_rename">Will rename</string>
     <string name="a_plan_status_skip">Will skip</string>
-    <string name="a_plan_skip_reason">⛔ %1$s</string>
-
+    
     <!-- ============ Step container (WorkflowASteps) ============ -->
     <string name="a_step_label_sort">Step 1 Sort and preview</string>
     <string name="a_step_label_naming">Step 2 Naming structure</string>
