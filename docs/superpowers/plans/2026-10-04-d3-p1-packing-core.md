@@ -2137,6 +2137,25 @@ CHANGED M31: ★存活★ -> 捕获      其余 26 组两遍均为"捕获"
 - **结论 / 阻塞 / 待裁决**：无新增待裁决项。**唯一权威文档至此与台账一致**；
   剩下的三处阶段快照同步仍是**产品决策**，本轮**未做**（见 §6.5 第 3 项）。
 
+- **追记后的收尾（同轮补记，2026-10-05 18:3x–18:4x）**：追记落盘后自查发现**两处"写下即过期"的失真** ——
+  追记里写的是「合回 `dev` 那一刻」的读数（`HANGOFF.md:2753` 交付面表「分支归宿」格
+  `dev == d3/p1`、`HANGOFF.md:2826-2827` 正文 `[ahead 42]`），而**同一轮随后又落了 docs 提交**
+  （都在 `dev` 上、`d3/p1` 未动）⇒ 两个断言当场失效。
+  - **修法**：新建 `artifacts/fix_w24_hangoff_stale.py`（两遍制），**沿用轮 5 纪律不改写历史数字**，
+    只就地追加 `> ⚠️` 注（`HANGOFF.md:2755` 与 `:2836`）说明"那是合并时点的快照"。
+    `git diff --numstat` = **`11 0`**（纯追加）。
+  - **⚠️ 订正注自己又过期了一次（本轮最该记住的教训）**：第一版注里写死
+    「本轮又落 **3 个** docs 提交 ⇒ `dev` = `d3/p1` **+3**、`[ahead 45]`」——
+    但**写下它的那个提交本身又让 `dev` 前进一格** ⇒ 实测立刻变成 `+4` / `[ahead 46]`。
+    **任何写死提交数的注都会自我过期**。故新建 `artifacts/fix_w24_hangoff_stale2.py`
+    把两处改为**时间无关表述**：只保留"合并时点读数（`[ahead 42]`）"这一不变的历史事实，
+    把"此后领先多少"改为指向 `git status -sb` / `git rev-list --count d3/p1..dev` 的**实时输出**。
+    脚本内加了反向断言（正文不得再出现 `**+3**` / `[ahead 45]`）。
+  - 该订正**把 `5f5b233` 改写成 `3ff135e`**（`git commit --amend`）：改前已核实
+    ① 全仓无任何文件引用 `5f5b233`、② 它是 `dev` 的 tip 且**未推送** ⇒ amend 不破坏任何记录；
+    改写后 `git show --numstat` = **`12 0`**（仍为纯追加，零删除行）。
+- **结论 / 阻塞 / 待裁决（补记）**：无新增待裁决项；订正只动 `HANGOFF.md`，**未改任何 Kotlin**。
+
 ---
 
 ## 4. 待裁决 / 阻塞（越界项写这里，不自行决定）
@@ -2340,6 +2359,17 @@ cmd.exe /c "D:\Programing\Personal\pixfold\pixfold-d1\run-gradle.bat clean \
 > 新鲜度：`find app/src/main app/src/test domain/src/main domain/src/test -type f -newer
 > artifacts/gates_w24_hangoff.log` = **0**。
 > ⇒ 文档订正对构建与测试**零影响**；读数与轮 19 完全一致（domain 434 / app 456 / lint 0-0-4）。
+> 轮 20 补记（**订正 `HANGOFF.md` 两处时间性失真之后**的复跑：只改 `HANGOFF.md`、未改任何 Kotlin；
+> `--rerun-tasks` 全量、先删两个 `test-results`；日志 `artifacts/gates_w24b_fix.log`，mtime 2026-10-05 18:3x）：
+> `RC=0` / `BUILD SUCCESSFUL in 36s` / **`62 actionable tasks: 62 executed`**（无 `up-to-date`）；
+> `domain:test` = **32 files / 434 tests / 0F / 0E / 0S**；
+> `app:testDebugUnitTest` = **50 files / 456 tests / 0F / 0E / 0S**；
+> `:app:lintDebug` = **`0 errors, 0 warnings, 4 hints`**；
+> `:app:assembleDebug` ⇒ APK **33,437,589 字节**、mtime **2026-10-05 18:28:51** ——
+> 与干净基线 `artifacts/w24bak/app-debug.clean.apk` **逐字节相同**；
+> 新鲜度：`find app/src domain/src -type f -newer artifacts/gates_w24b_fix.log` = **0**。
+> ⇒ 与轮 19/20 读数**三次完全一致**（domain 434 / app 456 / lint 0-0-4）—— 文档改动对构建与测试**零影响**。
+
 
 ### 6.3 改动面与越界核对
 
@@ -2459,8 +2489,21 @@ cmd.exe /c "D:\Programing\Personal\pixfold\pixfold-d1\run-gradle.bat clean \
 > 与 `AGENTS.md` / `README.md` 仍逐条 `git diff --quiet HEAD` unchanged**。
 > 文件级：3295 → **3426 行**、306,426 → **319,671 字节**、
 > sha256 `343720ff102b…` → **`c8fd0a404221…`**（CRLF 0 / bare CR 0 维持不变）。
+> 轮 20 补记（**订正两处时间性失真之后**）：`HANGOFF.md` 再由 `3426` → **`3437` 行**、
+> 319,671 → **320,594 字节**、sha256 `c8fd0a404221…` → **`07e640a3df3b…`**；
+> 随后把两条注改为**时间无关表述**（见 §3.1 轮 20 补记）⇒ **`3438` 行**、**320,687 字节**、
+> sha256 **`30ed30d25117…`**（CRLF 0 / bare CR 0 维持不变）。
+> 两次改动均为**纯追加**（`git diff --numstat` = `11 0`；amend 后 `git show --numstat` = `12 0`），
+> **零删除行**；**除 `HANGOFF.md` 外本轮未动任何文件**，`AGENTS.md` / `README.md`
+> 与阶段快照三处**仍逐条 unchanged**。
+
 
 ### 6.4 提交拓扑（`git log --oneline dev..d3/p1`）
+
+> ⚠️ **该命令自 2026-10-05 合回 `dev` 起已失效**：`git merge --ff-only d3/p1` 之后 `dev` 又前进了
+> 若干 docs 提交，故 `dev..d3/p1` **输出 0 行**（`d3/p1` 反被 `dev` 包含）。
+> 本表因此**不再能由该命令重放**，而是**手工维护的权威提交清单**；
+> 要看"合并后又落了什么"，用 `git log --oneline d3/p1..dev`。
 
 > **不写死条数**（终验当时为 9；W10 提交与回填提交各 +1）—— 以命令输出为准。
 > ⚠️ 轮 14 起 `pixfold-d1/app/**` 有改动，故 §6.3 里"`app/**` 始终 0 条"的旧结论**已作废**。
@@ -2468,6 +2511,8 @@ cmd.exe /c "D:\Programing\Personal\pixfold\pixfold-d1\run-gradle.bat clean \
 > 缺哈希行均已回填（`257e0e1` / `288309b` / `3185b15` / `b190bb6` 等），历史占位**已清零**：
 
 | 提交 | 类型 | 内容 |
+| `3ff135e` | docs | 轮 20 补记：订正 `HANGOFF.md` 追记里两处"写下即过期"的分支读数（`dev == d3/p1` / `[ahead 42]`）；⚠️ 第一版注写死了提交数又自我过期 ⇒ 改为时间无关表述（**纯追加 +12 / −0**；amend 自 `5f5b233`，改前已核实全仓无引用且未推送） |
+| `（轮 20 补记回填 = 本次提交）` | docs | 台账补记轮 20 追记后收尾（时间性失真订正 + 闸门复跑读数 + §6.4 命令失效注）提交号 |
 | `c5f6610` | docs | 轮 20 / W24 台账回写：§3 新增 W24 行、§3.1 新增轮 20 小节（触发/决策/订正 6 处/追记/写盘两遍制/纯新增验证/阶段快照未动/三次事实复核）、§6.2 追加闸门读数、§6.3 追加改动面、§6.4 新增 `768bec7` 行、§6.5 第 3 项补注（1 file / +88 / −0） |
 | `（轮 20 回填 = 本次提交）` | docs | 台账回填轮 20（W24：`HANGOFF.md` §9.1 订正 + 追记）提交号 |
 | `768bec7` | docs | 轮 20 / W24：`HANGOFF.md` §9.1「D3 打包核心轮」订正 6 处失真 + 追记 R1–R5/i18n/图标/合回 `dev`（**纯追加 +131 / −0**、两个 hunk；阶段快照三处与 `AGENTS.md`/`README.md` 未动） |
@@ -2610,6 +2655,10 @@ cmd.exe /c "D:\Programing\Personal\pixfold\pixfold-d1\run-gradle.bat clean \
      `768bec7`）—— 但那是**小节内的内容补记**，**不是阶段状态改动**：三处阶段快照
      （§9 顶 `> 进度(` 行 / 门槛表 `| D3 |` 行 / `| **打包** | ⬜ **未交付** |` 行）与
      `AGENTS.md` / `README.md` **仍然逐条未动**。
+     ⚠️ **轮 20 再补充**：追记落盘后又发现其中两处分支读数**写下即过期**
+     （`dev == d3/p1` / `[ahead 42]`），已就地加注订正（`HANGOFF.md:2755` 与 `:2836`，
+     纯追加 `11 0`）；订正注本身第一版写死了提交数、**又立刻自我过期**，
+     已改为**时间无关表述**（`3ff135e`）。**三处阶段快照逐字未动的结论不变。**
   4. ❌ **退出条件 2 的"适配层零 Android 依赖"可执行检查**（如 Gradle 依赖断言）—— 未授权，未做；
   5. ❌ D2b 五项、§11 第 12 条空间阈值。
 - **待用户裁决**（§4）：**R1** 撤销 `from == to` 空操作（既有缺陷，非本轮引入，修法二选一）；
