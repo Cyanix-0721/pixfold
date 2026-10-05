@@ -2156,6 +2156,25 @@ CHANGED M31: ★存活★ -> 捕获      其余 26 组两遍均为"捕获"
     改写后 `git show --numstat` = **`12 0`**（仍为纯追加，零删除行）。
 - **结论 / 阻塞 / 待裁决（补记）**：无新增待裁决项；订正只动 `HANGOFF.md`，**未改任何 Kotlin**。
 
+- **终笔（同轮第三笔，2026-10-05 18:4x–18:5x）**：核对提交时间轴时发现 §6.2 补记① 存在**时点误标** ——
+  它把 `artifacts/gates_w24b_fix.log`（mtime **18:29:19**）称作「订正 `HANGOFF.md` 两处时间性失真
+  **之后**的复跑」，但首次订正提交 `3ff135e` = **18:40:25** ⇒ 那次复跑实际在订正**之前**。
+  - **修法**：新建 `artifacts/ledger_w24_supp2.py`（两遍制；干跑 `chars 167883 → 168754`、
+    两锚点各 `count == 1`、两 precheck 各 `0`）。① 把误标行就地改为
+    「⚠️ **时点更正**：这一次复跑发生在首次订正**之前**、非「订正之后」」；
+    ② 追加「轮 20 补记②」记下**真正在两次订正之后**的那次复跑；脚本含反向断言
+    （正文不得再出现原误标串）。
+  - `git diff --numstat` = **`13 1`**，**唯一删除行就是那条旧误标行**（已在提交前逐字核对）。
+  - **提交 `1767739`**（`docs(d3): 更正台账 §6.2 补记里对闸门复跑时点的误标，并补记订正后的权威复跑`）。
+  - **终态闸门复跑**（`artifacts/gates_w24d_final.log`，mtime **18:49:42**）：`RC=0` /
+    `BUILD SUCCESSFUL in 41s` / **`62 actionable tasks: 62 executed`**；domain 32 files **434** /
+    app 50 files **456** / lint **`0 errors, 0 warnings, 4 hints`**；APK **33,437,589 字节**
+    （mtime 18:49:11）、sha256 **`1a2164ea74a298575e3937fa06b38bd6f4f37c2fb2d3adeabec8bbf7151983d1`**
+    —— 与干净基线 `artifacts/w24bak/app-debug.clean.apk` **逐字节相同**；新鲜度 0。
+    ⇒ **五次读数完全一致**，文档轮对构建与测试**零影响**。
+- **结论 / 阻塞 / 待裁决（终笔）**：无新增待裁决项；`d3/p1` 停在 `09fc863` 未动，
+  `dev` 已在其上，**仍未推送**（push 由用户处理）。三处阶段快照同步仍是**产品决策**，本轮**未做**。
+
 ---
 
 ## 4. 待裁决 / 阻塞（越界项写这里，不自行决定）
@@ -2381,6 +2400,18 @@ cmd.exe /c "D:\Programing\Personal\pixfold\pixfold-d1\run-gradle.bat clean \
 > 新鲜度：`find app/src domain/src -type f -newer artifacts/gates_w24c_final.log` = **0**。
 > ⇒ 四次读数（轮 19 / 轮 20 / 补记① / **补记②**）**完全一致**（domain 434 / app 456 / lint 0-0-4）——
 > 文档改动对构建与测试**零影响**；补记① 的时点误标在此更正。
+> 轮 20 补记② 落地之后（**本段是终笔前最后一次闸门复跑**）的读数
+> （`artifacts/gates_w24d_final.log`，mtime **2026-10-05 18:49:42**、`--rerun-tasks` 全量、先删两个 `test-results`）：
+> `RC=0` / `BUILD SUCCESSFUL in 41s` / **`62 actionable tasks: 62 executed`**（无 `up-to-date`）；
+> `domain:test` = **32 files / 434 tests / 0F / 0E / 0S**；
+> `app:testDebugUnitTest` = **50 files / 456 tests / 0F / 0E / 0S**；
+> `:app:lintDebug` = **`0 errors, 0 warnings, 4 hints`**；
+> `:app:assembleDebug` ⇒ APK **33,437,589 字节**、mtime **2026-10-05 18:49:11**、
+> sha256 **`1a2164ea74a298575e3937fa06b38bd6f4f37c2fb2d3adeabec8bbf7151983d1`** ——
+> 与干净基线 `artifacts/w24bak/app-debug.clean.apk` **逐字节相同**；
+> 新鲜度：`find app/src domain/src -type f -newer artifacts/gates_w24d_final.log` = **0**。
+> ⇒ **五次读数**（轮 19 / 轮 20 / 补记① / 补记② / **本次**）**完全一致**
+> （domain 434 / app 456 / lint 0-0-4）—— 本轮的文档改动对构建与测试**零影响**。
 
 
 ### 6.3 改动面与越界核对
@@ -2523,6 +2554,8 @@ cmd.exe /c "D:\Programing\Personal\pixfold\pixfold-d1\run-gradle.bat clean \
 > 缺哈希行均已回填（`257e0e1` / `288309b` / `3185b15` / `b190bb6` 等），历史占位**已清零**：
 
 | 提交 | 类型 | 内容 |
+| `1767739` | docs | 轮 20 终笔：更正 §6.2 补记① 对闸门复跑**时点**的误标（`gates_w24b_fix.log` mtime 18:29:19 早于首次订正提交 `3ff135e` 18:40:25）并补记两次订正之后的权威复跑 `gates_w24d_final.log`（**1 file / +13 / −1**，唯一删除行即旧误标行） |
+| `（轮 20 终笔回填 = 本次提交）` | docs | 台账回填轮 20 终笔的提交号 |
 | `3ff135e` | docs | 轮 20 补记：订正 `HANGOFF.md` 追记里两处"写下即过期"的分支读数（`dev == d3/p1` / `[ahead 42]`）；⚠️ 第一版注写死了提交数又自我过期 ⇒ 改为时间无关表述（**纯追加 +12 / −0**；amend 自 `5f5b233`，改前已核实全仓无引用且未推送） |
 | `63a33b9` | docs | 轮 20 补记：追记后收尾 —— 时间性失真订正（`HANGOFF.md:2755`/`:2836`）+ 闸门复跑读数 + §6.4 命令失效注（1 file / +49 / −0） |
 | `c5f6610` | docs | 轮 20 / W24 台账回写：§3 新增 W24 行、§3.1 新增轮 20 小节（触发/决策/订正 6 处/追记/写盘两遍制/纯新增验证/阶段快照未动/三次事实复核）、§6.2 追加闸门读数、§6.3 追加改动面、§6.4 新增 `768bec7` 行、§6.5 第 3 项补注（1 file / +88 / −0） |
