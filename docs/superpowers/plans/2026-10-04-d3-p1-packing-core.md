@@ -2359,7 +2359,7 @@ cmd.exe /c "D:\Programing\Personal\pixfold\pixfold-d1\run-gradle.bat clean \
 > 新鲜度：`find app/src/main app/src/test domain/src/main domain/src/test -type f -newer
 > artifacts/gates_w24_hangoff.log` = **0**。
 > ⇒ 文档订正对构建与测试**零影响**；读数与轮 19 完全一致（domain 434 / app 456 / lint 0-0-4）。
-> 轮 20 补记（**订正 `HANGOFF.md` 两处时间性失真之后**的复跑：只改 `HANGOFF.md`、未改任何 Kotlin；
+> 轮 20 补记（⚠️ **时点更正**：这一次复跑发生在首次订正**之前**、非「订正之后」—— 见下方第二次复跑）：
 > `--rerun-tasks` 全量、先删两个 `test-results`；日志 `artifacts/gates_w24b_fix.log`，mtime 2026-10-05 18:3x）：
 > `RC=0` / `BUILD SUCCESSFUL in 36s` / **`62 actionable tasks: 62 executed`**（无 `up-to-date`）；
 > `domain:test` = **32 files / 434 tests / 0F / 0E / 0S**；
@@ -2369,6 +2369,18 @@ cmd.exe /c "D:\Programing\Personal\pixfold\pixfold-d1\run-gradle.bat clean \
 > 与干净基线 `artifacts/w24bak/app-debug.clean.apk` **逐字节相同**；
 > 新鲜度：`find app/src domain/src -type f -newer artifacts/gates_w24b_fix.log` = **0**。
 > ⇒ 与轮 19/20 读数**三次完全一致**（domain 434 / app 456 / lint 0-0-4）—— 文档改动对构建与测试**零影响**。
+> 轮 20 补记②（**两次 `HANGOFF.md` 订正都落盘之后**的复跑：只改 `HANGOFF.md`、未改任何 Kotlin；
+> `--rerun-tasks` 全量、先删两个 `test-results`；日志 `artifacts/gates_w24c_final.log`，mtime 2026-10-05 18:44:59）：
+> `RC=0` / `BUILD SUCCESSFUL in 43s` / **`62 actionable tasks: 62 executed`**（无 `up-to-date`）；
+> `domain:test` = **32 files / 434 tests / 0F / 0E / 0S**；
+> `app:testDebugUnitTest` = **50 files / 456 tests / 0F / 0E / 0S**；
+> `:app:lintDebug` = **`0 errors, 0 warnings, 4 hints`**；
+> `:app:assembleDebug` ⇒ APK **33,437,589 字节**、mtime **2026-10-05 18:44:28**、
+> sha256 **`1a2164ea74a298575e3937fa06b38bd6f4f37c2fb2d3adeabec8bbf7151983d1`** ——
+> 与干净基线 `artifacts/w24bak/app-debug.clean.apk` **逐字节相同**；
+> 新鲜度：`find app/src domain/src -type f -newer artifacts/gates_w24c_final.log` = **0**。
+> ⇒ 四次读数（轮 19 / 轮 20 / 补记① / **补记②**）**完全一致**（domain 434 / app 456 / lint 0-0-4）——
+> 文档改动对构建与测试**零影响**；补记① 的时点误标在此更正。
 
 
 ### 6.3 改动面与越界核对
