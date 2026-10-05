@@ -3171,6 +3171,18 @@ cmd.exe /c "D:\Programing\Personal\pixfold\pixfold-d1\run-gradle.bat clean \
 > 需要完整链条时以 `git log --oneline` 为准。本轮尾段两笔已补入：
 > `3458d29`（回填 `63a33b9`）与 `74928f3`（§6.4 收口）：
 
+> ✅ **合回 `dev` 的实测核对（2026-10-06，用户「记得merge到dev」）**：**无需再做任何 merge，工作早已在 `dev` 上**。
+> 实测三条命令，全部可复跑：
+> - `git merge-base --is-ancestor d3/p1 dev` ⇒ **退出码 0**（`d3/p1` 是 `dev` 的祖先）；
+> - `git rev-list --count dev..d3/p1` = **0**（`d3/p1` 没有任何提交不在 `dev` 上）；
+> - `git rev-list --count d3/p1..dev` = **23**（`dev` 反超 `d3/p1`，因为轮 21–23 的回写提交都**直接落在 `dev`**）。
+>
+> ⇒ 轮 22 的 `git merge --ff-only d3/p1`（无 merge commit）之后，**轮 23 的全部六笔提交 `e83f215`
+> / `f9510aa` / `27ab1e7` / `d356d46` / `9b10d06` / `2879609` 逐笔都在 `dev` 上**（`git branch --contains <hash>`
+> 对六笔均只输出 `dev`）。`d3/p1` 停在 `09fc863` 未再前进，按惯例保留分支不删。
+> ⚠️ **仍未推送**：`git rev-list --left-right --count origin/dev...dev` = `0  65`（`origin/dev` 独有 0、`dev` 独有 65）
+> —— `push` 按本仓惯例由用户处理，agent 只提交不推送。
+
 | 提交 | 类型 | 内容 |
 | `9b10d06` | `docs(d3)` | 轮 23 登记三项开放项：新增 §4.1 (`O1` 撤销范围对话框两个执行档配色完全相同、`O2` 三处阶段快照是否写进覆盖度读数、`O3` D3 端到端卡在前置 `D2b` 的依赖阻塞)，并在 §3 的 W27 行与 §3.1 轮 23 的「结论 / 阻塞 / 待裁决」处补指向 §4.1 的引用（订正原「无新增待裁决项」）（1 file / +16 / −2） |
 | `d356d46` | `docs(d3)` | 轮 23 §6.4 收口：补登轮 23 的三笔提交（`27ab1e7` / `f9510aa` / `e83f215`），§3.1 补 `27ab1e7` 标题（1 file / +4 / −1） |
