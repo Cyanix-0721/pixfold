@@ -2752,6 +2752,13 @@ options.forEachIndexed { index, option ->
 | 测试计数 | `domain` **247 → 434**;`app` **399 → 456** |
 | 分支归宿 | 已 **fast-forward 合回 `dev`**(`dev == d3/p1`),**未推送** |
 
+> ⚠️ **上表与本文的"分支归宿"读数是 2026-10-05 合回时点的快照**：「分支归宿」格里的
+> `dev == d3/p1`、以及下方"合回 `dev`"段的 `[ahead 42]`，描述的都是 **`git merge --ff-only`
+> 刚完成那一刻**的事实。此后 `dev` 上继续累积了本轮的 docs 提交（`d3/p1` 未动、停在 `09fc863`）
+> ⇒ `dev` 已**领先 `d3/p1`**；精确差值会随每次文档提交继续增长，**故此处刻意不写死数字**，
+> 以 `git status -sb` / `git rev-list --count d3/p1..dev` 的实时输出为准。
+> 「**未推送**」一条**至今有效**。
+
 **五项修复 / 裁决(R1–R5)** —— 一律"先登记、拿到用户裁决再动手",逐轮证据见
 `docs/superpowers/plans/2026-10-04-d3-p1-packing-core.md` §3.1 与 §4:
 
@@ -2826,6 +2833,11 @@ options.forEachIndexed { index, option ->
 `git merge --ff-only d3/p1` 成功、**无 merge commit**;合并后 `dev == d3/p1`、
 `git status -sb` = `## dev...origin/dev [ahead 42]`(**仍未推送** —— `push` 按本仓惯例由用户处理)。
 分支 `d3/p1` 按"完成即合回 `dev` 并回写文档"的惯例保留(未删)。
+
+> ⚠️ **补正（同轮后续）**：上句"合并后 `dev == d3/p1`"与 `[ahead 42]` 均为**合并时点**读数，
+> 已随本轮后续的 docs 提交过期（`d3/p1` 未动、停在 `09fc863`，`dev` 继续前进）⇒
+> 「领先多少」**不写死**，以 `git status -sb` 实时输出为准。合并本身（`--ff-only`、
+> 无 merge commit）与"分支 `d3/p1` 保留未删"两条**未变**。
 
 **未做 / 不宣称**(边界,勿据此认为 D3 已完成):
 
