@@ -2664,7 +2664,9 @@ distinct `text` 值 **519** 条。**`WARN_ICONS`（11 键）的真机覆盖 = �
 
 #### 轮 24（2026-10-07 22:4x–23:1x）— W28 O1 撤销范围对话框两档视觉分级 + O2 阶段快照同步
 
-- 提交：（见下方回填行）
+- 提交：`a6cfe26` feat(d3): 撤销范围对话框两档视觉分级（O1）；
+  `ceaf447` docs(d3): 阶段快照同步轮 23 真机覆盖度读数（O2）；
+  `a09be6b` docs(d3): 轮 24（W28）台账回写 —— O1 两档分级 + O2 快照同步
 - 触发：用户 `m06826` 逐字「ready留着没用吧。o1o2都要」⇒ ① 删除本地 `ready` 分支（已由 `d4aca80` 记录）
   ② **§4.1 的 O1 与 O2 由「⬜ 待裁决」转为「要做」**。
 - 本回合约束（用户 `m06838` 逐字）：「这次任务真机暂时跳过你先做剩下的，我一会有点事没空真机校验，
@@ -3384,7 +3386,7 @@ cmd.exe /c "D:\Programing\Personal\pixfold\pixfold-d1\run-gradle.bat clean \
 > —— `push` 按本仓惯例由用户处理，agent 只提交不推送。
 
 | 提交 | 类型 | 内容 |
-| （轮 24 回填 = 本次提交） | `docs(d3)` | 轮 24 W28 台账回写：§3 新增 W28 行、§3.1 新增轮 24 小节（①–⑨）、§4.1 的 O1/O2 状态由「⬜ 待裁决」改「✅ 已落地」并订正小节前言、§6.2 第九次读数、§6.3 改动面 + 越界核对、§6.4 本行占位、§6.5 轮 24 段（⚠️ 真机按用户指令跳过） |
+| `a09be6b` | `docs(d3)` | 轮 24 W28 台账回写：§3 新增 W28 行、§3.1 新增轮 24 小节（①–⑨）、§4.1 的 O1/O2 状态由「⬜ 待裁决」改「✅ 已落地」并订正小节前言、§6.2 第九次读数、§6.3 改动面 + 越界核对、§6.4 本行占位、§6.5 轮 24 段（⚠️ 真机按用户指令跳过） |
 | `ceaf447` | `docs(d3)` | 轮 24 W28 / O2：四处阶段快照同步 —— `HANGOFF.md` §9 顶门槛表 D3 行 + §9 D3「现状对照」打包行、`AGENTS.md` 头部、`README.md` 状态行，各插入一句「真机验证层级：阶段分支共 4 轮真机核对（轮 23 覆盖度审计：`WARN_ICONS` 中文覆盖 8/11 → 11/11）；打包核心仍未端到端」（3 files / +4 / −4） |
 | `a6cfe26` | `feat(d3)` | 轮 24 W28 / O1：撤销范围对话框两档视觉分级 —— `pixfold-d1/app/src/main/kotlin/com/pixfold/d1/ui/theme/Theme.kt` 新增 `dangerOutlineButtonColors()` + `dangerOutlineBorder()`、`pixfold-d1/app/src/main/kotlin/com/pixfold/d1/ui/plan/ExecutionReportPage.kt` 安全档 `Button` → `OutlinedButton`、`pixfold-d1/app/src/test/kotlin/com/pixfold/d1/ui/plan/UndoScopeDialogStyleTest.kt` 补五条判据（第 ⑤ 条「两档取样点通道差 ≥ 40」为核心牙）；变异 2 条全捕获；闸门 `RC=0` / `62/62 executed`、domain 439 / app 456 / lint 0 issues；⚠️ 真机按用户指令跳过（3 files / +150 / −20） |
 | `9b10d06` | `docs(d3)` | 轮 23 登记三项开放项：新增 §4.1 (`O1` 撤销范围对话框两个执行档配色完全相同、`O2` 三处阶段快照是否写进覆盖度读数、`O3` D3 端到端卡在前置 `D2b` 的依赖阻塞)，并在 §3 的 W27 行与 §3.1 轮 23 的「结论 / 阻塞 / 待裁决」处补指向 §4.1 的引用（订正原「无新增待裁决项」）（1 file / +16 / −2） |
