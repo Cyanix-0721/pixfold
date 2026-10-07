@@ -1,5 +1,6 @@
 package com.pixfold.d1.ui.theme
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material3.ButtonColors
 import androidx.compose.material3.ButtonDefaults
@@ -10,6 +11,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.unit.dp
 import com.pixfold.d1.domain.settings.AccentChoice
 import com.pixfold.d1.domain.settings.PixFoldSettings
 import com.pixfold.d1.domain.settings.ThemeMode
@@ -126,6 +128,48 @@ fun dangerActionButtonColors(): ButtonColors {
         )
     }
 }
+
+/**
+ * **次级**「危险动作」按钮配色(O1,2026-10-07)。
+ *
+ * ## 为什么需要第二档
+ *
+ * 撤销范围对话框里两个执行档的危险程度**不同**(删本次产物 / 连用户原有的也删),
+ * 但原先两档都调 [dangerActionButtonColors] ⇒ 真机像素**逐位相同**(轮 23 读数:
+ * 两档都是 `#8C1D18`),用户只能靠读文字分辨。用户 2026-10-07:「o1o2都要」
+ * 即要求把这条分级落实。
+ *
+ * ## 为什么是「同色系换重量」而不是「换成另一个红色角色」
+ *
+ * 台账 §4.1 的 O1 曾举例「危险档用 `error`、安全档用 `errorContainer`」。
+ * 这个方案**不能用**:如 [dangerActionButtonColors] 的 KDoc 所述,error 族
+ * **按模式反转**——浅色下 `error` 深红而 `errorContainer` 是粉底,深色下正好反过来。
+ * 换角色会得到一个**随模式互换**的分级,而且每个模式下总有一档是**淡粉**
+ * (`#F9DEDC` / `#F2B8B5`),恰恰是"不像危险动作"的那种颜色。
+ *
+ * 故分级改用**视觉重量**:两档同为红色系,但
+ *
+ *  | 档位 | 底色 | 描边 | 用于 |
+ *  | ---- | ---- | ---- | ---- |
+ *  | [dangerActionButtonColors] | 深红**填充** | 无 | 删得最多的那一档 |
+ *  | 本函数 | **透明** | 红 1dp | 只删本次产物的那一档 |
+ *  | `TextButton` | **透明** | 无 | 取消(非动作) |
+ *
+ * 这与"删得越多越醒目"同序,且**与模式无关**(描边/内容色用 `error`——它正是
+ * 那 18 处**文字**色的来源,浅色深红、深色淡粉,在各自底色上都读得清)。
+ *
+ * 底栏的「撤销本次执行」仍用 [dangerActionButtonColors](填充),不受影响。
+ */
+@Composable
+fun dangerOutlineButtonColors(): ButtonColors =
+    ButtonDefaults.outlinedButtonColors(
+        contentColor = MaterialTheme.colorScheme.error,
+    )
+
+/** 与 [dangerOutlineButtonColors] 配套的描边;同一个 `error` 红,避免两处色号走偏。 */
+@Composable
+fun dangerOutlineBorder(): BorderStroke =
+    BorderStroke(1.dp, MaterialTheme.colorScheme.error)
 
 /**
  * 兼容重载:旧的 `PixFoldTheme(darkTheme, dynamicColor, content)` 调用点与测试

@@ -14,6 +14,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.Button
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -44,6 +45,8 @@ import com.pixfold.d1.ui.text.textOf
 import com.pixfold.d1.ui.text.textOfOrNull
 import com.pixfold.d1.ui.text.warnIcon
 import com.pixfold.d1.ui.theme.dangerActionButtonColors
+import com.pixfold.d1.ui.theme.dangerOutlineBorder
+import com.pixfold.d1.ui.theme.dangerOutlineButtonColors
 
 const val TAG_REPORT_PAGE = "report-page"
 const val TAG_REPORT_LIST = "report-list"
@@ -264,13 +267,21 @@ fun ExecutionReportPage(
  *
  *  1. **警告**:标题带警示图标、正文说清"覆盖掉的内容已经找不回来了";
  *  2. **三选一**:两个可执行档 + 取消,没有第四条路;
- *  3. **颜色区分**:两个执行档都是**破坏性**动作 ⇒ [dangerActionButtonColors]
- *     (与底栏撤销按钮同一套深红),取消是 [TextButton](无底色)⇒ 一眼能分出
- *     "哪个是危险动作、哪个只是关掉";
+ *  3. **颜色区分**:两档都是**破坏性**动作,但删得多少不同 ⇒ 用**视觉重量**分级
+ *     (O1,2026-10-07 用户「o1o2都要」):
+ *     危险档(连用户原有的也删)= [dangerActionButtonColors] 深红**填充**;
+ *     安全档(只删本次产物)= [OutlinedButton] + 红**描边**、底色透明;
+ *     取消 = [TextButton](无底色、无描边)。三档重量递减,一眼能分;
  *  4. **取消在最后**:按钮顺序 = 安全档 → 危险档 → 取消。
  *
  * 为什么危险档排在安全档**后面**却仍在取消**前面**:两档都是"会删东西"的动作,
  * 按危险程度递增排列(删本次产物 → 连用户原有的也删),最后才是非动作的取消。
+ *
+ * ⚠️ 两档为什么不用**两个不同的红色角色**(如台账 O1 举例的 `error`/`errorContainer`)?
+ * 因为 M3 的 error 族**按模式反转**(见 [dangerActionButtonColors] 的 KDoc):
+ * 换角色会得到一个随深浅模式**互换**的分级,而且每个模式下总有一档是**淡粉**
+ * (`#F9DEDC`/`#F2B8B5`)—— 恰恰是"不像危险动作"的颜色。故两档同用红色系,
+ * 只改**填充 / 描边 / 无**这三种视觉重量。
  *
  * ⚠️ 两个 Button 用的是 `AlertDialog` 的 `confirmButton` / `dismissButton` 槽位吗?
  * **不是**。Material3 的 `AlertDialog` 只有这两个槽位,摆不下三个同级按钮,
@@ -317,9 +328,11 @@ private fun UndoScopeDialog(
                 )
                 Text(text = body, style = MaterialTheme.typography.bodyMedium)
                 // 顺序即语义:安全 → 危险 → 取消(用户明说"取消放到最后边")。
-                Button(
+                // 安全档只删**本次产物**,故用描边(透明底)而非填充 —— 与危险档分级(O1)。
+                OutlinedButton(
                     onClick = { onChoose(UndoScope.ThisRun) },
-                    colors = dangerActionButtonColors(),
+                    colors = dangerOutlineButtonColors(),
+                    border = dangerOutlineBorder(),
                     modifier = Modifier
                         .fillMaxWidth()
                         .testTag(TAG_UNDO_SCOPE_THIS_RUN)

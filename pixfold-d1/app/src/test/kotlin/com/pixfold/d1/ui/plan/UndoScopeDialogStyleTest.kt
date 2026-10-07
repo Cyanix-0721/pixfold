@@ -35,15 +35,24 @@ import kotlin.test.assertTrue
  *
  *  - `Button`(填充)与 `TextButton`(纯文字)在**语义树里完全一样** ——
  *    都是 `Role.Button` + 同一段文字,`assertIsDisplayed()` 一条都抓不住;
- *  - 两个执行档必须是**深红填充**(与底栏撤销按钮同一套 `dangerActionButtonColors()`),
- *    取消必须是**无底色的纯文字按钮** ⇒ 用户一眼能分出"哪个会删东西、哪个只是关掉"。
+ *  - 三个按钮是**三档递减的视觉重量**,与"删得多少"同序:
+ *    危险档(连用户原有的也删)= 深红**填充** → 安全档(只删本次产物)= 红**描边**无底色
+ *    → 取消 = 无底色无描边的纯文字。
  *
  * ## 判据为什么是「两两可分」而不是「等于某个色号」
  *
  * 写死色号会把测试焊死在当前配色上(换主题就红,而不是发现缺陷)。真正要守的**性质**是:
  *
- *  1. 两个执行档都**偏红且是暗色**(淡粉 `#F2B8B5` 也"偏红",但不像危险动作);
- *  2. 取消的底色**等于对话框表面色**(即容器透明),与两个执行档**明显不同**。
+ *  1. 危险档**偏红且是暗色**、且底色**不透明**(淡粉 `#F2B8B5` 也"偏红",但不像危险动作);
+ *  2. 安全档底色**等于对话框表面色**(容器透明),但**上边缘是红的**(有描边);
+ *  3. 取消的底色**等于对话框表面色**且**上边缘不是红的**(无描边);
+ *  4. 安全档与危险档的取样点颜色**明显不同**(O1:两档曾逐位相同,只能靠读文字区分)。
+ *
+ * ## 第 4 条为什么不能只靠「都偏红」
+ *
+ * 轮 23 的真机读数正是缺陷本身:两档都从 `dangerActionButtonColors()` 取到同一个
+ * `#8C1D18`,像素逐位相同。"两个都偏红"这个性质在缺陷态下**照样成立**,
+ * 所以必须直接断言**两档彼此可分**,否则测试对 O1 没有牙。
  *
  * ## ⚠️ 必须在真实主题下取样
  *
@@ -128,6 +137,24 @@ class UndoScopeDialogStyleTest {
         return bitmap.getPixel(px(4.dp), px(gapY - dlg.top))
     }
 
+    /**
+     * 在对话框位图里取某个子节点**上边缘**的一个像素(水平取节点中点,避开圆角)。
+     *
+     * 为什么需要这个点:O1 之后安全档是 `OutlinedButton`(透明底 + 1dp 红描边),
+     * 它的**底色与对话框表面色相同**,只有**上边缘**才是红的。所以"有没有描边"
+     * 只能在上边缘取样 —— 这与 [sampleInDialog] 取的"容器色"是两个不同的判据。
+     *
+     * `+1` 是必要的:Compose 的 `BorderStroke` 画在布局边界**内侧**,而 [px] 向下截断,
+     * 故 `px(top) + 1` 一定落在描边笔画里(描边宽 1dp = 3.5px @560dpi)。
+     */
+    private fun sampleTopEdgeInDialog(bitmap: Bitmap, tag: String): Int {
+        val dlg = bounds(TAG_UNDO_SCOPE_DIALOG)
+        val node = bounds(tag)
+        val x = px((node.left + node.right) / 2 - dlg.left)
+        val y = px(node.top - dlg.top) + 1
+        return bitmap.getPixel(x, y)
+    }
+
     private fun setContentLight(content: @Composable () -> Unit) =
         rule.setContent { PixFoldTheme(darkTheme = false, dynamicColor = false, content = content) }
 
@@ -169,13 +196,37 @@ class UndoScopeDialogStyleTest {
         )
     }
 
+    /** 描边判据:上边缘**偏红**(与 [assertDarkRedContainer] 不同,这里不管亮度 —— 描边是细线)。 */
+    private fun assertRedEdge(color: Int, what: String) {
+        val r = Color.red(color)
+        val g = Color.green(color)
+        val b = Color.blue(color)
+        assertTrue(
+            r > g + 40 && r > b + 40,
+            "$what 的上边缘应有红色描边;实测 r=$r g=$g b=$b (${hex(color)})",
+        )
+    }
+
+    /** 无描边判据:上边缘**不偏红**(即与表面色同族)。 */
+    private fun assertNoRedEdge(color: Int, what: String) {
+        val r = Color.red(color)
+        val g = Color.green(color)
+        val b = Color.blue(color)
+        assertTrue(
+            !(r > g + 40 && r > b + 40),
+            "$what 的上边缘**不应**有红色描边;实测 r=$r g=$g b=$b (${hex(color)})",
+        )
+    }
+
     /**
-     * 两个执行档都是深红填充、取消是无底色纯文字 ⇒ 三者**颜色互相可分**。
+     * 三档递减的视觉重量 ⇒ 三者**两两可分**。
      *
-     * 一次跑完三条性质,浅 / 深只是主题不同:
-     *  ① 两个执行档各是暗红;
-     *  ② 取消那一点**等于**对话框表面色(容器透明,不是"另一种颜色");
-     *  ③ 执行档与取消的通道差足够大(用户"一眼能区分"的可证伪化)。
+     * 一次跑完五条性质,浅 / 深只是主题不同:
+     *  ① 危险档是暗红**填充**;
+     *  ② 安全档底色 = 对话框表面色(透明),但上边缘**有**红描边;
+     *  ③ 取消底色 = 对话框表面色(透明),且上边缘**没有**红描边;
+     *  ④ 取消与**填充档**的颜色明显不同(取消与描边档底色都透明,靠 ②③ 的描边判据区分);
+     *  ⑤ **安全档与危险档的取样点颜色明显不同**(O1 的核心;缺陷态下两档逐位相同)。
      */
     private fun assertScopesAndCancelAreDistinguishable() {
         val bmp = dialogBitmap()
@@ -183,34 +234,56 @@ class UndoScopeDialogStyleTest {
         val danger = sampleInDialog(bmp, TAG_UNDO_SCOPE_EVERYTHING)
         val cancel = sampleInDialog(bmp, TAG_UNDO_SCOPE_CANCEL)
         val surface = sampleDialogSurface(bmp)
+        val safeEdge = sampleTopEdgeInDialog(bmp, TAG_UNDO_SCOPE_THIS_RUN)
+        val cancelEdge = sampleTopEdgeInDialog(bmp, TAG_UNDO_SCOPE_CANCEL)
         println(
             "UndoScopeDialogStyle probe: safe=${hex(safe)} danger=${hex(danger)} " +
-                "cancel=${hex(cancel)} surface=${hex(surface)}",
+                "cancel=${hex(cancel)} surface=${hex(surface)} " +
+                "safeEdge=${hex(safeEdge)} cancelEdge=${hex(cancelEdge)}",
         )
 
-        assertDarkRedContainer(safe, "「仅撤销本次生成的」按钮")
+        // ① 危险档:不透明暗红填充。
         assertDarkRedContainer(danger, "「全部删除(含被覆盖的)」按钮")
 
+        // ② 安全档:底色透明(=表面色),靠描边表达危险。
+        assertTrue(
+            channelDistance(safe, surface) < 12,
+            "安全档应是**透明底**的描边按钮(取样点应等于对话框表面色);" +
+                "实测安全档=${hex(safe)} 表面=${hex(surface)}",
+        )
+        assertRedEdge(safeEdge, "「仅撤销本次生成的」按钮")
+
+        // ③ 取消:透明底且无描边。
         assertTrue(
             channelDistance(cancel, surface) < 12,
             "取消应是**无底色**的纯文字按钮(取样点应等于对话框表面色);" +
                 "实测取消=${hex(cancel)} 表面=${hex(surface)}",
         )
+        assertNoRedEdge(cancelEdge, "取消按钮")
+
+        // ④ 取消与**填充档**明显不同(取消与描边档的底色都是透明的,靠 ②③ 的描边区分)。
         assertTrue(
-            channelDistance(cancel, safe) >= 40,
+            channelDistance(cancel, danger) >= 40,
             "取消与执行档的颜色必须明显不同(用户:按钮颜色要区分开);" +
-                "实测取消=${hex(cancel)} 执行档=${hex(safe)}",
+                "实测取消=${hex(cancel)} 危险档=${hex(danger)}",
+        )
+
+        // ⑤ O1 的核心:两档彼此可分(原先两档逐位相同 ⇒ 这条当时必然失败)。
+        assertTrue(
+            channelDistance(safe, danger) >= 40,
+            "两个执行档的危险程度不同,颜色必须**彼此可分**(O1);" +
+                "实测安全档=${hex(safe)} 危险档=${hex(danger)}",
         )
     }
 
     @Test
-    fun `scope buttons are dark red while cancel is unfilled in light theme`() {
+    fun `danger scope is filled while safe scope is outlined in light theme`() {
         openDialog(dark = false)
         assertScopesAndCancelAreDistinguishable()
     }
 
     @Test
-    fun `scope buttons are dark red while cancel is unfilled in dark theme`() {
+    fun `danger scope is filled while safe scope is outlined in dark theme`() {
         openDialog(dark = true)
         assertScopesAndCancelAreDistinguishable()
     }
