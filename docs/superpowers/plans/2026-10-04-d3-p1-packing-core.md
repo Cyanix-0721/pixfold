@@ -208,7 +208,8 @@ cmd.exe /c "D:\Programing\Personal\pixfold\pixfold-d1\run-gradle.bat :app:lintDe
 | W24 | **`HANGOFF.md` §9.1 订正 + 追记（用户 `m03250`「文档都回写了吗」）**：唯一权威文档的 D3 小节仍是轮 5（W9，2026-10-04）写的，此后 **34 个提交一行未进** ⇒ 就地加注订正 **6 处失真**（标题「未合并、未推送」/「共 8 个提交」「只在 `domain/**`」/「真机核对…判定不需要真机」/「`app/**` 一行未改」/ lint 诚实例外整段 /「是否并回由用户决定」）+ **追加追记小节**（R1–R5 五项裁决、i18n 契约、警示图标矢量化、真机 2 轮、变异 401 组 / 0 逃逸、合回 `dev`、未做/不宣称）。**不改写历史数字，只就地加注** | `git diff --numstat` = `131 0` 且无删除行；两 hunk 均在 §9.1 内；`AGENTS.md` / `README.md` unchanged；阶段快照三处逐字未动 | ✅ 完成（`768bec7`；闸门 `62/62 executed`、domain 434 / app 456 / 0F 0E / lint 0-0-4） |
 | W25 | **D3 退出条件 ② 的可执行检查 + 三处阶段快照同步（用户 `m04274` 授权「选项 ①」）**：把「`domain/` 零 Android 依赖」从**自觉**变成**随 `:domain:test` 每轮常跑**的测试（`AdapterBoundaryTest`，四层判据 + 一层自检，5 个 `@Test`）；三处阶段快照同步（`HANGOFF.md` ×5 处 + `AGENTS.md` 头部 + `README.md` 状态行）；`HANGOFF.md` 4 处**自相矛盾就地订正**（原写「留待用户裁决」等） | 四层判据在**真实注入**下**全部可红**（4 次注入 / 0 逃逸；其中**注入 A 查出第 2 层曾假绿**并修复 + 补 4 条回归自检）；`app/**` 一行未改、无新增依赖（`domain/build.gradle.kts` 收工 sha256 复原基线）；三处快照旧串彻底消失（`🔄 部分已由 D1 提前交付` = 0 等） | ✅ 完成（`0da4e19` + `2f80794`；闸门 `62/62 executed`、domain **439** / app 456 / 0F 0E / lint 0-0-4、APK 逐字节与干净基线相同） |
 | W26 | **真机补验（用户 `m04808`「adb连上了，继续」）**：真机核对**三项此前从未在真机上验过的判据** —— (a) **放大字体是否挤出视口**（§7.4 判「❌ 只能真机」）、(b) **深色模式危险色阶**（轮 15 只有 Robolectric 像素预测）、(c) **撤销三档真点分叉**（取消/安全档/危险档的真机行为差异）。**零源码改动**（收工 `git status --porcelain` 为空），只产出取证 dump + 截图（`artifacts/` 被 `.gitignore` 忽略） | ①三项都必须**真点、真读数**（bounds / 像素 / 消息条数），不接受"看着没溢出"；②色阶须与源码判据**逐位对照**（说得出是哪个 token）；③三档分叉必须给出**可核对的数值差**且与领域层设计吻合；④设备必须回基线（`stay_on_while_plugged_in`=0 / `font_scale`=1.0 / `am force-stop` 生效 / `/data/local/tmp` 内 `.xml`+`.png` 计数 0）；⑤**不宣称"生产可见"**—— `performUndo` 仍不碰文件系统 | ✅ 完成（(a) **1.0x / 1.5x / 2.0x 三档**对话框 `[72,802][1192,2118]` / `[72,569][1192,2350]` / `[72,352][1192,2568]`，**三底边 2118/2350/2568 均 < 屏高 2780** ⇒ 未溢出，按钮宽度恒 952、高度 168→186 ⇒ 无截断；(b) 按钮 `(140,29,24)`=`#8C1D18`=`errorContainer`、文字 `(249,222,220)`=`onErrorContainer`，与 `ui/theme/Theme.kt` `dangerActionButtonColors()` 逐位吻合，而**取消键 `(0,0,0)` 与轮 15 的 Robolectric 预测 `#FF29292F` 不符** ⇒ 又一例"像素断言不能替代真机"；(c) 取消=**0 条**消息 / 安全档=**4 项** / 危险档=**5 项**，差值恰 **1** = 被覆盖的 CBZ ⇒ **R3 在真机上证明已修好**；设备回基线已确认；闸门 `62/62 executed`、domain 439 / app 456 / 0F 0E / lint 0-0-4、APK 逐字节与干净基线相同） |
-| W27 | **真机覆盖度审计 + 三个漏验警示面补验（用户「机器还连着的，补验吧」）**：先做**可核验的覆盖度审计**取代口头保证 —— 发现「dump 的 `resource-id` 衡量 tag 覆盖度」**是无效口径**（全树未设 `testTagsAsResourceId`，158 个 `TAG_*` 命中 0），改用**整串文案匹配**（切词匹配会产生假阳性，首版口径已废弃）；审计结论：`WARN_ICONS` 11 键的真机覆盖 **中文 8/11、英文 4/11**，尚有 **3 个警示面从未出现在任何 dump**（全库 266 份）⇒ 本轮逐一补验：(i) `a_naming_conflicts`、(ii) `pack_excluded_warning`、(iii) `domain_summary_clean_empty_dirs_warning`。**零源码改动**（收工 `git status --porcelain` 为空） | ①覆盖度口径必须**先自证有效**（无效口径的读数一律作废）；②三个面都必须**真机上真触发**（造出触发条件，而非"能找到代码"）；③必须给出**结构级 + 像素级**双重证据，且能解释与 emoji 时代的**形态差异**；④设备上造成的临时改动**必须全部回滚**并逐项复核；⑤设备回基线（`stay_on_while_plugged_in`=0 / `font_scale`=1.0 / `am force-stop` 生效 / `/data/local/tmp` 内 `.xml`+`.png` 计数 **0**） | ✅ 完成（三面全部在真机上触发并取证：**(i)** 用 A 线两行「新名称」覆盖框填同名制造 `Duplicate` ⇒ `skipped=2`，文案 `有 2 项存在冲突，执行时将跳过（见下表红字）` `[112,662][1040,718]`、图标节点 `View [42,662][98,718]` = **56×56 px = 16dp**、像素 `(0,0,0) x1986` + `(242,184,181) x984`；**(ii)** 取消勾选 `aot-1` ⇒ 文案 `[112,882][1222,994]`、图标 `View [42,910][98,966]`、像素同签名；**(iii)** 开「清理空目录」⇒ 第 1/2 步确认框内文案 `[226,1425][1108,1537]`、图标 `View [156,1453][212,1509]`、像素 `(0,0,0) x1990` + `(187,166,167) x983`。**决定性对照**：emoji 时代旧 dump `a_naming_dup2.xml` 该行只有**一个** `TextView [42,662][1031,718]`（`⚠️` 内联在文案里），新包同一行是 **`View` 图标节点 + 从 `x=112` 起排的文案** ⇒ 从 dump 结构上证明「图标已从文案里剥离为独立矢量节点」；临时改动三处**全部回滚并复核**（`已勾选 5 卷` / `清理空目录：关（默认）` / 冲突 0 警告 0）；闸门 `62/62 executed`、domain 439 / app 456 / 0F 0E / lint 0-0-4、APK 逐字节与干净基线相同；本行业务面之外**另登记 3 项**（§4.1 的 O1/O2/O3，均未动手）） |
+| W27 | **真机覆盖度审计 + 三个漏验警示面补验（用户「机器还连着的，补验吧」）**：先做**可核验的覆盖度审计**取代口头保证 —— 发现「dump 的 `resource-id` 衡量 tag 覆盖度」**是无效口径**（全树未设 `testTagsAsResourceId`，158 个 `TAG_*` 命中 0），改用**整串文案匹配**（切词匹配会产生假阳性，首版口径已废弃）；审计结论：`WARN_ICONS` 11 键的真机覆盖 **中文 8/11、英文 4/11**，尚有 **3 个警示面从未出现在任何 dump**（全库 266 份）⇒ 本轮逐一补验：(i) `a_naming_conflicts`、(ii) `pack_excluded_warning`、(iii) `domain_summary_clean_empty_dirs_warning`。**零源码改动**（收工 `git status --porcelain` 为空） | ①覆盖度口径必须**先自证有效**（无效口径的读数一律作废）；②三个面都必须**真机上真触发**（造出触发条件，而非"能找到代码"）；③必须给出**结构级 + 像素级**双重证据，且能解释与 emoji 时代的**形态差异**；④设备上造成的临时改动**必须全部回滚**并逐项复核；⑤设备回基线（`stay_on_while_plugged_in`=0 / `font_scale`=1.0 / `am force-stop` 生效 / `/data/local/tmp` 内 `.xml`+`.png` 计数 **0**） | ✅ 完成（三面全部在真机上触发并取证：**(i)** 用 A 线两行「新名称」覆盖框填同名制造 `Duplicate` ⇒ `skipped=2`，文案 `有 2 项存在冲突，执行时将跳过（见下表红字）` `[112,662][1040,718]`、图标节点 `View [42,662][98,718]` = **56×56 px = 16dp**、像素 `(0,0,0) x1986` + `(242,184,181) x984`；**(ii)** 取消勾选 `aot-1` ⇒ 文案 `[112,882][1222,994]`、图标 `View [42,910][98,966]`、像素同签名；**(iii)** 开「清理空目录」⇒ 第 1/2 步确认框内文案 `[226,1425][1108,1537]`、图标 `View [156,1453][212,1509]`、像素 `(0,0,0) x1990` + `(187,166,167) x983`。**决定性对照**：emoji 时代旧 dump `a_naming_dup2.xml` 该行只有**一个** `TextView [42,662][1031,718]`（`⚠️` 内联在文案里），新包同一行是 **`View` 图标节点 + 从 `x=112` 起排的文案** ⇒ 从 dump 结构上证明「图标已从文案里剥离为独立矢量节点」；临时改动三处**全部回滚并复核**（`已勾选 5 卷` / `清理空目录：关（默认）` / 冲突 0 警告 0）；闸门 `62/62 executed`、domain 439 / app 456 / 0F 0E / lint 0-0-4、APK 逐字节与干净基线相同；本行业务面之外**另登记 3 项**（§4.1 的 O1/O2/O3）） |
+| W28 | **O1 撤销范围对话框两档视觉分级 + O2 阶段快照同步（用户 `m06826`「o1o2都要」）**：O1 —— 撤销范围对话框的安全档与危险档原先取到**同一个** `dangerActionButtonColors()`（深色 `#8C1D18` = `errorContainer`），真机像素逐位相同、**只有文案不同** ⇒ 改为**视觉重量三级递减**（危险档深红填充 / 安全档 1dp `error` 色描边无底色 / 取消无底色无描边）；O2 —— 把轮 23 的覆盖度读数（`WARN_ICONS` 中文 **8/11 → 11/11**、真机账目 3 轮 → **4 轮**）写进四处阶段快照（`HANGOFF.md` ×2 + `AGENTS.md` 头部 + `README.md` 状态行），并把 §4.1 的 O1/O2 由「⬜ 待裁决」改为「✅ 已落地」。⚠️ **本轮按用户当回合指令 `m06838` 跳过真机核对** | O1：①两档必须**可区分且判据有牙** —— 原先的「都偏红」断言在缺陷态下**照样成立**，故必须补「两档取样点通道差 ≥ 40」；②**不取**台账举例的「危险档 `error` / 安全档 `errorContainer`」（error 族按模式反转 ⇒ 分级会随模式互换，且每模式下总有一档是淡粉 `#F9DEDC`/`#F2B8B5`）；③tag 与文本**一字不动**（`UndoScopeDialogTest` 三条文案/次序用例不受影响）；④变异必须证明新牙有效。O2：四处快照的插入片段各命中恰 1 次、旧串独立出现 0 次；`app/**` 只动 2 个生产文件、**零新增资源/依赖** | ✅ 完成（轮 24：`Theme.kt` `+44/−0` 新增 `dangerOutlineButtonColors()` + `dangerOutlineBorder()`、`ExecutionReportPage.kt` `+18/−5` 安全档 `Button` → `OutlinedButton`、`UndoScopeDialogStyleTest.kt` `+88/−15` 补五条判据（第 ⑤ 条 = O1 核心牙）；闸门 `RC=0` / `62/62 executed`、domain **439** / app **456** / 0F 0E、lint **0 issues**；探针读数 浅色 `safe=#FFE9E7EF danger=#FFB3261E cancel=#FFE9E7EF surface=#FFE9E7EF safeEdge=#FFB3261E`、深色 `safe=#FF29292F danger=#FF8C1D18 safeEdge=#FFF2B8B5`；**变异 2 条全捕获**（安全档改回填充 ⇒ 报错逐字 `安全档应是**透明底**的描边按钮(取样点应等于对话框表面色);实测安全档=#FFB3261E 表面=#FFE9E7EF`），`cp` 还原 `RESTORE-IDENTICAL`；⚠️ **真机未复核**（用户当回合指令跳过），像素读数仅 Robolectric 探针级） |
 
 **余量处理**：W1–W10 全部完成且仍有轮次 ⇒ **继续加固核心**（更多边界 / 更多变异 / 更多不变式），
 **不越界**到未授权工作面（适配层检查、D2b、真机、UI）。
@@ -2661,9 +2662,170 @@ distinct `text` 值 **519** 条。**`WARN_ICONS`（11 键）的真机覆盖 = �
   （`resource-id` 全空、英文切词假阳性）。任何"覆盖率 8/11"式的读数，
   在被接受前都要能回答「这个口径有没有可能永远返回假绿」。
 
+#### 轮 24（2026-10-07 22:4x–23:1x）— W28 O1 撤销范围对话框两档视觉分级 + O2 阶段快照同步
+
+- 提交：（见下方回填行）
+- 触发：用户 `m06826` 逐字「ready留着没用吧。o1o2都要」⇒ ① 删除本地 `ready` 分支（已由 `d4aca80` 记录）
+  ② **§4.1 的 O1 与 O2 由「⬜ 待裁决」转为「要做」**。
+- 本回合约束（用户 `m06838` 逐字）：「这次任务真机暂时跳过你先做剩下的，我一会有点事没空真机校验，
+  这次任务都会在今晚完成」⇒ **本轮按 §7.1 第 4 步的用户当回合覆盖，跳过 §7.3 真机核对**。
+
+##### ① O1 问题定性（轮 23 登记时的事实链）
+
+- 缺陷：`UndoScopeDialog` 的安全档「仅撤销本次生成的」与危险档「全部删除（含被覆盖的）」
+  都取 `app/src/main/kotlin/com/pixfold/d1/ui/theme/Theme.kt:114-128 dangerActionButtonColors()`
+  ⇒ 深色下同为 `(140,29,24)` = `#8C1D18` = `errorContainer`，**轮 22 真机实测两按钮中心像素逐位相同**；
+  浅色下同为 `#B3261E` = `error`。**两档只有文案不同**。
+- 用户原话依据（`m04079` 第③项）：「记得**按钮颜色要区分开**，把取消放到最后边」——
+  取消键已落实（无底色、排最后），**两个执行档是否再分级**此前属视觉产品决策故登记为待裁决。
+
+##### ② 方案裁决：为什么不用台账举例的「两个不同红色角色」
+
+台账 O1 行原举例「危险档用 `error`、安全档用 `errorContainer`」。**实测该方案不可取**：
+
+- `ColorSchemes.kt:145-152` 把 error 族**刻意钉死**为 material3 默认，而 M3 的 error 族**按模式反转** ——
+  浅色 `error` = `#B3261E` 深红✅ / `errorContainer` = `#F9DEDC` **淡粉**❌；
+  深色 `error` = `#F2B8B5` **淡粉**❌ / `errorContainer` = `#8C1D18` 深红✅。
+- ⇒ 取两个不同角色会让**分级随模式互换**（浅色安全档是深红、深色安全档是淡粉），
+  且**每个模式下总有一档是淡粉**，与「破坏性动作必须醒目」的约束 5 冲突。
+- 且 `dangerActionButtonColors()` 现有实现正是**为绕开这个反转**才按 `background.luminance() < 0.5f`
+  在两档间切换 —— 同一函数不能同时承担"模式适配"与"档位分级"两件事。
+
+**采用方案：同色系、换视觉重量**（三级递减）：
+
+| 档位 | 形态 | 浅色实测 | 深色实测 |
+| --- | --- | --- | --- |
+| 危险档「全部删除」 | `Button` 深红**填充** | `#FFB3261E` | `#FF8C1D18` |
+| 安全档「仅撤销本次生成的」 | `OutlinedButton` **透明底 + 1dp `error` 色描边** | 底 `#FFE9E7EF` / 边 `#FFB3261E` | 底 `#FF29292F` / 边 `#FFF2B8B5` |
+| 取消 | `TextButton` 无底色**无描边** | `#FFE9E7EF` | `#FF29292F` |
+
+⇒ 同一色系（`error` 角色）承载"这是危险操作"，**视觉重量**承载"危险到什么程度"。
+
+##### ③ O1 落地改动（生产 2 文件）
+
+- `pixfold-d1/app/src/main/kotlin/com/pixfold/d1/ui/theme/Theme.kt`（`+44/−0`）：
+  import 段补 `androidx.compose.foundation.BorderStroke` 与 `androidx.compose.ui.unit.dp`；
+  在 `dangerActionButtonColors()` 之后**追加**两个函数：
+  - `@Composable fun dangerOutlineButtonColors(): ButtonColors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.error)`
+  - `@Composable fun dangerOutlineBorder(): BorderStroke = BorderStroke(1.dp, MaterialTheme.colorScheme.error)`
+  并附 KDoc（含上面的模式反转理由与三档对照表）。
+  **底栏「撤销本次执行」仍用 `dangerActionButtonColors()`，不受影响。**
+- `pixfold-d1/app/src/main/kotlin/com/pixfold/d1/ui/plan/ExecutionReportPage.kt`（`+18/−5`）：
+  import 段补 `androidx.compose.material3.OutlinedButton` 与两个新函数；
+  `UndoScopeDialog` 内安全档由 `Button(colors = dangerActionButtonColors())` 改为
+  `OutlinedButton(colors = dangerOutlineButtonColors(), border = dangerOutlineBorder(), …)`；
+  危险档仍是 `Button` + `dangerActionButtonColors()`；
+  KDoc 第 3 条由「两个执行档都是破坏性动作 ⇒ `dangerActionButtonColors`」改写为「视觉重量分级」三条
+  + 新增「⚠️ 两档为什么不用两个不同的红色角色」段。
+- ⚠️ **`testTag` 常量与按钮文本一字未动** ⇒ `UndoScopeDialogTest.kt` 的三条文案/次序用例
+  （`:227-243` 三条 `assertTextEquals`、`:251-263` 纵向次序、`:311-330`/`:339-357` 措辞可分）**不受影响**。
+
+##### ④ O1 测试补牙（`UndoScopeDialogStyleTest.kt` `+88/−15`）
+
+- 新增脚手架 `sampleTopEdgeInDialog(bitmap, tag)`：取按钮**上边缘中点**（`y = px(node.top - dlg.top) + 1`）。
+  ⚠️ `+1` 必需 —— `BorderStroke` 画在布局边界**内侧**，而 `px()` 向下截断；描边宽 1dp = 3.5px @560dpi。
+- 新增 `assertRedEdge(color, what)`（上边缘 `r > g + 40 && r > b + 40`）与 `assertNoRedEdge(color, what)`。
+- `assertScopesAndCancelAreDistinguishable()` 重写为**五条性质**：
+  ① 危险档不透明暗红（`assertDarkRedContainer`：偏红 + `relativeLuminance < 0.25`）
+  ② 安全档底色 = 对话框表面色（`channelDistance(safe, surface) < 12`）**且**上边缘红（`assertRedEdge`）
+  ③ 取消底色 = 表面色 **且**上边缘不红（`assertNoRedEdge`）
+  ④ `channelDistance(cancel, danger) >= 40`（取消 vs **填充档**）
+  ⑤ **`channelDistance(safe, danger) >= 40`** ← **O1 的核心牙**
+- 两条 `@Test` 改名：`danger scope is filled while safe scope is outlined in light theme` / `… in dark theme`。
+- ⚠️ **首次跑闸门时曾失败 2 条**（`java.lang.AssertionError: 取消与执行档的颜色必须明显不同(用户:按钮颜色要区分开);实测取消=#FFE9E7EF 执行档=#FFE9E7EF`，深色 `#FF29292F`）
+  ⇒ 根因是**我的判据错**：安全档改为透明底后它与取消的**底色本就相同**，「取消 vs 安全档」不再是颜色对比。
+  已把性质 ④ 改为「取消 vs **填充档**」、安全档改由 ②③ 的**描边**判据区分。
+  ⚠️ **这条同时是 O1 的教训**：原先「两档都偏红」的断言**在缺陷态下照样成立**
+  （缺陷态两档都是填充红，两条 `assertDarkRedContainer` 全过）⇒ 光靠"都偏红"抓不住本缺陷。
+
+##### ⑤ O1 变异验证（证明新牙有杀伤力）
+
+- 备份 `pixfold-d1/artifacts/o1bak/app/src/main/kotlin/com/pixfold/d1/ui/plan/ExecutionReportPage.kt`；
+  把安全档改回 `Button` + `dangerActionButtonColors()`（**即还原 O1 缺陷态**）
+  ⇒ `:app:testDebugUnitTest` **RC=1**、`UndoScopeDialogStyleTest` **2 条失败**，报错逐字：
+  `java.lang.AssertionError: 安全档应是**透明底**的描边按钮(取样点应等于对话框表面色);实测安全档=#FFB3261E 表面=#FFE9E7EF`（浅）
+  / `安全档=#FF8C1D18 表面=#FF29292F`（深）⇒ **捕获**。
+- 用 `cp` 从备份还原（**不是 `git checkout --`**），`diff -q` 报 `RESTORE-IDENTICAL`；
+  三文件收工 sha256：`ExecutionReportPage.kt` = `63278b5e5acdb3eca95f0ccbf56345c922b0b1579063c509e7d5043fa633352a`、
+  `Theme.kt` = `8e34c88e00157f749ec1bfb9a1b4a98a2ecdf8c6bc14f130c1f20618a914f9ad`、
+  `UndoScopeDialogStyleTest.kt` = `4cbfb47694105558c27579ad29f577f4fbf59954dad4b88370441f7448365c07`。
+
+##### ⑥ O2 落地：四处阶段快照同步
+
+用两遍制脚本 `pixfold-d1/artifacts/o2_writeback.py`（干跑验锚点 `count == 1` → `--apply` → 写后 verify），
+四处各插入一句「真机验证层级」：
+
+| 文件 | 锚点（旧串） | 插入读数 |
+| --- | --- | --- |
+| `HANGOFF.md` §9 顶门槛表 D3 行 | `不以重写替代)。详见下方 D3 节 \|` | 阶段分支共 **4 轮**真机核对（轮 23 覆盖度审计：`WARN_ICONS` 中文 **8/11 → 11/11**）；**打包核心仍未端到端** |
+| `HANGOFF.md` §9 D3「现状对照」打包行 | `仍属 **D4b** —— 见本节「归属澄清」 \|` | 同上（真机 4 轮 + 中文 11/11） |
+| `AGENTS.md` 头部「当前阶段」段 | `下一步 = **D2b(缩略图生成策略 / 后台任务与进度 / 授权失效恢复)**。` | 同上 |
+| `README.md` 状态行 | `；2026-09-10 技术栈重审换栈为 Kotlin + Jetpack Compose；` | 同上（全角标点版） |
+
+- ⚠️ **写后 verify 首跑报了 2 个 `BAD`，是我的自查脚本错**：我把旧串**嵌进了新串尾部**
+  （`"…见本节「归属澄清」 |"` 被包含在 `"…见本节「归属澄清」。**真机验证层级**：… |"` 里），
+  于是「旧串出现 0 次」这条断言必然失败。**文件本身是对的**。
+  改为检查「新插入片段各命中恰 1 次」后 **4/4 OK**。
+  **教训：自查脚本的判据要针对"插入的增量"，不要针对"旧串消失"——当替换串包含旧串时会误报。**
+- 规模：`HANGOFF.md` 3540 → **3541 行 / 332,692 → 333,081 字节**（`c9b1e4a137a8`）；
+  `AGENTS.md` 166 → **167 行 / 23,341 → 23,549 字节**（`49e9c7b0bd1a`）；
+  `README.md` 132 → **133 行 / 71,933 → 72,159 字节**（`b715cf7686dc`）。
+- §4.1 的 O1/O2 两行状态由 `⬜ **待裁决**` 改为 `✅ **已落地**`，并把小节前言
+  「以下三项**均未动手**」订正为「O1/O2 已于轮 24 落地、O3 仍阻塞」。
+
+##### ⑦ 闸门读数（第九次）
+
+见 §6.2 轮 24 补记：`RC=0` / `BUILD SUCCESSFUL in 44s` / `62 actionable tasks: 62 executed`；
+domain **33 files / 439 tests**、app **50 files / 456 tests**、均 **0F 0E 0S**；
+lint **0 issues**；APK **33,437,589 字节 / sha256 `52eea49591906841…`**。
+
+##### ⑧ 本轮明确"未做"（不得高估）
+
+- ⚠️ **真机核对本轮跳过**（用户 `m06838` 当回合指令）⇒ **O1 的像素读数全部来自 Robolectric 探针**，
+  **真机上未复核**。轮 22 的教训（Robolectric 预测 `#FF29292F` 与真机 `(0,0,0)` 不符）说明
+  像素断言**不能替代真机** ⇒ 本轮 O1 的验证层级是「**领域单测 + UI 渲染链 + 离线像素**」，
+  **不含真机**。真机复核列为**待办**（不阻塞，但**不得宣称已真机验证**）。
+- **不宣称"D3 已完成"**（§0.2 第 8 条）—— D3 打包核心仍未端到端（见 §4.1 的 O3）。
+- **未改** `app/src/main/res/values*/**.xml`、未新增 `TextKey`、未新增依赖、未动 `domain/**`。
+
+##### ⑨ 回写自查：把本文档每条读数逐一对回原始产物
+
+沿用轮 22 新增、轮 23 沿用的工序：落盘后写脚本把本文档每一条读数对回**可复跑的原始产物**
+（`git diff --numstat` / 三文件 sha256 / JUnit XML / `lint-results-debug.xml` / `gates_o1_final.log` /
+APK 字节与 sha256 / 四处快照的插入片段计数）。**本轮自查查出并订正 3 处我自己的失真**：
+
+1. **W28 表行根本没插进去** —— 脚本的锚点是「W27 行首 + 行末」两段拼接，但这两段在文件里**并不相邻**
+   （中间隔着整行 W27 正文）⇒ `str.replace` **静默未命中**，写盘却报"成功"。
+   **只有写后 verify 抓到了**（`BAD verify[W28_ROW]: count=0`）。
+   ⇒ 补丁脚本 `pixfold-d1/artifacts/w28_fix_row.py` 改为锚定唯一行末串
+   `（§4.1 的 O1/O2/O3，均未动手）） |`，并同时把「均未动手」订正掉。
+   ⚠️ **教训（复用）**：**多段拼接的锚点等于把"相邻性"当成了隐含前提**；
+   锚点必须是**文件中真实连续存在的一段**，且 `count == 1` 必须在**写盘前**验。
+2. **`pixfold-d1/.mise.toml` 不存在** —— 该文件在**仓库根**（`.mise.toml`），`pixfold-d1/` 下没有。
+   我在 §6.3 的越界核对里沿用了旧写法。自查的 `git diff --quiet pixfold-d1/.mise.toml`
+   返回 **128**（`fatal: ambiguous argument`）才暴露。⇒ 已订正为 `.mise.toml`（**仓库根**）并注明
+   「`pixfold-d1/` 下**不存在**该文件」；改用 `git diff --quiet -- .mise.toml` ⇒ **RC=0**。
+3. **改动集文件数写成 6，实际 7** —— 我漏算了**台账自身**这一笔（本轮回写改了本文件）。
+   实测 `git status --porcelain` = **7 个 ` M`**、`git diff --shortstat` = **7 files changed, 334 insertions(+), 32 deletions(-)**；
+   其中**代码+文档 6 files / +154 / −24**、**台账自身 +180/−8**。⇒ 已按此重写 §6.3 的改动面块。
+4. **另订正一处笔误**：§4.1 的 O1 行末把 `ExecutionReportPage` 写成了 `ExecutionPlanPage`
+   （该文件不存在）⇒ 已改回。
+
+- ✅ 自查通过项（全部实测）：三文件 sha256 与文档所写**逐位一致**；
+  `git diff --numstat` 六项与文档所写**逐项一致**；JUnit XML `domain` **33 files / 439 tests / 0F 0E 0S**、
+  `app` **50 files / 456 tests / 0F 0E 0S**；源码 `@Test` 计数 `domain` 439 == XML 439、
+  `app` 457 − 1（`NegativeControlTest`）= 456 == XML 456；`lint-results-debug.xml` 内 `<issue ` 计数 **0**；
+  APK **33,437,589 字节 / `52eea49591906841…`**；两条探针串**逐字**与 `<system-out>` 一致；
+  闸门日志含 `BUILD SUCCESSFUL in 44s` 与 `62 actionable tasks: 62 executed`；
+  四个边界文件 `git diff --quiet` ⇒ **RC=0**。
+
+- ⚠️ **教训（复用）**：**"两档要区分"这类视觉需求的判据，不能写成"两档都满足性质 P"** ——
+  P 必须在缺陷态下**不成立**才有牙。本轮缺陷态（两档都是填充红）能让「都偏红」全过，
+  必须补一条**两档之间的**差值判据（第 ⑤ 条）。
+
 ---
 
-## 4. 待裁决 / 阻塞（越界项写这里，不自行决定）
+
 
 > 出现下列任一情况，**停止该项**并在此登记，然后继续**下一项**工作：
 > 需要新产品决策、需要新增 `TextKey`/资源、需要改 `app/**`、需要真机结论、
@@ -2680,13 +2842,12 @@ distinct `text` 值 **519** 条。**`WARN_ICONS`（11 键）的真机覆盖 = �
 
 ### 4.1 轮 23 新登记（2026-10-06，用户本回合指示「问题都做记录」）
 
-> ⚠️ 以下三项**均未动手**，只登记。前两项是我在轮 23 收尾报告里主动提出的候选；
-> 第三项是用户本回合明确的**依赖阻塞**。
+> ⚠️ **状态已更新（轮 24 / W28）**：**O1 与 O2 已落地**（用户 `m06826`「o1o2都要」裁决），详见各自行末与 §3.1 轮 24；**O3 仍为依赖阻塞**（等 D2b）。
 
 | # | 事项 | 为什么不能自行决定 | 状态 |
 | --- | --- | --- | --- |
-| O1 | **撤销范围对话框的两个执行按钮配色完全相同** —— 安全档「仅撤销本次生成的」与危险档「全部删除（含被覆盖的）」都从 `app/…/ui/theme/Theme.kt:114-128 dangerActionButtonColors()` 取到**同一个** `(140,29,24)` = `#8C1D18` = `errorContainer`，真机实测两者按钮中心像素**逐位相同**（轮 22 读数）；**只有文案不同** | 用户 `m04079` 第③项的原话是「记得**按钮颜色要区分开**，把取消放到最后边」。取消键已按裁决无底色且排最后（已落实）；但**两个执行档是否也要分级**（例如危险档用 `error`、安全档用 `errorContainer`，或加一个「危险」图标）属**视觉产品决策**，且会改已通过轮 22 真机像素取证的现状 ⇒ 只登记 | ⬜ **待裁决** |
-| O2 | **三处阶段快照是否要写进轮 23 的真机覆盖度** —— `HANGOFF.md` §9 顶门槛表 D3 行 / §9 D3「现状对照」打包行 + `AGENTS.md` 头部 + `README.md` 状态行，上一次同步是轮 21（`2f80794`）；轮 23 把 `WARN_ICONS` 中文覆盖从 8/11 提到 11/11、真机账目从 3 轮提到 4 轮，**本轮未动这三处**（理由：本轮是已交付状态的小节内取证补记，**不改变"当前阶段/状态"**） | 「快照要不要随取证轮一起动」是**文档策略**问题：若每轮都同步，快照会频繁漂移；若只在阶段/状态变化时同步，则覆盖度这类"加固读数"不进快照。两种都自洽 ⇒ 由用户定 | ⬜ **待裁决** |
+| O1 | **撤销范围对话框的两个执行按钮配色完全相同** —— 安全档「仅撤销本次生成的」与危险档「全部删除（含被覆盖的）」都从 `app/…/ui/theme/Theme.kt:114-128 dangerActionButtonColors()` 取到**同一个** `(140,29,24)` = `#8C1D18` = `errorContainer`，真机实测两者按钮中心像素**逐位相同**（轮 22 读数）；**只有文案不同** | 用户 `m04079` 第③项的原话是「记得**按钮颜色要区分开**，把取消放到最后边」。取消键已按裁决无底色且排最后（已落实）；但**两个执行档是否也要分级**（例如危险档用 `error`、安全档用 `errorContainer`，或加一个「危险」图标）属**视觉产品决策**，且会改已通过轮 22 真机像素取证的现状 ⇒ 只登记 | ✅ **已落地**（轮 24 / W28：用户 `m06826`「o1o2都要」裁决 ⇒ 取**视觉重量分级**（危险档深红填充 / 安全档 1dp `error` 色描边无底色 / 取消无底色无描边），**不取**本行举例的「危险档 `error` / 安全档 `errorContainer`」—— error 族按模式反转，取两角色会让分级随模式互换、且每模式下总有一档是淡粉 `#F9DEDC`/`#F2B8B5`；落地 = `Theme.kt` 新增 `dangerOutlineButtonColors()` + `dangerOutlineBorder()`、`ExecutionReportPage` 安全档改 `OutlinedButton`；测试补第 ⑤ 条「两档取样点通道差 ≥ 40」—— 原先「两档都偏红」的断言**在缺陷态下照样成立**；变异 2 条全捕获；⚠️ **本轮按用户指令 `m06838` 跳过真机**，像素读数仅 Robolectric 探针级、**真机未复核**） |
+| O2 | **三处阶段快照是否要写进轮 23 的真机覆盖度** —— `HANGOFF.md` §9 顶门槛表 D3 行 / §9 D3「现状对照」打包行 + `AGENTS.md` 头部 + `README.md` 状态行，上一次同步是轮 21（`2f80794`）；轮 23 把 `WARN_ICONS` 中文覆盖从 8/11 提到 11/11、真机账目从 3 轮提到 4 轮，**本轮未动这三处**（理由：本轮是已交付状态的小节内取证补记，**不改变"当前阶段/状态"**） | 「快照要不要随取证轮一起动」是**文档策略**问题：若每轮都同步，快照会频繁漂移；若只在阶段/状态变化时同步，则覆盖度这类"加固读数"不进快照。两种都自洽 ⇒ 由用户定 | ✅ **已落地**（轮 24 / W28：用户 `m06826`「o1o2都要」裁决 ⇒ **取「同步」**：把轮 23 的覆盖度读数写进四处 —— `HANGOFF.md` §9 顶门槛表 D3 行 + §9 D3「现状对照」打包行 + `AGENTS.md` 头部 + `README.md` 状态行，各插入一句「真机验证层级：阶段分支共 **4 轮**真机核对（轮 23 覆盖度审计：`WARN_ICONS` 中文覆盖 8/11 → **11/11**）；打包核心仍未端到端」；用两遍制脚本 `artifacts/o2_writeback.py` 落地并逐条 verify；⚠️ 写后自查首跑报 2 个假 `BAD`（替换串包含旧串导致「旧串消失」判据失效），已改为检查插入增量） |
 | O3 | **D3 打包核心无法直接进入真机端到端测试（依赖阻塞，非缺陷）** —— 用户 2026-10-06 逐字：「**前面阶段的还没实现所以无法直接进入真机测试打包**」。具体：端到端要真扫 → 真排 → 真写 CBZ，依赖 **D2b 平台能力**（缩略图生成策略 / 后台任务与进度 / 授权失效恢复 / 存储空间预检与不足退路 / 大归档写入 Zip64）与 **D4b 真实文件闭环**；而 D3 原型**不连真实文件系统**（B 线走 mock 数据、`performUndo` 恒 `applied=false`） | **不是**待我修的东西，而是路线顺序：D3 已交付的部分（领域核心 + 适配层边界 + 渲染链真机取证）**已是当前能验的全部**；再往下的端到端**卡在前置阶段**。任何"绕过前置直接跑真实打包"的做法都会越界（改 `app/**` 接 SAF、引入 Zip64 依赖、动 D2b 工作面） | 🚧 **阻塞**（等 D2b） |
 
 **已知的、明确不碰的开放项**（不要在本轮"顺手"处理）：
@@ -2949,7 +3110,20 @@ cmd.exe /c "D:\Programing\Personal\pixfold\pixfold-d1\run-gradle.bat clean \
 > 与干净基线 `artifacts/w24bak/app-debug.clean.apk` **逐字节相同**；
 > 新鲜度：`find app/src domain/src -type f -newer artifacts/gates_w27_d1.log` = **0**；
 > 源码 `@Test` 计数：`domain` **439** == XML **439**、`app` **456** == XML **456**。
-> ⇒ **这是"APK 未变"的第三次独立复现**：本轮连测试文件都没动，故 `domain` 439 / `app` 456 /
+
+> **轮 24 补记（第九次读数 —— O1 两档分级轮的复跑）**：本轮**有源码改动**（`Theme.kt` 新增两函数、
+> `ExecutionReportPage.kt` 安全档换 `OutlinedButton`、测试补五条判据），故闸门读数的意义是
+> **"新能力被验证 + 无回归"**。（`artifacts/gates_o1_final.log`，`--rerun-tasks` 全量、先删两个 `test-results`）：
+> `RC=0` / `BUILD SUCCESSFUL in 44s` / **`62 actionable tasks: 62 executed`**（无 `up-to-date`）；
+> `domain:test` = **33 files / 439 tests / 0F / 0E / 0S**；`app:testDebugUnitTest` = **50 files / 456 tests / 0F / 0E / 0S**；
+> `:app:lintDebug` = **0 issues**（`app/build/reports/lint-results-debug.xml` 内 `<issue` 计数 **0**；
+> 4 条 `Hint AutoboxingStateCreation` 不计入 `warningsAsErrors`）；
+> `:app:assembleDebug` ⇒ APK **33,437,589 字节**、sha256 **`52eea495919068411bf4575e318bb85f1e5132c8efb928554fb768e42f5e0ccd`**；
+> 源码 `@Test` 计数：`domain` **439** == XML **439**、`app` **457 − 1**（`NegativeControlTest`）**= 456** == XML **456**。
+> ⚠️ **这是"APK 未变"的反例**：本轮改了生产代码，故 APK sha256 **不再**等于干净基线
+> （`artifacts/w24bak/app-debug.clean.apk` = `1a2164ea74a29857…`）—— **尺寸恰好相同是 dex 未压缩所致，
+> 不能当作"未变"的证据**。包内实证：`dangerOutlineButtonColors` 基线 **0** → 新包 **4**、`OutlinedButton` **15** → **17**。
+：本轮连测试文件都没动，故 `domain` 439 / `app` 456 /
 > APK sha256 三项与轮 21 / 轮 22 读数**完全一致**。
 > ⚠️ **可红性说明**：同轮 22 —— 本轮无源码可变异，闸门读数的意义是**"未回归"**而非"新能力被验证"；
 > 本轮真正的新增结论**全部来自设备侧**，闸门只用来排除"取证过程污染了构建"这一种可能。
@@ -3146,7 +3320,27 @@ cmd.exe /c "D:\Programing\Personal\pixfold\pixfold-d1\run-gradle.bat clean \
 > `app/src/` 全树**未设置 `testTagsAsResourceId`**（`grep -rc` = **0 hits**，dump 的 `resource-id` 只有
 > `""` 与 `android:id/content`）⇒ 158 个 `TAG_*` **命中 0** —— 该口径**无效**，其读数一律作废；
 > 改用**整串文案匹配**（`artifacts/audit_w27.py`）才得到可信读数。
-> **教训：任何"覆盖率 N/M"在被接受前，都要能回答「这个口径有没有可能永远返回假绿」。**
+
+> **轮 24 改动面（O1 + O2）**：收工 `git status --porcelain` = **7 个文件全为 ` M`**（无新增、无删除、无重命名）：
+> - **O1 生产 2** —— `pixfold-d1/app/src/main/kotlin/com/pixfold/d1/ui/theme/Theme.kt`（`+44/−0`）、
+>   `pixfold-d1/app/src/main/kotlin/com/pixfold/d1/ui/plan/ExecutionReportPage.kt`（`+18/−5`）；
+> - **O1 测试 1** —— `pixfold-d1/app/src/test/kotlin/com/pixfold/d1/ui/plan/UndoScopeDialogStyleTest.kt`（`+88/−15`）；
+> - **O2 文档快照 3** —— `HANGOFF.md`（`+2/−2`）、`AGENTS.md`（`+1/−1`）、`README.md`（`+1/−1`）；
+>   ⇒ **代码+文档 = 6 files / +154 / −24**；
+> - **台账自身 1** —— `docs/superpowers/plans/2026-10-04-d3-p1-packing-core.md`（本轮回写）。
+> ⇒ 合计 `git status --porcelain` = **7 个文件**（代码+文档 6 + 台账 1）。
+> ⚠️ **不写死台账自身的 numstat 与总计**：本台账在**同一轮里被反复追加**（回写 → 自查段 → 订正段），
+> 每写一次行数就变一次 ⇒ 任何"台账自身 +N/−M"与"合计"读数**写下即过期**（轮 23 已因同类自指读数
+> 订正过一次）。**稳定可复跑的是那 6 个代码+文档文件的 `+154 / −24`**；
+> 台账自身的规模以 `git show --numstat <本轮回写提交>` 为准。
+> **越界核对**：`app/src/main/res/values*/**.xml` **零改动**（未新增 `TextKey`/资源）；
+> `pixfold-d1/app/build.gradle.kts` / `pixfold-d1/domain/build.gradle.kts` / `pixfold-d1/gradle/libs.versions.toml` /
+> `.mise.toml`（**仓库根**,`pixfold-d1/` 下**不存在**该文件）逐条 `git diff --quiet` ⇒ **unchanged**（**零新增依赖**）；
+> `pixfold-d1/domain/**` 一行未改；`artifacts/` 与 `app/build/` 不入库（前者已 gitignored）。
+> ⚠️ **真机核对本轮按用户当回合指令跳过**（`m06838` 逐字「这次任务真机暂时跳过」）
+> ⇒ O1 的像素读数**全部来自 Robolectric 探针**、**真机上未复核** —— 这是**验证层级缺口**，
+> 已在 §3.1 轮 24 ⑧ 与 §6.5 显式登记，**不得当作"已真机验证"**。
+
 
 
 ### 6.4 提交拓扑（`git log --oneline dev..d3/p1`）
@@ -3190,6 +3384,9 @@ cmd.exe /c "D:\Programing\Personal\pixfold\pixfold-d1\run-gradle.bat clean \
 > —— `push` 按本仓惯例由用户处理，agent 只提交不推送。
 
 | 提交 | 类型 | 内容 |
+| （轮 24 回填 = 本次提交） | `docs(d3)` | 轮 24 W28 台账回写：§3 新增 W28 行、§3.1 新增轮 24 小节（①–⑨）、§4.1 的 O1/O2 状态由「⬜ 待裁决」改「✅ 已落地」并订正小节前言、§6.2 第九次读数、§6.3 改动面 + 越界核对、§6.4 本行占位、§6.5 轮 24 段（⚠️ 真机按用户指令跳过） |
+| `ceaf447` | `docs(d3)` | 轮 24 W28 / O2：四处阶段快照同步 —— `HANGOFF.md` §9 顶门槛表 D3 行 + §9 D3「现状对照」打包行、`AGENTS.md` 头部、`README.md` 状态行，各插入一句「真机验证层级：阶段分支共 4 轮真机核对（轮 23 覆盖度审计：`WARN_ICONS` 中文覆盖 8/11 → 11/11）；打包核心仍未端到端」（3 files / +4 / −4） |
+| `a6cfe26` | `feat(d3)` | 轮 24 W28 / O1：撤销范围对话框两档视觉分级 —— `pixfold-d1/app/src/main/kotlin/com/pixfold/d1/ui/theme/Theme.kt` 新增 `dangerOutlineButtonColors()` + `dangerOutlineBorder()`、`pixfold-d1/app/src/main/kotlin/com/pixfold/d1/ui/plan/ExecutionReportPage.kt` 安全档 `Button` → `OutlinedButton`、`pixfold-d1/app/src/test/kotlin/com/pixfold/d1/ui/plan/UndoScopeDialogStyleTest.kt` 补五条判据（第 ⑤ 条「两档取样点通道差 ≥ 40」为核心牙）；变异 2 条全捕获；闸门 `RC=0` / `62/62 executed`、domain 439 / app 456 / lint 0 issues；⚠️ 真机按用户指令跳过（3 files / +150 / −20） |
 | `9b10d06` | `docs(d3)` | 轮 23 登记三项开放项：新增 §4.1 (`O1` 撤销范围对话框两个执行档配色完全相同、`O2` 三处阶段快照是否写进覆盖度读数、`O3` D3 端到端卡在前置 `D2b` 的依赖阻塞)，并在 §3 的 W27 行与 §3.1 轮 23 的「结论 / 阻塞 / 待裁决」处补指向 §4.1 的引用（订正原「无新增待裁决项」）（1 file / +16 / −2） |
 | `d356d46` | `docs(d3)` | 轮 23 §6.4 收口：补登轮 23 的三笔提交（`27ab1e7` / `f9510aa` / `e83f215`），§3.1 补 `27ab1e7` 标题（1 file / +4 / −1） |
 | `27ab1e7` | `docs(d3)` | 轮 23 订正：上一笔把本台账的"开工前 → 回写后"记成了**回写过程中的中间态**（3372 → 3440 行 / 328,136 → 336,003 字节）；订正为可从 git 对象复核的一对 `0184e55` 3223 行 / 314,630 字节 / `95a09f696ccf…` → `e83f215` 3443 行 / 336,296 字节 / `f57e582ba398…`（`+220 / −0`），并同步补上 `HANGOFF.md` 的 sha256 一对（`d342b937d57d…` → `3da5fd12205c…`）（1 file / +4 / −3） |
@@ -3252,6 +3449,16 @@ cmd.exe /c "D:\Programing\Personal\pixfold\pixfold-d1\run-gradle.bat clean \
 **未推送、未合并 `dev`**（`git log origin/dev..d3/p1` 与本地一致；是否并回由用户决定）。
 
 ### 6.5 结论与明确的"未做"
+
+- **轮 24（W28）另加**：**O1** 撤销范围对话框两档视觉分级（危险档深红填充 `#B3261E`/`#8C1D18`、
+  安全档 1dp `error` 色描边 + 透明底、取消无底色无描边）+ **O2** 阶段快照同步（四处：`HANGOFF.md` ×2 +
+  `AGENTS.md` 头部 + `README.md` 状态行，写入「真机 4 轮 / `WARN_ICONS` 中文 11/11」）；
+  测试补五条判据，其中第 ⑤ 条「两档取样点通道差 ≥ 40」是 O1 的**核心牙**
+  （原先「两档都偏红」在缺陷态下照样成立）；变异验证：把安全档改回填充 ⇒ `UndoScopeDialogStyleTest`
+  **2 条失败**（浅 `安全档=#FFB3261E 表面=#FFE9E7EF` / 深 `安全档=#FF8C1D18 表面=#FF29292F`）⇒ **捕获**，
+  `cp` 还原报 `RESTORE-IDENTICAL`。
+  ⚠️ **本轮跳过真机核对**（用户 `m06838` 当回合指令）⇒ O1 的像素读数**仅 Robolectric 探针级**、
+  **真机未复核**；真机复核列为**待办**（不阻塞，但**不得宣称已真机验证**）。
 
 - **完成**：W0–**W21** 全部 ✅（§3 状态表）；D3 退出条件 1 所要求的**打包领域核心**
   **轮 13（W17）另加**：R1 真缺陷修复（撤销 `from == to` 空操作 ⇒ `ExecEntry.originalPath`），6 组变异全捕获，
