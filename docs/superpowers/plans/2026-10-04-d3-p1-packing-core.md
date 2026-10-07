@@ -2110,7 +2110,7 @@ CHANGED M31: ★存活★ -> 捕获      其余 26 组两遍均为"捕获"
 - **追记小节**（`#### ✅ D3 打包核心轮·追记(2026-10-05:…)`，插在本小节末尾、`### D2` 之前）：
   性质声明、交付面与读数（42 提交 / 69 files +8912 −150 / domain 247→434 / app 399→456）、
   **R1–R5 五项裁决表**、i18n 契约、警示图标矢量化、真机 2 轮、变异累计 **401 组 / 0 逃逸**、
-  合回 `dev`（`--ff-only`、无 merge commit、分支保留）、未做/不宣称。
+  合回 `dev`（`--ff-only`、无 merge commit、**分支已于 2026-10-07 删除**）、未做/不宣称。
 - **写盘方式**：`artifacts/ledger_w26.py`（两遍制：默认干跑，`--apply` 才写盘；备份
   `artifacts/w26bak/HANGOFF.md`）。两条编辑**均为 grow 型**（锚点串保留在结果里），
   每条带 `count == 1` 锚点断言，以及新增块首行 `count == 0` 的**防二次写入** precheck。
@@ -3179,7 +3179,13 @@ cmd.exe /c "D:\Programing\Personal\pixfold\pixfold-d1\run-gradle.bat clean \
 >
 > ⇒ 轮 22 的 `git merge --ff-only d3/p1`（无 merge commit）之后，**轮 23 的全部六笔提交 `e83f215`
 > / `f9510aa` / `27ab1e7` / `d356d46` / `9b10d06` / `2879609` 逐笔都在 `dev` 上**（`git branch --contains <hash>`
-> 对六笔均只输出 `dev`）。`d3/p1` 停在 `09fc863` 未再前进，按惯例保留分支不删。
+> 对六笔均只输出 `dev`）。`d3/p1` 停在 `09fc863` 未再前进。
+> ✅ **2026-10-07 用户「应该合并到Dev就删掉的」⇒ 该分支已删除**（`git branch -d d3/p1`，安全删除；
+> 删除前实测 `git rev-list --count dev..d3/p1` = **0**、`git merge-base --is-ancestor d3/p1 dev`
+> 退出码 0 ⇒ **零提交丢失**，`09fc863` 仍可从 `dev` 到达）。
+> ⚠️ **原先写的"按惯例保留分支不删"是错的** —— `AGENTS.md` §6 的分支模型原文即
+> 「阶段分支从 `dev` 开、**完成即合回 `dev` 并回写文档、随即删除**」，保留才是偏离惯例；
+> 本台账该处措辞已就地订正。
 > ⚠️ **仍未推送**：`git rev-list --left-right --count origin/dev...dev` = `0  65`（`origin/dev` 独有 0、`dev` 独有 65）
 > —— `push` 按本仓惯例由用户处理，agent 只提交不推送。
 
