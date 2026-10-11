@@ -15,6 +15,8 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateMapOf
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
@@ -172,8 +174,8 @@ fun DragReorderGrid(
     var containerInRoot by remember { mutableStateOf(Offset.Zero) }
     // 边缘自动滚动需要的容器高度(px)与连续触边事件数。
     // burst 每有一个"仍在边缘带内"的拖拽事件就 +1,用于加速;离开边缘带清零。
-    var containerHeight by remember { mutableStateOf(0f) }
-    var edgeBurst by remember { mutableStateOf(0) }
+    var containerHeight by remember { mutableFloatStateOf(0f) }
+    var edgeBurst by remember { mutableIntStateOf(0) }
     // 浮层尺寸在**起拖瞬间**定格:源卡一旦滚出视口就被销毁,
     // 再去 slotBounds 里取它的尺寸会拿到过期值导致浮层变形或消失。
     var dragSize by remember { mutableStateOf(Size.Zero) }

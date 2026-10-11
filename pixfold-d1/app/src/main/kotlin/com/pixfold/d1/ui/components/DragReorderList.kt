@@ -12,6 +12,8 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateMapOf
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
@@ -91,8 +93,8 @@ fun DragReorderList(
     // 浮层的锚点:容器自身的左上角根坐标,用于把指针的根坐标换算成容器内局部坐标。
     var containerInRoot by remember { mutableStateOf(Offset.Zero) }
     // 边缘自动滚动需要的容器高度(px)与连续触边事件数(第 18 条)。
-    var containerHeight by remember { mutableStateOf(0f) }
-    var edgeBurst by remember { mutableStateOf(0) }
+    var containerHeight by remember { mutableFloatStateOf(0f) }
+    var edgeBurst by remember { mutableIntStateOf(0) }
     // 浮层尺寸在起拖瞬间定格:源行滚出视口后被销毁,再取 slotBounds 会拿到过期值。
     var dragSize by remember { mutableStateOf(Size.Zero) }
 
