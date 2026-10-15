@@ -3,8 +3,10 @@ package com.pixfold.d1.ui.components
 import androidx.compose.foundation.layout.size
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
@@ -28,7 +30,10 @@ import kotlin.test.assertTrue
  * 故本测试:
  *  1. 使用**真实组件** [DragReorderGrid](不是简化 harness);
  *  2. 模拟**完整手势**(按下 → 越过 slop → 移到目标 → 抬起);
- *  3. 断言**松手后**才提交,且拖动中不提交。
+ *  3. 断言**界面**在拖动中实时重排(`cards reflow live while dragging`),
+ *     同时断言**数据**只在松开时提交一次(`drag does not report a move while
+ *     still dragging`)—— 用户 2026-10-14 要求实时让位后,这两条一守视觉、
+ *     一守「不给领域层制造抖动」,缺任一都会放过一整类错误实现。
  */
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [34], qualifiers = "w400dp-h800dp")
@@ -61,6 +66,62 @@ class DragReorderTest {
         }
     }
 
+    /**
+     * 读「左上角那一格」的文件名 —— 实时让位的判据。
+     *
+     * 读的是 `TAG_GRID_CARD` 的 `contentDescription`([DraggableThumbCard] 上写的就是
+     * `item.fileName`),不是 `onNodeWithText`:卡片文字被截断成 `img1...`,
+     * 按文本定位会随字体测量而变。按**位置**选首格也刻意避开索引 —— 断言的是
+     * 「谁现在占据左上角」这一**视觉**事实,而不是「列表里第 0 项是谁」。
+     */
+    private fun topLeftCardName(): String {
+        val cards = rule.onAllNodesWithTag(TAG_GRID_CARD).fetchSemanticsNodes()
+        val first = cards.minWithOrNull(
+            compareBy({ it.boundsInRoot.top }, { it.boundsInRoot.left }),
+        ) ?: error("没有任何网格卡片")
+        return first.config[SemanticsProperties.ContentDescription].firstOrNull().orEmpty()
+    }
+
+    /**
+     * 拖动中**实时让位** —— 用户 2026-10-14 逐字:「拖拽应该在拖拽后的位置挤压旁边的,
+     * 自动显示新的位置而不是生硬的悬浮在某个卡片或行上」。
+     *
+     * 这条**推翻**了本组件早先的「不做悬停实时重排」(HANGOFF §12.5 结论 2)。
+     * 旧结论担心的不是"重排本身",而是"**每次指针移动都提交一次重排**" ⇒ 顺序来回换位。
+     * 故本用例与下一条必须同时成立、缺一不可:
+     *  - 本条守「**界面**在松手前已经重排」(实时让位真的发生);
+     *  - 下一条守「**数据**在松手前没有提交」(不给领域层制造抖动)。
+     * 只满足一条的实现都是错的:只提交不重排 ⇒ 本条红;拖动中持续提交 ⇒ 下一条红。
+     */
+    @Test
+    fun `cards reflow live while dragging`() {
+        val list = items(9)
+        setGrid(list, onMove = { _, _ -> })
+
+        assertEquals("img1.jpg", topLeftCardName(), "前提:未拖动时左上角是 img1")
+
+        val node = rule.onNodeWithText("img1.jpg").fetchSemanticsNode()
+        val origin = node.boundsInRoot.topLeft
+        val from = node.boundsInRoot.center - origin
+        val to = rule.onNodeWithText("img3.jpg").fetchSemanticsNode().boundsInRoot.center - origin
+
+        rule.onNodeWithText("img1.jpg").performTouchInput {
+            down(from)
+            advanceEventTime(700)
+            moveBy(Offset(0f, -20f))
+            moveTo(to)
+            // 刻意不 up():让位必须发生在**松手之前**
+        }
+        rule.waitForIdle()
+
+        assertEquals(
+            "img2.jpg",
+            topLeftCardName(),
+            "拖动中左上角应已被 img2 顶上(实时让位);若仍是 img1,说明只在松手后才重排",
+        )
+        rule.onAllNodesWithTag(TAG_GRID_CARD).assertCountEquals(9)
+    }
+
     @Test
     fun `drag first card onto third slot moves it there`() {
         val list = items(9)
@@ -85,6 +146,11 @@ class DragReorderTest {
 
     @Test
     fun `drag does not report a move while still dragging`() {
+        // ⚠ 与 `cards reflow live while dragging` **必须同时成立**:实时让位是
+        // **界面**行为,它绝不能靠"拖动中不断提交给领域层"来实现 —— 那样
+        // 每次指针移动都会写一次 PageOrderState(manualIds 反复增长、撤销记录
+        // 被灌满、指针在格边界抖动时顺序来回换位,正是旧裁决担心的那个坑)。
+        // 正确分工:拖动中只改**展示顺序**(本地),松开时提交一次。
         val list = items(9)
         val moved = mutableListOf<Pair<String, Int>>()
         setGrid(list, onMove = { id, t -> moved += id to t })
@@ -99,7 +165,7 @@ class DragReorderTest {
             advanceEventTime(700)
             moveBy(Offset(0f, -20f))
             moveTo(to)
-            // 不 up():拖动过程中不得上报(松手才落地)
+            // 不 up():拖动过程中不得上报(松开才落地)
         }
 
         assertTrue(moved.isEmpty(), "拖动中不得提交移动,实际 $moved")

@@ -2,8 +2,6 @@ package com.pixfold.d1.ui.components
 
 import androidx.compose.foundation.clickable
 import androidx.compose.ui.draw.alpha
-import androidx.compose.foundation.background
-import androidx.compose.ui.graphics.Color
 import androidx.compose.material3.Surface
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -26,7 +24,10 @@ import com.pixfold.d1.domain.model.SourceItem
 
 const val TAG_LIST_ROW = "list-row"
 
-/** 列表行:小缩略图 + 文件名 + 相对路径/大小。信息密度高于网格,便于核对路径。 */
+/** 列表行:小缩略图 + 文件名 + 相对路径/大小。信息密度高于网格,便于核对路径。
+ *
+ * 拖动中的让位由**邻居实时重排**表达(见 [DragReorderGrid] 的 KDoc),
+ * 故不再需要"目标行高亮"—— 被拖的这一行自己就在新位置上(半透明,见 [isDragging])。 */
 @Composable
 fun ThumbRow(
     item: SourceItem,
@@ -35,7 +36,6 @@ fun ThumbRow(
     isPinned: Boolean = false,
     onPin: (() -> Unit)? = null,
     isDragging: Boolean = false,
-    isHovered: Boolean = false,
 ) {
     Row(
         modifier = modifier
@@ -43,9 +43,6 @@ fun ThumbRow(
             .testTag(TAG_LIST_ROW)
             .alpha(if (isDragging) 0.35f else 1f)
             .heightIn(min = 56.dp)
-            .background(
-                if (isHovered) MaterialTheme.colorScheme.primaryContainer else Color.Transparent,
-            )
             .semantics { contentDescription = item.relPath },
         verticalAlignment = Alignment.CenterVertically,
     ) {

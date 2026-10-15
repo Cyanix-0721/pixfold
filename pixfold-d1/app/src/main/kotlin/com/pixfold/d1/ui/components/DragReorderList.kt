@@ -40,10 +40,12 @@ const val TAG_LIST_CONTAINER = "view-list"
 /**
  * 可拖拽排序的缩略图列表(验收清单第 4 项)。
  *
- * 与 [DragReorderGrid] **同一套语义**(归档设计结论,详见 HANGOFF §12.5):
+ * 与 [DragReorderGrid] **同一套语义**(详见该文件 KDoc):
  *  - 整行可拖,长按启动,无需拖拽把手;
  *  - 目标行由**父容器**用各行 `boundsInRoot` 判定(行自身看不到兄弟节点);
- *  - **松手才落地**——拖动中只高亮目标行,`onMoveTo` 仅在抬起时回调一次。
+ *  - **实时让位**(用户 2026-10-14 裁决,推翻早先的「松手落地」):拖动中其他行
+ *    立刻让出位置,被拖的行落在新位置上(半透明占位)。界面实时变,**数据只在
+ *    松手时提交一次**([onMoveTo] 在拖动中一次都不调)。
  *
  * **手势挂在容器上,不挂在行上**:理由与网格完全相同(HANGOFF §11 第 18 条)——
  * LazyColumn 会在行滚出视口时销毁它,挂在行上的手势随之被取消,跨视口拖拽失败;
@@ -87,13 +89,19 @@ fun DragReorderList(
         if (scrollToTopSignal > 0) listState.requestScrollToItem(0)
     }
     val slotBounds = remember { mutableStateMapOf<Int, Rect>() }
-    var draggingIndex by remember { mutableStateOf<Int?>(null) }
-    var pointerInRoot by remember { mutableStateOf(Offset.Zero) }
-    var hoveredIndex by remember { mutableStateOf<Int?>(null) }
+    // 拖动中按 **id** 记住"手里是哪一项"(实时重排会不断改下标,记下标易失同步),
+    // 以及拖动期间的**本地展示顺序**(null = 未拖动)。分工与 [DragReorderGrid] 一致:
+    // **界面实时变,数据只在松手时提交一次**。
+    var draggingId by remember { mutableStateOf<String?>(null) }
+    var dragStartIndex by remember { mutableIntStateOf(-1) }
+    var dragItems by remember { mutableStateOf<List<SourceItem>?>(null) }
     // 浮层的锚点:容器自身的左上角根坐标,用于把指针的根坐标换算成容器内局部坐标。
+    var pointerInRoot by remember { mutableStateOf(Offset.Zero) }
     var containerInRoot by remember { mutableStateOf(Offset.Zero) }
     // 边缘自动滚动需要的容器高度(px)与连续触边事件数(第 18 条)。
     var containerHeight by remember { mutableFloatStateOf(0f) }
+    // 容器宽度:与高度一起判断"指针是否已拖出容器"(理由见 [DragReorderGrid])。
+    var containerWidth by remember { mutableFloatStateOf(0f) }
     var edgeBurst by remember { mutableIntStateOf(0) }
     // 浮层尺寸在起拖瞬间定格:源行滚出视口后被销毁,再取 slotBounds 会拿到过期值。
     var dragSize by remember { mutableStateOf(Size.Zero) }
@@ -103,6 +111,7 @@ fun DragReorderList(
             .onGloballyPositioned {
                 containerInRoot = it.boundsInRoot().topLeft
                 containerHeight = it.size.height.toFloat()
+                containerWidth = it.size.width.toFloat()
             }
             .pointerInput(Unit) {
                 detectDragGesturesAfterLongPress(
@@ -110,20 +119,39 @@ fun DragReorderList(
                         // 起点按**包含**判定:长按空白处不该起拖。
                         val root = containerInRoot + local
                         val index = findContainedSlotAt(root, slotBounds)
-                        if (index != null) {
-                            draggingIndex = index
+                        if (index != null && index < currentItems.size) {
+                                dragStartIndex = index
+                            dragItems = currentItems
+                            draggingId = currentItems[index].id
                             pointerInRoot = root
-                            hoveredIndex = null
                             dragSize = slotBounds[index]?.size ?: Size.Zero
                             edgeBurst = 0
                         }
                     },
                     onDrag = { change, _ ->
-                        val from = draggingIndex
-                        if (from != null) {
+                        if (draggingId != null) {
                             change.consume()
                             pointerInRoot = containerInRoot + change.position
-                            hoveredIndex = findSlotAt(pointerInRoot, slotBounds)
+                            // 实时让位:容器**内部**用严格包含判定(收敛性关键,见 [DragReorderGrid] KDoc);
+                            // 落在行间缝隙时返回 null -> 保持原目标不动。
+                            // 拖到容器**外**时兜底到最近的行 —— 否则贴边自动滚动期间让位停摆。
+                            val hit = resolveReflowTarget(
+                                point = pointerInRoot,
+                                containerTopLeft = containerInRoot,
+                                containerWidth = containerWidth,
+                                containerHeight = containerHeight,
+                                bounds = slotBounds,
+                            )
+                            val list = dragItems
+                            if (hit != null && list != null) {
+                                val from = list.indexOfFirst { it.id == draggingId }
+                                if (from >= 0 && hit != from && hit < list.size) {
+                                    val moved = list.toMutableList()
+                                    val item = moved.removeAt(from)
+                                    moved.add(hit, item)
+                                    dragItems = moved
+                                }
+                            }
                             // 第 18 条:指针贴边时带动列表滚动,否则跨视口拖拽物理上不可能。
                             val step = edgeAutoScrollStep(
                                 pointerYInRoot = pointerInRoot.y,
@@ -141,19 +169,20 @@ fun DragReorderList(
                         }
                     },
                     onDragEnd = {
-                        val from = draggingIndex
-                        val target = hoveredIndex
-                        draggingIndex = null
-                        hoveredIndex = null
+                        val id = draggingId
+                        val finalIndex = dragItems?.indexOfFirst { it.id == id } ?: -1
+                        draggingId = null
+                        dragItems = null
                         edgeBurst = 0
-                        // 松手才落地;拖到自己行/无目标 -> 不提交
-                        if (from != null && target != null && target != from) {
-                            currentOnMoveTo(currentItems[from].id, target)
+                        // **数据只在松手时提交一次**:拖动中一次都没提交过,故领域层的
+                        // manualIds 只增长一次、撤销记录里也只有一个动作(见文件 KDoc)。
+                        if (id != null && finalIndex >= 0 && finalIndex != dragStartIndex) {
+                            currentOnMoveTo(id, finalIndex)
                         }
                     },
                     onDragCancel = {
-                        draggingIndex = null
-                        hoveredIndex = null
+                        draggingId = null
+                        dragItems = null
                         edgeBurst = 0
                     },
                 )
@@ -167,7 +196,7 @@ fun DragReorderList(
             contentPadding = PaddingValues(vertical = 4.dp),
             // 拖动期间交出滚动权(见 [DragReorderGrid] KDoc):否则 LazyColumn
             // 作为后代先拿到事件,会把拖拽抢成 cancel。
-            userScrollEnabled = draggingIndex == null,
+            userScrollEnabled = draggingId == null,
         ) {
             // 头部区块(排序规则编辑器)。理由与 [DragReorderGrid] 完全一致:
             // 独立 item、不参与 itemsIndexed,保证 `onClick(index)` / `slotBounds[index]`
@@ -175,7 +204,9 @@ fun DragReorderList(
             if (header != null) {
                 item(key = DRAG_HEADER_ITEM_KEY) { header() }
             }
-            itemsIndexed(items, key = { _, it -> it.id }) { index, item ->
+            // 渲染源 = 拖动中的本地顺序(实时让位),否则入参顺序。
+            val displayItems = dragItems ?: items
+            itemsIndexed(displayItems, key = { _, it -> it.id }) { index, item ->
                 // 滚出视口的行被销毁时清掉它的过期坐标,免得拖拽起点命中错误的行。
                 val latestIndex by rememberUpdatedState(index)
                 DisposableEffect(item.id) {
@@ -189,8 +220,7 @@ fun DragReorderList(
                     ThumbRow(
                         item = item,
                         isPinned = isPinned(item.id),
-                        isDragging = draggingIndex == index,
-                        isHovered = hoveredIndex != null && hoveredIndex == index && draggingIndex != index,
+                        isDragging = draggingId == item.id,
                         onClick = { onClick(index) },
                         onPin = { onPin(item.id) },
                     )
@@ -198,17 +228,18 @@ fun DragReorderList(
             }
         }
 
-        // 跟手浮层(HANGOFF §11 第 9 条):拖动中手里的那一行跟着指针走。
-        // 只画不参与命中判定,故不与"松手落地"冲突。
-        val dragFrom = draggingIndex
-        if (dragFrom != null && currentItems.size > dragFrom) {
-            DragGhost(
-                item = currentItems[dragFrom],
-                pointerInRoot = pointerInRoot,
-                containerInRoot = containerInRoot,
-                sizeInRoot = dragSize,
-                style = DragGhostStyle.Row,
-            )
+        // 跟手浮层:拖动中手里的那一行跟着指针走。只画不参与命中判定。
+        val ghostId = draggingId
+        if (ghostId != null) {
+            (dragItems ?: items).firstOrNull { it.id == ghostId }?.let { ghostItem ->
+                DragGhost(
+                    item = ghostItem,
+                    pointerInRoot = pointerInRoot,
+                    containerInRoot = containerInRoot,
+                    sizeInRoot = dragSize,
+                    style = DragGhostStyle.Row,
+                )
+            }
         }
 
         // W2:下滑后显示回顶按钮(右下角);判据同网格(下方还有内容 且 确实下滑过)

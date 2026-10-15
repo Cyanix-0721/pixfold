@@ -114,8 +114,21 @@ fun adaptiveColumnCount(
  * 目标格判定由**父容器**负责:卡片只上报指针位置,这里用各格的实际
  * [boundsInRoot] 命中最接近的格子 —— 卡片自身看不到兄弟节点,无法自己算目标。
  *
- * **松手落地**:拖动中只更新 [hoveredIndex] 用于高亮,[onMoveTo] 只在抬起时回调一次。
- * 这避免了"悬停实时重排 → 指针微动反复换位"(HANGOFF §12.5 结论 2)。
+ * **实时让位**(用户 2026-10-14 裁决,推翻此前的「松手落地」):拖动中其他卡片**立刻**
+ * 让出位置,被拖的卡片就落在新位置上(半透明占位),而不是浮在别处、松手才突然跳。
+ *
+ * 关键分工 —— **界面实时变,数据只提交一次**:
+ *  - 拖动中只重排本地展示顺序([dragItems]),`onMoveTo` 一次都不调;
+ *  - 松手时按**最终索引**提交一次。
+ * 为什么不能"拖动中每次移动都提交":那会让 `PageOrderState.manualIds` 被灌满、
+ * 撤销记录被污染,并且指针在格边界抖动时顺序来回换位 —— 旧裁决(HANGOFF §12.5
+ * 结论 2)担心的其实正是这个,而不是"重排"本身。连续多次本地重排的复合结果恒等于
+ * 「从原位直接移到末位」(其余项相对顺序不变),故提交最终索引与领域层
+ * `moveItemTo` 的 remove+insert 语义逐字一致。
+ *
+ * 格边界抖动的收敛性:目标格由**格矩形包含判定**得出(不是"离哪个卡片近"),
+ * 重排后被拖卡片已占据指针所在格 ⇒ 下一次事件算出的目标 == 当前索引 ⇒ 立即稳定,
+ * 不会来回换位。
  *
  * **手势挂在容器上,不挂在卡片上**(HANGOFF §11 第 18 条)。这是跨视口拖拽的
  * 必要前提:LazyGrid 会在卡片滚出视口时**销毁**它,挂在卡片上的 `pointerInput`
@@ -167,14 +180,24 @@ fun DragReorderGrid(
         if (scrollToTopSignal > 0) gridState.requestScrollToItem(0)
     }
     val slotBounds = remember { mutableStateMapOf<Int, Rect>() }
-    var draggingIndex by remember { mutableStateOf<Int?>(null) }
+    // 拖动中按 **id** 记住"手里是哪一项",不记下标 —— 实时重排会不断改变下标,
+    // 记下标就得在每个重排点同步改写,漏一处就变成"浮层里是别人"。
+    var draggingId by remember { mutableStateOf<String?>(null) }
+    // 起拖时该项在**原始列表**里的下标:松手时只需比较"最终下标是否已变",
+    // 变了才提交(拖回原位 -> 不提交,与领域层 moveItemTo 的 from==target 早退一致)。
+    var dragStartIndex by remember { mutableIntStateOf(-1) }
+    // 拖动期间的**本地展示顺序**(null = 未拖动,直接用入参 items)。
+    // 界面实时按它渲染,数据一次都不提交(见上方 KDoc 的"界面实时变、数据提交一次")。
+    var dragItems by remember { mutableStateOf<List<SourceItem>?>(null) }
     var pointerInRoot by remember { mutableStateOf(Offset.Zero) }
-    var hoveredIndex by remember { mutableStateOf<Int?>(null) }
     // 浮层的锚点:容器自身的左上角根坐标,用于把指针的根坐标换算成容器内局部坐标。
     var containerInRoot by remember { mutableStateOf(Offset.Zero) }
     // 边缘自动滚动需要的容器高度(px)与连续触边事件数。
     // burst 每有一个"仍在边缘带内"的拖拽事件就 +1,用于加速;离开边缘带清零。
     var containerHeight by remember { mutableFloatStateOf(0f) }
+    // 容器宽度:与高度一起用来判断"指针是否已拖出容器"。
+    // 拖出去时没有格子包含它,严格包含判定会一直返回 null ⇒ 实时让位停摆(见下方 onDrag)。
+    var containerWidth by remember { mutableFloatStateOf(0f) }
     var edgeBurst by remember { mutableIntStateOf(0) }
     // 浮层尺寸在**起拖瞬间**定格:源卡一旦滚出视口就被销毁,
     // 再去 slotBounds 里取它的尺寸会拿到过期值导致浮层变形或消失。
@@ -185,6 +208,7 @@ fun DragReorderGrid(
             .onGloballyPositioned {
                 containerInRoot = it.boundsInRoot().topLeft
                 containerHeight = it.size.height.toFloat()
+                containerWidth = it.size.width.toFloat()
             }
             .pointerInput(Unit) {
                 detectDragGesturesAfterLongPress(
@@ -193,22 +217,47 @@ fun DragReorderGrid(
                         // 否则"点空白/长按空白"会莫名抓住一张卡片。
                         val root = containerInRoot + local
                         val index = findContainedSlotAt(root, slotBounds)
-                        if (index != null) {
-                            draggingIndex = index
+                        if (index != null && index < currentItems.size) {
+                            dragStartIndex = index
+                            dragItems = currentItems
+                            draggingId = currentItems[index].id
                             pointerInRoot = root
-                            hoveredIndex = null
                             dragSize = slotBounds[index]?.size ?: Size.Zero
                             edgeBurst = 0
                         }
                     },
                     onDrag = { change, _ ->
-                        val from = draggingIndex
-                        if (from != null) {
+                        if (draggingId != null) {
                             change.consume()
                             // change.position 已是**容器局部**坐标(手势挂在容器上),
                             // 比原先"卡片左上角 + 卡片内偏移"的换算少一层易错源。
                             pointerInRoot = containerInRoot + change.position
-                            hoveredIndex = findSlotAt(pointerInRoot, slotBounds)
+                            // 实时让位:容器**内部**用严格包含判定(不是"最近的格中心")。
+                            // 这是收敛性的关键 —— 重排后被拖卡片已占住指针所在格,
+                            // 下一次事件算出的目标 == 它自己的格 ⇒ 立刻稳定,不会来回换位。
+                            // 指针落在格子之间的缝隙时返回 null,此时**保持原目标不动**。
+                            //
+                            // 但指针拖到容器**外**时(真机上手指很容易越过网格下沿滑进
+                            // 底部动作栏),没有任何格子包含它 ⇒ 严格包含会一直 null ⇒
+                            // 贴边自动滚动还在滚、让位却完全停摆。故容器外兜底到"最近的格":
+                            // 容器内仍严格,容器外退化为最近邻,两处语义各有理由。
+                            val hit = resolveReflowTarget(
+                                point = pointerInRoot,
+                                containerTopLeft = containerInRoot,
+                                containerWidth = containerWidth,
+                                containerHeight = containerHeight,
+                                bounds = slotBounds,
+                            )
+                            val list = dragItems
+                            if (hit != null && list != null) {
+                                val from = list.indexOfFirst { it.id == draggingId }
+                                if (from >= 0 && hit != from && hit < list.size) {
+                                    val moved = list.toMutableList()
+                                    val item = moved.removeAt(from)
+                                    moved.add(hit, item)
+                                    dragItems = moved
+                                }
+                            }
                             // 第 18 条:指针贴边时带动网格滚动,否则跨视口拖拽物理上不可能。
                             val step = edgeAutoScrollStep(
                                 pointerYInRoot = pointerInRoot.y,
@@ -226,19 +275,20 @@ fun DragReorderGrid(
                         }
                     },
                     onDragEnd = {
-                        val from = draggingIndex
-                        val target = hoveredIndex
-                        draggingIndex = null
-                        hoveredIndex = null
+                        val id = draggingId
+                        val finalIndex = dragItems?.indexOfFirst { it.id == id } ?: -1
+                        draggingId = null
+                        dragItems = null
                         edgeBurst = 0
-                        // 松手才落地;拖到自己格/无目标 -> 不提交
-                        if (from != null && target != null && target != from) {
-                            currentOnMoveTo(currentItems[from].id, target)
+                        // **数据只在松手时提交一次**:按最终索引提交。拖动中一次都没提交过,
+                        // 故领域层的 manualIds 只增长一次、撤销记录里也只有一个动作。
+                        if (id != null && finalIndex >= 0 && finalIndex != dragStartIndex) {
+                            currentOnMoveTo(id, finalIndex)
                         }
                     },
                     onDragCancel = {
-                        draggingIndex = null
-                        hoveredIndex = null
+                        draggingId = null
+                        dragItems = null
                         edgeBurst = 0
                     },
                 )
@@ -257,7 +307,7 @@ fun DragReorderGrid(
             contentPadding = PaddingValues(8.dp),
             // 拖动期间交出滚动权(见上方 KDoc):否则 LazyGrid 作为后代先拿到事件,
             // 会把拖拽抢成 cancel。程序化 scrollBy 不受此开关影响。
-            userScrollEnabled = draggingIndex == null,
+            userScrollEnabled = draggingId == null,
         ) {
             // 头部区块(排序规则编辑器)。
             //
@@ -268,7 +318,9 @@ fun DragReorderGrid(
             if (header != null) {
                 item(key = DRAG_HEADER_ITEM_KEY, span = { GridItemSpan(maxLineSpan) }) { header() }
             }
-            itemsIndexed(items, key = { _, it -> it.id }) { index, item ->
+            // 渲染源 = 拖动中的本地顺序(实时让位),否则入参顺序。
+            val displayItems = dragItems ?: items
+            itemsIndexed(displayItems, key = { _, it -> it.id }) { index, item ->
                 // 让 slotBounds 只保留**当前已组合**的格:滚出视口的格被 Lazy 销毁后,
                 // 它的旧根坐标会与滚上来的新格几乎重合,拖拽起点会命中错误的格。
                 val latestIndex by rememberUpdatedState(index)
@@ -285,8 +337,7 @@ fun DragReorderGrid(
                     DraggableThumbCard(
                         item = item,
                         isPinned = isPinned(item.id),
-                        isHovered = hoveredIndex != null && hoveredIndex == index && draggingIndex != index,
-                        isDragging = draggingIndex == index,
+                        isDragging = draggingId == item.id,
                         onClick = { onClick(index) },
                         onPin = { onPin(item.id) },
                     )
@@ -294,17 +345,19 @@ fun DragReorderGrid(
             }
         }
 
-        // 跟手浮层(HANGOFF §11 第 9 条):拖动中手里的那张图跟着指针走。
-        // 只画不参与命中判定,故不与"松手落地"冲突。
-        val dragFrom = draggingIndex
-        if (dragFrom != null && currentItems.size > dragFrom) {
-            DragGhost(
-                item = currentItems[dragFrom],
-                pointerInRoot = pointerInRoot,
-                containerInRoot = containerInRoot,
-                sizeInRoot = dragSize,
-                style = DragGhostStyle.Card,
-            )
+        // 跟手浮层:拖动中手里的那张图跟着指针走(用户 2026-10-14 保留此视觉,
+        // 只把"松手才重排"改成"实时让位")。只画不参与命中判定。
+        val ghostId = draggingId
+        if (ghostId != null) {
+            (dragItems ?: items).firstOrNull { it.id == ghostId }?.let { ghostItem ->
+                DragGhost(
+                    item = ghostItem,
+                    pointerInRoot = pointerInRoot,
+                    containerInRoot = containerInRoot,
+                    sizeInRoot = dragSize,
+                    style = DragGhostStyle.Card,
+                )
+            }
         }
 
         // W2:下滑后显示回顶按钮(右下角)。判据同时要求"下方还有内容"与"确实下滑过",
@@ -326,11 +379,10 @@ fun DragReorderGrid(
     }
 }
 
-/** 找出**包含**该点的格下标;不包含任何格时返回 null(拖拽起点判定用,不做兜底)。 */
-internal fun findContainedSlotAt(point: Offset, bounds: Map<Int, Rect>): Int? =
-    bounds.entries.firstOrNull { (_, r) -> r.contains(point) }?.key
-
-/** 在已知各格 bounds 中找出包含该点的下标;找不到则取**最近格中心**(容错)。 */
+/** 在已知各格 bounds 中找出包含该点的下标;找不到则取**最近格中心**(容错)。
+ *
+ * 只用于「指针拖出容器」的兜底(见 [isOutsideContainer])与既有的滚动后起拖判定;
+ * 容器**内**的格间缝隙刻意不兜底 —— 那里是实时让位收敛性依赖的死区。 */
 internal fun findSlotAt(point: Offset, bounds: Map<Int, Rect>): Int? {
     findContainedSlotAt(point, bounds)?.let { return it }
     if (bounds.isEmpty()) return null
@@ -340,3 +392,55 @@ internal fun findSlotAt(point: Offset, bounds: Map<Int, Rect>): Int? {
         dx * dx + dy * dy
     }?.key
 }
+
+/** 找出**包含**该点的格下标;不包含任何格时返回 null。
+ *
+ * 拖拽起点与实时让位都用它。刻意**不做**"兜底到最近格中心" —— 实时让位要靠
+ * "指针在格内才换位"来收敛:重排后被拖卡片已占住指针所在格 ⇒ 下一次事件算出的
+ * 目标 == 它自己的格 ⇒ 立即稳定;若在缝隙里也兜底到最近格,指针在边界附近微动
+ * 就会来回换位(即旧裁决担心的现象)。
+ *
+ * ⚠️ 指针拖到**容器外**是另一回事:那里没有任何格包含它,若不兜底则贴边滚动期间
+ * 让位完全停摆。故调用方在容器外改用 [findSlotAt] 兜底 —— 见 [isOutsideContainer]。 */
+internal fun findContainedSlotAt(point: Offset, bounds: Map<Int, Rect>): Int? =
+    bounds.entries.firstOrNull { (_, r) -> r.contains(point) }?.key
+
+/** 实时让位的**目标下标**判定(纯函数,便于离线断言)。
+ *
+ * 三段语义,各有理由,缺一不可 —— 每条都有变异守护(见 `artifacts/mutate6.py`)：
+ *  1. **容器内**且落在某个格/行里 ⇒ 该格。这是收敛性的关键:重排后被拖项已占住
+ *     指针所在格,下一次事件算出的目标 == 它自己的格 ⇒ 立即稳定。
+ *  2. **容器内**但落在格/行之间的缝隙 ⇒ **null**(保持原目标不动)。刻意不兜底到
+ *     "最近的格中心":那样指针在边界附近微动就会来回换位 —— 正是旧裁决担心的现象。
+ *  3. **容器外**(手指滑出网格下沿、进到底部动作栏) ⇒ 退化为最近的格。容器外没有
+ *     任何格包含该点,不兜底则贴边自动滚动期间让位完全停摆(滚是滚了、卡片不跟)。
+ */
+internal fun resolveReflowTarget(
+    point: Offset,
+    containerTopLeft: Offset,
+    containerWidth: Float,
+    containerHeight: Float,
+    bounds: Map<Int, Rect>,
+): Int? {
+    findContainedSlotAt(point, bounds)?.let { return it }
+    return if (isOutsideContainer(point, containerTopLeft, containerWidth, containerHeight)) {
+        findSlotAt(point, bounds)
+    } else {
+        null
+    }
+}
+
+/** 指针是否已拖出容器矩形(上/下/左/右任一方向)。
+ *
+ * 专供实时让位的兜底:容器**外**的点不被任何格包含,若不兜底,贴边自动滚动期间
+ * 让位会完全停摆(滚是滚了,卡片却不跟着走)。容器**内**的格间缝隙刻意不兜底 —— 
+ * 那是收敛性依赖的"死区"。 */
+internal fun isOutsideContainer(
+    point: Offset,
+    containerTopLeft: Offset,
+    containerWidth: Float,
+    containerHeight: Float,
+): Boolean = point.x < containerTopLeft.x ||
+    point.x > containerTopLeft.x + containerWidth ||
+    point.y < containerTopLeft.y ||
+    point.y > containerTopLeft.y + containerHeight
