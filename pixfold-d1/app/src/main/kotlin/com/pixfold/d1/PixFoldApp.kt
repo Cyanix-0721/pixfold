@@ -133,6 +133,27 @@ fun PixFoldApp(store: SettingsStore? = null) {
                 style = NavTransitionStyle.Page,
             ) {
                 composable<HomeRoute> {
+                    // 用户 2026-10-14 裁决:「默认返回到主页改为触发重置。**只有工作流内部切换不会自动重置**」。
+                    //
+                    // **为什么复位挂在「回到主页」这一侧,而不是 `WorkflowARoute` 的 `DisposableEffect`**:
+                    // 预览页是**根导航的兄弟目的地**(见上方 :100-113),`navigate(PreviewRoute)` 一样会让
+                    // `WorkflowARoute` 离开组合 —— 在离场时复位,预览读到的 `PageOrderState` 会当场变成
+                    // 自动序,点开的图与网格对不上(正是 2026-09-25 修过的那类缺陷)。
+                    // 挂在 `HomeRoute` 上则只在"真的回到主页"时触发;首次启动时复位到初值是幂等的。
+                    //
+                    // 复位三样:页序/排序规则(`workflowAState`)、命名结构与覆盖(`namingState`)、
+                    // 当前集合(`activeCollectionId`)。工作流 B 的共享状态全在 `WorkflowBSteps`
+                    // 内部自持,离开组合即自然归零,无需在此处写第二遍。
+                    LaunchedEffect(Unit) {
+                        workflowAState = workflowAStateOf(collections)
+                        namingState =
+                            NamingState(
+                                NamingScheme(
+                                    rootDirName = collections.firstOrNull()?.rootDirName.orEmpty(),
+                                ),
+                            )
+                        activeCollectionId = collections.first().id
+                    }
                     DestinationSurface {
                         HomeScreen(
                             onOpenWorkflowA = { navController.navigate(WorkflowARoute) },

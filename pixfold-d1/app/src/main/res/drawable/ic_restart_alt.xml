@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Material Symbols "restart_alt" — 重置全部 / Reset all
+  Source : https://fonts.gstatic.com/s/i/short-term/release/materialsymbolsoutlined/restart_alt/default/24px.svg
+  License: Apache License 2.0
+
+  ⚠️ 几何数据由 `artifacts/svg2vd.py` 机器变换,不是手抄。
+  官方 viewBox 是 `0 -960 960 960`(原点在 y=-960),而 VectorDrawable
+  没有 viewBox 偏移语义 —— 直接照抄会把图形画到画布外(本仓库已两次踩坑)。
+  变换:x'=x*0.025,y'=(y+960)*0.025;绝对坐标平移、相对命令只缩放。
+-->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <path
+        android:fillColor="@android:color/white"
+        android:pathData="M11,20.95q-3.025,-0.375,-5.013,-2.638T4,13q0,-1.65,0.65,-3.163T6.5,7.2l1.425,1.425q-0.95,0.85,-1.438,1.975T6,13q0,2.2,1.4,3.888T11,18.95v2Zm2,0v-2q2.175,-0.4,3.588,-2.075T18,13q0,-2.5,-1.75,-4.25t-4.25,-1.75h-0.075l1.1,1.1l-1.4,1.4l-3.5,-3.5l3.5,-3.5l1.4,1.4l-1.1,1.1h0.075q3.35,0,5.675,2.325t2.325,5.675q0,3.025,-1.988,5.288T13,20.95Z" />
+</vector>

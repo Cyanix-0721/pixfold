@@ -1,6 +1,7 @@
 package com.pixfold.d1.ui.workflowb
 
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -14,6 +15,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
@@ -49,7 +51,9 @@ import com.pixfold.d1.nav.WorkflowBLibraryRoute
 import com.pixfold.d1.nav.WorkflowBMetadataRoute
 import com.pixfold.d1.nav.WorkflowBPackRoute
 import com.pixfold.d1.nav.goToWorkflowBStep
+import com.pixfold.d1.nav.popWorkflowStep
 import com.pixfold.d1.nav.workflowBStepIndex
+import com.pixfold.d1.ui.components.ResetAllButton
 import com.pixfold.d1.ui.plan.ExecutionReportPage
 
 const val TAG_B_STEP_TABS = "b-step-tabs"
@@ -114,36 +118,64 @@ fun WorkflowBSteps(
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val currentIndex = navBackStackEntry?.destination.workflowBStepIndex()
 
+    /**
+     * 重置**整个工作流**的调整(用户 2026-10-14 裁决,B 侧与 A 侧同构)。
+     *
+     * 「全部」= 卷勾选回到初始(全部 included)、当前卷回到第一卷、输出冲突与源文件
+     * 策略回到默认(重命名 / 保留)、危险动作开关复位、确认流程与报告复位,
+     * 并**回到步骤 1**。
+     */
+    fun resetAll() {
+        state = workflowBStateOf(rootPath, volumes)
+        conflictPolicy = OutputConflictPolicy.Rename
+        sourcePolicy = SourcePolicy.Keep
+        cleanEmptyDirs = false
+        confirmFlow = ConfirmFlowState()
+        report = null
+        undoMessage = null
+        // 回到步骤 1(退回一律用 pop,保持返回链线性)
+        navController.goToWorkflowBStep(currentIndex, 0)
+    }
+
     Column(
         modifier = modifier
             .fillMaxSize()
             .windowInsetsPadding(contentInsets),
     ) {
-        PrimaryTabRow(
-            selectedTabIndex = currentIndex,
-            modifier = Modifier
-                .fillMaxWidth()
-                .testTag(TAG_B_STEP_TABS),
+        // 页签行 + 右侧「重置全部」:理由与槽位写法同 WorkflowASteps
+        //(`PrimaryTabRow` 无 trailing 槽位,故外层 Row 分槽)。
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
         ) {
-            WorkflowBStep.entries.forEachIndexed { i, step ->
-                // 要进 semantics{},故先在组合上下文里解析
-                val stepLabel = stringResource(step.labelRes)
-                Tab(
-                    selected = currentIndex == i,
-                    // 跳步走 goToWorkflowBStep,保证返回链始终线性(详见该函数注释)
-                    onClick = { navController.goToWorkflowBStep(currentIndex, i) },
-                    text = { Text(stepLabel) },
-                    modifier = Modifier
-                        .testTag(
-                            when (step) {
-                                WorkflowBStep.Library -> TAG_B_STEP_LIBRARY
-                                WorkflowBStep.Metadata -> TAG_B_STEP_METADATA
-                                WorkflowBStep.Pack -> TAG_B_STEP_PACK
-                            },
-                        )
-                        .semantics { contentDescription = stepLabel },
-                )
+            PrimaryTabRow(
+                selectedTabIndex = currentIndex,
+                modifier = Modifier
+                    .weight(1f)
+                    .testTag(TAG_B_STEP_TABS),
+            ) {
+                WorkflowBStep.entries.forEachIndexed { i, step ->
+                    // 要进 semantics{},故先在组合上下文里解析
+                    val stepLabel = stringResource(step.labelRes)
+                    Tab(
+                        selected = currentIndex == i,
+                        // 跳步走 goToWorkflowBStep,保证返回链始终线性(详见该函数注释)
+                        onClick = { navController.goToWorkflowBStep(currentIndex, i) },
+                        text = { Text(stepLabel) },
+                        modifier = Modifier
+                            .testTag(
+                                when (step) {
+                                    WorkflowBStep.Library -> TAG_B_STEP_LIBRARY
+                                    WorkflowBStep.Metadata -> TAG_B_STEP_METADATA
+                                    WorkflowBStep.Pack -> TAG_B_STEP_PACK
+                                },
+                            )
+                            .semantics { contentDescription = stepLabel },
+                    )
+                }
             }
+
+            ResetAllButton(onReset = { resetAll() })
         }
 
         // 步骤内容不重复叠加 inset(外层已处理)
@@ -183,7 +215,7 @@ fun WorkflowBSteps(
                             onLibraryChange = { state = it },
                             contentInsets = innerInsets,
                             onNext = { navController.navigate(WorkflowBPackRoute) },
-                            onBack = { navController.popBackStack() },
+                            onBack = { navController.popWorkflowStep() },
                             modifier = Modifier.weight(1f),
                         )
                     }
@@ -244,7 +276,7 @@ fun WorkflowBSteps(
                                 onCancelConfirm = { confirmFlow = confirmFlow.cancel() },
                                 onExecute = {},
                                 showPlanSection = true,
-                                onBack = { navController.popBackStack() },
+                                onBack = { navController.popWorkflowStep() },
                                 modifier = Modifier.weight(1f),
                             )
                         }

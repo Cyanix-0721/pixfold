@@ -1,6 +1,7 @@
 package com.pixfold.d1.ui.workflowa
 
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -53,7 +54,9 @@ import com.pixfold.d1.nav.WorkflowANamingRoute
 import com.pixfold.d1.nav.WorkflowAPlanRoute
 import com.pixfold.d1.nav.WorkflowASortRoute
 import com.pixfold.d1.nav.goToWorkflowAStep
+import com.pixfold.d1.nav.popWorkflowStep
 import com.pixfold.d1.nav.workflowAStepIndex
+import com.pixfold.d1.ui.components.ResetAllButton
 import com.pixfold.d1.ui.plan.ExecutionReportPage
 
 const val TAG_STEP_TABS = "step-tabs"
@@ -195,37 +198,74 @@ fun WorkflowASteps(
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val currentIndex = navBackStackEntry?.destination.workflowAStepIndex()
 
+    /**
+     * 重置**整个工作流**的调整(用户 2026-10-14 裁决)。
+     *
+     * 「全部」= 排序规则回到批次默认、人工调整清空、命名结构回到初值、覆盖清空、
+     * 危险动作开关复位、确认流程与报告复位,并**回到步骤 1**。
+     *
+     * ⚠️ 必须走 [updateState] / [updateNamingState] 而不是直接改本地 `state`:
+     * 这两个状态**上层(`PixFoldApp`)也持有**,预览页读的是上层那份。只改本地会让
+     * 「重置后打开预览仍按旧页序取图」—— 属于 2026-09-25 已踩过的同类缺陷。
+     */
+    fun resetAll() {
+        updateState(workflowAStateOf(collections))
+        updateNamingState(
+            NamingState(NamingScheme(rootDirName = collections.firstOrNull()?.rootDirName.orEmpty())),
+        )
+        cleanEmptyDirs = false
+        confirmFlow = ConfirmFlowState()
+        report = null
+        undoMessage = null
+        // 当前集合也复位(重置后停在第一个集合,与初值一致)
+        val firstId = collections.firstOrNull()?.id.orEmpty()
+        activeId = firstId
+        onActiveCollectionChange(firstId)
+        // 回到步骤 1:往回跳一律用 pop(见 goToWorkflowAStep 的注释),保持返回链线性
+        navController.goToWorkflowAStep(currentIndex, 0)
+    }
+
     Column(
         modifier = modifier
             .fillMaxSize()
             .windowInsetsPadding(contentInsets),
     ) {
-        PrimaryTabRow(
-            selectedTabIndex = currentIndex,
-            modifier = Modifier
-                .fillMaxWidth()
-                .testTag(TAG_STEP_TABS),
+        // 页签行 + 右侧「重置全部」。M3 的 `PrimaryTabRow` **没有 trailing 槽位**
+        // (API 只有 selectedTabIndex/modifier/colors/indicator/content),
+        // 故只能在外面套一层 Row 分槽:页签 weight(1f) 吃掉剩余宽度,按钮靠右。
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
         ) {
-            WorkflowAStep.entries.forEachIndexed { i, step ->
-                // 要进 semantics{},故先在组合上下文里解析
-                val stepLabel = stringResource(step.labelRes)
-                Tab(
-                    selected = currentIndex == i,
-                    // 跳步必须走 goToWorkflowAStep:往回 pop、往前逐级 push,
-                    // 保证返回链始终是线性的一步一退(详见该函数注释)。
-                    onClick = { navController.goToWorkflowAStep(currentIndex, i) },
-                    text = { Text(stepLabel) },
-                    modifier = Modifier
-                        .testTag(
-                            when (step) {
-                                WorkflowAStep.Sort -> TAG_STEP_SORT
-                                WorkflowAStep.Naming -> TAG_STEP_NAMING
-                                WorkflowAStep.Plan -> TAG_STEP_PLAN
-                            },
-                        )
-                        .semantics { contentDescription = stepLabel },
-                )
+            PrimaryTabRow(
+                selectedTabIndex = currentIndex,
+                modifier = Modifier
+                    .weight(1f)
+                    .testTag(TAG_STEP_TABS),
+            ) {
+                WorkflowAStep.entries.forEachIndexed { i, step ->
+                    // 要进 semantics{},故先在组合上下文里解析
+                    val stepLabel = stringResource(step.labelRes)
+                    Tab(
+                        selected = currentIndex == i,
+                        // 跳步必须走 goToWorkflowAStep:往回 pop、往前逐级 push,
+                        // 保证返回链始终是线性的一步一退(详见该函数注释)。
+                        onClick = { navController.goToWorkflowAStep(currentIndex, i) },
+                        text = { Text(stepLabel) },
+                        modifier = Modifier
+                            .testTag(
+                                when (step) {
+                                    WorkflowAStep.Sort -> TAG_STEP_SORT
+                                    WorkflowAStep.Naming -> TAG_STEP_NAMING
+                                    WorkflowAStep.Plan -> TAG_STEP_PLAN
+                                },
+                            )
+                            .semantics { contentDescription = stepLabel },
+                    )
+                }
             }
+
+            ResetAllButton(onReset = { resetAll() })
         }
 
         // 步骤内容不重复叠加 inset(外层已处理)
@@ -286,7 +326,7 @@ fun WorkflowASteps(
                                 contentInsets = innerInsets,
                                 initialState = namingState,
                                 onStateChange = { updateNamingState(it) },
-                                onBack = { navController.popBackStack() },
+                                onBack = { navController.popWorkflowStep() },
                                 onNext = { navController.navigate(WorkflowAPlanRoute) },
                                 modifier = Modifier.weight(1f),
                             )
@@ -363,7 +403,7 @@ fun WorkflowASteps(
                                 onExecute = {},
                                 contentInsets = innerInsets,
                                 modifier = Modifier.weight(1f),
-                                onBack = { navController.popBackStack() },
+                                onBack = { navController.popWorkflowStep() },
                             )
                         }
                     }

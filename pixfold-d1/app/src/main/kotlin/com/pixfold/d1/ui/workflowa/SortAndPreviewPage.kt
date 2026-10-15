@@ -223,7 +223,14 @@ fun SortAndPreviewPage(
         state = next
         onStateChange(next)
     }
-    var activeId by remember {
+    // ⚠️ `remember(initialCollectionId)`:这个 key **不是**多余的。
+    // 「重置全部」(用户 2026-10-14)要把工作流复位到初值,其中包含**当前集合回到第一个**;
+    // 而重置发生在 `WorkflowASteps` 那一层,本页不会重新组合 —— 没有这个 key 时
+    // 上层的 `activeId` 改了、这里的 `activeId` 纹丝不动,重置看起来「只清了一半」。
+    // 用 key 后:上层改值 ⇒ 本页重新播种。用户自己切集合时上层会收到同一个值,
+    // 重新播种到同一值是无操作,故不影响正常交互(已由 `ResetAllTest` 的
+    // `reset all returns to the first collection` 守住)。
+    var activeId by remember(initialCollectionId) {
         mutableStateOf(initialCollectionId ?: collections.firstOrNull()?.id.orEmpty())
     }
     // W4:每次排序规则变更自增 -> 通知网格/列表回顶(用户 2026-09-17 指定)
