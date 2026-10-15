@@ -242,8 +242,13 @@ fun SettingsScreen(
                 options = AppLanguage.entries.map { it to stringResource(languageLabel(it)) },
                 onSelect = { onChange(settings.copy(language = it)) },
             )
-            // 如实告知:阶段 1 只本地化了设置页自身(见规格 §9.3)。
-            Note(stringResource(R.string.settings_language_note))
+            // 语言区**不再**带说明行:原先那句「其他页面的多语言将在后续版本补全」是
+            // 设置与主题体系**阶段 1** 的产物(当时只本地化了设置页自身,见规格 §9.3)。
+            // 全量 i18n 已于 2026-09-25 落地(`2221ef1` / `0368be5` / `53149ba`),
+            // 此后这句话就是假信息 —— 界面在说「多语言还没做」,而实际全应用早已双语。
+            // 选项本身已自解释(跟随系统 / 中文 / English),无需任何补充说明。
+            // 2026-10-14 真机走查发现,守卫见 `SettingsScreenTest` 的
+            // `language section no longer claims other screens are untranslated`。
 
             Divider()
 

@@ -22,7 +22,6 @@
     <string name="settings_pure_black_desc">Saves power on OLED; hierarchy is shown by borders</string>
     <string name="settings_section_language">Language</string>
     <string name="settings_language">Language</string>
-    <string name="settings_language_note">Other screens will be translated in a later version</string>
     <string name="settings_section_behavior">Behavior</string>
     <string name="settings_storage">File access</string>
     <string name="settings_storage_saf_desc">Authorize folders via the system picker; privacy-friendly, no extra permission</string>

@@ -10,8 +10,29 @@
 
     <!-- ============ Home screen (HomeScreen) ============ -->
     <string name="home_settings_cd">Settings</string>
-    <string name="home_workflow_a">Workflow A · Organize and name images</string>
-    <string name="home_workflow_b">Workflow B · Build CBZ files</string>
+    <!--
+      Home card copy. User 2026-10-14: 「主要功能就是工作流AB，所以主页应该有2个大卡片显示，
+      并且改下文案，直接叫工作流不好听」— the "Workflow A/B" prefix is gone on purpose.
+      Resource names keep the `home_workflow_*` prefix so the ~30 existing navigation tests
+      that locate the entries via `TestText.of(R.string.home_workflow_a)` keep working.
+    -->
+    <string name="home_workflow_a">Organize images</string>
+    <string name="home_workflow_a_subtitle">Sort, rename and preview by your own rules</string>
+    <string name="home_workflow_b">Pack comics</string>
+    <string name="home_workflow_b_subtitle">Fill in metadata and pack volumes into CBZ</string>
+
+    <!--
+      ============ Reset all (ResetAllButton) ============
+      User 2026-10-14: a single icon button at the right end of the step tab row,
+      resetting the whole workflow (sort rule / manual order / naming overrides /
+      metadata edits). Long press reveals `common_reset_all_hint`; tapping opens a
+      confirmation (product constraint 5: destructive actions must be explained).
+    -->
+    <string name="common_reset_all_cd">Reset all adjustments</string>
+    <string name="common_reset_all_hint">Reset all adjustments</string>
+    <string name="common_reset_all_title">Reset all adjustments?</string>
+    <string name="common_reset_all_body">Sort rules, manual adjustments, naming overrides and metadata edits will be cleared.</string>
+    <string name="common_reset_all_confirm">Reset</string>
 
     <!-- ============ Scroll to top (ScrollToTopButton) ============ -->
     <string name="common_scroll_to_top">Back to top</string>

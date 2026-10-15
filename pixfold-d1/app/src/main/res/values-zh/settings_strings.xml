@@ -22,7 +22,6 @@
     <string name="settings_pure_black_desc">OLED 更省电；层级改由边框表达</string>
     <string name="settings_section_language">语言</string>
     <string name="settings_language">语言</string>
-    <string name="settings_language_note">其他页面的多语言将在后续版本补全</string>
     <string name="settings_section_behavior">行为</string>
     <string name="settings_storage">文件访问方式</string>
     <string name="settings_storage_saf_desc">通过系统文件选择器授权目录，隐私友好、无需额外权限</string>

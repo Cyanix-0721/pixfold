@@ -218,6 +218,34 @@ class SettingsScreenTest {
     }
 
     /**
+     * 语言区**不得**再出现「其他页面稍后补全」这类说明(2026-10-14 真机走查发现)。
+     *
+     * 该说明是设置与主题体系**阶段 1** 的产物 —— 当时只有设置页自身被本地化
+     * (规格 §9.3)。**全量 i18n 已于 2026-09-25 落地**
+     * (`2221ef1` / `0368be5` / `53149ba`),此后这句话就是**假信息**:
+     * 界面在告诉用户「多语言还没做」,而实际上全应用早已双语。
+     *
+     * 用户走查原话(2026-10-14):「如果你发现什么问题也要提出来」——
+     * 这条即当时提出的候选之一,真机 `set1.xml` 节点 `[56,2433][751,2489]` 逐字取证。
+     *
+     * 断言用**字面量**而非 `TestText.of(R.string.…)`:本用例要守的正是
+     * 「**这段文字永远不要再出现**」。若经资源 id 取,删掉资源后测试连编译都过不了;
+     * 而保留资源又等于允许它回来 —— 字面量是这里唯一能表达该意图的写法。
+     * (Robolectric 默认 locale 为 `en_US`,解析默认槽位 `values/`,故取英文。)
+     */
+    @Test
+    fun `language section no longer claims other screens are untranslated`() {
+        show()
+        val stale = rule
+            .onAllNodesWithText("translated in a later version", substring = true)
+            .fetchSemanticsNodes()
+        assertTrue(
+            stale.isEmpty(),
+            "语言区不应再声称「其他页面稍后补全」—— 全量 i18n 已于 2026-09-25 完成;实测 ${stale.size} 个节点命中",
+        )
+    }
+
+    /**
      * 「竖屏默认列数」选一个固定数字应上报到 `portraitDefaultColumns`。
      *
      * 选项 0 固定是「跟随自适应」,故选项 1 = 下界 `MIN_COLUMNS` = 2 列。
