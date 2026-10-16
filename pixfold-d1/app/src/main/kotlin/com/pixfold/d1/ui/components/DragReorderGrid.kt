@@ -8,13 +8,12 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.GridItemSpan
+import androidx.compose.foundation.lazy.grid.LazyGridItemInfo
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.itemsIndexed
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -33,6 +32,7 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.boundsInRoot
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -74,6 +74,13 @@ val ADAPTIVE_COLUMN_MIN_WIDTH: Dp = 80.dp
 
 /** 网格容器左右 `contentPadding` 之和;自适应算式要从可用宽里扣掉它。 */
 private const val GRID_CONTENT_PADDING_DP = 16
+
+/**
+ * 网格的 `contentPadding`。**必须只有这一处** —— 它同时喂给
+ * [LazyVerticalGrid] 与命中几何换算 [layoutSlotBounds],两处若各写一遍就会漂移,
+ * 而漂移的直接后果是「指针明明在格子里却命不中」(见该函数 KDoc)。
+ */
+private val GridContentPadding = PaddingValues(8.dp)
 
 /**
  * 由容器宽度算出**自适应列数** —— 网格列数算式的**唯一事实来源**。
@@ -179,7 +186,9 @@ fun DragReorderGrid(
         handledSignal[0] = scrollToTopSignal
         if (scrollToTopSignal > 0) gridState.requestScrollToItem(0)
     }
-    val slotBounds = remember { mutableStateMapOf<Int, Rect>() }
+    // 命中判定用的格子几何**每次由 layoutInfo 现算**(见 [layoutSlotBounds]),
+    // 不再由 item 节点的 `onGloballyPositioned` 累积 —— 后者会被 `animateItem`
+    // 的飞行中位移污染,导致边缘抽搐(用户 2026-10-15 真机反馈)。
     // 拖动中按 **id** 记住"手里是哪一项",不记下标 —— 实时重排会不断改变下标,
     // 记下标就得在每个重排点同步改写,漏一处就变成"浮层里是别人"。
     var draggingId by remember { mutableStateOf<String?>(null) }
@@ -200,8 +209,23 @@ fun DragReorderGrid(
     var containerWidth by remember { mutableFloatStateOf(0f) }
     var edgeBurst by remember { mutableIntStateOf(0) }
     // 浮层尺寸在**起拖瞬间**定格:源卡一旦滚出视口就被销毁,
-    // 再去 slotBounds 里取它的尺寸会拿到过期值导致浮层变形或消失。
+    // 再去 layoutInfo 里取它的尺寸会拿到空值导致浮层变形或消失。
     var dragSize by remember { mutableStateOf(Size.Zero) }
+
+    // 命中几何的换算参数与取值函数。必须放在 `containerInRoot` 等状态**声明之后** ——
+    // Kotlin 局部函数只能引用在它之前声明的局部变量。
+    val gridDensity = LocalDensity.current
+    val gridLayoutDirection = LocalLayoutDirection.current
+    val gridPadLeftPx = with(gridDensity) { GridContentPadding.calculateLeftPadding(gridLayoutDirection).toPx() }
+    val gridPadTopPx = with(gridDensity) { GridContentPadding.calculateTopPadding().toPx() }
+    val gridHeaderOffset = if (header != null) 1 else 0
+    fun currentSlotBounds(): Map<Int, Rect> = layoutSlotBounds(
+        visible = gridSlotInfos(gridState.layoutInfo.visibleItemsInfo),
+        containerTopLeft = containerInRoot,
+        padLeft = gridPadLeftPx,
+        padTop = gridPadTopPx,
+        headerOffset = gridHeaderOffset,
+    )
 
     Box(
         modifier = modifier
@@ -216,13 +240,14 @@ fun DragReorderGrid(
                         // 起点按**包含**判定(不许兜底到最近格):长按空白处不该起拖,
                         // 否则"点空白/长按空白"会莫名抓住一张卡片。
                         val root = containerInRoot + local
-                        val index = findContainedSlotAt(root, slotBounds)
+                        val bounds = currentSlotBounds()
+                        val index = findContainedSlotAt(root, bounds)
                         if (index != null && index < currentItems.size) {
                             dragStartIndex = index
                             dragItems = currentItems
                             draggingId = currentItems[index].id
                             pointerInRoot = root
-                            dragSize = slotBounds[index]?.size ?: Size.Zero
+                            dragSize = bounds[index]?.size ?: Size.Zero
                             edgeBurst = 0
                         }
                     },
@@ -246,7 +271,7 @@ fun DragReorderGrid(
                                 containerTopLeft = containerInRoot,
                                 containerWidth = containerWidth,
                                 containerHeight = containerHeight,
-                                bounds = slotBounds,
+                                bounds = currentSlotBounds(),
                             )
                             val list = dragItems
                             if (hit != null && list != null) {
@@ -304,7 +329,7 @@ fun DragReorderGrid(
             modifier = Modifier
                 .fillMaxSize()
                 .testTag(TAG_GRID_CONTAINER),
-            contentPadding = PaddingValues(8.dp),
+            contentPadding = GridContentPadding,
             // 拖动期间交出滚动权(见上方 KDoc):否则 LazyGrid 作为后代先拿到事件,
             // 会把拖拽抢成 cancel。程序化 scrollBy 不受此开关影响。
             userScrollEnabled = draggingId == null,
@@ -312,7 +337,7 @@ fun DragReorderGrid(
             // 头部区块(排序规则编辑器)。
             //
             // ⚠️ 它必须是**独立 item**,绝不能并进下面的 itemsIndexed —— 页面用
-            // `onClick(index)` / `slotBounds[index]` 传的是**逻辑索引**,多一个前导项
+            // `onClick(index)` / 命中几何的索引传的是**逻辑索引**,多一个前导项
             // 会让所有格子的索引与拖拽落点整体错位。
             // `span = maxLineSpan` 让它横跨整行(否则只占第 1 列)。
             if (header != null) {
@@ -320,19 +345,41 @@ fun DragReorderGrid(
             }
             // 渲染源 = 拖动中的本地顺序(实时让位),否则入参顺序。
             val displayItems = dragItems ?: items
+            // ⚠️ 过渡动画**只在拖动期间挂载**,这不是省事,而是必要:
+            // 拖动中项目集合恒定(只有顺序变),故不会有项进出视线;而在**非拖动**的重排里
+            // (如"改排序规则 ⇒ 整表倒序")`animateItem` 会把正在移出视线的项**留在组合树里
+            // 并量成 0 尺寸**,语义树里凭空多出一批 `top=bottom=0` 的卡片节点 ⇒ 任何取
+            // `min()` / 最小 top 当判据的既有断言(滚动锚定、编辑器滚出视口)都会被误拉低。
+            // 实测:常挂 `animateItem` 即便把三档 spec 全设成 `snap` 也让 2 条**不涉及拖拽**的
+            // 既有测试变红;本文件与 [DragReorderList] 的拖动期功能测试则不受影响。
+            val reflowAnimating = draggingId != null
             itemsIndexed(displayItems, key = { _, it -> it.id }) { index, item ->
-                // 让 slotBounds 只保留**当前已组合**的格:滚出视口的格被 Lazy 销毁后,
-                // 它的旧根坐标会与滚上来的新格几乎重合,拖拽起点会命中错误的格。
-                val latestIndex by rememberUpdatedState(index)
-                DisposableEffect(item.id) {
-                    onDispose { slotBounds.remove(latestIndex) }
-                }
                 Box(
                     modifier = Modifier
-                        .padding(4.dp)
-                        .onGloballyPositioned { coords ->
-                            slotBounds[index] = coords.boundsInRoot()
-                        },
+                        // 实时让位的**过渡**:让位靠逐帧改本地展示顺序实现,没有它邻居是在
+                        // 一帧内瞬移的 —— 用户 2026-10-15 反馈的"缺少动效"正指此处。
+                        // 规格与选型理由见 [DragReorderPlacementSpec]。前提是 **key 稳定**。
+                        // 淡入淡出**不设**:拖动中每次贴边自动滚动都会带入新项,给它们淡入会
+                        // 让"让位"这件事被淡入噪声盖住;置 null 也顺带避免上面那种 0 尺寸残留节点。
+                        //
+                        // ⚠️ `animateItem` **必须挂在 item 根节点**(就是这里):实测把它挪到
+                        // 内层嵌套 Box 会让动画**静默失效**(不报错、就是不动)。正因如此,
+                        // 命中几何**不能**再从这个节点读 —— 该节点的 `onGloballyPositioned`
+                        // 读到的是图层**飞行中**的矩形(实测被重排的项用 14 帧才爬到位),
+                        // 用它做命中判定会让指针停在卡片边缘时反复换位 = 用户反馈的"抽搐"。
+                        // 现改由 [layoutSlotBounds] 从 `gridState.layoutInfo` 现算逻辑几何。
+                        .then(
+                            if (reflowAnimating) {
+                                Modifier.animateItem(
+                                    fadeInSpec = null,
+                                    placementSpec = DragReorderPlacementSpec,
+                                    fadeOutSpec = null,
+                                )
+                            } else {
+                                Modifier
+                            },
+                        )
+                        .padding(4.dp),
                 ) {
                     DraggableThumbCard(
                         item = item,
@@ -378,6 +425,73 @@ fun DragReorderGrid(
         )
     }
 }
+
+/** 由 Lazy 布局信息换算出**逻辑索引 → 格子矩形**的映射(命中判定的几何来源)。
+ *
+ * ## 为什么不能用 item 节点的 `onGloballyPositioned`
+ *
+ * 这是本文件最容易踩的坑,已用冻结时钟逐帧探针实测(2026-10-15):
+ *
+ * | 几何来源 | `animateItem` 动画**进行中**读到的是 |
+ * | --- | --- |
+ * | item 节点的 `onGloballyPositioned { boundsInRoot() }` | **飞行中**位置(被重排的项用 14 帧才从 `(0,0)` 爬到 `(180,100)`) |
+ * | `LazyGridState.layoutInfo.visibleItemsInfo` 的 `offset`/`size` | **逻辑**位置(一帧到位) |
+ *
+ * 用户真机反馈的「拖动到其他卡片的边缘,被挤压的卡片和预计新位置的虚影抽搐」正是前者造成的:
+ * 命中判定读到的矩形在飞行途中,指针明明已落在新占位的格子内却按旧矩形算,于是反复换位、
+ * 动画反复重启,自我维持成抖动。改用 `layoutInfo` 后几何与动画解耦。
+ *
+ * ⚠️ **不能靠「把 `animateItem` 挪到内层」或「外层再包一个 Box」来回避** —— 实测前者让
+ * 动画**静默失效**(不报错、就是不动),后者读数依旧(动画图层挂在 item 根上)。
+ * 故 `animateItem` 必须留在 item 根节点,命中几何另找来源。
+ *
+ * ## 换算公式(已实测校验)
+ *
+ * `rect = containerTopLeft + contentPaddingTopLeft + info.offset`,`size = info.size`。
+ * 实测例:容器根坐标 `(0,0)`、`contentPadding = 8dp`、header(高 40px)之后第一张卡
+ * 的 `info.offset = (0, 40)` ⇒ `onGloballyPositioned` 落定读数 `Rect(8,48,180,148)`,
+ * 与算式逐位吻合。
+ *
+ * ⚠️ 本函数收 [SlotInfo] 而**不是** `LazyGridItemInfo` —— 网格与列表的 Lazy 信息接口
+ * 是两个互不相关的类型,故各自先映射成这个中立值类型再共用同一份换算逻辑(见
+ * `gridSlotInfos` / `listSlotInfos`),避免"两份换算各写一遍"日后漂移。
+ *
+ * @param visible 可见项信息(含前导 header 项)。
+ * @param containerTopLeft 容器的根坐标左上角(容器自身的 `onGloballyPositioned`)。
+ * @param padLeft / @param padTop `contentPadding` 换算成 px 后的左/上内边距。
+ * @param headerOffset 前导项个数(有 header 时为 1),用于把 **lazy 下标**换成**逻辑下标**。
+ */
+internal fun layoutSlotBounds(
+    visible: List<SlotInfo>,
+    containerTopLeft: Offset,
+    padLeft: Float,
+    padTop: Float,
+    headerOffset: Int,
+): Map<Int, Rect> {
+    if (visible.isEmpty()) return emptyMap()
+    val out = LinkedHashMap<Int, Rect>(visible.size)
+    for (info in visible) {
+        // 前导项(header)不参与命中判定,且会把逻辑下标整体错位,必须跳过并减去。
+        if (info.index < headerOffset) continue
+        val left = containerTopLeft.x + padLeft + info.offset.x
+        val top = containerTopLeft.y + padTop + info.offset.y
+        out[info.index - headerOffset] = Rect(
+            left = left,
+            top = top,
+            right = left + info.size.width,
+            bottom = top + info.size.height,
+        )
+    }
+    return out
+}
+
+/** 网格可见项的**中立几何**形式(见 [layoutSlotBounds] 为何不直接收 `LazyGridItemInfo`)。 */
+internal data class SlotInfo(val index: Int, val offset: Offset, val size: Size)
+
+/** 把 `LazyVerticalGrid` 的可见项映射成 [SlotInfo]。 */
+internal fun gridSlotInfos(visible: List<LazyGridItemInfo>): List<SlotInfo> =
+    visible.map { SlotInfo(it.index, Offset(it.offset.x.toFloat(), it.offset.y.toFloat()), Size(it.size.width.toFloat(), it.size.height.toFloat())) }
+
 
 /** 在已知各格 bounds 中找出包含该点的下标;找不到则取**最近格中心**(容错)。
  *

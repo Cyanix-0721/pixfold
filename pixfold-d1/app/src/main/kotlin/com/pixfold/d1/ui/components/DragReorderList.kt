@@ -6,12 +6,11 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListItemInfo
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -30,12 +29,19 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.boundsInRoot
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
 import com.pixfold.d1.domain.model.SourceItem
 
 /** 列表容器的 tag;与工作流 A 页面的 TAG_LIST 取同一值,便于测试定位。 */
 const val TAG_LIST_CONTAINER = "view-list"
+
+/**
+ * 列表的 `contentPadding`。**必须只有这一处** —— 它同时喂给 [LazyColumn] 与命中几何换算
+ * [layoutSlotBounds],两处若各写一遍就会漂移,直接后果是"指针明明在行里却命不中"。
+ */
+private val ListContentPadding = PaddingValues(vertical = 4.dp)
 
 /**
  * 可拖拽排序的缩略图列表(验收清单第 4 项)。
@@ -88,7 +94,9 @@ fun DragReorderList(
         handledSignal[0] = scrollToTopSignal
         if (scrollToTopSignal > 0) listState.requestScrollToItem(0)
     }
-    val slotBounds = remember { mutableStateMapOf<Int, Rect>() }
+    // 命中判定用的行几何**每次由 layoutInfo 现算**(见 [layoutSlotBounds] 与
+    // [DragReorderGrid] 同类缺陷记录):item 节点读到的几何会被 `animateItem`
+    // 的飞行中位移污染,导致边缘抽搐(用户 2026-10-15 真机反馈)。
     // 拖动中按 **id** 记住"手里是哪一项"(实时重排会不断改下标,记下标易失同步),
     // 以及拖动期间的**本地展示顺序**(null = 未拖动)。分工与 [DragReorderGrid] 一致:
     // **界面实时变,数据只在松手时提交一次**。
@@ -103,8 +111,24 @@ fun DragReorderList(
     // 容器宽度:与高度一起判断"指针是否已拖出容器"(理由见 [DragReorderGrid])。
     var containerWidth by remember { mutableFloatStateOf(0f) }
     var edgeBurst by remember { mutableIntStateOf(0) }
-    // 浮层尺寸在起拖瞬间定格:源行滚出视口后被销毁,再取 slotBounds 会拿到过期值。
+    // 浮层尺寸在起拖瞬间定格:源行滚出视口后被销毁,再取 layoutInfo 会拿到空值。
     var dragSize by remember { mutableStateOf(Size.Zero) }
+
+    // 命中几何的换算参数与取值函数（放在状态声明**之后**：Kotlin 局部函数只能引用
+    // 在它之前声明的局部变量）。列表行的 `size` 是**整数高度**、没有宽度,
+    // 故宽度一律取容器宽(行总是占满整行)。
+    val listDensity = LocalDensity.current
+    val listLayoutDirection = LocalLayoutDirection.current
+    val listPadLeftPx = with(listDensity) { ListContentPadding.calculateLeftPadding(listLayoutDirection).toPx() }
+    val listPadTopPx = with(listDensity) { ListContentPadding.calculateTopPadding().toPx() }
+    val listHeaderOffset = if (header != null) 1 else 0
+    fun currentSlotBounds(): Map<Int, Rect> = layoutSlotBounds(
+        visible = listSlotInfos(listState.layoutInfo.visibleItemsInfo, containerWidth),
+        containerTopLeft = containerInRoot,
+        padLeft = listPadLeftPx,
+        padTop = listPadTopPx,
+        headerOffset = listHeaderOffset,
+    )
 
     Box(
         modifier = modifier
@@ -118,13 +142,14 @@ fun DragReorderList(
                     onDragStart = { local ->
                         // 起点按**包含**判定:长按空白处不该起拖。
                         val root = containerInRoot + local
-                        val index = findContainedSlotAt(root, slotBounds)
+                        val bounds = currentSlotBounds()
+                        val index = findContainedSlotAt(root, bounds)
                         if (index != null && index < currentItems.size) {
                                 dragStartIndex = index
                             dragItems = currentItems
                             draggingId = currentItems[index].id
                             pointerInRoot = root
-                            dragSize = slotBounds[index]?.size ?: Size.Zero
+                            dragSize = bounds[index]?.size ?: Size.Zero
                             edgeBurst = 0
                         }
                     },
@@ -140,7 +165,7 @@ fun DragReorderList(
                                 containerTopLeft = containerInRoot,
                                 containerWidth = containerWidth,
                                 containerHeight = containerHeight,
-                                bounds = slotBounds,
+                                bounds = currentSlotBounds(),
                             )
                             val list = dragItems
                             if (hit != null && list != null) {
@@ -193,29 +218,40 @@ fun DragReorderList(
             modifier = Modifier
                 .fillMaxSize()
                 .testTag(TAG_LIST_CONTAINER),
-            contentPadding = PaddingValues(vertical = 4.dp),
+            contentPadding = ListContentPadding,
             // 拖动期间交出滚动权(见 [DragReorderGrid] KDoc):否则 LazyColumn
             // 作为后代先拿到事件,会把拖拽抢成 cancel。
             userScrollEnabled = draggingId == null,
         ) {
             // 头部区块(排序规则编辑器)。理由与 [DragReorderGrid] 完全一致:
-            // 独立 item、不参与 itemsIndexed,保证 `onClick(index)` / `slotBounds[index]`
+            // 独立 item、不参与 itemsIndexed,保证 `onClick(index)` / 命中几何的索引
             // 的**逻辑索引**不被前导项污染。
             if (header != null) {
                 item(key = DRAG_HEADER_ITEM_KEY) { header() }
             }
             // 渲染源 = 拖动中的本地顺序(实时让位),否则入参顺序。
             val displayItems = dragItems ?: items
+            // ⚠️ 过渡动画**只在拖动期间挂载**,与 [DragReorderGrid] 同因同法:
+            // 拖动中项目集合恒定(只有顺序变);非拖动重排时 `animateItem` 会把移出视线的项
+            // 留在组合树里并量成 0 尺寸,污染取 `min()` / 最小 top 的既有几何断言。
+            val reflowAnimating = draggingId != null
             itemsIndexed(displayItems, key = { _, it -> it.id }) { index, item ->
-                // 滚出视口的行被销毁时清掉它的过期坐标,免得拖拽起点命中错误的行。
-                val latestIndex by rememberUpdatedState(index)
-                DisposableEffect(item.id) {
-                    onDispose { slotBounds.remove(latestIndex) }
-                }
                 Box(
-                    modifier = Modifier.onGloballyPositioned { coords ->
-                        slotBounds[index] = coords.boundsInRoot()
-                    },
+                    modifier = Modifier
+                        // 实时让位的**过渡**,与 [DragReorderGrid] 同源同规格:
+                        // 规格与选型理由见 [DragReorderPlacementSpec]。
+                        // 前提是 **key 稳定**;淡入淡出置 null 的理由同 Grid。
+                        .then(
+                            if (reflowAnimating) {
+                                Modifier.animateItem(
+                                    fadeInSpec = null,
+                                    placementSpec = DragReorderPlacementSpec,
+                                    fadeOutSpec = null,
+                                )
+                            } else {
+                                Modifier
+                            },
+                        )
                 ) {
                     ThumbRow(
                         item = item,
@@ -258,3 +294,15 @@ fun DragReorderList(
         )
     }
 }
+
+/** 把 `LazyColumn` 的可见项映射成 [SlotInfo](换算逻辑与网格共用,见 [layoutSlotBounds])。 */
+internal fun listSlotInfos(visible: List<LazyListItemInfo>, containerWidth: Float): List<SlotInfo> =
+    visible.map {
+        SlotInfo(
+            index = it.index,
+            offset = Offset(0f, it.offset.toFloat()),
+            // ⚠️ `LazyListItemInfo.size` 是 Int(**行高**),不是 IntSize —— 列表行没有独立宽度,
+            // 一律取容器宽度(行总是占满整行)。
+            size = Size(containerWidth, it.size.toFloat()),
+        )
+    }

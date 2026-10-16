@@ -229,7 +229,6 @@ class EdgeAutoScrollTest {
         }
         rule.waitForIdle()
 
-        println("PROBE-GRID visibleMax=$visibleMax moved=$moved")
         assertTrue(moved.isNotEmpty(), "拖到下边缘后松手应上报移动(空说明手势被滚动打断)")
         assertTrue(
             moved.first().second > visibleMax,
@@ -262,7 +261,6 @@ class EdgeAutoScrollTest {
         }
         rule.waitForIdle()
 
-        println("PROBE-OUTSIDE-GRID moved=$moved")
         assertTrue(moved.isNotEmpty(), "推到容器外后仍应上报移动")
         assertTrue(
             moved.first().second >= outsideMinTarget,
@@ -309,7 +307,6 @@ class EdgeAutoScrollTest {
             "贴回上边缘后第 1 张图必须重新可见(视口回到顶部)",
         )
         // ② 落点按滚动后的布局解析(第 2 排),而不是停在远端的旧坐标
-        println("PROBE-GRID-UP moved=$moved")
         assertEquals(1, moved.size, "松手应上报一次移动,实际 $moved")
         assertTrue(
             moved.first().second in 3..5,
@@ -339,7 +336,6 @@ class EdgeAutoScrollTest {
         }
         rule.waitForIdle()
 
-        println("PROBE-LIST visibleMax=$visibleMax moved=$moved")
         assertTrue(moved.isNotEmpty(), "列表拖到下边缘后松手应上报移动")
         assertTrue(
             moved.first().second > visibleMax,
@@ -389,7 +385,6 @@ class EdgeAutoScrollTest {
         }
         rule.waitForIdle()
 
-        println("PROBE-AFTER-SCROLL visible=$visible moved=$moved")
         assertEquals(1, moved.size, "滚下去后拖拽仍应上报一次移动,实际 $moved")
         assertEquals(
             "i${visible.first()}",
