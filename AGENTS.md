@@ -113,7 +113,7 @@
 4. **真机核对**:必须**先获用户授权**(见 7.3)。
 5. **回写文档**:`HANGOFF.md` → 同步本文件头部快照 + `README.md`(变更路由三处一致)。
 6. **展示改动集等批准**:列出文件与行数,**等用户点头**。
-7. **提交**(只提交不推送)→ **合回 `dev`** → 再补一次"提交号 + 合并结果"的文档同步提交。
+7. **提交**(只提交不推送)→ **推送前**跑密钥扫描(见 §7.2 末;**必须在提交之后** —— 该扫描读的是 git 对象,提交前跑会漏掉正要提交的内容)→ **合回 `dev`** → 再补一次"提交号 + 合并结果"的文档同步提交。
 
 ⚠️ **任务面板纪律(与上列 7 步并行贯穿全程):开工建全量清单,每步完成立即标记,不得攒批** —— 条文与理由见全局 `~/.dsh/AGENTS.md` §0(含 `todo_write` 的挂载来源、`executing-plans` 依据、以及「面板是压缩后唯一能自证进度的载体」的原因),**此处不复述以免两处漂移**。**留一条本项目实测先例**:第 18 条一轮 7 项**开工时只写了一次、全程未再更新**,直到用户指出(`User said (m16667)`:「你又忘了推进任务进度」)才一次性全勾掉;性质是**执行过失而非规约缺口**。
 
@@ -131,6 +131,18 @@ cmd.exe /c "D:\Programing\Personal\pixfold\pixfold-d1\run-gradle.bat :app:lintDe
 - **测试数只认 JUnit XML**:`pixfold-d1/app/build/test-results/testDebugUnitTest/TEST-*.xml`、`pixfold-d1/domain/build/test-results/test/TEST-*.xml`(用 Python 解析;本机无 `bc`)。
 - `app` 的 `@Test` 总数比 XML 多 1 是**正常的** —— `NegativeControlTest` 是故意失败的负向对照,默认排除,仅 `-PincludeNegativeControl` 时运行。
 - **lint 必须零告警**:`warningsAsErrors = true` + `abortOnError = true`,一条 warning 即硬失败。新增资源/权限/API 后尤其容易多出 `ObsoleteSdkInt`、`UnusedQuantity`、`ExtraTranslation`。
+
+**提交后、推送前另跑一道密钥扫描**(WSL 侧,≈8s;**不是 Gradle target,故不并入上面的命令**;放在 §7.1 第 7 步):
+
+```
+betterleaks git . --redact --log-opts="origin/dev..dev" --include=commit-messages
+```
+
+- **必须在提交之后跑**:该命令读的是 **git 对象**(`--log-opts` 走 `git log`),工作树里未提交的改动**不在扫描范围内** —— 提交前跑会恰好漏掉正要提交的内容。实证:工作树有未提交的 `AGENTS.md` 改动时,`betterleaks git` 扫描字节数不含它;要扫工作树须用 `betterleaks filesystem <path>`。
+- 只扫**未推送**部分(已推送的无法追回,扫了也没用;`origin/dev..dev` 随推送自动收敛)。当前 88 个未推送提交实测 `scanned ~1.33 MB in 8.0s`,退出码 0。
+- **判绿口径见全局 `~/.dsh/AGENTS.md` §4**:真扫描必有 `INF scanned ~NNNN bytes`(百万级)且退出码 0;见到 `scanned ~0 bytes` + `incomplete scan` 一律当**失败**,不许当绿。
+- `--redact` **不可省**(否则命中值明文落盘);回报只给 `rule_id`/路径/行号,不复述 `match.value`。
+- 为什么**不改名「五道闸门」**:`四道闸门`是项目高频固定术语(`HANGOFF.md` 16 处、`AGENTS.md` 6 处、`README.md` 8 处、`docs/notes/` 25 处),且 HANGOFF 那 16 处全是**历轮历史记录**(「P4 收口跑四道闸门」),改名等于伪造历史;四道闸门 = 一次 Gradle 调用的四个 target,密钥扫描是独立命令、语义上属 §7.1 第 7 步「提交」。
 
 ### 7.3 真机核对规约(三层自证的第三层)
 
