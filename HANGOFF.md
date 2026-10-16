@@ -3041,12 +3041,40 @@ core+extended 11,398 class ⇒ `classes.dex` **3,272 B**),故 35.7 MB 是 **debu
 **本轮验证实况**:四道闸门全绿 —— `:app:lintDebug` 零告警、`:app:testDebugUnitTest` **476**、
 `:domain:test` **483**、`:app:assembleDebug` APK **34,109,166 B**。
 **真机核对**(2026-10-15,PJX110 / Android 16,用户亲测):①–⑤ 逐项通过;⑥ 用户逐字
-「**回主页重置正常,拖拽也可以但是缺少动效不够好看**」⇒ 功能达成,**动效列为待办**(见下)。
+「**回主页重置正常,拖拽也可以但是缺少动效不够好看**」⇒ 功能达成,动效另开一轮(见下)。
 
-**⏭️ 本轮遗留(未完成)**:拖拽让位的**过渡动效**。用户 2026-10-15 明确要求补;
-候选实现 = `Modifier.animateItem(fadeInSpec, placementSpec, fadeOutSpec)`(`LazyGridItemScope`/
-`LazyItemScope` 均有;BOM 2026.09.00 钉的 `foundation:1.12.1` 已 `javap` 实证存在)。
-观感类结论按 §7.4 只能真机由用户判定。
+#### ✅ D1 收尾轮 · 第二轮(2026-10-15/16:拖拽让位动效 + 边缘抽搐修复)
+
+**依据**:用户 2026-10-15 逐字「拖拽也可以但是**缺少动效不够好看**」;动效落地后真机复测
+又逐字反馈「**动画有点慢,而且拖拽到边缘的时候会抽搐**」⇒ 分两轮修完。
+
+| # | 问题(用户原话要点) | 根因 | 落点 | 自证 |
+| --- | --- | --- | --- | --- |
+| ⑥b | 让位无过渡动效,重排瞬时生效 | — | 新建 `ui/components/DragReorderAnimation.kt`(`DragReorderPlacementSpec`)+ 网格/列表 `Modifier.animateItem(fadeInSpec = null, placementSpec = …, fadeOutSpec = null)` | `DragReorderAnimationSpecTest`(钉规格);变异 A1/A3 |
+| ⑥b-1 | 「动画有点慢」 | `StiffnessMedium`(1500) 在**连续重启**下稳态追踪滞后达 196.4px(≈2.73 格) | 改 `StiffnessHigh`(10000) | 数值模拟:t90 100.4ms → **38.9ms**;滞后 → **54.7px(≈0.76 格)** |
+| ⑥b-2 | 「拖拽到边缘的时候会抽搐」 | **命中几何被动画污染** —— `slotBounds` 由各 item 的 `onGloballyPositioned` 累积,而 `animateItem` 的位移施加在 item 自身 `graphicsLayer` 上 ⇒ 读到**飞行途中**的矩形 ⇒ 反复换位 ⇒ 动画反复重启 ⇒ 自我维持抖动 | 抽出纯函数 `layoutSlotBounds(visible, containerTopLeft, padLeft, padTop, headerOffset)`,每次从 `gridState.layoutInfo.visibleItemsInfo` 现算逻辑几何 | `LayoutSlotBoundsTest`(5 例)+ 变异 M1–M6;真机录屏抖动量化 |
+
+**⑥b-2 的两条实现约束(踩过)**:
+- **不能靠「把 `animateItem` 挪到内层」或「外层再包一个 Box」回避**:实测前者让动画**静默失效**
+  (不报错、就是不动),后者读数依旧(动画图层挂在 item 根上)⇒ `animateItem` 必须留在 item 根节点,
+  命中几何另找来源。
+- **`visibilityThreshold` 必须显式传**:不传时 `spring()` 走 `DefaultSpringAnimations` 分支用
+  `DefaultDisplacementThreshold = 0.01f`,比库默认的 `IntOffset.VisibilityThreshold = (1,1)`
+  精细 **100 倍**,动画尾巴明显更长(贴边自动滚动每带入一行新项都从视口边界"飞"进来,尾巴叠加 = 残影感)。
+
+**⑥b-2 的教训(值得记住)**:凡"读界面几何做命中判定"的地方,都要问一句
+**「这个读数会不会被动画污染」** —— `onGloballyPositioned` 给的是**含动画中间态**的渲染位置,
+而 `layoutInfo` 给的是**布局逻辑位置**。二者在无动画时等价,一挂动画就分道扬镳。
+
+**本轮验证实况(第二轮)**:四道闸门全绿 —— `:app:lintDebug` 零告警、`:app:testDebugUnitTest` **482**
+(较首轮 +6:`LayoutSlotBoundsTest` 5 + `DragReorderAnimationSpecTest` 1)、`:domain:test` **483**、
+`:app:assembleDebug` APK **34,109,166 B**。
+**真机核对已通过(2026-10-16,用户亲测)**:用户逐字「**效果可以**」。
+抖动量化读数 = 14.15s 录屏抽 424 帧,方向反转仅 **6 次**且全部落在拖拽**起止**时刻(非拖动中段),
+**无自我维持抖动**;拖拽往返后卡片顺序正确回到原状(首行仍 `001/002/003/004`)。
+
+> **⏭️ 该轮已无遗留**:原「拖拽让位过渡动效」待办**已关闭**。观感类结论按 §7.4 只能真机由用户判定,
+> 用户 2026-10-16 已判定通过。
 
 ### D2：平台能力验证
 
@@ -3212,10 +3240,40 @@ core+extended 11,398 class ⇒ `classes.dex` **3,272 B**),故 35.7 MB 是 **debu
     - **自证**:变异 M10–M17(8 组;M15"浮层尺寸改实时取"存活,已按 §7.4 改掉该断言口径并写明);
       四道闸门绿(app 476 / domain 483 / lint 零告警)。**真机核对已通过(2026-10-15,用户亲测)**:
       用户逐字「回主页重置正常,**拖拽也可以但是缺少动效不够好看**」⇒ 功能达成,动效另开(见下)。
-    - **⏭️ 未完成:让位动效**。用户 2026-10-15 明确要求补动效(现为重排瞬时生效,无过渡)。
-      已确认 `androidx.compose.foundation:foundation:1.12.1`(BOM 2026.09.00 钉的版本)的
-      `LazyGridItemScope`/`LazyItemScope` **有 `Modifier.animateItem(fadeInSpec, placementSpec, fadeOutSpec)`**
-      (`javap` 实证),是候选实现路径;观感类结论按 §7.4 只能真机由用户判定。
+    - **✅ 让位动效已落地(2026-10-15/16)**。用户 2026-10-15 要求补动效(原为重排瞬时生效、无过渡),
+      真机复测后又反馈「动画有点慢,而且拖拽到边缘的时候会抽搐」⇒ 分两轮修完,详见下条。
+    - **动效实现**:`ui/components/DragReorderAnimation.kt` 的 `DragReorderPlacementSpec` ——
+      `spring(dampingRatio = DampingRatioNoBouncy, stiffness = StiffnessHigh, visibilityThreshold = IntOffset.VisibilityThreshold)`,
+      经 `Modifier.animateItem(fadeInSpec = null, placementSpec = …, fadeOutSpec = null)` 挂载。
+      三个参数各有实测依据:① **spring 而非 tween** —— 位移动画会被连续重启(指针每跨一格一次),
+      spring 从当前速度继续、tween 每次从 0 速度起步,且 foundation 的 `InterruptionSpec`
+      **只对非 `SpringSpec` 生效**(传 tween 会被顶换成 `spring(1.0/400)`,比 Medium 还慢);
+      ② **`StiffnessHigh`(10000) 而非 Medium(1500)** —— 用户「有点慢」的量化依据:72px 一格
+      时 t90 从 100.4ms 降到 38.9ms,连续重启下的稳态追踪滞后从 **196.4px(≈2.73 格)** 降到
+      **54.7px(≈0.76 格)**;③ **必须显式传 `visibilityThreshold`** —— 不传时走
+      `DefaultSpringAnimations` 分支用 `DefaultDisplacementThreshold = 0.01f`,比库默认的
+      `IntOffset.VisibilityThreshold = (1,1)` 精细 100 倍,动画尾巴明显更长。
+      `fadeInSpec`/`fadeOutSpec` 传 `null` 且**只在拖动期间挂载**:只要任一 spec 非 null,
+      项进出视线时就会被留在组合树并量成 0 尺寸,污染取 `min()` 的既有几何断言
+      (实测常挂即便三档全 `snap` 也会让 2 条不涉及拖拽的既有测试变红)。
+    - **「边缘抽搐」的根因与修法(本轮最有价值的一条)**:命中判定的格几何原先由各 item 的
+      `onGloballyPositioned` **累积**(`slotBounds: Map<Int, Rect>`),而 `animateItem` 的位移动画
+      施加在 item 自身的 `graphicsLayer` 上 —— **`onGloballyPositioned` 读到的是飞行途中的矩形**。
+      于是「指针已落在新占位的格内,却按旧矩形算」⇒ 反复换位 ⇒ 动画反复重启 ⇒ **自我维持的抖动**。
+      修法 = 抽出纯函数 `layoutSlotBounds(visible, containerTopLeft, padLeft, padTop, headerOffset)`,
+      **每次由 `gridState.layoutInfo.visibleItemsInfo` 现算逻辑几何**,与动画解耦
+      (公式 `rect = containerTopLeft + contentPaddingTopLeft + info.offset`,size 取 `info.size`;
+      前导 header 项按 `headerOffset` 跳过并减去,否则逻辑下标整体错位)。
+      ⚠️ **不能靠「把 `animateItem` 挪到内层」或「外层再包一个 Box」回避** —— 实测前者让动画
+      **静默失效**(不报错、就是不动),后者读数依旧(动画图层挂在 item 根上)。
+      ⇒ **教训**:凡"读界面几何做命中判定"的地方,都要问一句「这个读数会不会被动画污染」。
+    - **自证**:`LayoutSlotBoundsTest`(5 例,含容器左上角 + padding 计入、header 偏移、空列表)
+      + `DragReorderAnimationSpecTest`(钉规格,并如实记录三条**无杀伤力**的观测路径:读语义树几何 ❌
+      —— `animateItem` 施加在自身图层上、`boundsInRoot` 不计入节点自身变换;逐帧比像素 ❌ ——
+      主要反映跟手浮层噪声,`snap` 与 `spring` 读数一模一样;断言"两帧有变化" ❌ 更弱)
+      + 变异 M1–M6。**真机核对已通过(2026-10-16,用户亲测)**:用户逐字「**效果可以**」,
+      抖动量化读数 = 14.15s 录屏 424 帧里方向反转仅 6 次,且全部落在拖拽起止时刻(非拖动中段),
+      **无自我维持抖动**。
 
     **历史(2026-09-25 的旧裁决,已被上方推翻,保留备查)**:**维持"松手落地"**,并**另补「跟手浮层」**。
     用户当时的裁决(逐字选项):「维持松手落地，另补「跟手浮层」」。
@@ -3551,7 +3609,11 @@ mise ls                  # 看 mise 管的工具版本
      拖动中只重排本地展示顺序(`dragItems`),`onMoveTo` 一次都不调,松手时按最终索引提交一次;
      抖动由**格矩形包含判定**消除(重排后被拖项已占住指针所在格 ⇒ 目标 == 自身 ⇒ 立即稳定),
      缝隙处判 `null` 不兜底、容器外才退化为最近格。详见 §11 第 9 条「当前有效裁决」与 §9 P3 收口记录。
-     动效(过渡)仍缺,用户 2026-10-15 已要求补,候选 `Modifier.animateItem()`(foundation 1.12.1 有,`javap` 实证)。
+     **✅ 动效(过渡)已于 2026-10-15/16 补齐**:`Modifier.animateItem()`(foundation 1.12.1 有,`javap` 实证)
+     + `spring(DampingRatioNoBouncy, StiffnessHigh, visibilityThreshold = IntOffset.VisibilityThreshold)`,
+     只在拖动期间挂载。另修掉一个由此暴露的真缺陷:**命中几何原先由 `onGloballyPositioned` 累积,
+     会被 `animateItem` 的飞行中位移污染** ⇒ 边缘反复换位 = 自我维持抖动;改为
+     `layoutSlotBounds(...)` 每次从 `gridState.layoutInfo` 现算。详见 §11 第 9 条。
   3. **统一重排入口**:`PageOrder.moveItemTo(id, targetIndex)` 是唯一重排入口,UI 不各自改顺序。
   > 原 Flutter 侧的具体坑(`StackFit.expand` 遇无界高度压成 0、`Draggable`/`LongPressDraggable` 分支)随换栈作废,不在此保留。
 - **调试产物不得写入用户存储**(2026-09-17 用户指出,操作纪律):`uiautomator dump` 默认写
