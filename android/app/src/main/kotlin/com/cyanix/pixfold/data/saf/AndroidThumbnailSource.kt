@@ -3,11 +3,11 @@ package com.cyanix.pixfold.data.saf
 import android.content.ContentResolver
 import android.content.Context
 import android.graphics.Bitmap
-import androidx.core.net.toUri
 import android.util.Log
 import android.util.Size
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
+import androidx.core.net.toUri
 import com.cyanix.pixfold.ui.workspace.ThumbnailSource
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -40,6 +40,13 @@ import kotlinx.coroutines.withContext
  *
  * [thumbnail] 是 `suspend` 且内部切到 [Dispatchers.IO] —— binder 调用会阻塞，
  * 不能留在组合线程上。`ImageBitmap` 构造本身是轻量的（`asImageBitmap` 只做包装）。
+ *
+ * ## 职责边界：本类**只管读**
+ *
+ * 缓存与并发闸门**不在这里**，在 [CachingThumbnailSource] 装饰器里。
+ * 这样分开的理由是**可测性**：缓存账目（LRU 淘汰顺序、字节预算、命中不重读）
+ * 全是纯逻辑，不该为了测它去 mock `ContentResolver.loadThumbnail`；
+ * 反过来本类只有「调一次 binder、失败返回 null」这一件事，没有可单测的逻辑。
  */
 class AndroidThumbnailSource(context: Context) : ThumbnailSource {
 

@@ -32,6 +32,7 @@ import com.cyanix.pixfold.domain.workflowa.workflowAStateOf
 import com.cyanix.pixfold.data.SharedPrefsSettingsStore
 import com.cyanix.pixfold.data.saf.AndroidSafSource
 import com.cyanix.pixfold.data.saf.AndroidThumbnailSource
+import com.cyanix.pixfold.ui.workspace.CachingThumbnailSource
 import com.cyanix.pixfold.domain.settings.AppLanguage
 import com.cyanix.pixfold.domain.settings.PixFoldSettings
 import com.cyanix.pixfold.domain.settings.SettingsStore
@@ -94,7 +95,10 @@ fun PixFoldApp(store: SettingsStore? = null) {
     //   WorkspaceController —— 协程编排 + UI 状态机（扫描在 Dispatchers.IO）
     //   本函数              —— 把结果接到工作流 A 的数据源上
     val workspaceSource = remember { AndroidSafSource(context) }
-    val thumbnailSource = remember { AndroidThumbnailSource(context) }
+    // 平台实现只管读；缓存与并发闸门在装饰器里（详见 CachingThumbnailSource 的 KDoc）。
+    val thumbnailSource = remember {
+        CachingThumbnailSource(AndroidThumbnailSource(context))
+    }
     val workspaceScope = rememberCoroutineScope()
     val workspaceController = remember(workspaceSource, workspaceScope) {
         WorkspaceController(
@@ -109,6 +113,8 @@ fun PixFoldApp(store: SettingsStore? = null) {
     // 目录内容随时会变，显示过期列表比重新扫一遍更糟。
     LaunchedEffect(Unit) { workspaceController.restore() }
     val workspaceState = workspaceController.state
+    // 工作区切换后旧 uri 全部不可读，缓存留着只会占内存并让新图被提前淘汰。
+    LaunchedEffect(workspaceState) { thumbnailSource.clearCache() }
 
     // 选目录：ACTION_OPEN_DOCUMENT_TREE 是**唯一**能拿到可持久化 tree URI 的通道
     // （HANGOFF §4：没有「以 SAF 树形式授权目录」的标准分享通道）。
