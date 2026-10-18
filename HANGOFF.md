@@ -3351,6 +3351,21 @@ core+extended 11,398 class ⇒ `classes.dex` **3,272 B**),故 35.7 MB 是 **debu
 >
 > 闸门:domain **616**(+8)/ app 554 / lint 零告警 / APK 34,421,078 B。变异 **M1–M3 全 KILLED**(M1 删掉拒绝分支 / M2 预检传空计划 / M3 拒绝时也跑执行)。
 
+> **✅ 2026-10-19 凌晨(再续):D4b 的端到端集成测试已落地(领域层)**
+>
+> `domain/src/test/.../pack/PackEndToEndTest.kt`(18 tests)。这一层与 `PackRunnerTest` / `PackPreflightTest` / `PackGateTest` 的分工:**那三个用的都是手造的、形状被裁剪过的对象**(2 页的卷、1000 字节的页),断言点单一、好定位;而真实链路的风险恰恰在**数据形状**上 —— `MockDataB` 的卷是 12–20 页、每页 800KB–3.8MB(预检会算出 MB 级估算)、有一卷 `outputExists = true`(默认 Rename 策略会改名,这个名字最终决定 ZIP 内容归属)、`cbzFileName` 是「标题 + 第NN卷」拼接且含中文与空格。
+>
+> 断言口径:不断「ZIP 里有什么内容」(那由 `CbzWriter`/`CbzWritePlan` 的测试负责),只断**链路产物** —— 卷数对得上 / 每卷写出非空字节 / ZIP 结构合法(局部文件头 `PK\x03\x04` + 中央目录结束记录 `PK\x05\x06`)/ 进度单调推进到 100% / 报告计数与计划一致 / 重命名与跳过两策略下输出名与写出集合都对。
+>
+> 三条「真实数据才暴露」的发现:
+> 1. **输出名唯一性**必须单独断言 —— 五卷里两卷都在「海贼王」系列、标题取自系列层,若 `outputDisplay` 拼错会静默互相覆盖。
+> 2. **跳过策略下被跳过的那卷不该产生输出** —— 只有拿真实库里那卷 `outputExists = true` 才验得到,手造夹具很容易漏掉这个组合。
+> 3. **中断与缺页的交互**:中断后剩余卷不再写出、已写出的保留;缺页的卷**不打开流**(否则留 0 字节 CBZ),这两条在端到端里用真实页 id 跑,比手造夹具更接近真机路径。
+>
+> ⚠️ **踩坑:`fun interface` 的匿名对象实现不可用**。把 `object : CbzOutputSink { override fun openFor(...): OutputStream? }` 写成匿名对象时,编译器持续报 `ABSTRACT_MEMBER_NOT_IMPLEMENTED`(即使方法签名逐字正确、`--rerun-tasks` 也照报),改用 **SAM 转换** `CbzOutputSink { plan -> ... }` 后立即通过。**教训:只有一个抽象方法的 `fun interface`,匿名对象语法在某些 Kotlin 版本上会踩这个坑,优先用 SAM lambda。**
+>
+> 闸门:domain **634**(+18)/ app 554 / lint 零告警 / APK 34,421,078 B。变异 **M1–M8 全 KILLED**(M1/M8 缺页先开流 / M2 跳过卷也开流 / M3 中断检查恒 false / M4 写盘失败不清理 / M5 `isComplete` 恒真 / M6 闸门拒绝时也执行 / M7 闸门把 Marginal 当阻断)。⚠️ 变异首轮 M2/M3/M4 **ANCHOR-MISS**,因为我凭记忆写了锚点 —— 按项目纪律锚点必须是**代码里真实存在的串**,读原文后重跑全部 KILLED。
+
 优先交付（**GUI 仅 Android**，2026-09-10 变更）：
 
 - Android：单目录/单系列，图片预览与人工排序，逐卷元数据，CBZ 生成；
