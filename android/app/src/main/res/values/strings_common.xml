@@ -83,6 +83,8 @@
     <string name="workspace_change_cd">Change workspace folder</string>
     <string name="workspace_loading">Scanning folder…</string>
     <string name="workspace_denied">Access to %1$s was revoked. Pick the folder again.</string>
+    <!-- 自动重试过仍失败：与「一次没试就放弃」是两种信号，措辞要如实。 -->
+    <string name="workspace_denied_retried">Still no access to %1$s after retrying. Pick the folder again.</string>
     <string name="workspace_denied_generic">Access was revoked. Pick the folder again.</string>
     <string name="workspace_failed">Could not read that folder. Pick it again or choose another one.</string>
     <string name="workspace_empty">This folder has no images</string>

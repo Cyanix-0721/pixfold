@@ -92,10 +92,14 @@ fun WorkspaceBar(
             actionLabel = stringResource(R.string.workspace_pick)
             actionCd = stringResource(R.string.workspace_pick_cd)
             // 带上目录名：「哪个目录失效了」对用户是有用信息，否则不知道该重选哪个。
-            statusText = state.handle
-                ?.takeIf { it.displayName.isNotEmpty() }
-                ?.let { stringResource(R.string.workspace_denied, it.displayName) }
-                ?: stringResource(R.string.workspace_denied_generic)
+            // 重试过仍失败时换一种措辞 —— 「一次没试就放弃」与「尽力了」是两种信号，
+            // 如实告知能避免用户以为应用轻易放弃了（见 D2b 退出条件 ③）。
+            val name = state.handle?.takeIf { it.displayName.isNotEmpty() }?.displayName
+            statusText = when {
+                name == null -> stringResource(R.string.workspace_denied_generic)
+                state.autoRetried > 0 -> stringResource(R.string.workspace_denied_retried, name)
+                else -> stringResource(R.string.workspace_denied, name)
+            }
             statusCd = null
         }
         is WorkspaceState.Failed -> {

@@ -3,8 +3,11 @@ package com.cyanix.pixfold.ui.workspace
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import com.cyanix.pixfold.domain.source.FailureCause
+import com.cyanix.pixfold.domain.source.LoadResult
 import com.cyanix.pixfold.domain.source.WorkspaceHandle
 import com.cyanix.pixfold.domain.source.WorkspaceSource
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -36,11 +39,15 @@ import kotlinx.coroutines.withContext
  *
  * @param nameResolver 由 tree URI 解析出目录显示名（平台层做，需 `query`）。
  *   抽成参数是为了让本类**不碰 Android 类型**，可以在纯 JVM 里测。
+ * @param ioDispatcher 阻塞 IO 的调度器。抽成参数同样是为了可测：测试传
+ *   `UnconfinedTestDispatcher`，否则 `WithContext(Dispatchers.IO)` 会把执行甩到真实线程池，
+ *   `runTest` 的虚拟时间控制不到它，测试只能靠 sleep 等 —— 那是最脆的一类测试。
  */
 class WorkspaceController(
     private val source: WorkspaceSource,
     private val scope: CoroutineScope,
     private val nameResolver: (treeUri: String) -> String = { "" },
+    private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
 ) {
 
     /** 当前状态。界面直接读它（`by` 委托，读在组合期会自动订阅）。 */
@@ -93,8 +100,27 @@ class WorkspaceController(
         job = scope.launch {
             // 阻塞遍历必须离开主线程：851 张图实测约 1 秒，千级更久，
             // 留在主线程就是肉眼可见的掉帧甚至 ANR。
-            val result = withContext(Dispatchers.IO) { source.loadCollections(handle) }
-            state = result.toWorkspaceState(handle)
+            val first = withContext(ioDispatcher) { source.loadCollections(handle) }
+
+            // 授权失效的自动重试（D2b 退出条件 ③「授权失效恢复流程」）。
+            //
+            // **为什么必须自动重试一次而不是直接报失效**：Cold start 时
+            // takePersistableUriPermission 授予的权限可能尚未就绪，表现同样是
+            // SecurityException —— 与「用户真的撤销了授权」在平台层无法区分。
+            // 不重试的话，用户每次冷启动都会看到一次「授权已失效」，
+            // 然后点一下重选又莫名其妙地好了。
+            val cause = first.failureCause
+            if (cause == null || !shouldAutoRetry(cause, retriedTimes = 0)) {
+                state = first.toWorkspaceState(handle)
+                return@launch
+            }
+
+            val second = withContext(ioDispatcher) { source.loadCollections(handle) }
+            state = when (second) {
+                is LoadResult.Success -> second.toWorkspaceState(handle)
+                LoadResult.Denied -> WorkspaceState.Denied(handle, autoRetried = 1)
+                is LoadResult.Failed -> second.toWorkspaceState(handle)
+            }
         }
     }
 }

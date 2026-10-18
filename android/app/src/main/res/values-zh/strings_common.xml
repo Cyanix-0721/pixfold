@@ -80,6 +80,7 @@
     <string name="workspace_change_cd">更换工作区文件夹</string>
     <string name="workspace_loading">正在扫描文件夹…</string>
     <string name="workspace_denied">对 %1$s 的授权已失效,请重新选择该文件夹。</string>
+    <string name="workspace_denied_retried">重试后仍无法访问 %1$s,请重新选择该文件夹。</string>
     <string name="workspace_denied_generic">授权已失效,请重新选择文件夹。</string>
     <string name="workspace_failed">无法读取该文件夹,请重新选择或换一个。</string>
     <string name="workspace_empty">这个文件夹里没有图片</string>

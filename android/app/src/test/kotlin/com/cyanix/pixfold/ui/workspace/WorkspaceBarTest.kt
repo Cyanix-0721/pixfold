@@ -123,4 +123,27 @@ class WorkspaceBarTest {
         assertEquals(1, picks)
     }
 
+
+    @Test
+    fun `自动重试过仍失败时措辞如实告知而非假装一次成功`() {
+        // 「尽力了」与「一次没试就放弃」对用户是两种信号。
+        var picks = 0
+        setContent(
+            WorkspaceState.Denied(
+                WorkspaceHandle(treeUri = "content://tree/x", displayName = "旅行照片"),
+                autoRetried = 1,
+            ),
+            onPick = { picks++ },
+        )
+
+        // 文案必须**真的换成「重试后」那一版** —— 只断言「目录名在、按钮在」是不够的：
+        // 两版文案都含目录名、都有按钮，这种断言对缺陷毫无杀伤力（M6 变异存活实证）。
+        val expected = TestText.of(R.string.workspace_denied_retried, "旅行照片")
+        rule.onNodeWithText(expected).assertExists()
+        // 反向确认：不该同时出现「一次没试就放弃」那版。
+        rule.onNodeWithText(TestText.of(R.string.workspace_denied, "旅行照片")).assertDoesNotExist()
+        rule.onNodeWithTag(TAG_WORKSPACE_ACTION).assertExists()
+        rule.onNodeWithTag(TAG_WORKSPACE_ACTION).performClick()
+        assertEquals(1, picks)
+    }
 }

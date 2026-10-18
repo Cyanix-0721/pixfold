@@ -2,6 +2,7 @@ package com.cyanix.pixfold.ui.workspace
 
 import com.cyanix.pixfold.domain.model.ImageCollection
 import com.cyanix.pixfold.domain.model.SourceItem
+import com.cyanix.pixfold.domain.source.FailureCause
 import com.cyanix.pixfold.domain.source.LoadResult
 import com.cyanix.pixfold.domain.source.WorkspaceHandle
 import org.junit.Test
@@ -98,5 +99,68 @@ class WorkspaceStateTest {
         assertTrue(WorkspaceState.Denied(handle).canOrganize)
         assertTrue(WorkspaceState.Failed("x").canOrganize)
         assertTrue(WorkspaceState.Ready(handle, realCollections).canOrganize)
+    }
+}
+
+/**
+ * 授权失效恢复策略单测（D2b 退出条件 ③）。
+ *
+ * 这一层的价值全在**「什么时候该重试、什么时候该打扰用户」**这个判断上：
+ * 判错了两种方向都很难受 ——
+ * - 太激进：冷启动必弹一次「授权已失效」，用户以为自己的目录坏了；
+ * - 太保守：真的撤销了还一直自动重试，界面永远转圈。
+ */
+class WorkspaceRecoveryPolicyTest {
+
+    @Test
+    fun `Denied 归为临时性失效而不是确定性撤销`() {
+        // 平台层分不清「真撤销」与「冷启动尚未就绪」，故必须按临时性处理。
+        assertEquals(FailureCause.Transient, LoadResult.Denied.failureCause)
+    }
+
+    @Test
+    fun `Failed 归为 IO 失效`() {
+        assertEquals(FailureCause.Io, LoadResult.Failed("boom").failureCause)
+    }
+
+    @Test
+    fun `成功没有失效成因`() {
+        assertEquals(null, LoadResult.Success(emptyList()).failureCause)
+    }
+
+    @Test
+    fun `临时性失效第一次失败允许自动重试`() {
+        assertTrue(shouldAutoRetry(FailureCause.Transient, retriedTimes = 0))
+    }
+
+    @Test
+    fun `临时性失效重试一次后不再重试`() {
+        // 无限重试会留下永远转圈的界面。
+        assertFalse(shouldAutoRetry(FailureCause.Transient, retriedTimes = AUTO_RETRY_LIMIT))
+    }
+
+    @Test
+    fun `确定性撤销一次都不重试`() {
+        // 撤销后重试一百次也不会成功，只会让用户多等。
+        assertFalse(shouldAutoRetry(FailureCause.Revoked, retriedTimes = 0))
+    }
+
+    @Test
+    fun `IO 失效同样给一次重试机会`() {
+        assertTrue(shouldAutoRetry(FailureCause.Io, retriedTimes = 0))
+        assertFalse(shouldAutoRetry(FailureCause.Io, retriedTimes = AUTO_RETRY_LIMIT))
+    }
+
+    @Test
+    fun `失效状态携带重试次数以便文案如实告知`() {
+        // 「已重试过仍失败」与「一次没试就放弃」对用户是两种信号。
+        assertEquals(0, WorkspaceState.Denied(handle = null).autoRetried)
+        assertEquals(1, WorkspaceState.Denied(handle = null, autoRetried = 1).autoRetried)
+    }
+
+    @Test
+    fun `自动重试上限是一次`() {
+        // 这个数字是产品决策，改动须有真机依据（冷启动实测一次内恢复）。
+        assertEquals(1, AUTO_RETRY_LIMIT)
     }
 }
