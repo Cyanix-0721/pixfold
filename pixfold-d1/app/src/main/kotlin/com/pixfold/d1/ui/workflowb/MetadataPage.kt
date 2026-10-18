@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.Button
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.DropdownMenuItem
@@ -54,6 +55,7 @@ import com.pixfold.d1.domain.workflowb.selectVolume
 import com.pixfold.d1.domain.workflowb.setVolumeIncluded
 import com.pixfold.d1.domain.workflowb.updateVolume
 import com.pixfold.d1.ui.components.PageActionBar
+import com.pixfold.d1.ui.components.VolumeChipRow
 import com.pixfold.d1.ui.text.textOf
 import com.pixfold.d1.ui.text.textOfOrNull
 
@@ -89,6 +91,16 @@ const val TAG_OTHER_LANG_CODE = "metadata-other-lang-code"
 
 /** 步骤 2 切换到某卷的 chip。 */
 fun volumeChipTag(id: String) = "metadata-volume-chip-$id"
+
+/** 「全部 N 卷」入口(sheet 打开器)。 */
+const val TAG_VOLUME_ALL = "metadata-volume-all"
+
+/** 「全部 N 卷」sheet 的标题/列表容器。 */
+const val TAG_VOLUME_SHEET = "metadata-volume-sheet"
+const val TAG_VOLUME_SHEET_LIST = "metadata-volume-sheet-list"
+
+/** sheet 内的卷芯片(与页面上常驻的 [volumeChipTag] 区分,避免 tag 冲突)。 */
+fun volumeSheetChipTag(id: String) = "metadata-volume-sheet-chip-$id"
 
 /**
  * 工作流 B · 步骤 2:逐卷元数据(验收第 11、12、13 项)。
@@ -132,19 +144,33 @@ fun MetadataPage(
             .windowInsetsPadding(contentInsets)
             .testTag(TAG_METADATA_PAGE),
     ) {
+        // 2026-10-18 真机实测(P2):卷切换芯片原先作为 LazyColumn 的第一个 item,
+        // 一次全屏 swipe 后 5 个芯片全部滚出视口(dump 内 content-desc 以「卷 」开头的
+        // 节点数为 0)⇒ 换卷必须先回顶;且换卷后列表内容重建、滚动位置回到顶部,
+        // 构成「换卷 → 回顶 → 再滚回原字段」的来回。
+        // 故移出 LazyColumn 常驻于其上方 —— 结构与本步骤 3 的卷选择器一致
+        // (`PackPreviewPage.kt` 的 FlowRow 也在 LazyColumn 之外)。
+        // 附带效果:切卷时 LazyColumn 的 item key 全部不变,LazyListState 得以保留滚动位置。
+        VolumeChipRow(
+            volumes = state.volumes,
+            activeId = state.activeVolume.id,
+            onSelect = { update(selectVolume(state, it)) },
+            selectorTag = TAG_VOLUME_SELECTOR,
+            chipTag = ::volumeChipTag,
+            allEntryTag = TAG_VOLUME_ALL,
+            sheetTag = TAG_VOLUME_SHEET,
+            sheetListTag = TAG_VOLUME_SHEET_LIST,
+            sheetChipTag = ::volumeSheetChipTag,
+            chipDescription = { id -> stringResource(R.string.meta_volume_chip_cd, id) },
+            chipLabel = { v -> Text(v.title.ifEmpty { v.id }) },
+        )
+
         LazyColumn(
             modifier = Modifier
                 .fillMaxWidth()
                 .weight(1f)
                 .testTag(TAG_METADATA_LIST),
         ) {
-            item(key = "volume-selector") {
-                VolumeSelector(
-                    state = state,
-                    onSelect = { update(selectVolume(state, it)) },
-                )
-            }
-
             item(key = "volume-header") {
                 VolumeHeader(
                     volume = volume,
@@ -312,38 +338,6 @@ fun MetadataPage(
                         ) { Text(stringResource(R.string.meta_next)) }
                     }
                 },
-            )
-        }
-    }
-}
-
-/**
- * 步骤 2/3 的卷切换行:让"当前卷"在切步骤后仍可换(选中项在领域状态里)。
- *
- * 2026-09-25 真机实测缺陷:原为 `Row + horizontalScroll`。5 卷时第 4、5 卷芯片
- * (`海贼王` 两卷)完全落在视口外 —— `进击的巨人 外传` 右边界已达 1219px(屏宽 1264),
- * 只能靠横向滑动才够得着,而界面上没有任何提示说明这里能滑。
- * 与集合芯片行同源,一并改 FlowRow 自动换行(见 `SortAndPreviewPage.kt` 同处注释)。
- */
-@Composable
-private fun VolumeSelector(state: WorkflowBState, onSelect: (String) -> Unit) {
-    FlowRow(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 12.dp, vertical = 4.dp)
-            .testTag(TAG_VOLUME_SELECTOR),
-        horizontalArrangement = Arrangement.spacedBy(6.dp),
-        verticalArrangement = Arrangement.spacedBy(4.dp),
-    ) {
-        state.volumes.forEach { v ->
-            val chipCd = stringResource(R.string.meta_volume_chip_cd, v.id)
-            FilterChip(
-                selected = v.id == state.activeVolume.id,
-                onClick = { onSelect(v.id) },
-                label = { Text(v.title.ifEmpty { v.id }) },
-                modifier = Modifier
-                    .testTag(volumeChipTag(v.id))
-                    .semantics { contentDescription = chipCd },
             )
         }
     }

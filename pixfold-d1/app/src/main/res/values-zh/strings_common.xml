@@ -8,6 +8,11 @@
     <string name="common_back">返回</string>
     <string name="common_close">关闭</string>
 
+    <!-- ============ 卷切换(工作流 B 步骤 2/3 共用 VolumeChipRow) ============ -->
+    <plurals name="volume_all">
+        <item quantity="other">全部 %1$d 卷</item>
+    </plurals>
+
     <!-- ============ 首页(HomeScreen) ============ -->
     <string name="home_settings_cd">设置</string>
     <!--

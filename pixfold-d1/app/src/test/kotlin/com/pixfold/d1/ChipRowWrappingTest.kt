@@ -54,6 +54,9 @@ class ChipRowWrappingTest {
             "ui/workflowa/SortRuleEditor.kt",
             "ui/workflowb/MetadataPage.kt",
             "ui/workflowb/PackPreviewPage.kt",
+            // 2026-10-18 起卷切换芯片行抽成共享组件(步骤 2/3 共用),守卫必须跟过来,
+            // 否则"把共享组件改回横向滚动"这条路绕过守卫。
+            "ui/components/VolumeChipRow.kt",
         )
         files.forEach { rel ->
             val src = mainSource(rel)
@@ -80,8 +83,12 @@ class ChipRowWrappingTest {
         val expected = mapOf(
             "ui/workflowa/SortAndPreviewPage.kt" to 1, // 集合切换芯片
             "ui/workflowa/SortRuleEditor.kt" to 1, // 每级排序字段芯片
-            "ui/workflowb/MetadataPage.kt" to 2, // 卷切换 + 批量字段
-            "ui/workflowb/PackPreviewPage.kt" to 3, // 卷切换 + 冲突策略 + 源处置策略
+            // 2026-10-18:卷切换行已上移到共享组件,本文件只剩批量字段芯片
+            "ui/workflowb/MetadataPage.kt" to 1,
+            // 2026-10-18:同上,只剩冲突策略 + 源处置策略
+            "ui/workflowb/PackPreviewPage.kt" to 2,
+            // 卷切换芯片行(工作流 B 步骤 2/3 共用)
+            "ui/components/VolumeChipRow.kt" to 1,
         )
         expected.forEach { (rel, count) ->
             val src = mainSource(rel)

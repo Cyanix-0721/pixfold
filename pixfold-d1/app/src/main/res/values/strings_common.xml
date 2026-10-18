@@ -8,6 +8,12 @@
     <string name="common_back">Back</string>
     <string name="common_close">Close</string>
 
+    <!-- ============ 卷切换(工作流 B 步骤 2/3 共用 VolumeChipRow) ============ -->
+    <plurals name="volume_all">
+        <item quantity="one">All %1$d volume</item>
+        <item quantity="other">All %1$d volumes</item>
+    </plurals>
+
     <!-- ============ Home screen (HomeScreen) ============ -->
     <string name="home_settings_cd">Settings</string>
     <!--

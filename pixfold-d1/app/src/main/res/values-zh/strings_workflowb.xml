@@ -36,7 +36,7 @@
         <item quantity="other">已设置到 %1$d 卷（跳过 %2$d 卷逐项例外）</item>
     </plurals>
     <string name="meta_volume_chip_cd">卷 %1$s</string>
-    <string name="meta_include_cd">勾选卷 %1$s</string>
+        <string name="meta_include_cd">勾选卷 %1$s</string>
     <plurals name="meta_volume_status">
         <item quantity="other">参与打包 · %1$d 页 · 已覆盖 %2$d 个字段</item>
     </plurals>
