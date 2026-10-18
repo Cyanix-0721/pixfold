@@ -44,6 +44,29 @@ class TaskProgressTest {
     }
 
     @Test
+    fun `跳过项也推进进度但不算失败`() {
+        // 跳过 = 无需处理,不是失败。早先把两者并成一个字段,界面就会把
+        // 「跳过了 1 卷」读成「1 卷失败了」—— 纯粹误导。
+        val p = TaskProgress(total = 10, done = 5, failed = 0, skipped = 5)
+        assertEquals(100, p.percent)
+        assertTrue(p.isComplete)
+        assertEquals(0, p.failed, "跳过不能计入失败数")
+        assertEquals(5, p.skipped)
+    }
+
+    @Test
+    fun `跳过数变化必须上报`() {
+        assertTrue(
+            shouldEmitProgress(
+                last = TaskProgress(total = 1_000, done = 500),
+                next = TaskProgress(total = 1_000, done = 500, skipped = 1),
+                lastEmitAtMillis = 1_000,
+                nowMillis = 1_001,
+            ),
+        )
+    }
+
+    @Test
     fun `百分比按已处理数算而不是按成功数`() {
         val p = TaskProgress(total = 10, done = 2, failed = 3)
         assertEquals(50, p.percent)

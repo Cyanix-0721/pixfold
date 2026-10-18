@@ -17,15 +17,21 @@ package com.cyanix.pixfold.domain.task
  *
  * @param total 计划处理的总项数。`<= 0` 视为「无事可做」。
  * @param done 已成功处理的项数。
- * @param failed 已失败处理的项数（跳过也计入这里 —— 它们都是「处理过了但没成功」）。
+ * @param failed 已失败处理的项数（**真失败**：读写报错、打不开流）。
+ * @param skipped 按计划跳过、无需处理的项数（输出已存在且用户选了跳过策略等）。
+ *   **必须与 [failed] 分开**：跳过的卷不是失败。早先版本把它并进 `failed`,
+ *   于是「跳过了 1 卷」在界面上会被读成「1 卷失败了」—— 一个纯粹误导的结论。
+ *   但对**进度**而言两者都是「处理过了」，故都计入 [processed]。
  */
 data class TaskProgress(
     val total: Int = 0,
     val done: Int = 0,
     val failed: Int = 0,
+    val skipped: Int = 0,
 ) {
-    /** 已处理 = 成功 + 失败。负数输入按 0 处理（平台层重复回调会产生脏值）。 */
-    val processed: Int get() = (done.coerceAtLeast(0) + failed.coerceAtLeast(0))
+    /** 已处理 = 成功 + 失败 + 跳过（三者都是「处理过了」）。负数输入按 0 处理（平台层重复回调会产生脏值）。 */
+    val processed: Int
+        get() = (done.coerceAtLeast(0) + failed.coerceAtLeast(0) + skipped.coerceAtLeast(0))
 
     /** 还剩多少没处理。 */
     val remaining: Int get() = (total.coerceAtLeast(0) - processed).coerceAtLeast(0)
@@ -79,7 +85,7 @@ const val PROGRESS_EMIT_STEP_PERCENT: Int = 5
  *
  * 1. **首次上报** —— 不报的话界面一直停在「准备中」；
  * 2. **完成必须上报** —— 被节流掉就意味着进度条永远停在 99%；
- * 3. **失败数变化必须上报** —— 否则用户不知道有东西失败了；
+ * 3. **失败数或跳过数变化必须上报** —— 否则用户不知道有东西失败了、或有卷被跳过了；
  * 4. **总数或已处理数倒退必须上报** —— 重扫/换工作区会把进度重置，节流不能吃掉它；
  * 5. **百分比跨档** —— 常规推进；
  * 6. **距上次上报超过 [PROGRESS_EMIT_INTERVAL_MILLIS]** —— 长时间无进展时给「我还活着」的信号，
@@ -99,6 +105,7 @@ fun shouldEmitProgress(
     if (last == null) return true
     if (next.isComplete && !last.isComplete) return true
     if (next.failed != last.failed) return true
+    if (next.skipped != last.skipped) return true
     if (next.total != last.total) return true
     if (next.processed < last.processed) return true
 
