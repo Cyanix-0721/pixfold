@@ -5,6 +5,8 @@
 > 目标平台：**Android（唯一 GUI 平台）**；Windows / Linux 不再作为 GUI 目标平台
 > 技术栈：**Kotlin + Jetpack Compose（Android 原生，2026-09-10 重审锁定，替换 09-08 的 Flutter + Dart；判定见 §8.2）**
 > 分支模型（2026-09-16 起）：`ready`（设计文档线）→ **`dev`（开发主线）** → 阶段分支 `d1/pN`（完成即合回 `dev`）；D1 全绿后 `dev` → `main` 发 release，此后开发继续在 `dev`。详见 §9.1
+>
+> **⚠️ 工程改名（2026-10-18，进入 D2 时用户裁决）**：Android 工程目录 **`pixfold-d1/` → `android/`**、包名 **`com.pixfold.d1` → `com.cyanix.pixfold`**（`namespace` 与 `applicationId` 同步；`rootProject.name` → `pixfold-android`）。理由：`pixfold-d1` 是 D1 阶段代号，工程已升级为 D4 MVP 基座并进入 D2，名字里的 `d1` 与实际不符。**文档口径**：指向**当前**工程/包名/命令/路径的引用一律用新名；**历轮台账与历史记录保留 `pixfold-d1` 原文不改**（改历史等于伪造历史，且旧提交号的描述会与当时的真实路径对不上）。`applicationId` 变更 ⇒ 旧应用与新版在手机上共存为两个独立应用，需手动卸载旧的 `com.pixfold.d1`。
 
 ## 1. 项目重新定位
 
@@ -493,11 +495,11 @@ Android 第一版应优先保证“选目录 → 预览 → 手工确认 → 生
 
 > **决策门(2026-09-10 更新;① 于 2026-09-21 重述)**:① ~~**正式工程创建**的触发 = D1 退出条件达成~~ 
 > → **重述(2026-09-21)**:D1 退出条件**已达成**,且用户确认 **D1 的 UI 即 D4 MVP 的基座**,
-> 故**不再另起"正式工程"** —— MVP 的能力**就地长在 `pixfold-d1/` 上**(即 §9 D1「复用关系」)。
+> 故**不再另起"正式工程"** —— MVP 的能力**就地长在 `android/` 上**(即 §9 D1「复用关系」)。
 > 原表述"D1 之前只维护设计文档 + 验证工程"的本意是**不另起新工程**,
-> 而非"原型将来作废重写";`pixfold-d1/` 现定位为 **MVP 代码基座**。
+> 而非"原型将来作废重写";`android/` 现定位为 **MVP 代码基座**。
 > 发版仍按 §9.1 拓扑(`dev` → `main`);② 换栈触发 = §8.2 证伪条件 ③,**已于 2026-09-10 触发并完成换栈**(→ Kotlin + Jetpack Compose,§8.1);后续 D1 走查若再发现问题,按同一框架记录,**不再预设对照方案**。
-> D1 执行注(2026-09-16 更新):D1 原型工程 = **本仓库内的 `pixfold-d1/`**,在**阶段分支**上开发(拓扑见 §9.1),不连真实文件系统、用确定性 mock 数据。原 `C:\Personal\pixfold-d1` 的 Flutter 代码**已作废**,需在 **Kotlin + Compose** 新栈重建;原 Dart 侧 16 项测试随之作废,但**其覆盖的语义必须在新栈重建**(语义已提取为 `docs/notes/d1-archive-domain-semantics.md`)。范围 = 本节 D1 六项交付;**验收平台 = Android 单端**(§2/§7);实现策略 = **内置优先、零三方依赖、拖拽自研**(2026-09-10 用户决策,设计结论见 §12.5)。领域逻辑(自然排序/多级排序/命名求值/冲突检测/ComicInfo.xml/页码重编号)为**不依赖 UI 的纯 Kotlin 核心**,跑 JVM 单测(独立 `domain/` 模块)。
+> D1 执行注(2026-09-16 更新;工程名 2026-10-18 起为 `android/`):D1 原型工程 = **本仓库内的 `android/`**,在**阶段分支**上开发(拓扑见 §9.1),不连真实文件系统、用确定性 mock 数据。原 `C:\Personal\pixfold-d1` 的 Flutter 代码**已作废**,需在 **Kotlin + Compose** 新栈重建;原 Dart 侧 16 项测试随之作废,但**其覆盖的语义必须在新栈重建**(语义已提取为 `docs/notes/d1-archive-domain-semantics.md`)。范围 = 本节 D1 六项交付;**验收平台 = Android 单端**(§2/§7);实现策略 = **内置优先、零三方依赖、拖拽自研**(2026-09-10 用户决策,设计结论见 §12.5)。领域逻辑(自然排序/多级排序/命名求值/冲突检测/ComicInfo.xml/页码重编号)为**不依赖 UI 的纯 Kotlin 核心**,跑 JVM 单测(独立 `domain/` 模块)。
 >
 > **⚠️ D1 ↔ D3 范围重叠的校正(2026-09-19 用户确认)**:上面这条执行注(2026-09-16 追加)把领域逻辑划进 D1,而 §9.1「切片原则」也要求"各阶段的领域逻辑随该阶段一起进" —— 两者叠加的结果是:**D3 退出条件里的"排序/命名/元数据"三类已由 D1 的 P1–P5 实际交付**(见 D3 节)。此前 D3 在门槛表上仍写"⬜ 待办",照字面读会导致 D1 收口后**重复实现已完成的领域核心**。按用户 2026-09-19 决定,D3 由"**重新实现领域核心**"改为"**验证与固化**"性质:不重复造已落地的领域层,只做剩余部分(打包核心 + 适配层抽取)与"正式工程可承接"的确认。详见 D3 节。
 > **⚠️ 工程实况(2026-09-13,路径已失效)**:`C:\Personal\pixfold-d1` **目录已从磁盘删除**(与 `pixfold-saf-spike` 一同),`ready` 分支从未包含它。删除前的完整 Flutter 原型(含 `lib/domain/comic.dart` 等领域层与 16 项测试)**归档在分支 `archive-flutter-verify`**(tip `9efef5b`,已推远程)。新栈重建时:**领域层的语义与测试意图已提取成笔记可读参考,代码本身作废、不迁移**;§12.5 的三条拖拽设计结论已单独保留在正文,不依赖归档。
@@ -519,14 +521,14 @@ Android 第一版应优先保证“选目录 → 预览 → 手工确认 → 生
 ### D1：交互原型
 
 > **✅ 复用关系(2026-09-21 用户确认)**:**D1 的 UI 将作为 D4 MVP 的基座**,
-> **不是一次性原型**。即:本仓库 `pixfold-d1/` 的原型代码在 D1 通过后
+> **不是一次性原型**。即:本仓库 `android/` 的原型代码在 D1 通过后
 > **就地演进为 MVP**,而**不是另起一个工程重写**。
 >
 > 这条同时**重述了"不创建正式工程"的准确含义**(见下方 §9 决策门该条的正文):
 > 它指的是**不另起新工程**、也不在 D1 期间追求"可交付产品",
 > **而不是**"原型代码将来要作废重写"。
 >
-> **边界**:`pixfold-d1/` 从此是 **MVP 的代码基座**;
+> **边界**:`android/` 从此是 **MVP 的代码基座**;
 > D1 的**六项交付范围不变**(设置页等 MVP 级功能**不计入** D1,见 D4「提前启动」)。
 
 先不连接真实文件系统，完成：
@@ -665,7 +667,7 @@ ready ──► dev                          ← ready 整合进 dev,dev 成为�
 **工程结构**(领域层独立成纯 Kotlin JVM 模块,用 Gradle 边界强制"领域不依赖 UI/平台"):
 
 ```text
-pixfold-d1/
+android/
 ├── domain/     ← 纯 Kotlin JVM,零 Android 依赖;:domain:test 秒级反馈
 └── app/        ← Android + Compose
 ```
@@ -684,7 +686,7 @@ pixfold-d1/
 (改右扫时 25 项全过),已补退化状态用例钉死(现 30 项)。
 
 **P1 真机实证(2026-09-16,第 3 层)**:设备 = **PJX110 / Android 16(API 36)/ arm64-v8a / 1264x2780 / 560dpi**
-(用户手机固定无线调试地址 `192.168.43.1:4444`;另有一台 `emulator-5556` 在线,`pixfold-d1/adb.bat` 默认锁定真机)。
+(用户手机固定无线调试地址 `192.168.43.1:4444`;另有一台 `emulator-5556` 在线,`android/adb.bat` 默认锁定真机)。
 APK 安装启动成功、点击与横竖屏切换无崩溃(同 PID 未重启)。**真机走查发现并修复 2 处前两层漏掉的缺陷**:
 ① **深色模式下窗口背景恒为近白** `(250,250,250)`——XML 主题写死 `Theme.Material.Light`,而设备处于深色模式;
 修复 = 新增 `values-night/themes.xml` + Compose 侧 `Surface(color = colorScheme.background)`
@@ -2532,7 +2534,7 @@ LazyList 实为按 **key** 解析 `updateScrollPositionIfTheFirstItemWasMoved`,�
   横屏下拉范围 **2–9**、对勾在 **9**;转回竖屏 ⇒ 播报 `2 列`。
 - **清空即回自适应**:设置里选「跟随自适应（4）」⇒ 两行都回到自适应,重进排序页播报 **`4 列`**。
 
-⚠️ **操作教训(本轮新增)**:长按提示 **1.5s 自动消失**,而 `pixfold-d1/dumpui.bat` 的 `uiautomator dump` 往返太慢,
+⚠️ **操作教训(本轮新增)**:长按提示 **1.5s 自动消失**,而 `android/dumpui.bat` 的 `uiautomator dump` 往返太慢,
 两次都抓不到;`input swipe` 也触发不了长按。正解 = **把动作与取证串进设备侧的同一个 `adb shell`**
 (`input draganddrop X Y X Y 700; screencap -p /data/local/tmp/tip.png`),再与基线截图做逐像素比对
 (本机 `python3` 无 PIL,用 `zlib` 手写 PNG 反滤波解码)。
@@ -2863,7 +2865,7 @@ options.forEachIndexed { index, option ->
   `--rerun-tasks` 全量):`RC=0` / `BUILD SUCCESSFUL in 1m 12s` / **`62 actionable tasks: 62 executed`**;
   JUnit XML `domain` **32 files / 434 tests / 0F 0E 0S**、`app` **50 files / 456 tests / 0F 0E 0S**;
   lint **`0 errors, 0 warnings, 4 hints`**(4 条均为既有 `AutoboxingStateCreation`,hint 不计入 `warningsAsErrors`);
-  APK `pixfold-d1/app/build/outputs/apk/debug/app-debug.apk` = **33,437,589 字节**。
+  APK `android/app/build/outputs/apk/debug/app-debug.apk` = **33,437,589 字节**。
 - **lint 陈旧读数疑点已关闭**:上一小节记的"报告文件仍是 **2026-09-29 的旧产物**"不再成立 ——
   现 mtime **2026-10-05 17:20**、末行 `0 errors, 0 warnings, 4 hints`,是**新鲜读数**。
 - **变异纪律**:逐轮台账明列 —— W7 23 / W8 16 / W11 7 / W12 23 / W13 39 / W14 58 / W15 64 / W16 66 /
@@ -3694,7 +3696,7 @@ mise ls                  # 看 mise 管的工具版本
      (无匹配时报 `No such file or directory`,即为干净)。
   4. **`.bat` 脚本必须纯 ASCII**:`cmd.exe` 按本地 ANSI 代码页(本机 GBK)读 `.bat`,
      UTF-8 中文注释会被解析成乱码并**当作命令执行**(实测报"不是内部或外部命令");
-     说明文字写英文,或改放 `.md`。已新增 `pixfold-d1/dumpui.bat` 统一走 `/data/local/tmp`。
+     说明文字写英文,或改放 `.md`。已新增 `android/dumpui.bat` 统一走 `/data/local/tmp`。
 - **真机实证的四个"假阴性"陷阱**(2026-09-16 P1/P2、2026-09-17 P3 实证,方法教训):用 `adb` 自动走查 GUI 时,
   以下四种情况会**误报缺陷**,须先排除再下结论:
   1. **截图时序**:`input tap` 后立刻 `screencap`,可能读到**上一帧**(实测:点"列表"后截图仍显示网格选中,
@@ -3745,7 +3747,7 @@ mise ls                  # 看 mise 管的工具版本
 
    ```
    adb shell dumpsys power  | grep mWakefulness=      # 期望 Awake
-   adb shell dumpsys window | grep mCurrentFocus      # 期望 com.pixfold.d1/.MainActivity
+   adb shell dumpsys window | grep mCurrentFocus      # 期望 com.cyanix.pixfold/.MainActivity
    ```
 
    **教训**:`input keyevent 224`(唤醒)、`111`(ESC)、`4`(BACK)对
