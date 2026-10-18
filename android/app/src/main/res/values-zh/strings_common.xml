@@ -71,4 +71,19 @@
     <string name="preview_rename_save">保存</string>
     <string name="preview_renamed">将重命名为 %1$s</string>
 
+    <!-- ============ 工作区(D2a · SAF 只读) ============ -->
+    <string name="workspace_current">当前工作区:%1$s</string>
+    <string name="workspace_current_cd">当前工作区 %1$s,点按更换</string>
+    <string name="workspace_pick">选择文件夹</string>
+    <string name="workspace_pick_cd">选择一个文件夹读取图片</string>
+    <string name="workspace_change">更换</string>
+    <string name="workspace_change_cd">更换工作区文件夹</string>
+    <string name="workspace_loading">正在扫描文件夹…</string>
+    <string name="workspace_denied">对 %1$s 的授权已失效,请重新选择该文件夹。</string>
+    <string name="workspace_denied_generic">授权已失效,请重新选择文件夹。</string>
+    <string name="workspace_failed">无法读取该文件夹,请重新选择或换一个。</string>
+    <string name="workspace_empty">这个文件夹里没有图片</string>
+    <string name="workspace_empty_hint">换一个文件夹开始整理。</string>
+    <string name="workspace_demo_note">当前显示演示数据 —— 选择文件夹即可操作真实文件</string>
+
 </resources>

@@ -113,9 +113,8 @@ fun DragGhost(
                 ) {
                     when (style) {
                         DragGhostStyle.Card -> Column(modifier = Modifier.fillMaxWidth()) {
-                            ProceduralThumb(
-                                seed = item.seed,
-                                fileName = item.fileName,
+                            ItemThumb(
+                                item = item,
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .aspectRatio(1f),
@@ -134,9 +133,8 @@ fun DragGhost(
                             modifier = Modifier.fillMaxWidth().padding(8.dp),
                             verticalAlignment = Alignment.CenterVertically,
                         ) {
-                            ProceduralThumb(
-                                seed = item.seed,
-                                fileName = item.fileName,
+                            ItemThumb(
+                                item = item,
                                 modifier = Modifier.size(44.dp),
                                 showIndex = false,
                             )

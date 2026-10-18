@@ -2,10 +2,14 @@ package com.cyanix.pixfold
 
 import android.app.LocaleManager
 import android.os.LocaleList
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.mutableStateOf
@@ -26,6 +30,8 @@ import com.cyanix.pixfold.domain.naming.setOverride
 import com.cyanix.pixfold.domain.workflowa.WorkflowAState
 import com.cyanix.pixfold.domain.workflowa.workflowAStateOf
 import com.cyanix.pixfold.data.SharedPrefsSettingsStore
+import com.cyanix.pixfold.data.saf.AndroidSafSource
+import com.cyanix.pixfold.data.saf.AndroidThumbnailSource
 import com.cyanix.pixfold.domain.settings.AppLanguage
 import com.cyanix.pixfold.domain.settings.PixFoldSettings
 import com.cyanix.pixfold.domain.settings.SettingsStore
@@ -44,6 +50,9 @@ import com.cyanix.pixfold.ui.preview.PreviewRename
 import com.cyanix.pixfold.ui.settings.LicensesScreen
 import com.cyanix.pixfold.ui.settings.SettingsScreen
 import com.cyanix.pixfold.ui.theme.PixFoldTheme
+import com.cyanix.pixfold.ui.workspace.LocalThumbnailSource
+import com.cyanix.pixfold.ui.workspace.WorkspaceController
+import com.cyanix.pixfold.ui.workspace.collectionsOr
 import com.cyanix.pixfold.ui.workflowa.WorkflowASteps
 import com.cyanix.pixfold.ui.workflowb.WorkflowBSteps
 
@@ -78,24 +87,79 @@ fun PixFoldApp(store: SettingsStore? = null) {
     // (真机实测发现:选了 English 界面仍是中文 —— 此前完全漏了这一步)。
     ApplyAppLanguage(settings.language)
 
+    // ---- 工作区（D2a）：真实 SAF 目录授权 ----
+    //
+    // 三层各司其职，不要合并：
+    //   AndroidSafSource    —— 平台层，DocumentsContract 递归遍历 + readBytes
+    //   WorkspaceController —— 协程编排 + UI 状态机（扫描在 Dispatchers.IO）
+    //   本函数              —— 把结果接到工作流 A 的数据源上
+    val workspaceSource = remember { AndroidSafSource(context) }
+    val thumbnailSource = remember { AndroidThumbnailSource(context) }
+    val workspaceScope = rememberCoroutineScope()
+    val workspaceController = remember(workspaceSource, workspaceScope) {
+        WorkspaceController(
+            source = workspaceSource,
+            scope = workspaceScope,
+            // 显示名要靠 provider query 才能拿到（tree URI 本身不含目录名），
+            // 故留在平台层；控制器只接收「URI → 名字」这个纯函数。
+            nameResolver = { workspaceSource.displayNameOf(it) },
+        )
+    }
+    // 冷启动恢复：上次授权过的目录自动重扫。**不缓存上次结果** ——
+    // 目录内容随时会变，显示过期列表比重新扫一遍更糟。
+    LaunchedEffect(Unit) { workspaceController.restore() }
+    val workspaceState = workspaceController.state
+
+    // 选目录：ACTION_OPEN_DOCUMENT_TREE 是**唯一**能拿到可持久化 tree URI 的通道
+    // （HANGOFF §4：没有「以 SAF 树形式授权目录」的标准分享通道）。
+    val pickWorkspaceFolder = rememberLauncherForActivityResult(
+        ActivityResultContracts.OpenDocumentTree(),
+    ) { uri ->
+        // uri == null 表示用户取消了选择 —— 保持现状，不动已有授权。
+        if (uri != null) workspaceController.pick(uri.toString())
+    }
+
     PixFoldTheme(settings = settings) {
         // Surface 提供 M3 语义背景色 —— 深色模式下不会透出窗口白底(真机实证修复)。
         Surface(
             modifier = Modifier.fillMaxSize(),
             color = MaterialTheme.colorScheme.background,
         ) {
+            // 真实缩略图来源（D2a）。用 CompositionLocal 而不是参数透传：缩略图出现在
+            // 5 个互不相干的位置（网格卡/列表行/拖拽浮层 ×2/预览页），其中两处在
+            // DragGhost 里、根本不在页面参数路径上。逐个加参数会变成 5 个独立开关。
+            //
+            // 测试环境不提供它（默认 null）⇒ 一律走 D1 的程序化缩略图，
+            // 既有 491 个测试的断言一行都不用改。
+            CompositionLocalProvider(LocalThumbnailSource provides thumbnailSource) {
             val navController = rememberNavController()
 
-            // 工作流 A 演示数据:trip(30 张)+ scan(14 张)+ misc(12 张)+ cn(16 张),
-            // 多集合用于演示"批次默认 + 本组独立"(验收第 7 项);
-            // cn 是中文数字自然序的可证伪样例(见 MockData.chapters 的 KDoc)。
-            val collections = remember { MockData.workspaceA.collections }
+            // 工作流 A 的数据源（D2a）：**有真实工作区就用扫描结果，否则回退 mock**。
+            //
+            // 回退规则写在 `collectionsOr` 里并单独单测过，三条约束：
+            //  1. 从未选过目录（None）/ 正在扫描（Loading）/ 授权失效（Denied）⇒ 用 mock，
+            //     D1 的演示与既有 491 个测试因此不受影响；
+            //  2. `Ready` 但列表为空 ⇒ **不回退**（用户选了个空目录，就该看到「没有图片」，
+            //     悄悄塞回演示数据会让人以为扫到了东西）；
+            //  3. mock 数据：trip(30)+scan(14)+misc(12)+cn(16)，多集合用于演示
+            //     「批次默认 + 本组独立」（验收第 7 项），cn 是中文数字自然序的可证伪样例。
+            val collections = remember(workspaceState) {
+                workspaceState.collectionsOr(MockData.workspaceA.collections)
+            }
             // 工作流 B 演示数据:5 卷覆盖缺卷号 / 无语言线索 / 输出冲突三类异常
             // (验收第 11–14 项;确定性 mock,不连真实文件系统)。
             val library = remember { MockDataB.library }
             // 预览跟随**当前集合**:切集合后打开预览应看到该集合的图,
             // 否则页码与图片会对不上(索引来自当前集合)。
-            var activeCollectionId by remember { mutableStateOf(collections.first().id) }
+            //
+            // ⚠️ 两个 key 都必要:
+            //  - `collections` 作 key:工作区切换后集合列表整个换掉,必须重新播种,
+            //    否则 `activeCollectionId` 会指向一个已不存在的集合 id(表现为预览取不到图)。
+            //  - `.orEmpty()` 而不是 `.first().id`:真实扫描可能扫出**空目录**
+            //    (用户选了个没有图片的文件夹),`first()` 会直接抛 NoSuchElementException。
+            var activeCollectionId by remember(collections) {
+                mutableStateOf(collections.firstOrNull()?.id.orEmpty())
+            }
 
             // ---- 工作流 A 的两份共享状态提升到应用根(2026-09-25)----
             //
@@ -111,8 +175,12 @@ fun PixFoldApp(store: SettingsStore? = null) {
             //
             // 默认值刻意与 `WorkflowASteps` 内部的兜底取值保持**同一表达式**,
             // 否则"上层初始值"与"组件自持初值"会算出不同结果。
-            var workflowAState by remember { mutableStateOf(workflowAStateOf(collections)) }
-            var namingState by remember {
+            // ⚠️ `remember(collections)`:工作区切换 = 换了一整套集合,
+            // 旧集合的页序/排序规则对新集合毫无意义(集合 id 都不同),必须重建。
+            // 同一工作区重扫时,若内容未变则 `List.equals` 为真、不会重置,
+            // 用户的手工排序因此不会被无谓清掉 —— 这是刻意选 equals 作 key 的原因。
+            var workflowAState by remember(collections) { mutableStateOf(workflowAStateOf(collections)) }
+            var namingState by remember(collections) {
                 mutableStateOf(
                     NamingState(
                         NamingScheme(rootDirName = collections.firstOrNull()?.rootDirName.orEmpty()),
@@ -152,7 +220,7 @@ fun PixFoldApp(store: SettingsStore? = null) {
                                     rootDirName = collections.firstOrNull()?.rootDirName.orEmpty(),
                                 ),
                             )
-                        activeCollectionId = collections.first().id
+                        activeCollectionId = collections.firstOrNull()?.id.orEmpty()
                     }
                     DestinationSurface {
                         HomeScreen(
@@ -200,6 +268,11 @@ fun PixFoldApp(store: SettingsStore? = null) {
                             // 工具栏列的临时覆盖不回写这里)。
                             portraitDefaultColumns = settings.portraitDefaultColumns,
                             landscapeDefaultColumns = settings.landscapeDefaultColumns,
+                            // 工作区条（D2a）：页签行上方的从属信息层。
+                            // HANGOFF §4（2026-10-15 用户裁决）把它定为「范围」而非「任务」，
+                            // 故不做成第 4 个页签；选目录入口也长在工作流内部，不进首页。
+                            workspaceState = workspaceState,
+                            onPickWorkspace = { pickWorkspaceFolder.launch(null) },
                         )
                     }
                 }
@@ -208,8 +281,15 @@ fun PixFoldApp(store: SettingsStore? = null) {
                     // 预览是最内层:返回即关闭预览,回到工作流 A。
                     // (ImagePreview 内部也有自己的关闭按钮;二者语义一致。)
                     val route = entry.toRoute<PreviewRoute>()
+                    // 空列表时（用户选了空目录）没有可预览的图 —— 直接不渲染内容。
+                    // 注意这里**不能**用 `?: collections.first()`：空目录是合法状态，
+                    // 抛 NoSuchElementException 会让预览页崩掉。
                     val activeCollection = collections.firstOrNull { it.id == activeCollectionId }
-                        ?: collections.first()
+                        ?: collections.firstOrNull()
+                    if (activeCollection == null) {
+                        DestinationSurface { }
+                        return@composable
+                    }
                     // ⚠️ 必须用**当前页序**,不能用 `collection.images`(声明序)。
                     // 点击回传的 `route.index` 是页序下标(见 SortAndPreviewPage 传
                     // `items = order.order`);两者只在"页序 == 声明序"时碰巧一致,
@@ -256,6 +336,7 @@ fun PixFoldApp(store: SettingsStore? = null) {
                         )
                     }
                 }
+            }
             }
         }
     }

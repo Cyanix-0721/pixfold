@@ -75,9 +75,8 @@ fun DraggableThumbCard(
             // clickable 放在内容上:长按拖拽由外层 pointerInput 处理,静止点按仍是点击
             // (两者可共存:长按超时后 drag 才启动,短按走 click)
             Column(modifier = Modifier.clickable(onClick = onClick)) {
-                ProceduralThumb(
-                    seed = item.seed,
-                    fileName = item.fileName,
+                ItemThumb(
+                    item = item,
                     modifier = Modifier
                         .fillMaxWidth()
                         .aspectRatio(1f),

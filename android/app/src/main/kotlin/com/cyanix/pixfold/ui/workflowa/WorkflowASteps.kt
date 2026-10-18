@@ -1,13 +1,17 @@
 package com.cyanix.pixfold.ui.workflowa
 
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.windowInsetsPadding
+import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Tab
 import androidx.compose.material3.PrimaryTabRow
@@ -57,9 +61,17 @@ import com.cyanix.pixfold.nav.goToWorkflowAStep
 import com.cyanix.pixfold.nav.popWorkflowStep
 import com.cyanix.pixfold.nav.workflowAStepIndex
 import com.cyanix.pixfold.ui.components.ResetAllButton
+import com.cyanix.pixfold.ui.workspace.WorkspaceBar
+import com.cyanix.pixfold.ui.workspace.WorkspaceState
 import com.cyanix.pixfold.ui.plan.ExecutionReportPage
 
 const val TAG_STEP_TABS = "step-tabs"
+
+/** 空工作区空态（D2a）：选中的目录里没有图片。 */
+const val TAG_EMPTY_WORKSPACE = "empty-workspace"
+
+/** 空工作区空态里的「选择文件夹」按钮。 */
+const val TAG_EMPTY_WORKSPACE_PICK = "empty-workspace-pick"
 const val TAG_STEP_SORT = "step-sort"
 const val TAG_STEP_NAMING = "step-naming"
 const val TAG_STEP_BACK = "step-back"
@@ -153,6 +165,20 @@ fun WorkflowASteps(
      */
     portraitDefaultColumns: Int? = null,
     landscapeDefaultColumns: Int? = null,
+    /**
+     * 工作区状态（D2a）。`null` = **不显示**工作区条。
+     *
+     * 默认 `null` 而不是 `WorkspaceState.None` 是刻意的：`None` 会渲染出
+     * 「当前显示演示数据…」+「选择文件夹」一行，而既有 491 个 UI 测试都是
+     * 在「没有工作区概念」的前提下写的（它们只测步骤内容与导航）。默认 null
+     * 让这些测试的布局与断言**一行都不用改**；真实应用由 `PixFoldApp` 注入实际状态。
+     *
+     * 语义上这也说得通：单独使用本组件（例如某个只关心排序的宿主）时，
+     * 「工作区」是宿主的事，组件不该替它凭空画一条选择入口。
+     */
+    workspaceState: WorkspaceState? = null,
+    /** 用户要求选择/更换工作区目录。仅 [workspaceState] 非 null 时会被调用。 */
+    onPickWorkspace: () -> Unit = {},
 ) {
     // 跨步骤共享的唯一状态源。这些状态**必须留在嵌套 NavHost 之外** ——
     // 它们要跨步骤存活,而 NavHost 里每个 destination 都是独立作用域。
@@ -230,6 +256,16 @@ fun WorkflowASteps(
             .fillMaxSize()
             .windowInsetsPadding(contentInsets),
     ) {
+        // 工作区条（D2a）—— 页签行**上方**的从属信息层。
+        //
+        // **为什么不是第 4 个页签**：HANGOFF §4（2026-10-15 用户裁决）把工作区定为
+        // 「范围」而非「任务」，与三条工作流步骤不同层；做成第 4 个 Tab 会打破 3 步
+        // 线性流程，并牵动 workflowAStepIndex()/goToWorkflowAStep()/popWorkflowStep()
+        // 与约 30 条导航测试。放在页签行外层的顶部即可获得「工作流内部」的位置。
+        if (workspaceState != null) {
+            WorkspaceBar(state = workspaceState, onPick = onPickWorkspace)
+        }
+
         // 页签行 + 右侧「重置全部」。M3 的 `PrimaryTabRow` **没有 trailing 槽位**
         // (API 只有 selectedTabIndex/modifier/colors/indicator/content),
         // 故只能在外面套一层 Row 分槽:页签 weight(1f) 吃掉剩余宽度,按钮靠右。
@@ -270,6 +306,24 @@ fun WorkflowASteps(
 
         // 步骤内容不重复叠加 inset(外层已处理)
         val innerInsets = WindowInsets(0, 0, 0, 0)
+
+        // 空工作区（D2a）：用户选了一个**没有图片**的文件夹。
+        //
+        // 这是合法状态而不是错误，但三个步骤页在空列表下都会渲染成一片空白
+        // （`SortAndPreviewPage` 里 `activeCollection` 为 null 时直接 return）。
+        // 空白界面上没有任何可操作入口，用户会以为应用卡住了 —— 必须显式说明，
+        // 并给一个「重新选择」按钮。
+        //
+        // 判据用 `collections.isEmpty()` 而**不是** `workspaceState is Ready`：
+        // 宿主也可以直接传空集合（不接工作区），那时同样需要这条空态。
+        if (collections.isEmpty()) {
+            EmptyWorkspace(
+                onPick = onPickWorkspace,
+                showPick = workspaceState != null,
+                modifier = Modifier.weight(1f),
+            )
+            return@Column
+        }
 
         PixFoldNavHost(
             navController = navController,
@@ -408,6 +462,53 @@ fun WorkflowASteps(
                         }
                     }
                 }
+            }
+        }
+    }
+}
+
+/**
+ * 空工作区空态（D2a）。
+ *
+ * 只做「说明 + 重新选择」两件事。刻意不放「用演示数据继续」的按钮 ——
+ * 用户刚明确选了这个目录，再给他一个「其实用的是假数据」的出口只会造成混淆；
+ * 想看演示数据，取消授权（或换个目录）即可。
+ *
+ * @param showPick 是否显示选择按钮。宿主没接工作区（`workspaceState == null`）
+ *   时无从选起，只显示说明文字。
+ */
+@Composable
+private fun EmptyWorkspace(
+    onPick: () -> Unit,
+    showPick: Boolean,
+    modifier: Modifier = Modifier,
+) {
+    Column(
+        modifier = modifier
+            .fillMaxSize()
+            .padding(24.dp)
+            .testTag(TAG_EMPTY_WORKSPACE),
+        verticalArrangement = Arrangement.Center,
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        Text(
+            text = stringResource(R.string.workspace_empty),
+            style = MaterialTheme.typography.titleMedium,
+            color = MaterialTheme.colorScheme.onSurface,
+        )
+        Spacer(modifier = Modifier.height(8.dp))
+        Text(
+            text = stringResource(R.string.workspace_empty_hint),
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        if (showPick) {
+            Spacer(modifier = Modifier.height(16.dp))
+            Button(
+                onClick = onPick,
+                modifier = Modifier.testTag(TAG_EMPTY_WORKSPACE_PICK),
+            ) {
+                Text(text = stringResource(R.string.workspace_pick))
             }
         }
     }

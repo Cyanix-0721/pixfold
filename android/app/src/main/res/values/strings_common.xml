@@ -74,4 +74,19 @@
     <string name="preview_rename_save">Save</string>
     <string name="preview_renamed">Will be renamed to %1$s</string>
 
+    <!-- ============ Workspace (D2a · SAF read-only) ============ -->
+    <string name="workspace_current">Workspace: %1$s</string>
+    <string name="workspace_current_cd">Current workspace %1$s, tap to change</string>
+    <string name="workspace_pick">Choose folder</string>
+    <string name="workspace_pick_cd">Choose a folder to read images from</string>
+    <string name="workspace_change">Change</string>
+    <string name="workspace_change_cd">Change workspace folder</string>
+    <string name="workspace_loading">Scanning folder…</string>
+    <string name="workspace_denied">Access to %1$s was revoked. Pick the folder again.</string>
+    <string name="workspace_denied_generic">Access was revoked. Pick the folder again.</string>
+    <string name="workspace_failed">Could not read that folder. Pick it again or choose another one.</string>
+    <string name="workspace_empty">This folder has no images</string>
+    <string name="workspace_empty_hint">Pick another folder to organize.</string>
+    <string name="workspace_demo_note">Showing demo data — choose a folder to work on real files</string>
+
 </resources>

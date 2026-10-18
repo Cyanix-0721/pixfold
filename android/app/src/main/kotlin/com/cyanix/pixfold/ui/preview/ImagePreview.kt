@@ -36,7 +36,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.cyanix.pixfold.R
 import com.cyanix.pixfold.domain.model.SourceItem
-import com.cyanix.pixfold.ui.components.ProceduralThumb
+import com.cyanix.pixfold.ui.components.ItemThumb
 
 const val TAG_PREVIEW = "preview-root"
 const val TAG_PREVIEW_IMAGE = "preview-image"
@@ -96,7 +96,7 @@ fun ImagePreview(
     // 同理,页码在 UI 层解析而不放在 `PreviewState` 上 —— 那个类取不到资源。
     val zoomCd = stringResource(R.string.preview_zoom_cd, zoomAmount(state.scale))
     // 语义里带上**当前图片的文件名**:否则"预览显示的到底是哪一张"在测试里无法断言
-    // (`ProceduralThumb` 只把文件名画进 Canvas,不产生任何 semantics)。
+    // (`ItemThumb` 回退到 `ProceduralThumb` 时只把文件名画进 Canvas,不产生任何 semantics)。
     // 这是本页能被证伪的前提,不是装饰。
     val imageCd = stringResource(R.string.preview_image_cd, current.fileName)
     val pageLabel = stringResource(R.string.preview_page_label, state.index + 1, state.count)
@@ -112,9 +112,8 @@ fun ImagePreview(
     ) {
         // 图片区:占满可用空间 = 自适应窗口;手势自研。
         // 预览显示文件名(去掉扩展名),便于确认"当前看的是哪一张"。
-        ProceduralThumb(
-            seed = current.seed,
-            fileName = current.fileName,
+        ItemThumb(
+            item = current,
             showIndex = true,
             captionMaxChars = 28,
             modifier = Modifier
