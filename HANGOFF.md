@@ -3366,6 +3366,26 @@ core+extended 11,398 class ⇒ `classes.dex` **3,272 B**),故 35.7 MB 是 **debu
 >
 > 闸门:domain **634**(+18)/ app 554 / lint 零告警 / APK 34,421,078 B。变异 **M1–M8 全 KILLED**(M1/M8 缺页先开流 / M2 跳过卷也开流 / M3 中断检查恒 false / M4 写盘失败不清理 / M5 `isComplete` 恒真 / M6 闸门拒绝时也执行 / M7 闸门把 Marginal 当阻断)。⚠️ 变异首轮 M2/M3/M4 **ANCHOR-MISS**,因为我凭记忆写了锚点 —— 按项目纪律锚点必须是**代码里真实存在的串**,读原文后重跑全部 KILLED。
 
+> **✅ 2026-10-19 凌晨(再再续):D4b 的运行报告已能喂给现有报告页(领域层,零 Android 依赖)**
+>
+> `domain/pack/PackReportBridge.kt`(18 tests)把**真实写盘**的 `PackRunReport` 单向转成界面已在渲染的 `ExecutionReport`。
+> 两套报告此前各说各话:`ExecutionReport` 是 D3 的**确定性模拟**(KDoc 原文「D1 原型不触碰真实文件系统」),
+> `PackRunReport` 是 D4b 的**真实结果**。改 UI 让它同时认两套(报告页 / 撤销入口 / 文案解析全分叉)成本远大于做一次转换。
+>
+> **转换的三条硬规则**:
+> 1. **只有 `Written` 算 `Succeeded` 且带 `createdPath`** —— `ExecEntry` 的 init 强制 `Succeeded ⟺ createdPath != null`;其余一律 null,于是**自动不进撤销记录**(`undoOpsOf` 只收带 path 的项)。
+> 2. **`originalPath` 取 `VolumePackPlan.overwritesExisting`** 这**唯一**实现,不在此重写 `conflictPolicy == Overwrite && outputExists` —— 那正是缺陷 R3 最贵的部分(界面警告了覆盖、撤销却按新建删)。填对之后 `overwrittenCount` / `needsUndoWarning` / 撤销安全档三者全部自动正确。
+> 3. **中断后未处理的卷补成 `Skipped` + 「尚未开始」** —— `PackRunReport.entries` 只含已处理卷,直接转换会让报告比计划少几行,用户拿报告核对计划会以为「计划里那几卷凭空消失了」。故转换要传完整 `plans`(计划内容不在 `PackRunReport` 里)。补「尚未开始」而不是「跳过」:跳过是**计划里就定了**的(输出已存在 + 跳过策略),这里是**用户取消**导致没轮到,两种原因不能共用一句话。
+>
+> **新增两条文案键**:`PackFailMissingPages`(plurals,%1$d 读不出的页数;英文 one/other 两档 —— lint 的 `PluralsCandidate` 直接拦下了 `%d` 后跟 `pages` 的写法)、`PackFailWrite`(%1$s 平台详情原样带出:`ENOSPC`/`EPERM`/provider 抛错 这些原因用户与开发者都猜不到,它是唯一线索)、`PackFailNotStarted`。
+>
+> **归责边界**:归这里 = 机器结果翻译成报告词汇;不归这里 = 要不要执行(`PackGate`)、真的去写(`PackRunner`)、撤销怎么做(`undoRecordOf`)。本文件零副作用。
+>
+> 四道闸门绿(app **554** / domain **652**,+18 / lint 零告警 / APK **34,422,326 B**),变异 **M1–M5 全 KILLED**(M1 全部算成功 / M2 覆盖项不填 originalPath / M3 中断后不补行 / M4 缺页原因漏页数 / M5 失败详情不带给用户)。
+> ⚠️ **首轮 3 红又是夹具 bug**:夹具一律用 `Rename` 策略,而 `overwritesExisting` 要求 `conflictPolicy == Overwrite` ⇒ 覆盖用例本来就不算覆盖。**教训:读判据实现再写夹具,别按字段名猜。**
+> ⚠️ **新增复数键必须同步 `TranslationCoverageTest.PLURAL_KEYS`** —— 那是「复数键集合」的显式契约,漏改直接红。
+>
+
 优先交付（**GUI 仅 Android**，2026-09-10 变更）：
 
 - Android：单目录/单系列，图片预览与人工排序，逐卷元数据，CBZ 生成；

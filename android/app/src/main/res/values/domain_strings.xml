@@ -160,6 +160,12 @@
     </plurals>
     <string name="domain_pack_fail_no_pages">No pages to pack</string>
     <string name="domain_pack_fail_empty_output_dir">Output folder is empty</string>
+    <plurals name="domain_pack_fail_missing_pages">
+        <item quantity="one">%1$d page could not be read; this volume was not written</item>
+        <item quantity="other">%1$d pages could not be read; this volume was not written</item>
+    </plurals>
+    <string name="domain_pack_fail_write">Write failed: %1$s</string>
+    <string name="domain_pack_fail_not_started">Not started (cancelled by user)</string>
     <string name="domain_rename_fail_empty_name">New name is empty</string>
     <string name="domain_undo_nothing">Nothing to undo</string>
     <plurals name="domain_undo_recorded">

@@ -132,6 +132,7 @@ private fun TextKey.pluralQuantityIndex(): Int? = when (this) {
     TextKey.SummaryProcessingVolumes,
     TextKey.PackPackPages,
     TextKey.ExecSummary,
+    TextKey.PackFailMissingPages,
     TextKey.UndoRecorded,
     TextKey.WarnCaseCollision,
     TextKey.WarnDuplicate,
@@ -284,6 +285,9 @@ internal fun TextKey.resId(): Int = when (this) {
     TextKey.ExecSummary -> R.plurals.domain_exec_summary
     TextKey.PackFailNoPages -> R.string.domain_pack_fail_no_pages
     TextKey.PackFailEmptyOutputDir -> R.string.domain_pack_fail_empty_output_dir
+    TextKey.PackFailMissingPages -> R.plurals.domain_pack_fail_missing_pages
+    TextKey.PackFailWrite -> R.string.domain_pack_fail_write
+    TextKey.PackFailNotStarted -> R.string.domain_pack_fail_not_started
     TextKey.RenameFailEmptyName -> R.string.domain_rename_fail_empty_name
     TextKey.UndoNothing -> R.string.domain_undo_nothing
     TextKey.UndoRecorded -> R.plurals.domain_undo_recorded

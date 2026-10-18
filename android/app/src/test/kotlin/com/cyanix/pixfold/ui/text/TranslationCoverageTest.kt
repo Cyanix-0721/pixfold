@@ -268,10 +268,11 @@ class TranslationCoverageTest {
         /** 非 `one` 的数量档 —— 中英资源在这一档都存在。 */
         private const val OTHER_QUANTITY = 5
 
-        /** 复数键共 11 个(英文有 `one`+`other` 两档,中文只有 `other`)。 */
+        /** 复数键共 12 个(英文有 `one`+`other` 两档,中文只有 `other`)。 */
         private val PLURAL_KEYS = setOf(
             "SummaryProcessingVolumes",
             "PackPackPages",
+            "PackFailMissingPages",
             "ExecSummary",
             "UndoRecorded",
             "WarnDuplicate",

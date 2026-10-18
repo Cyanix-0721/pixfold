@@ -172,6 +172,39 @@ enum class TextKey {
     ExecSummary,
     PackFailNoPages,
     PackFailEmptyOutputDir,
+
+    /**
+     * 「N 页读不出来,该卷未写入」—— D4b 真实写盘专有。
+     *
+     * 与 [PackFailNoPages] 的区别:[PackFailNoPages] 是**计划阶段**就已知「这卷没有页」;
+     * 这里是**执行阶段**才发现有页读不出字节(文件被移走 / 授权失效 / provider 报错)。
+     * 此时该卷**一个字节都没写、连输出流都没打开**(PackRunner 的「先探测后开流」),
+     * 故措辞必须说「未写入」而不是「写了一半」。
+     *
+     * 参数:%1$d = 读不出的页数。
+     */
+    PackFailMissingPages,
+
+    /**
+     * 「写入失败:<原因>」—— D4b 真实写盘专有。
+     *
+     * 参数:%1$s = 平台层给出的失败详情(打开输出流失败 / 抛异常的消息)。
+     * 刻意把详情原样带出:写盘失败的原因(`ENOSPC` / `EPERM` / provider 抛错)
+     * 用户与开发者都无法从「写入失败」四个字里猜到,而这条详情是唯一线索。
+     */
+    PackFailWrite,
+
+    /**
+     * 「尚未开始」—— 用户中途取消时,后面没轮到的卷在报告里的状态。
+     *
+     * 为什么必须有这一条:真实执行被中断时,报告若只列**已处理**的卷,
+     * 行数就比计划少,而报告页的契约是「报告第 N 行 ↔ 计划第 N 行」
+     * (`ExecutionReport` KDoc)。少行会让用户以为计划本身漏了几卷。
+     * 补成「尚未开始」而不是「跳过」:跳过是**计划里就定了**的
+     * (输出已存在 + 跳过策略),而这里是**用户取消导致没轮到** ——
+     * 两种原因完全不同,用同一句话会把取消说成计划决定。
+     */
+    PackFailNotStarted,
     RenameFailEmptyName,
     UndoNothing,
     UndoRecorded,
