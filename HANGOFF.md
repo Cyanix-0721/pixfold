@@ -3333,6 +3333,24 @@ core+extended 11,398 class ⇒ `classes.dex` **3,272 B**),故 35.7 MB 是 **debu
 > 于是判定误报「没生效」并把 M3 残留在源码里(第二次跑测试才看到);正确判据是**文件内容确实变了**。
 > ②首轮 3 条测试红又是**夹具 bug**:mock 卷只有几张页,`take(pages)` 造 7 万页时被静默截断,
 > 于是「需要 Zip64」的用例永远不触发 —— 断言对了、夹具错了。**教训:夹具必须能造出断言所需的规模。**
+> **✅ 2026-10-19 凌晨(续):D4b 的「预检 → 执行」闸门已落地(领域层,零 Android 依赖)**
+>
+> `domain/pack/PackGate.kt`(8 tests)。补的缺口:上一段的 `preflightPackPlans` 虽然单测通过,但它与真正的写盘 `runPackPlans` 之间**没有任何代码联系** —— 「预检拒绝就别写」此前只是注释里的承诺。后果不是理论风险:`runPackPlans` 一旦被调用就逐卷 `openFor` + 写字节,预检结论被无视时,用户会在**已经知道空间不足**的情况下看着程序写到一半失败,并在目标目录留下若干半成品。
+>
+> 故新增 `runPackPlansChecked(...) : PackCheckedOutcome`,两种结果:
+> - `Rejected(preflight)` —— 有阻断项,**一个输出流都不打开、一个页面字节都不读**(`runPackPlans` 根本不会被调用);
+> - `Ran(preflight, report)` —— 预检放行并已执行,预检明细与执行报告一起带回。
+>
+> 四条设计要点:
+> 1. **断言的是「一次都没打开」而不是「打开了但没写」** —— 打开本身就已经在用户目录里创建了文件,那正是 `writeOne` 里「先探测后开流」要避免的事。
+> 2. **接口形状防「忘了预检」**:参数 = `runPackPlans` 全部参数 + 可用空间/阈值/安全余量。想真正写盘就必须提供可用空间与阈值,提供它们就意味着预检已经发生了。
+> 3. **拒绝时原样带回 `preflight`** —— `SpaceInsufficient.shortfallBytes` 让界面能说清「还差 1.2 GB」。
+> 4. 预检只阻断 `blockers`;**`Marginal` 与 `Zip64Required` 放行**(有独立用例)。空计划不被空间临界拦住;放行后中断令牌仍然生效。
+>
+> ⚠️ **首轮 2 条测试红又是夹具 bug**:`base.copy(pages = items)` **不会联动 `pageOrder`** ⇒ 预检按旧页数算,于是「Zip64 用例」既不够大、「临界用例」也不临界。修法 = 显式 `pageOrder = pageOrderOf(items)`。**教训:`ComicVolume.copy` 的 `pages` 与 `pageOrder` 是两个独立字段,改一个必须同时改另一个。**
+>
+> 闸门:domain **616**(+8)/ app 554 / lint 零告警 / APK 34,421,078 B。变异 **M1–M3 全 KILLED**(M1 删掉拒绝分支 / M2 预检传空计划 / M3 拒绝时也跑执行)。
+
 优先交付（**GUI 仅 Android**，2026-09-10 变更）：
 
 - Android：单目录/单系列，图片预览与人工排序，逐卷元数据，CBZ 生成；
