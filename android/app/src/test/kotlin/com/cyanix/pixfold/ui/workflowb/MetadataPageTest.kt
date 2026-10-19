@@ -391,4 +391,65 @@ class MetadataPageTest {
         rule.onAllNodesWithTag(volumeChipTag("aot-1")).assertCountEquals(1)
         rule.onAllNodesWithTag(volumeChipTag("aot-2")).assertCountEquals(1)
     }
+
+    // ================= 空工作区:不得崩、给空态、不给「下一步」 =================
+
+    /**
+     * 真实 SAF 工作区可能**一卷都没有**:目录里没有任何图片,或所有图片都散在根目录
+     * (按「每个直接含图片的目录 = 一个集合」的规则,根目录本身不构成卷)。上层随之传下
+     * `volumes = emptyList()`,而 `WorkflowBState.activeVolume` 落到 `volumes.first()`
+     * ⇒ 组合期抛 `NoSuchElementException: List is empty.`,整页崩溃。
+     *
+     * 故这里**直接构造** `WorkflowBState(...)`(不经 `workflowBStateOf`),把 `activeVolumeId`
+     * 显式留空 —— 模拟的就是上层真实传下来的那个形状。
+     *
+     * ⚠️ `onNext` 刻意传**非 null 的空 lambda**而不是 null:空态里"不渲染下一步"必须是
+     * 页面自己的判断,而不是碰巧因为上层没给回调。否则把空态写回正常态结构时,
+     * 下面的断言会照样绿("没给回调"与"刻意不渲染"分不开)。
+     */
+    private fun showEmpty(onBack: (() -> Unit)? = null) {
+        rule.setContent {
+            MetadataPage(
+                libraryState = WorkflowBState(
+                    rootPath = "/tmp",
+                    volumes = emptyList(),
+                    activeVolumeId = "",
+                ),
+                onLibraryChange = {},
+                contentInsets = WindowInsets(0, 0, 0, 0),
+                onNext = {},
+                onBack = onBack,
+            )
+        }
+    }
+
+    /** 本轮修复的崩溃点本身:空列表必须渲染出空态,而不是在组合期抛异常。 */
+    @Test
+    fun `empty volume list shows the empty state instead of crashing`() {
+        showEmpty()
+        rule.waitForIdle()
+        rule.onNodeWithTag(TAG_META_EMPTY).assertIsDisplayed()
+    }
+
+    /**
+     * 空态不给「下一步」,但必须留「返回」。
+     *
+     * 没有卷可编辑,推进过去只是把空列表继续传下去;而返回是用户**唯一的出路**
+     * (退回去换一个目录)。两条一起断:少给一个或者多给一个都会红。
+     */
+    @Test
+    fun `empty state offers no next step but keeps the back button`() {
+        showEmpty(onBack = {})
+        rule.waitForIdle()
+        rule.onNodeWithTag(TAG_METADATA_NEXT).assertDoesNotExist()
+        rule.onNodeWithTag(TAG_B_STEP_BACK).assertIsDisplayed()
+    }
+
+    /** 反向断言:正常有卷时不得出现空态(否则空态会盖住整页可编辑内容)。 */
+    @Test
+    fun `non-empty library does not show the empty state`() {
+        show()
+        rule.onNodeWithTag(TAG_META_EMPTY).assertDoesNotExist()
+        rule.onNodeWithTag(TAG_METADATA_LIST).assertIsDisplayed()
+    }
 }

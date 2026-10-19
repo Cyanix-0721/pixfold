@@ -35,6 +35,7 @@ import com.cyanix.pixfold.domain.model.NamingScheme
 import com.cyanix.pixfold.domain.model.NamingState
 import com.cyanix.pixfold.domain.model.SourceItem
 import com.cyanix.pixfold.domain.naming.buildProposals
+import com.cyanix.pixfold.domain.naming.namingSchemeSeedOf
 import com.cyanix.pixfold.domain.naming.buildRenamePlan
 import com.cyanix.pixfold.domain.model.effectiveScheme
 import com.cyanix.pixfold.domain.naming.clearOverride
@@ -125,7 +126,7 @@ fun NamingPage(
     // 与新集合完全不匹配 —— 不重播种就会带着一堆指向不存在项的覆盖继续算建议。
     // `ImageCollection` 是 data class,内容相同的重扫结果 equals 相等 ⇒ 不会误重置。
     var state by remember(collection) {
-        mutableStateOf(initialState ?: NamingState(NamingScheme(rootDirName = collection.rootDirName)))
+        mutableStateOf(initialState ?: NamingState(namingSchemeSeedOf(listOf(collection))))
     }
     fun update(next: NamingState) {
         state = next
@@ -177,7 +178,14 @@ fun NamingPage(
         )
 
         Text(
-            text = pluralStringResource(R.plurals.a_naming_title, pageOrder.size, collection.name, pageOrder.size),
+            // 标题用**清洗后**的名字(`derived.title`),与最终产出的 CBZ 名同源;
+            // 芯片行则用原始目录名(`name`)——那里要能对上文件管理器里的目录(用户 2026-10-19 裁决)。
+            text = pluralStringResource(
+                R.plurals.a_naming_title,
+                pageOrder.size,
+                collection.derived.title,
+                pageOrder.size,
+            ),
             style = MaterialTheme.typography.titleMedium,
             color = MaterialTheme.colorScheme.onBackground,
             modifier = Modifier

@@ -31,6 +31,7 @@ import androidx.compose.ui.unit.dp
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
+import com.cyanix.pixfold.domain.naming.namingSchemeSeedOf
 import com.cyanix.pixfold.R
 import com.cyanix.pixfold.domain.model.ImageCollection
 import com.cyanix.pixfold.domain.model.NamingScheme
@@ -217,7 +218,7 @@ fun WorkflowASteps(
     var namingState by remember(collections) {
         mutableStateOf(
             initialNamingState ?: NamingState(
-                NamingScheme(rootDirName = collections.firstOrNull()?.rootDirName.orEmpty()),
+                namingSchemeSeedOf(collections),
             ),
         )
     }
@@ -247,7 +248,7 @@ fun WorkflowASteps(
     fun resetAll() {
         updateState(workflowAStateOf(collections))
         updateNamingState(
-            NamingState(NamingScheme(rootDirName = collections.firstOrNull()?.rootDirName.orEmpty())),
+            NamingState(namingSchemeSeedOf(collections)),
         )
         cleanEmptyDirs = false
         confirmFlow = ConfirmFlowState()

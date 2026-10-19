@@ -40,8 +40,11 @@ fun defaultCbzName(
     id: String,
     titleSug: Suggestion<String>,
     volumeSug: Suggestion<Int?>,
+    cbzBaseSug: Suggestion<String> = Suggestion(null, ""),
 ): String {
-    val t = (titleSug.value ?: id).replace(ILLEGAL_FOR_FILE_NAME, "_")
+    // 基名优先用独立建议(CBZ 名要保留作者前缀),没有才退回 title。
+    val base = cbzBaseSug.value?.takeIf { it.isNotEmpty() } ?: titleSug.value ?: id
+    val t = base.replace(ILLEGAL_FOR_FILE_NAME, "_")
     val v = volumeSug.value
     return if (v == null) "$t.cbz" else "$t 第${v.toString().padStart(2, '0')}卷.cbz"
 }
@@ -78,6 +81,7 @@ fun comicVolumeOf(
     langSug: Suggestion<String>,
     outputDirSug: String,
     outputExists: Boolean = false,
+    cbzBaseSug: Suggestion<String> = Suggestion(null, ""),
 ): ComicVolume = ComicVolume(
     id = id,
     dirPath = dirPath,
@@ -96,7 +100,8 @@ fun comicVolumeOf(
     volume = volumeSug.value,
     language = LangChoice.Unset,
     otherLangCode = "",
-    cbzFileName = defaultCbzName(id, titleSug, volumeSug),
+    cbzBaseSug = cbzBaseSug,
+    cbzFileName = defaultCbzName(id, titleSug, volumeSug, cbzBaseSug),
     outputDir = outputDirSug,
     pageOrder = pageOrderOf(pages),
 )
@@ -137,7 +142,7 @@ fun useSuggestion(volume: ComicVolume, field: MetaField): ComicVolume {
         // 语言的建议值就是"未设置":回 Unset 并清空手输代码
         MetaField.Language -> volume.copy(language = LangChoice.Unset, otherLangCode = "")
         MetaField.CbzName -> volume.copy(
-            cbzFileName = defaultCbzName(volume.id, volume.titleSug, volume.volumeSug),
+            cbzFileName = defaultCbzName(volume.id, volume.titleSug, volume.volumeSug, volume.cbzBaseSug),
         )
         MetaField.OutputDir -> volume.copy(outputDir = volume.outputDirSug)
     }

@@ -87,6 +87,16 @@ data class ComicVolume(
     val otherLangCode: String = "",
     val cbzFileName: String,
     val outputDir: String,
+    /**
+     * CBZ 文件名的**基名建议**(不含卷号后缀与扩展名)。
+     *
+     * 必须独立于 [titleSug]:CBZ 名要**保留** `[作者]` 前缀(文件名用于在文件管理器里
+     * 辨认,作者是有用信息),而 `<Title>` 元数据不保留(作者另写 `<Writer>`)。
+     * 两者共用 `titleSug` 会让「恢复建议值」悄悄丢掉作者前缀。
+     *
+     * 为空串表示「没有单独的建议」,此时 [defaultCbzName] 回退到 `titleSug`。
+     */
+    val cbzBaseSug: Suggestion<String> = Suggestion(null, ""),
     /** 逐项例外:被人工改过的字段;批量设置时**跳过**这些字段(验收第 13 项)。 */
     val overridden: Set<MetaField> = emptySet(),
     val pageOrder: PageOrderState = pageOrderOf(pages),

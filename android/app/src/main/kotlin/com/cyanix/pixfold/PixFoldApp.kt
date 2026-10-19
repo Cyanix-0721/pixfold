@@ -17,6 +17,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.core.net.toUri
 import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
@@ -26,11 +27,14 @@ import androidx.navigation.compose.rememberNavController
 import androidx.navigation.toRoute
 import com.cyanix.pixfold.domain.mock.MockData
 import com.cyanix.pixfold.domain.mock.MockDataB
+import com.cyanix.pixfold.domain.comic.comicVolumesFrom
+import com.cyanix.pixfold.domain.model.ComicVolume
 import com.cyanix.pixfold.domain.model.ImageCollection
 import com.cyanix.pixfold.domain.model.NamingScheme
 import com.cyanix.pixfold.domain.model.NamingState
 import com.cyanix.pixfold.domain.model.effectiveScheme
 import com.cyanix.pixfold.domain.naming.buildProposals
+import com.cyanix.pixfold.domain.naming.namingSchemeSeedOf
 import com.cyanix.pixfold.domain.naming.setOverride
 import com.cyanix.pixfold.domain.workflowa.WorkflowAState
 import com.cyanix.pixfold.domain.workflowa.reconcileNamingState
@@ -39,6 +43,10 @@ import com.cyanix.pixfold.domain.workflowa.workflowAStateOf
 import com.cyanix.pixfold.data.SharedPrefsSettingsStore
 import com.cyanix.pixfold.data.saf.AndroidSafSource
 import com.cyanix.pixfold.data.saf.AndroidThumbnailSource
+import com.cyanix.pixfold.data.saf.SafOutputExistsProbe
+import com.cyanix.pixfold.data.saf.SafPackExecutor
+import com.cyanix.pixfold.domain.workflowb.WorkflowBState
+import com.cyanix.pixfold.domain.workflowb.reconcileLibrary
 import com.cyanix.pixfold.ui.workspace.CachingThumbnailSource
 import com.cyanix.pixfold.domain.settings.AppLanguage
 import com.cyanix.pixfold.domain.settings.PixFoldSettings
@@ -202,9 +210,66 @@ fun PixFoldApp(store: SettingsStore? = null) {
             val collections = remember(workspaceState) {
                 workspaceState.collectionsOr(MockData.workspaceA.collections)
             }
-            // 工作流 B 演示数据:5 卷覆盖缺卷号 / 无语言线索 / 输出冲突三类异常
-            // (验收第 11–14 项;确定性 mock,不连真实文件系统)。
-            val library = remember { MockDataB.library }
+            // ---- 工作流 B 的真实数据源(D2b,用户 2026-10-19 裁决「复用工作区」)----
+            //
+            // 「一个集合 = 一本」:工作区扫描出的每个**直接含图片的目录**就是一个卷,
+            // 父目录即系列 —— 与工作流 A 完全同一套语义,两处不会对同一批文件给出
+            // 不一致的划分。
+            //
+            // 三层分工(与 `SafPackExecutor` 的 KDoc 一致):
+            //   comicVolumesFrom        —— 纯函数,集合 → 卷的建议值
+            //   SafOutputExistsProbe    —— 问provider「同名 CBZ 是不是已经在那」,决定覆盖警告
+            //   SafPackExecutor         —— 真正逐页读字节、写 ZIP
+            //
+            // ⚠️ 为什么 `outputExists` 必须问一次(哪怕慢):它为 true 而未告知用户,
+            // 打包时会静默覆盖别人已有的文件;它为 false 而实际存在,撤销记录会把
+            // 「覆盖」记成「新建」,撤销时**删掉用户原来的文件**(缺陷 R3)。
+            val packTreeUri = workspaceHandle?.treeUri?.let { it.toUri() }
+            // probe 的目录解析必须与 `dirOfVolume` 用**同一套**规则,否则「判断存在」
+            // 和「实际写入」会看两个不同的目录。规则由 `comicVolumesFrom` 的输出目录
+            // 建议值定义:卷目录的父目录;根下一级时回退工作区根的显示名。
+            val outputDirOf: (com.cyanix.pixfold.domain.model.ComicVolume) -> String = { volume ->
+                volume.outputDir
+            }
+            val scannedVolumes = remember(collections, packTreeUri, workspaceHandle?.displayName) {
+                if (packTreeUri == null) {
+                    // 没有可用工作区 ⇒ 退回演示数据。这不是「悄悄塞假数据」:
+                    // 界面顶部的工作区条同时显示「未选择工作区」,用户看得见自己在
+                    // 哪个状态,与工作流 A 的 `collectionsOr` 是同一套回退口径。
+                    MockDataB.library.volumes
+                } else {
+                    val probe = SafOutputExistsProbe(
+                        context = context,
+                        treeUri = packTreeUri,
+                        dirOfVolume = outputDirOf,
+                    )
+                    comicVolumesFrom(
+                        collections = collections,
+                        rootDisplayName = workspaceHandle?.displayName.orEmpty(),
+                        outputExists = probe,
+                    )
+                }
+            }
+            val libraryRootPath = workspaceHandle?.displayName
+                ?: MockDataB.library.rootPath
+            // 工作流 B 也有「实时刷新 + 增量对账」(与 A 同构):用户在文件管理器里
+            // 增删图片/目录后,卷列表会重扫;重扫**不能**清掉用户填好的元数据与勾选。
+            // 对账责任在这一层 —— `WorkflowBSteps` 只负责不缓存(见其 KDoc)。
+            var workflowBVolumes by remember(workspaceHandle) {
+                mutableStateOf(scannedVolumes)
+            }
+            val lastReconciledB = remember(workspaceHandle) { LastReconciledVolumes(scannedVolumes) }
+            if (lastReconciledB.volumes != scannedVolumes) {
+                lastReconciledB.volumes = scannedVolumes
+                workflowBVolumes = reconcileLibrary(
+                    previous = WorkflowBState(
+                        rootPath = libraryRootPath,
+                        volumes = workflowBVolumes,
+                        activeVolumeId = "",
+                    ),
+                    scanned = scannedVolumes,
+                ).volumes
+            }
             // 预览跟随**当前集合**:切集合后打开预览应看到该集合的图,
             // 否则页码与图片会对不上(索引来自当前集合)。
             //
@@ -265,7 +330,7 @@ fun PixFoldApp(store: SettingsStore? = null) {
             var namingState by remember(workspaceHandle) {
                 mutableStateOf(
                     NamingState(
-                        NamingScheme(rootDirName = collections.firstOrNull()?.rootDirName.orEmpty()),
+                        namingSchemeSeedOf(collections),
                     ),
                 )
             }
@@ -309,9 +374,7 @@ fun PixFoldApp(store: SettingsStore? = null) {
                         workflowAState = workflowAStateOf(collections)
                         namingState =
                             NamingState(
-                                NamingScheme(
-                                    rootDirName = collections.firstOrNull()?.rootDirName.orEmpty(),
-                                ),
+                                namingSchemeSeedOf(collections),
                             )
                         activeCollectionId = collections.firstOrNull()?.id.orEmpty()
                     }
@@ -422,10 +485,24 @@ fun PixFoldApp(store: SettingsStore? = null) {
                 composable<WorkflowBRoute> {
                     DestinationSurface {
                         WorkflowBSteps(
-                            rootPath = library.rootPath,
-                            volumes = library.volumes,
+                            rootPath = libraryRootPath,
+                            volumes = workflowBVolumes,
                             // 同上:步骤级返回跟随手势进度。
                             predictiveBackAnimation = settings.predictiveBackAnimation,
+                            // 工作区条 + 空态:与工作流 A 同一份状态(用户裁决「复用工作区」),
+                            // 故在两处切目录互相同步。
+                            workspaceState = workspaceState,
+                            onPickWorkspace = { pickWorkspaceFolder.launch(null) },
+                            // 真实写入器。null 只在「没有工作区」时出现 —— 但那时
+                            // `scannedVolumes` 已回退到 mock,模拟执行反而更诚实
+                            // (不该往真实磁盘写一批来自 mock 路径的 CBZ)。
+                            packExecutor = packTreeUri?.let { uri ->
+                                SafPackExecutor(
+                                    context = context,
+                                    treeUri = uri,
+                                    rootDisplayName = workspaceHandle?.displayName.orEmpty(),
+                                )
+                            },
                         )
                     }
                 }
@@ -448,6 +525,22 @@ fun PixFoldApp(store: SettingsStore? = null) {
  * 容器本身仍需 `remember`：它要跨重组存活，且随工作区句柄一起重建。
  */
 private class LastReconciled(var collections: List<ImageCollection>)
+
+/**
+ * 工作流 B 的对账基准（**普通可变字段**，不是 `mutableStateOf`）。
+ *
+ * 为什么用普通字段：它只用来回答「这一帧的扫描结果跟上一帧是不是同一份」，答案
+ * 不该参与重组；写成 state 会多触发一轮与界面无关的重组，而且会让「记录基准」
+ * 这个动作本身被 Compose 的写-读追踪当成状态变更。
+ *
+ * 为什么用 `!=` 而不是引用比较：`comicVolumesFrom` 每次扫描都新建列表，
+ * 引用永远不等 ⇒ 每次重组都对账一次，把用户正在改的元数据反复重算。
+ *
+ * 与工作流 A 的 [LastReconciled] 分开两个类而非泛型化：两者记录的元素类型不同
+ * （`ImageCollection` / `ComicVolume`），合并成一个泛型类只会多一层类型参数
+ * 而不减少任何逻辑。
+ */
+private class LastReconciledVolumes(var volumes: List<ComicVolume>)
 
 /**
  * 把设置里的语言应用到系统的 **per-app locale**。

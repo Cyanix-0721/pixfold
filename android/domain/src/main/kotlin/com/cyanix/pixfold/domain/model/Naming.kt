@@ -159,16 +159,29 @@ data class NamingState(
 /**
  * 计算**当前生效**的命名结构(唯一入口)。
  *
- * 根目录名:用户改过 -> 用用户的;否则 -> 用当前集合的 [ImageCollection.rootDirName]。
+ * 根目录名:用户改过 -> 用用户的;否则 -> 用当前集合的**清洗后标题**
+ * ([com.cyanix.pixfold.domain.naming.DerivedNames.title])。
  * 其余字段一律取自 [NamingState.scheme](批次级)。
  *
- * **为什么不直接把集合名写回 `scheme.rootDirName`**:那样就分不清"跟随集合的默认值"
- * 与"用户手输的值" —— 切集合会把用户输入冲掉,或反过来永远不跟随。
- * 用独立的可空字段表达"是否覆盖",语义无歧义。
+ * ## 为什么跟随集合时要用清洗后的名字(2026-10-19 真机改判)
+ *
+ * 原先直接取 [ImageCollection.rootDirName](= 原始目录名)。真实素材下
+ * `[Cior (Ken-1)] 彼女がボクの知らないところで` 会让「新名称」预览变成
+ * `[Cior (Ken-1)] 彼女がボクの知らないところで_001.jpg` —— 与同页标题
+ * (`命名结构 · 彼女がボクの知らないところで（24 张）`)和最终 CBZ 名都对不上。
+ * `RootDir` 组件产出的就是**新文件名**,按「落盘文件名用清洗后的名字」的裁决,
+ * 它必须与 `comicVolumesFrom` 算出的 CBZ 基名同源。
+ *
+ * ## 为什么不直接把集合名写回 `scheme.rootDirName`
+ *
+ * 那样就分不清"跟随集合的默认值"与"用户手输的值" —— 切集合会把用户输入冲掉,
+ * 或反过来永远不跟随。用独立的可空字段表达"是否覆盖",语义无歧义。
  */
 fun effectiveScheme(state: NamingState, collection: ImageCollection): NamingScheme =
     if (state.rootDirNameOverride != null) {
         state.scheme.copy(rootDirName = state.rootDirNameOverride)
     } else {
-        state.scheme.copy(rootDirName = collection.rootDirName)
+        // `derived.title`:剥作者前缀 / 括号原作 / 末尾标注。空结果时 `derivedNamesOf`
+        // 已回退到原始名,故这里不会出现空根目录名。
+        state.scheme.copy(rootDirName = com.cyanix.pixfold.domain.naming.derivedNamesOf(collection.rootDirName).title)
     }

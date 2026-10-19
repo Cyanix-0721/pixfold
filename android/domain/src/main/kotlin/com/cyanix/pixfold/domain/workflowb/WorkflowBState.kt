@@ -24,9 +24,33 @@ data class WorkflowBState(
     val volumes: List<ComicVolume>,
     val activeVolumeId: String,
 ) {
-    /** 当前卷;id 失效时退回第一卷(不返回 null,避免 UI 到处判空)。 */
+    /**
+     * 当前卷;**空工作区时为 null**。
+     *
+     * 真实 SAF 扫描可能一卷都不产生(目录里没有图片,或图片全散在根目录 ——
+     * 按「每个直接含图片的目录 = 一个集合」的规则,根目录本身不构成卷)。
+     * 这是**合法状态**,不是异常,故这里给可空版本。
+     */
+    val activeVolumeOrNull: ComicVolume?
+        get() = volumes.firstOrNull { it.id == activeVolumeId } ?: volumes.firstOrNull()
+
+    /**
+     * 当前卷;id 失效时退回第一卷。
+     *
+     * ⚠️ **空列表会抛异常**(`volumes.first()` 的语义)。界面在读取本属性**之前**
+     * 必须先用 [hasVolumes] 判定并渲染空态;空态三处落点见 `MetadataPage`、
+     * `PackPreviewPage`、`LibraryPage`。领域层保留非空版本是因为绝大多数调用点
+     * (批量设置、计划生成、预览)都以「至少有一卷」为前提,让它们逐个判空只是噪声。
+     *
+     * 异常消息刻意写成 `NoSuchElementException: List is empty.` 之外的形态 ——
+     * 崩溃日志里能一眼看出「读的是 activeVolume,且卷列表是空的」。
+     */
     val activeVolume: ComicVolume
-        get() = volumes.firstOrNull { it.id == activeVolumeId } ?: volumes.first()
+        get() = activeVolumeOrNull
+            ?: throw NoSuchElementException("当前工作区没有任何漫画卷,不能读取 activeVolume")
+
+    /** 是否有卷可处理(空工作区的显式判据)。 */
+    val hasVolumes: Boolean get() = volumes.isNotEmpty()
 
     val includedCount: Int get() = volumes.count { it.included }
 

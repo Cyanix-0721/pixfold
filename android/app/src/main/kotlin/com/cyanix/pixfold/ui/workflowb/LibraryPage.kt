@@ -26,6 +26,7 @@ import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.cyanix.pixfold.R
@@ -35,9 +36,19 @@ import com.cyanix.pixfold.domain.workflowb.WorkflowBState
 import com.cyanix.pixfold.domain.workflowb.selectVolume
 import com.cyanix.pixfold.domain.workflowb.setVolumeIncluded
 import com.cyanix.pixfold.ui.components.PageActionBar
+import com.cyanix.pixfold.ui.workspace.WorkspaceBar
+import com.cyanix.pixfold.ui.workspace.WorkspaceState
 import com.cyanix.pixfold.ui.text.textOf
 
 const val TAG_LIBRARY_PAGE = "library-page"
+
+/**
+ * 步骤 1 的空工作区提示（工作区扫不出任何卷）。
+ *
+ * 与步骤 2 / 步骤 3 的空态 tag 分开：三处文案不同，共用一个 tag 时测试无法区分
+ * 是不是渲染了错误的那一页 —— 而「空态出现在错误的页上」正是路由缺陷的典型形态。
+ */
+const val TAG_LIBRARY_EMPTY = "library-page-empty"
 const val TAG_LIBRARY_LIST = "library-list"
 const val TAG_LIBRARY_SUMMARY = "library-summary"
 
@@ -81,6 +92,16 @@ fun LibraryPage(
     modifier: Modifier = Modifier,
     contentInsets: WindowInsets = WindowInsets.safeDrawing,
     onNext: (() -> Unit)? = null,
+    /**
+     * 工作区状态（D2b）。`null` = **不显示**工作区条。
+     *
+     * 与工作流 A 的同名参数语义完全一致：默认 `null` 让既有测试的布局与断言一行都不用改。
+     * 真实应用由 `PixFoldApp` 注入。用户 2026-10-19 裁决「工作流 B 复用工作区
+     * （和工作流 A 同一套）」—— 因此这里显示的**就是同一个**工作区，不是第二份选择。
+     */
+    workspaceState: WorkspaceState? = null,
+    /** 用户要求选择/更换工作区目录。仅 [workspaceState] 非 null 时会被调用。 */
+    onPickWorkspace: () -> Unit = {},
 ) {
     // 要进 semantics{},故先在组合上下文里解析
     val nextCd = stringResource(R.string.lib_next_cd)
@@ -90,6 +111,11 @@ fun LibraryPage(
             .windowInsetsPadding(contentInsets)
             .testTag(TAG_LIBRARY_PAGE),
     ) {
+        // 工作区条常驻在标题行**之前**：它决定下面整个列表的来源，
+        // 放在列表里会随滚动消失（与工作流 A 的落点一致，见 HANGOFF §4「从属层」）。
+        if (workspaceState != null) {
+            WorkspaceBar(state = workspaceState, onPick = onPickWorkspace)
+        }
         Text(
             text = stringResource(R.string.lib_root, state.rootPath),
             style = MaterialTheme.typography.titleSmall,
@@ -119,6 +145,22 @@ fun LibraryPage(
                 .testTag(TAG_LIBRARY_LIST),
             verticalArrangement = Arrangement.spacedBy(2.dp),
         ) {
+            if (!state.hasVolumes) {
+                // 空工作区:光有顶部的工作区条与一条「0 卷」摘要,下面一片空白,
+                // 用户会以为还在加载。必须给一句明确的话 + 出口(工作区条上的「更换」)。
+                item(key = "empty") {
+                    Text(
+                        text = stringResource(R.string.b_library_empty),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 24.dp, vertical = 32.dp)
+                            .testTag(TAG_LIBRARY_EMPTY),
+                    )
+                }
+            }
             state.seriesGroups.forEach { (series, volumes) ->
                 // 分组键保持语言无关(空串 = 未命名系列,见 groupVolumesBySeries 的 KDoc);
                 // 只有**显示**时才翻译,故 testTag 用原始键、标题用解析结果。
@@ -128,7 +170,7 @@ fun LibraryPage(
                 items(volumes, key = { it.id }) { volume ->
                     VolumeRow(
                         volume = volume,
-                        selected = volume.id == state.activeVolume.id,
+                        selected = volume.id == state.activeVolumeOrNull?.id,
                         onSelect = { onStateChange(selectVolume(state, volume.id)) },
                         onToggleIncluded = { checked ->
                             onStateChange(setVolumeIncluded(state, volume.id, checked))

@@ -316,4 +316,112 @@ class PackPreflightTest {
         )
         assertFalse(result.canProceed)
     }
+
+    // ==================== 同批输出名冲突（2026-10-19 真机实测发现的缺陷） ====================
+
+    /**
+     * 真机再现：同系列两本，目录名都解析不出卷号 ⇒ 两卷 `cbzFileName` 相同。
+     * 执行后报告显示「成功 2」，磁盘上只剩 1 个文件（79,764,572 B）。
+     * 断言这个情形**在执行前就被拦住**。
+     */
+    @Test
+    fun `两卷写同一路径时阻断执行`() {
+        val a = planWithOutput("v1", outputName = "同名.cbz")
+        val b = planWithOutput("v2", outputName = "同名.cbz")
+
+        val result = preflightPackPlans(listOf(a, b), hugeAvailable, percent10, safetyMargin = 0L)
+
+        assertFalse(result.canProceed, "同批两卷写同一文件,后写必然毁掉前写")
+        val blocker = result.blockers.filterIsInstance<PackBlocker.OutputNameCollision>().single()
+        assertEquals("out/同名.cbz", blocker.outputPath)
+        assertEquals(listOf("v1", "v2"), blocker.volumeIds)
+        assertEquals(2, blocker.collidingCount)
+    }
+
+    @Test
+    fun `三卷撞同一路径时一次列出全部卷`() {
+        val plans = listOf("v1", "v2", "v3").map { planWithOutput(it, outputName = "同名.cbz") }
+
+        val result = preflightPackPlans(plans, hugeAvailable, percent10, 0L)
+
+        val blocker = result.blockers.filterIsInstance<PackBlocker.OutputNameCollision>().single()
+        assertEquals(3, blocker.collidingCount)
+        assertEquals(listOf("v1", "v2", "v3"), blocker.volumeIds)
+    }
+
+    @Test
+    fun `不同目录下的同名文件不算冲突`() {
+        // 不同系列各有一本「第01卷.cbz」是完全合法的 —— 判据必须是**完整路径**,
+        // 不能只是文件名,否则会把正常的多系列工作区误判成冲突。
+        val a = planWithOutput("v1", outputName = "第01卷.cbz", outputDir = "系列A")
+        val b = planWithOutput("v2", outputName = "第01卷.cbz", outputDir = "系列B")
+
+        val result = preflightPackPlans(listOf(a, b), hugeAvailable, percent10, 0L)
+
+        assertTrue(result.canProceed)
+        assertTrue(result.blockers.isEmpty())
+    }
+
+    @Test
+    fun `跳过的卷不参与冲突判定`() {
+        // 跳过卷不写任何字节,它参与判定会让用户被一个根本不会发生的冲突拦住。
+        val a = planWithOutput("v1", outputName = "同名.cbz")
+        val b = planWithOutput("v2", outputName = "同名.cbz", skipped = true)
+
+        val result = preflightPackPlans(listOf(a, b), hugeAvailable, percent10, 0L)
+
+        assertTrue(result.canProceed)
+    }
+
+    @Test
+    fun `冲突与空间不足同时成立时两条阻断项都在`() {
+        // 一次给全部问题 —— 用户改完元数据后不该又被新的一条拦住第二次。
+        val a = planWithOutput("v1", outputName = "同名.cbz")
+        val b = planWithOutput("v2", outputName = "同名.cbz")
+
+        val result = preflightPackPlans(listOf(a, b), availableBytes = 0L, percent10, 0L)
+
+        assertFalse(result.canProceed)
+        assertEquals(2, result.blockers.size)
+        assertTrue(result.blockers.any { it is PackBlocker.OutputNameCollision })
+        assertTrue(result.blockers.any { it is PackBlocker.SpaceInsufficient })
+    }
+
+    @Test
+    fun `多组冲突按路径排序各成一条`() {
+        // 输入顺序**刻意与字典序相反**（甲 U+7532 > 乙 U+4E59）：
+        // 若断言顺序与 groupBy 的自然首现顺序一致，去掉排序的变异会存活 ——
+        // 实测 M5 就因此活过一轮。
+        val plans = listOf(
+            planWithOutput("b1", outputName = "甲.cbz"),
+            planWithOutput("b2", outputName = "甲.cbz"),
+            planWithOutput("a1", outputName = "乙.cbz"),
+            planWithOutput("a2", outputName = "乙.cbz"),
+        )
+
+        val result = preflightPackPlans(plans, hugeAvailable, percent10, 0L)
+
+        val collisions = result.blockers.filterIsInstance<PackBlocker.OutputNameCollision>()
+        // 按 code point 排序：「乙」U+4E59 < 「甲」U+7532。别按直觉的中文顺序断言。
+        assertEquals(listOf("out/乙.cbz", "out/甲.cbz"), collisions.map { it.outputPath })
+    }
+
+    /** 造一个输出名/输出目录可控的计划（冲突判据直接吃 `outputPath`）。 */
+    private fun planWithOutput(
+        id: String,
+        outputName: String,
+        outputDir: String = "out",
+        skipped: Boolean = false,
+    ): VolumePackPlan {
+        val v = volume(id).copy(cbzFileName = outputName, outputDir = outputDir)
+        return VolumePackPlan(
+            volume = v,
+            outputDisplay = outputName,
+            pageCount = v.pageCount,
+            skipped = skipped,
+            skipReason = null,
+            conflictPolicy = OutputConflictPolicy.Rename,
+            sourcePolicy = SourcePolicy.Keep,
+        )
+    }
 }

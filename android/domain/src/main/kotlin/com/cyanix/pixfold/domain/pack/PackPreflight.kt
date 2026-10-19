@@ -61,6 +61,32 @@ sealed interface PackBlocker {
     ) : PackBlocker {
         val shortfallBytes: Long get() = space.shortfallBytes
     }
+
+    /**
+     * 同一批计划里有**多个卷写出到同一个文件**。
+     *
+     * 2026-10-19 真机实测发现的真实缺陷：真实素材同系列两本
+     * （`[Cior (Ken-1)] …で` 与 `…で――2 [DL版]`）目录名都解析不出卷号，
+     * Title 又都取了系列名 ⇒ 两卷 `cbzFileName` 相同 ⇒ 后一卷静默覆盖前一卷。
+     * 报告显示「成功 2」，磁盘上只剩 1 个文件、79,764,572 B —— **用户以为两本都打好了**。
+     *
+     * 为什么是**阻断**而不是提示：无论 [com.cyanix.pixfold.domain.plan.OutputConflictPolicy]
+     * 选什么，同批内两个不同卷写同一路径都不可能同时成立（后写必然毁掉前写）。
+     * 这不是「要不要覆盖已有文件」的问题，是「这批计划本身自相矛盾」。
+     *
+     * 为什么归预检而不是归 `PackRunner`：执行到一半才发现冲突时，前几卷的字节
+     * 已经落盘、覆盖已经发生；用户本该在点「执行」之前就知道。
+     *
+     * @param outputPath 被多个卷抢的路径（原样给用户看，便于他去改元数据）
+     * @param volumeIds 抢同一路径的卷 id（≥2；顺序 = 计划顺序，便于定位是哪两本）
+     */
+    data class OutputNameCollision(
+        val outputPath: String,
+        val volumeIds: List<String>,
+    ) : PackBlocker {
+        /** 卷数（≥2）。界面文案「%1$d 卷写到同一个文件」用它。 */
+        val collidingCount: Int get() = volumeIds.size
+    }
 }
 
 /** 提示项：不阻止执行，但用户应当知道。 */
@@ -144,6 +170,24 @@ fun preflightPackPlans(
     }.toMutableList()
 
     val blockers = mutableListOf<PackBlocker>()
+
+    // 同批输出名冲突 —— **必须最先判**,且与空间无关:哪怕空间充足到能写十份,
+    // 两个卷写同一路径也只有最后一份能活下来。
+    // 用 outputPath(含目录)而非仅文件名:不同输出目录下的同名 CBZ 是合法的。
+    // 同批输出名冲突 —— **必须最先判**,且与空间无关:哪怕空间充足到能写十份,
+    // 两个卷写同一路径也只有最后一份能活下来。
+    // 用 outputPath(含目录)而非仅文件名:不同输出目录下的同名 CBZ 是合法的。
+    blockers += runnable
+        .groupBy { it.outputPath }
+        .filterValues { it.size > 1 }
+        .entries
+        .sortedBy { it.key }
+        .map { (path, group) ->
+            PackBlocker.OutputNameCollision(
+                outputPath = path,
+                volumeIds = group.map { it.volume.id },
+            )
+        }
 
     // 空计划:干脆不判空间。estimatedBytes = 0 + safetyMargin > 0 会返回 Marginal,
     // 而「没有东西要打包」被告知「空间临界」是荒唐的。

@@ -1,6 +1,7 @@
 package com.cyanix.pixfold.ui.workflowb
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
@@ -27,6 +28,7 @@ import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.cyanix.pixfold.R
 import com.cyanix.pixfold.domain.comic.includedVolumes
@@ -38,6 +40,7 @@ import com.cyanix.pixfold.domain.plan.effectiveDangerActions
 import com.cyanix.pixfold.domain.plan.generalSummaryLines
 import com.cyanix.pixfold.domain.plan.buildConfirmSequence
 import com.cyanix.pixfold.domain.plan.planCountsOf
+import com.cyanix.pixfold.domain.task.TaskProgress
 import com.cyanix.pixfold.ui.plan.ConfirmDialog
 import com.cyanix.pixfold.ui.plan.PlanHeader
 import com.cyanix.pixfold.ui.plan.PlanRow
@@ -62,6 +65,17 @@ const val TAG_PACK_VOLUME_SELECTOR = "pack-volume-selector"
 const val TAG_PACK_PENDING = "pack-pending-issues"
 const val TAG_PACK_EXCLUDED = "pack-excluded"
 const val TAG_PACK_INCLUDED_COUNT = "pack-included-count"
+
+/**
+ * 步骤 3 的空工作区态（没有任何卷可打包）。
+ *
+ * 与 `MetadataPage` 的 `TAG_META_EMPTY` 分开：两页的空态文案不同（「没有可编辑的卷」
+ * vs 「没有可打包的卷」），共用一个 tag 会让测试无法区分是不是渲染了**错误的**那一页。
+ */
+const val TAG_PACK_EMPTY = "pack-empty"
+
+/** 执行被阻断/故障时的错误横条（D2b）。 */
+const val TAG_PACK_EXECUTION_ERROR = "pack-execution-error"
 
 /** 页码预览第 i 行。 */
 fun packPageRowTag(index: Int) = "pack-page-row-$index"
@@ -110,7 +124,59 @@ fun PackPreviewPage(
     onExecute: () -> Unit = {},
     showPlanSection: Boolean = false,
     onBack: (() -> Unit)? = null,
+    /**
+     * 是否正在真实执行（D2b）。
+     *
+     * `true` 时底部按钮变成「取消」、上方显示进度条 —— 用户必须在长任务里有**两件事**：
+     * 知道还要多久（进度）、以及能中途叫停（取消）。只给进度不给取消，在 30 卷
+     * × 每卷 20 页的规模下就是「关掉应用才能停」。
+     *
+     * 刻意不做成「根据 executor 是否为空自动推断」：测试里可以注入执行器但只想看
+     * 静态布局，两种需求要能分开表达。
+     */
+    executing: Boolean = false,
+    /**
+     * 打包进度（D2b）。`null` = 未开始或无进度可报。
+     *
+     * 类型用领域层已算好的 [TaskProgress] 而不是「已完成/总数」两个 Int：分段进度条
+     * 需要 `fraction`，而 `fraction` 在空任务时返回 1f（不是 NaN），这个边界已经在
+     * 领域层单测里钉住了，UI 侧不该再算一遍。
+     */
+    progress: TaskProgress? = null,
+    /** 用户要求中止执行。仅在 [executing] 为 true 时有意义。 */
+    onCancelExecution: () -> Unit = {},
+    /**
+     * 取消已发出、任务正在收尾（D2b）。
+     *
+     * 它会禁用「取消」按钮**但不隐藏它**：任务不是在收到信号的那一毫秒就停，
+     * 当前这一卷要写完（否则磁盘上会留下半个 CBZ）。这段时间里用户需要看到
+     * 「我已经按过了」的反馈，否则会连点，而连点会让上层重复发取消信号。
+     */
+    cancelling: Boolean = false,
+    /**
+     * 执行被阻断/故障的一句话说明（D2b）。`null` = 无故障。
+     *
+     * 与 `ExecutionReportPage` 的报告是**两种东西**：报告说「哪些卷成功了」，
+     * 这里说「这次压根没跑起来」。前者是终局，后者是错误态 —— 混进报告里
+     * 会让用户以为部分卷已经写出来了。
+     */
+    executionError: String? = null,
 ) {
+    // 空工作区必须**先于**任何 `activeVolume` 读取判定（2026-10-19）。
+    // 真实 SAF 扫描可能一卷都不产生（目录里没有图片，或图片全散在根目录 ——
+    // 按「每个直接含图片的目录 = 一个集合」的规则，根目录本身不构成卷）。
+    // 此时 `WorkflowBState.activeVolume` 落到 `volumes.first()`，
+    // 直接抛 `NoSuchElementException: List is empty.`，整页崩在组合期。
+    // 步骤 2（`MetadataPage`）已有同样的防护；本页是同一缺陷的第二个落点。
+    if (libraryState.volumes.isEmpty()) {
+        PackEmptyState(
+            modifier = modifier,
+            contentInsets = contentInsets,
+            onBack = onBack,
+        )
+        return
+    }
+
     val volume = libraryState.activeVolume
     val preview = previewOf(volume)
 
@@ -360,10 +426,42 @@ fun PackPreviewPage(
             }
         }
 
+        // 执行故障横条:必须是**错误色**而不是普通的提示色 —— 它是「这次什么都没写成」,
+        // 不是「有个小提醒」。放在底栏正上方,因为用户的视线在按钮附近。
+        if (executionError != null) {
+            WarnLine(
+                icon = warnIcon(R.string.pack_error_space) ?: R.drawable.ic_warning_triangle,
+                text = executionError,
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.error,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 12.dp, vertical = 6.dp)
+                    .testTag(TAG_PACK_EXECUTION_ERROR),
+            )
+        }
+
         // 底栏:左 = 返回上一步,右 = 确认打包(用户 2026-09-25 指定)。
         // 终局动作原先在计划区末尾,计划覆盖全部 included 卷,长列表要滚很久才够得到,
         // 且未滚到之前按钮根本没被组合。与 A 侧 [TAG_A_PLAN_CONFIRM] 一致。
-        if (showPlanSection) {
+        //
+        // 执行期间(D2b)整条底栏换形态:计划区已经不可编辑,「确认打包」按下去只会
+        // 再启一次任务。此时唯一有意义的动作是**取消**,故右侧换成取消按钮,
+        // 左侧的返回也一并撤掉 —— 返回会离开这个目的地,而任务还在后台跑。
+        if (showPlanSection && executing) {
+            // 进度与取消由 `PackProgressBar` 一体承担（进度条 + 行内取消,见其 KDoc
+            // 「为什么取消按钮在进度条行内」）。**不在这里自作主张再写一套** ——
+            // 同一屏出现两个挂 TAG_PACK_PROGRESS 的进度条时,`onNodeWithTag` 会直接
+            // 撞到多个节点而失败,而且两条进度条的读数还可能不同源。
+            //
+            // 底栏在执行期整条撤掉:左侧「返回」会离开这个目的地(任务却还在后台跑),
+            // 右侧「确认打包」再按一次就是并发写同一批文件。
+            PackProgressBar(
+                progress = progress ?: TaskProgress(total = 0),
+                onCancel = onCancelExecution,
+                cancelling = cancelling,
+            )
+        } else if (showPlanSection) {
             val back = onBack
             val backCd = stringResource(R.string.b_step_back_cd)
             val confirmCd = stringResource(R.string.pack_confirm_cd)
@@ -470,6 +568,62 @@ private fun PackHeader(volume: ComicVolume, includedCount: Int, totalCount: Int)
             )
         }
         HorizontalDivider(modifier = Modifier.padding(top = 4.dp))
+    }
+}
+
+/**
+ * 步骤 3 的空工作区态。
+ *
+ * 与 `MetadataPage` 的 `MetadataEmptyState` 刻意同构（外层 `Column` 撑满 + 内边距 +
+ * `PageActionBar` 在列表之外），这样返回按钮在两种状态下落在同一位置。
+ *
+ * 为什么步骤 2 与步骤 3 都要各写一份而不是抽公共组件：两页的 tag 与文案都不同，
+ * 且这个空态只有 30 行、没有第二个变化维度；抽成公共组件反而要传 tag 与文案两个
+ * 参数，比复制更难读。真正需要统一的是**位置**（底栏同槽位），而这一点由两处都
+ * 用 `PageActionBar` 保证。
+ */
+@Composable
+private fun PackEmptyState(
+    modifier: Modifier,
+    contentInsets: WindowInsets,
+    onBack: (() -> Unit)?,
+) {
+    Column(
+        modifier = modifier
+            .fillMaxSize()
+            .windowInsetsPadding(contentInsets)
+            .testTag(TAG_PACK_PAGE),
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .weight(1f),
+            contentAlignment = Alignment.Center,
+        ) {
+            Text(
+                text = stringResource(R.string.b_pack_empty),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                textAlign = TextAlign.Center,
+                modifier = Modifier
+                    .padding(horizontal = 24.dp, vertical = 16.dp)
+                    .testTag(TAG_PACK_EMPTY),
+            )
+        }
+
+        if (onBack != null) {
+            val backCd = stringResource(R.string.b_step_back_cd)
+            PageActionBar(
+                leading = {
+                    FilledTonalButton(
+                        onClick = onBack,
+                        modifier = Modifier
+                            .testTag(TAG_B_STEP_BACK)
+                            .semantics { contentDescription = backCd },
+                    ) { Text(stringResource(R.string.b_step_back)) }
+                },
+            )
+        }
     }
 }
 

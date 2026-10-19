@@ -1,6 +1,7 @@
 package com.cyanix.pixfold.ui.workflowb
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
@@ -39,6 +40,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.cyanix.pixfold.R
 import com.cyanix.pixfold.domain.comic.applyWriterCleaning
@@ -95,6 +97,16 @@ const val TAG_WRITER_CLEAN = "metadata-writer-clean"
 
 /** 「下一步 打包计划」按钮(常驻底栏)。 */
 const val TAG_METADATA_NEXT = "metadata-next"
+
+/**
+ * 空工作区的显式空态(2026-10-19)。
+ *
+ * 真实 SAF 工作区可能**一卷都没有**:目录里没有任何图片,或所有图片都散在根目录
+ * (按「每个直接含图片的目录 = 一个集合」的规则,根目录本身不构成卷)⇒ 上层传下来的
+ * `volumes = emptyList()`。这条路径原先会在读取 `activeVolume` 时抛
+ * `NoSuchElementException`(领域层 `volumes.first()`),整页崩掉。
+ */
+const val TAG_META_EMPTY = "b-meta-empty"
 
 /** 元数据字段输入框(逐卷)。 */
 fun metaFieldTag(field: MetaField) = "metadata-field-${field.name}"
@@ -153,6 +165,23 @@ fun MetadataPage(
     fun update(next: WorkflowBState) {
         state = next
         onLibraryChange(next)
+    }
+
+    // 空工作区必须**先于**任何 `activeVolume` 读取判定(2026-10-19)。
+    // 真实 SAF 扫描可能一卷都不产生:目录里没有图片,或图片全散在根目录(根目录本身不成卷)。
+    // 此时 `WorkflowBState.activeVolume` 落到 `volumes.first()`,直接抛
+    // `NoSuchElementException: List is empty.` —— 整页崩在组合期。
+    // 领域层的那个定义由别的分支负责,这里只在 UI 层做防护:不读空列表、给出可见空态。
+    val empty = libraryState.volumes.isEmpty()
+    if (empty) {
+        // 空态**不渲染「下一步」**:没有卷可编辑,推进过去只会把空列表继续传下去。
+        // 但「返回」必须保留 —— 用户唯一的出路是退回去换一个目录。
+        MetadataEmptyState(
+            modifier = modifier,
+            contentInsets = contentInsets,
+            onBack = onBack,
+        )
+        return
     }
 
     val volume = state.activeVolume
@@ -392,6 +421,63 @@ fun MetadataPage(
                                 .semantics { contentDescription = nextCd },
                         ) { Text(stringResource(R.string.meta_next)) }
                     }
+                },
+            )
+        }
+    }
+}
+
+/**
+ * 空工作区时的整页替代内容。
+ *
+ * 与 `WorkflowASteps` 的 `EmptyWorkspace`、`SortAndPreviewPage` 的 `a_sort_empty` 空态
+ * 同一立场:**状态错配必须可见,白屏/崩溃是最坏的失败模式**。
+ *
+ * 结构刻意与正常态同构(外层 `Column` 撑满 + 内边距 + `PageActionBar` 在列表之外),
+ * 这样返回按钮落在与正常态完全相同的位置 —— 用户在两种状态下不用重新找它。
+ * 「下一步」不渲染:没有卷可编辑,推进没有意义。
+ */
+@Composable
+private fun MetadataEmptyState(
+    modifier: Modifier,
+    contentInsets: WindowInsets,
+    onBack: (() -> Unit)?,
+) {
+    Column(
+        modifier = modifier
+            .fillMaxSize()
+            .windowInsetsPadding(contentInsets)
+            .testTag(TAG_METADATA_PAGE),
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .weight(1f),
+            contentAlignment = Alignment.Center,
+        ) {
+            Text(
+                text = stringResource(R.string.b_meta_empty),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                textAlign = TextAlign.Center,
+                modifier = Modifier
+                    .padding(horizontal = 24.dp, vertical = 16.dp)
+                    .testTag(TAG_META_EMPTY),
+            )
+        }
+
+        // 底栏只保留返回槽位。渲染条件与正常态同形(`onBack != null` 才出现),
+        // 这样「直接组合本页的测试」不会凭空多出一条底栏、改变可用区域。
+        if (onBack != null) {
+            val backCd = stringResource(R.string.b_step_back_cd)
+            PageActionBar(
+                leading = {
+                    FilledTonalButton(
+                        onClick = onBack,
+                        modifier = Modifier
+                            .testTag(TAG_B_STEP_BACK)
+                            .semantics { contentDescription = backCd },
+                    ) { Text(stringResource(R.string.b_step_back)) }
                 },
             )
         }

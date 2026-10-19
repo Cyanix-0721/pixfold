@@ -691,6 +691,49 @@ class NamingPageTest {
             .assertTextEquals(TestText.plural(R.plurals.a_naming_title, 1, solo.name, 1))
     }
 
+    /**
+     * 标题用**清洗后**的名字,而不是原始目录名(2026-10-19 统一抽象)。
+     *
+     * 为什么需要这条:mock 的集合名本来就干净(`trip` / `scan` / `封:面?`),
+     * 用 `name` 还是 `derived.title` 在既有用例上**完全看不出区别** —— 变异实测
+     * 把标题改回 `collection.name` 时 app 614 项全绿。真实素材(`[Cior (Ken-1)] …`)
+     * 才有分叉,故这里显式造一个带作者前缀的集合名。
+     *
+     * 形态与 `[name]` 相反的另一面:芯片行仍显示原始目录名(见 `CollectionChipRows`),
+     * 那里用户要能在文件管理器里对上目录。
+     */
+    @Test
+    fun `naming title shows the cleaned name while chips keep the raw directory name`() {
+        val raw = "[Cior (Ken-1)] 彼女がボクの知らないところで"
+        val coll = ImageCollection("real", raw, raw, listOf(item("r1"), item("r2")))
+        show(collection = coll, order = pageOrderOf(coll.images))
+
+        // `assertTextEquals` 本身就是双向的:实现改回 `collection.name` 时,
+        // 实际值会是「[Cior (Ken-1)] 彼女がボクの知らないところで」,与期望不符即红。
+        rule.onNodeWithTag(TAG_NAMING_TITLE)
+            .assertTextEquals(TestText.plural(R.plurals.a_naming_title, 2, "彼女がボクの知らないところで", 2))
+    }
+
+    /**
+     * 默认方案的「新名称」预览不能带作者前缀 —— 这是 2026-10-19 真机抓到的第二处不一致。
+     *
+     * 当时步骤 2 的标题已经清洗成 `命名结构 · 彼女がボクの知らないところで（24 张）`,
+     * 而下面的新名称仍是 `[Cior (Ken-1)] 彼女がボクの知らないところで_001.jpg`:
+     * 同一页同一个名字两个形态。根因是 `NamingScheme.rootDirName` 播种自
+     * `ImageCollection.rootDirName`(原始目录名)。
+     *
+     * 修法 = `namingSchemeSeedOf(...)` 统一入口 + 取 `derivedNamesOf(rootDirName).title`。
+     * 本用例从**界面侧**钉住它:`show()` 不传 `initial`,走的就是生产播种路径。
+     */
+    @Test
+    fun `new name preview uses the cleaned root name`() {
+        val raw = "[Cior (Ken-1)] 彼女がボクの知らないところで"
+        val coll = ImageCollection("real", raw, raw, listOf(item("r1")))
+        show(collection = coll, order = pageOrderOf(coll.images))
+
+        assertFieldAfterScroll("r1", "彼女がボクの知らないところで_001.jpg")
+    }
+
     // ================= 手工调整披露(HANGOFF §11 第 10 条,2026-09-25 用户裁决) =================
 
     /**
