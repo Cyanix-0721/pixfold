@@ -1,16 +1,22 @@
 package com.cyanix.pixfold.ui.workflowb
 
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.material3.PrimaryTabRow
 import androidx.compose.material3.Tab
+import androidx.compose.material3.TextButton
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -21,12 +27,18 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.unit.dp
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import com.cyanix.pixfold.R
+import com.cyanix.pixfold.data.task.PackTaskBus
+import com.cyanix.pixfold.data.task.PackTaskRequest
+import com.cyanix.pixfold.data.task.PackTaskService
+import com.cyanix.pixfold.data.task.PackTaskSettled
+import com.cyanix.pixfold.data.task.PackTaskState
 import com.cyanix.pixfold.domain.model.ComicVolume
 import com.cyanix.pixfold.domain.plan.ConfirmFlowState
 import com.cyanix.pixfold.domain.plan.ExecutionReport
@@ -58,7 +70,9 @@ import com.cyanix.pixfold.nav.goToWorkflowBStep
 import com.cyanix.pixfold.nav.popWorkflowStep
 import com.cyanix.pixfold.nav.workflowBStepIndex
 import com.cyanix.pixfold.ui.components.ResetAllButton
+import com.cyanix.pixfold.ui.text.WarnLine
 import com.cyanix.pixfold.ui.workspace.WorkspaceState
+import com.cyanix.pixfold.ui.workspace.handleOrNull
 import kotlinx.coroutines.launch
 import com.cyanix.pixfold.ui.plan.ExecutionReportPage
 
@@ -163,8 +177,35 @@ fun WorkflowBSteps(
      * `Boolean`：执行器自身携带工作区 URI 与平台上下文，测试里根本无法构造真实现，
      * 而 `false` 那种布尔开关会让「忘了传执行器」与「故意不传」在类型上无法区分 ——
      * 前者是缺陷（用户点确认却什么都没写），后者是测试的正当需求。
+     *
+     * ⚠️ **2026-10-19 起真实应用不再走这条路径**，改用前台服务（见 [backgroundPacking]）：
+     * 在组合作用域里跑执行器，用户切到别的应用就会中断。这里保留它是因为
+     * 「进程内的同步执行」仍是单元测试与将来「只需要打一卷」的轻量场景的正当需求。
      */
     packExecutor: PackExecutorPort? = null,
+    /**
+     * 把打包交给前台服务（D2b 第 2 项「后台任务与进度 · 切后台恢复」）。
+     *
+     * `true` 时：
+     * - 点「确认打包」→ [PackTaskService.enqueue]，**不**在组合作用域里起协程；
+     * - 进度、取消、结果全部来自 [PackTaskBus]，Activity 重建/切后台都不影响任务；
+     * - 通知栏有持续进度（Android 16 上是状态栏胶囊 / Live Update）。
+     *
+     * 与 [packExecutor] 的关系：两者互斥，[backgroundPacking] 优先。做成两颗参数而不是
+     * 一个三态枚举，是因为它们回答的是两个不同问题（「谁来执行」与「在哪个生命周期里执行」），
+     * 而目前的组合只有三种：模拟（都空）/ 进程内（只给执行器）/ 前台服务（给服务标记）。
+     */
+    backgroundPacking: Boolean = false,
+    /**
+     * 上次打包被中断时，交给界面展示的恢复提示（D2b）。`null` = 没有需要提示的中断。
+     *
+     * 由上层（`PixFoldApp`）在启动时用 `recoverPackTask(快照, 服务是否还活着)` 算出，
+     * 提示被用户关掉后由上层清成 `null`。放上层是因为它要读落盘快照 + 问系统服务状态，
+     * 两件事都超出本组件的职责。
+     */
+    interruptedNotice: String? = null,
+    /** 用户确认/关闭了恢复提示。 */
+    onDismissInterruptedNotice: () -> Unit = {},
 ) {
     // 跨步骤共享的唯一状态源。这些状态**必须留在嵌套 NavHost 之外** ——
     // 它们要跨步骤存活,而 NavHost 里每个 destination 都是独立作用域。
@@ -221,6 +262,43 @@ fun WorkflowBSteps(
     val scope = rememberCoroutineScope()
     // 拒绝文案与结果故障要在非 composable 的回调里取 `Context` 解析文案
     val context = androidx.compose.ui.platform.LocalContext.current
+    // 这两条文案要**在组合期**取，不能在点击回调里 `context.getString`：
+    // 前者不会被记为配置依赖，语言/字号一变还拿着旧 Configuration 的字符串
+    // （lint `LocalContextGetResourceValueCall`）。取值时机与展示时机解耦后，
+    // 回调里只需把字符串塞进状态。
+    val unknownErrorText = androidx.compose.ui.res.stringResource(
+        com.cyanix.pixfold.R.string.pack_error_unknown,
+    )
+    val busyErrorText = androidx.compose.ui.res.stringResource(
+        com.cyanix.pixfold.R.string.pack_error_busy,
+    )
+
+    // ---- 前台服务执行（D2b 第 2 项）----
+    // Service 是唯一执行方，这里只是观察者。`collectAsState` 在 Activity 重建后
+    // 直接拿到当前进度（进程还活着的情况下），不需要任何重连逻辑。
+    val backgroundState by PackTaskBus.state.collectAsState()
+    val backgroundRunning = backgroundState as? PackTaskState.Running
+
+    // 三个派生值，**不写回**上面那组 mutable 状态：
+    // 组合期写 `mutableStateOf` 会把「读取」变成「读取+写入」，在同一帧里触发
+    // 额外的重组，且让「服务态」与「进程内态」两份真相互相覆盖。
+    val effectiveExecuting = if (backgroundPacking) backgroundRunning != null else executing
+    val effectiveCancelling = if (backgroundPacking) backgroundRunning?.cancelling ?: false else cancelling
+    val effectiveProgress = if (backgroundPacking) backgroundRunning?.progress else progress
+
+    // 收尾结果只在副作用里消费一次。展示完把总线拨回 Idle，否则下次进打包页
+    // 还会看到上一次的报告，用户会以为刚才那次又跑了一遍。
+    LaunchedEffect(backgroundState, backgroundPacking) {
+        if (!backgroundPacking) return@LaunchedEffect
+        val settled = backgroundState as? PackTaskState.Settled ?: return@LaunchedEffect
+        when (val outcome = settled.outcome) {
+            is PackTaskSettled.Done -> report = outcome.report
+            is PackTaskSettled.Cancelled -> report = outcome.report
+            is PackTaskSettled.Rejected -> executionError = outcome.message
+            is PackTaskSettled.Error -> executionError = outcome.message
+        }
+        PackTaskBus.consumeResult()
+    }
 
     val navController = rememberNavController()
     // 当前步骤**从导航栈派生**(理由同 WorkflowASteps):手势进行中 entry 不变,序号稳定。
@@ -237,7 +315,15 @@ fun WorkflowBSteps(
     fun resetAll() {
         // 重置时若有任务在跑,先叫停 —— 否则重置完界面归零,后台还在往磁盘写,
         // 用户看到的是「我明明重置了,文件却还在变多」。
-        cancelToken?.cancel()
+        //
+        // 前台服务路径下「叫停」走总线：`requestCancel` 会让执行方在**卷间**停下。
+        // 注意**不要**在这里 `consumeResult` 清状态 —— 那会把正在跑的任务从界面上
+        // 抹掉而磁盘上它还在写，比不重置更糟。
+        if (backgroundPacking) {
+            if (backgroundRunning != null) PackTaskBus.requestCancel()
+        } else {
+            cancelToken?.cancel()
+        }
         cancelToken = null
         executing = false
         cancelling = false
@@ -259,6 +345,13 @@ fun WorkflowBSteps(
             .fillMaxSize()
             .windowInsetsPadding(contentInsets),
     ) {
+        // 上次被打断的提示（D2b 第 2 项）。放在**页签行之上**：它讲的是「上一轮
+        // 遗留的问题」，与本轮选到哪一步无关；塞进某个步骤里会让只在别的步骤
+        // 工作的用户永远看不到它。
+        if (interruptedNotice != null) {
+            InterruptedNoticeRow(text = interruptedNotice, onDismiss = onDismissInterruptedNotice)
+        }
+
         // 页签行 + 右侧「重置全部」:理由与槽位写法同 WorkflowASteps
         //(`PrimaryTabRow` 无 trailing 槽位,故外层 Row 分槽)。
         Row(
@@ -394,7 +487,39 @@ fun WorkflowBSteps(
                                             sourcePolicy,
                                         )
                                         val executor = packExecutor
-                                        if (executor == null) {
+                                        if (backgroundPacking) {
+                                            // ---- 前台服务（D2b 第 2 项）----
+                                            // 请求与执行分离：这里只把「要打什么」交给总线，
+                                            // 真正的读字节/写 ZIP 在 Service 里跑，故切后台、
+                                            // 旋转屏幕、Activity 被回收都不影响它。
+                                            //
+                                            // 用当前工作区的 tree URI + 显示名。两者都缺失
+                                            // （不该发生 —— 没工作区时 `volumes` 是 mock，
+                                            // 用户点确认会被预检拦住）时退回 `rootPath`，
+                                            // 让失败发生在 `SafPackExecutor` 里并显示成错误，
+                                            // 而不是静默什么都不做。
+                                            val treeUri = workspaceState?.handleOrNull()?.treeUri
+                                            val rootName = workspaceState?.handleOrNull()?.displayName
+                                            if (treeUri == null || rootName == null) {
+                                                executionError = unknownErrorText
+                                            } else {
+                                                executionError = null
+                                                val accepted = PackTaskService.enqueue(
+                                                    context = context,
+                                                    request = PackTaskRequest(
+                                                        treeUri = treeUri,
+                                                        rootDisplayName = rootName,
+                                                        plans = plans,
+                                                        workspaceName = rootName,
+                                                    ),
+                                                )
+                                                // `false` = 已有任务在跑。并发写同一批输出路径
+                                                // 会互相覆盖，故必须让用户知道这次没启动。
+                                                if (!accepted) {
+                                                    executionError = busyErrorText
+                                                }
+                                            }
+                                        } else if (executor == null) {
                                             // 没有真实执行器 ⇒ D1 原型的模拟路径。
                                             // 这条分支存在的意义是让既有 UI 测试不必构造
                                             // 平台对象;真实应用永远会注入执行器。
@@ -440,15 +565,21 @@ fun WorkflowBSteps(
                                 onExecute = {},
                                 showPlanSection = true,
                                 // 执行态:底栏换「取消」+ 上方进度条(见 PackPreviewPage)
-                                executing = executing,
-                                progress = progress,
+                                executing = effectiveExecuting,
+                                progress = effectiveProgress,
                                 onCancelExecution = {
-                                    // 先让界面进入「取消中」,再发信号:反过来的话
-                                    // 信号发出去后界面仍可点,存在连点窗口。
-                                    cancelling = true
-                                    cancelToken?.cancel()
+                                    if (backgroundPacking) {
+                                        // 服务侧取消：令牌在总线里，`requestCancel` 会置
+                                        // `cancelling = true` 并让执行方在**卷间**停下。
+                                        PackTaskBus.requestCancel()
+                                    } else {
+                                        // 先让界面进入「取消中」,再发信号:反过来的话
+                                        // 信号发出去后界面仍可点,存在连点窗口。
+                                        cancelling = true
+                                        cancelToken?.cancel()
+                                    }
                                 },
-                                cancelling = cancelling,
+                                cancelling = effectiveCancelling,
                                 executionError = executionError,
                                 onBack = { navController.popWorkflowStep() },
                                 modifier = Modifier.weight(1f),
@@ -460,3 +591,47 @@ fun WorkflowBSteps(
         }
     }
 }
+
+/**
+ * 「上次打包被中断」的提示条（D2b 第 2 项）。
+ *
+ * ### 为什么不是 `Snackbar`
+ * Snackbar 会自动消失（默认 4 秒），而这条消息讲的是**磁盘上可能有不完整的文件** ——
+ * 用户可能正在看别的地方，错过就再也看不到了。它必须等到用户主动关掉。
+ *
+ * ### 为什么不用 `AlertDialog`
+ * 它不阻塞任何操作：用户可能只是想先看看库里的内容，或者干脆是别人点了别人的
+ * 打包。用模态对话框会强制用户处理一件「可能跟我没关系」的事。
+ *
+ * ### 为什么不自动删掉可疑文件
+ * 中断时刻的真实状态不可知 —— 文件可能是完整的（旧文件被原地覆盖到一半），
+ * 也可能是零字节（`createDocument` 刚建好就死了）。自动删除会毁掉可能完好的数据。
+ * 这里只陈述事实 + 给出确认，删不删由用户决定（[onDismiss] 只关提示，不碰磁盘）。
+ */
+@Composable
+private fun InterruptedNoticeRow(text: String, onDismiss: () -> Unit) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .testTag(TAG_B_INTERRUPTED_NOTICE)
+            .padding(horizontal = 16.dp, vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        WarnLine(
+            icon = R.drawable.ic_warning_triangle,
+            text = text,
+            color = MaterialTheme.colorScheme.error,
+            modifier = Modifier.weight(1f),
+        )
+        TextButton(onClick = onDismiss, modifier = Modifier.testTag(TAG_B_INTERRUPTED_DISMISS)) {
+            Text(stringResource(R.string.b_interrupted_dismiss))
+        }
+    }
+}
+
+/** 「上次打包被中断」提示条。 */
+const val TAG_B_INTERRUPTED_NOTICE = "b-interrupted-notice"
+
+/** 关掉「上次打包被中断」提示。 */
+const val TAG_B_INTERRUPTED_DISMISS = "b-interrupted-dismiss"

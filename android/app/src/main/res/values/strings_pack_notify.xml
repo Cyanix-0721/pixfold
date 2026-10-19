@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  打包任务的前台服务通知文案(D2b「后台任务与进度 · 切后台恢复」)。
+
+  这些文案**不在** domain_strings 体系里：`TextKey` 映射的是「领域层产生的、
+  要跨层传递并翻译的消息」。通知文案由平台服务直接取用，不经过 `Msg`，
+  走普通 string 资源更直接。
+-->
+<resources>
+    <!-- 渠道名。用户在系统设置的通知列表里看到的就是这一条。 -->
+    <string name="pack_notify_channel">Packing tasks</string>
+    <string name="pack_notify_channel_desc">Progress while comics are being packaged. Runs in the background so it survives leaving the app.</string>
+
+    <!-- 进行中。标题恒定（通知条不抖），进度放在副标题。 -->
+    <string name="pack_notify_title">Packaging comics</string>
+    <!-- 服务刚起来、还没拿到第一批进度。刻意不用「0 / N」：那会让用户以为已经卡住了。 -->
+    <string name="pack_notify_preparing">Preparing…</string>
+    <string name="pack_notify_counts">%1$d / %2$d</string>
+
+    <!-- 收尾三种。done 与 cancelled 都是「正常结束」，failed/rejected 才是问题。 -->
+    <string name="pack_notify_done">Packaging finished</string>
+    <string name="pack_notify_cancelled">Packaging cancelled</string>
+    <string name="pack_notify_rejected">Cannot start packaging</string>
+    <string name="pack_notify_failed">Packaging failed</string>
+
+    <!-- 收尾正文：工作区 + 成功/失败卷数。失败数即使为 0 也显示，
+         因为「跑了但有一卷失败」是最需要看见的情况。 -->
+    <string name="pack_notify_summary">%1$s · succeeded %2$d · failed %3$d</string>
+</resources>

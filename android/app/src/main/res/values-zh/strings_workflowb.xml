@@ -27,7 +27,7 @@
     <string name="meta_writer_clean">一键清理</string>
     <string name="meta_writer_clean_cd">一键清理作者</string>
     <string name="meta_writer_cleaned_hint">清理建议：%1$s（%2$s）</string>
-    <string name="meta_cbz_name_hint">由 Title + Number 建议值派生（%1$s）</string>
+    <string name="meta_cbz_name_hint">它将命名为：%1$s</string>
     <string name="meta_output_dir_hint">建议输出目录（%1$s）</string>
     <plurals name="meta_batch_applied">
         <item quantity="other">已设置到 %1$d 卷</item>

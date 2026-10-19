@@ -122,6 +122,11 @@ dependencies {
     // coroutines-android 提供 Dispatchers.IO / Main。
     implementation(libs.kotlinx.coroutines.android)
     implementation(libs.lifecycle.runtime.compose)
+    // D2b 切后台恢复:进度通知要用 NotificationCompat.ProgressStyle(Android 16 的
+    // Live Updates 形态,经 core 兼容到低版本)。该 API 自 androidx.core 1.17.0 起提供,
+    // 当前虽经 lifecycle 传递解析到 1.19.0,但**必须显式声明** —— 否则将来 lifecycle
+    // 版本变动会把传递依赖拉低,编译期才报错,回归成本高。
+    implementation(libs.core.ktx)
 
     testImplementation(composeBom)
     testImplementation(kotlin("test"))

@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  打包任务通知的小图标(D2b「后台任务与进度」)。
+
+  为什么必须是小图标：Android 的通知栏只接受**单色 alpha 遮罩**。传彩色图或
+  adaptive icon 会被系统渲染成一个白色方块 —— 那是「通知看起来像坏了」最常见的
+  原因之一。
+
+  几何：一条向下的箭头 + 下方托盘（Material Symbols 的 `download` 语义），
+  用在「正在把图片写进 CBZ」这个动作上比通用的齿轮更贴切。
+
+  尺寸按通知图标的惯例取 24dp / 24 viewport，系统会自己缩到状态栏尺寸。
+-->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M11,3h2v10l3.5,-3.5 1.4,1.4 -5.9,5.9 -5.9,-5.9 1.4,-1.4 3.5,3.5z" />
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M5,19h14v2H5z" />
+</vector>

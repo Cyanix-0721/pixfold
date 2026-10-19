@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  打包任务通知文案（中文）。与 `values/strings_pack_notify.xml` 逐键对应 ——
+  缺一个键 lint 的 `MissingTranslation` 会硬失败（`warningsAsErrors = true`）。
+-->
+<resources>
+    <string name="pack_notify_channel">打包任务</string>
+    <string name="pack_notify_channel_desc">漫画打包过程中的进度。在后台运行，离开应用也不会中断。</string>
+
+    <string name="pack_notify_title">正在打包漫画</string>
+    <string name="pack_notify_preparing">正在准备…</string>
+    <string name="pack_notify_counts">%1$d / %2$d</string>
+
+    <string name="pack_notify_done">打包完成</string>
+    <string name="pack_notify_cancelled">打包已取消</string>
+    <string name="pack_notify_rejected">无法开始打包</string>
+    <string name="pack_notify_failed">打包失败</string>
+
+    <string name="pack_notify_summary">%1$s · 成功 %2$d · 失败 %3$d</string>
+</resources>

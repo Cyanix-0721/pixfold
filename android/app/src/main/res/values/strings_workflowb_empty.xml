@@ -47,4 +47,12 @@
 
     <string name="pack_error_unknown">Packing was blocked for an unknown reason. Please report this.</string>
 
+    <!-- 上次打包被中断的提示（D2b 第 2 项）。刻意不说「已完成」也不说「失败」：
+         中断时刻的真实状态不可知，说死了会误导用户去删可能完好的文件。 -->
+    <string name="b_interrupted_dismiss">Got it</string>
+
+    <!-- 已有打包任务在跑。并发写同一批输出路径会互相覆盖，故必须拒绝。 -->
+    <string name="pack_error_busy">A packing task is already running. Try again when it finishes.</string>
+    <!-- 上次打包被中断（D2b 第 2 项）。三项读数：处理了几卷 / 共几卷 / 几个目标文件。 -->
+    <string name="b_interrupted_notice">Last packing run did not finish (%1$d / %2$d). Incomplete output files: up to %3$d.</string>
 </resources>

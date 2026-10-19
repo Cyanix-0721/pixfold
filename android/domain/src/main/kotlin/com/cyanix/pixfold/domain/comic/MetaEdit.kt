@@ -50,6 +50,20 @@ fun defaultCbzName(
 }
 
 /**
+ * 直接从一卷算出它的**默认 CBZ 文件名**。
+ *
+ * 存在的唯一理由：让「界面上的提示」与「点恢复建议值后的实际值」调**同一个入口**。
+ * 2026-10-19 真实缺陷就是这么来的 —— 提示行自己拼了 `titleSug`，而恢复走
+ * [defaultCbzName]（用 `cbzBaseSug`，保留 `[作者]` 前缀），带作者前缀的目录上
+ * 两者不同，用户照着提示改反而改错。
+ *
+ * 因此凡是要「显示默认名」的地方一律调本函数，**不要自己拼**；
+ * [useSuggestion] 也走它，两处不会分叉。
+ */
+fun defaultCbzName(volume: ComicVolume): String =
+    defaultCbzName(volume.id, volume.titleSug, volume.volumeSug, volume.cbzBaseSug)
+
+/**
  * 语言选项 → ComicInfo.xml 的 `LanguageISO` 值(规格 §8.4)。
  *
  * `null` 表示**不写入标签**;`Other` 不校验 ISO 639-1 合法性(归档语义:交给用户)。
@@ -141,9 +155,8 @@ fun useSuggestion(volume: ComicVolume, field: MetaField): ComicVolume {
         MetaField.Volume -> volume.copy(volume = volume.volumeSug.value)
         // 语言的建议值就是"未设置":回 Unset 并清空手输代码
         MetaField.Language -> volume.copy(language = LangChoice.Unset, otherLangCode = "")
-        MetaField.CbzName -> volume.copy(
-            cbzFileName = defaultCbzName(volume.id, volume.titleSug, volume.volumeSug, volume.cbzBaseSug),
-        )
+        // 与界面提示行调**同一个**入口 —— 两处各拼一次必然分叉（2026-10-19 真实缺陷）。
+        MetaField.CbzName -> volume.copy(cbzFileName = defaultCbzName(volume))
         MetaField.OutputDir -> volume.copy(outputDir = volume.outputDirSug)
     }
     return next.copy(overridden = next.overridden - field)

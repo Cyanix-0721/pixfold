@@ -44,6 +44,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.cyanix.pixfold.R
 import com.cyanix.pixfold.domain.comic.applyWriterCleaning
+import com.cyanix.pixfold.domain.comic.defaultCbzName
 import com.cyanix.pixfold.domain.comic.setMetaValue
 import com.cyanix.pixfold.domain.comic.useSuggestion
 import com.cyanix.pixfold.domain.model.ComicVolume
@@ -361,9 +362,22 @@ fun MetadataPage(
                         field = MetaField.CbzName,
                         value = volume.cbzFileName,
                         volume = volume,
+                        // 提示行必须直接给出**恢复后真正会得到的那个文件名**，
+                        // 不能自己拼一个「看起来像」的。
+                        //
+                        // 2026-10-19 真实缺陷：这里原先传的是 `titleSug.value`，
+                        // 而「恢复建议值」实际走 `defaultCbzName(..., cbzBaseSug)`——
+                        // 后者**保留 `[作者]` 前缀**且带「第NN卷」后缀。真实素材下
+                        // 提示显示「彼女がボクの知らないところで」而恢复得到
+                        // 「[Cior (Ken-1)] 彼女がボクの知らないところで 第01卷.cbz」，
+                        // 用户照着提示改反而改错。
+                        //
+                        // 唯一不会漂移的写法是调同一个函数（domain 的唯一权威），
+                        // 只把「同一个函数」写两遍就等于日后两处会分叉。
+                        // 文案键只做包装，值仍来自 `defaultCbzName(volume)`。
                         suggestionText = stringResource(
                             R.string.meta_cbz_name_hint,
-                            volume.titleSug.value.orEmpty(),
+                            defaultCbzName(volume),
                         ),
                         onValue = { update(updateVolume(state, setMetaValue(volume, MetaField.CbzName, MetaValue.Text(it)))) },
                         onReset = { update(updateVolume(state, useSuggestion(volume, MetaField.CbzName))) },

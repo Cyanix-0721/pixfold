@@ -16,6 +16,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.Modifier
 import androidx.core.net.toUri
 import androidx.compose.ui.platform.LocalContext
@@ -181,6 +182,65 @@ fun PixFoldApp(store: SettingsStore? = null) {
     ) { uri ->
         // uri == null 表示用户取消了选择 —— 保持现状，不动已有授权。
         if (uri != null) workspaceController.pick(uri.toString())
+    }
+
+    // ---- 通知权限（D2b 第 2 项）----
+    //
+    // Android 13 起 `POST_NOTIFICATIONS` 是运行时权限。没有它前台服务**仍能跑**
+    // （任务不中断），但进度条看不见 —— 而「看得见」正是这一项的验收要求。
+    //
+    // 请求时机：进应用就问，而不是等用户点了「确认打包」才问。后者的代价是
+    // 用户点完确认、打包已经开始，界面上才冒出一个权限对话框 —— 那时任务在
+    // 后台跑而通知栏空着，正好是最需要它的时候。
+    val notificationPermission =
+        rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { }
+    // minSdk 34 ⇒ `POST_NOTIFICATIONS` 一定存在，无需 SDK_INT 判断（加了 lint 会报
+    // `ObsoleteSdkInt`：那条件恒真，留着只会让人以为还要考虑更老的系统）。
+    LaunchedEffect(Unit) {
+        val granted = context.checkSelfPermission(
+            android.Manifest.permission.POST_NOTIFICATIONS,
+        ) == android.content.pm.PackageManager.PERMISSION_GRANTED
+        if (!granted) {
+            notificationPermission.launch(android.Manifest.permission.POST_NOTIFICATIONS)
+        }
+    }
+
+    // ---- 上次打包被中断的提示（D2b 第 2 项）----
+    //
+    // 只在**没有任务正在跑**时判：服务活着说明任务还在写，此时把「上次中断了」
+    // 摆出来是假警报（`recoverPackTask` 也因此把 `serviceAlive` 做成必填参数）。
+    //
+    // 只说事实、不给动作：中断时刻磁盘上可能是完整文件（旧文件被覆盖到一半）、
+    // 也可能是零字节（`createDocument` 刚建完就死了），自动删会毁掉可能完好的数据。
+    //
+    // 文案在**组合期**用 `stringResource` 算，不在 `LaunchedEffect` 里调
+    // `context.getString`：后者不会被 Compose 记为配置依赖，语言/字号一变就会
+    // 拿着旧 Configuration 的字符串（lint `LocalContextGetResourceValueCall`）。
+    var interruptedSnapshot by remember {
+        mutableStateOf<com.cyanix.pixfold.domain.task.PackTaskSnapshot?>(null)
+    }
+    LaunchedEffect(Unit) {
+        val taskStore = com.cyanix.pixfold.data.task.PackTaskStore(context)
+        val snapshot = taskStore.load()
+        val serviceAlive = com.cyanix.pixfold.data.task.PackTaskBus.isRunning()
+        val recovery = com.cyanix.pixfold.domain.task.recoverPackTask(snapshot, serviceAlive)
+        if (recovery is com.cyanix.pixfold.domain.task.PackTaskRecovery.Interrupted) {
+            interruptedSnapshot = recovery.snapshot
+            // 快照读过一次就清掉：提示关掉后重启应用不该再弹同一条。
+            // 只在**取到之后**清 —— 取之前清会让「用户没看到就丢了」。
+            taskStore.clear()
+        }
+    }
+    val interruptedSnap = interruptedSnapshot
+    val interruptedNotice: String? = if (interruptedSnap == null) {
+        null
+    } else {
+        stringResource(
+            R.string.b_interrupted_notice,
+            interruptedSnap.progress.processed,
+            interruptedSnap.progress.total,
+            interruptedSnap.outputTargets.size,
+        )
     }
 
     PixFoldTheme(settings = settings) {
@@ -503,6 +563,13 @@ fun PixFoldApp(store: SettingsStore? = null) {
                                     rootDisplayName = workspaceHandle?.displayName.orEmpty(),
                                 )
                             },
+                            // ---- 前台服务（D2b 第 2 项「切后台恢复」）----
+                            // 只在有工作区时开启：没有工作区时 `volumes` 是 mock，
+                            // 交给服务往真实磁盘写 mock 路径的 CBZ 是错的（服务也没有
+                            // 可用的 tree URI）。故无工作区时保持进程内模拟路径。
+                            backgroundPacking = packTreeUri != null,
+                            interruptedNotice = interruptedNotice,
+                            onDismissInterruptedNotice = { interruptedSnapshot = null },
                         )
                     }
                 }

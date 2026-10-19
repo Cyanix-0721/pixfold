@@ -27,7 +27,7 @@
     <string name="meta_writer_clean">Clean up</string>
     <string name="meta_writer_clean_cd">Clean up writer automatically</string>
     <string name="meta_writer_cleaned_hint">Cleaned suggestion: %1$s (%2$s)</string>
-    <string name="meta_cbz_name_hint">Derived from Title + Number suggestions (%1$s)</string>
+    <string name="meta_cbz_name_hint">Will be: %1$s</string>
     <string name="meta_output_dir_hint">Suggested output folder (%1$s)</string>
     <plurals name="meta_batch_applied">
         <item quantity="one">Applied to %1$d volume</item>

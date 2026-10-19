@@ -20,11 +20,13 @@ import androidx.compose.ui.test.performScrollToNode
 import androidx.compose.ui.test.performTextReplacement
 import com.cyanix.pixfold.R
 import com.cyanix.pixfold.TestText
+import com.cyanix.pixfold.domain.comic.defaultCbzName
 import com.cyanix.pixfold.domain.comic.setMetaValue
 import com.cyanix.pixfold.domain.mock.MockDataB
 import com.cyanix.pixfold.domain.model.ComicVolume
 import com.cyanix.pixfold.domain.model.MetaField
 import com.cyanix.pixfold.domain.model.MetaValue
+import com.cyanix.pixfold.domain.model.Suggestion
 import com.cyanix.pixfold.domain.source.SERIES_PREFIX
 import com.cyanix.pixfold.domain.workflowb.WorkflowBState
 import com.cyanix.pixfold.domain.workflowb.workflowBStateOf
@@ -451,5 +453,70 @@ class MetadataPageTest {
         show()
         rule.onNodeWithTag(TAG_META_EMPTY).assertDoesNotExist()
         rule.onNodeWithTag(TAG_METADATA_LIST).assertIsDisplayed()
+    }
+
+    // ================= CBZ 名提示必须与「恢复建议值」的实际结果一致 =================
+
+    /**
+     * 提示行显示的默认名，必须**逐字等于**点「恢复建议值」后输入框里的值。
+     *
+     * 2026-10-19 真实缺陷：提示行传的是 `titleSug`（`彼女がボクの知らないところで`），
+     * 而恢复实际走 `defaultCbzName(..., cbzBaseSug)`，后者**保留 `[作者]` 前缀**
+     * （`[Cior (Ken-1)] 彼女がボクの知らないところで`）。带作者前缀的目录上两者不同
+     * ⇒ 用户照着提示改、点恢复却得到另一个名字。
+     *
+     * 断言方式刻意不查内部实现：读提示行文案 → 改输入框 → 点恢复 → 读输入框，
+     * 比较「提示承诺的」与「实际得到的」。
+     */
+    @Test
+    fun `cbz name hint matches what reset actually produces`() {
+        // 造一个「title 建议」与「CBZ 基名建议」不同的卷（真实素材的常态：
+        // 目录名带 [作者] 前缀时，Title 剥掉前缀而 CBZ 名保留）。
+        val withAuthor = library.volumes.first().let {
+            it.copy(
+                titleSug = Suggestion("彼女がボクの知らないところで", "目录层级"),
+                cbzBaseSug = Suggestion("[Cior (Ken-1)] 彼女がボクの知らないところで", "目录名清洗"),
+                volumeSug = Suggestion(1, "目录名解析"),
+            )
+        }
+        show(listOf(withAuthor))
+
+        // 权威真值 = 领域层算出的默认文件名（语言无关，固定形态）。
+        // 用它当期望值是合理的：要断言的正是「界面显示/恢复的值 == 领域权威值」。
+        // 上面的夹具把 titleSug 与 cbzBaseSug 刻意设成不同，界面若走错来源必然红。
+        val expected = defaultCbzName(withAuthor)
+
+        // 反向钉住「权威值本身必须是带作者前缀的那个」——否则提示与恢复可以
+        // **一起**走错来源而仍然彼此一致，这条用例照样绿（变异 M2 实测存活）。
+        assertTrue(
+            expected.startsWith("[Cior (Ken-1)]"),
+            "默认名必须保留 [作者] 前缀（来自 cbzBaseSug），实际是「$expected」",
+        )
+        assertTrue(
+            expected != "${withAuthor.titleSug.value}.cbz",
+            "默认名不得退回 titleSug（那会丢掉作者前缀）",
+        )
+
+        scrollTo(metaSuggestionTag(MetaField.CbzName))
+        val hintNode = rule.onNodeWithTag(metaSuggestionTag(MetaField.CbzName)).fetchSemanticsNode()
+        val hintText = hintNode.config[SemanticsProperties.Text].joinToString("")
+        assertTrue(
+            hintText.contains(expected),
+            "提示行必须原样给出完整默认名「$expected」，实际是「$hintText」",
+        )
+
+        scrollTo(metaFieldTag(MetaField.CbzName))
+        rule.onNodeWithTag(metaFieldTag(MetaField.CbzName)).performTextReplacement("我随便改的名字.cbz")
+        rule.waitForIdle()
+        assertEquals("我随便改的名字.cbz", fieldText(MetaField.CbzName))
+
+        rule.onNodeWithTag(metaResetTag(MetaField.CbzName)).performClick()
+        rule.waitForIdle()
+
+        assertEquals(
+            expected,
+            fieldText(MetaField.CbzName),
+            "点「恢复建议值」得到的名字与提示行承诺的不一致",
+        )
     }
 }

@@ -1,6 +1,40 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
     <!--
+      D2b「后台任务与进度」：打包任务跑在前台服务里（见 <service> 的注释）。
+
+      三条权限缺一不可：
+        · FOREGROUND_SERVICE           —— 启动前台服务的基础权限（API 28 起）。
+        · FOREGROUND_SERVICE_DATA_SYNC —— Android 14 起按类型细分。**少这条会在
+          startForeground 时抛 SecurityException**，而那时任务已经开始，用户会
+          看到它跑到一半就没了。
+        · POST_NOTIFICATIONS           —— Android 13 起通知是运行时权限。没有它
+          前台服务仍能运行（任务不中断），但**进度条看不见**；而「看得见」正是
+          这个阶段的验收要求，故必须声明并在界面上请求。
+
+      刻意**不**声明的：`WAKE_LOCK`（前台服务已保证进程不被回收，写 ZIP 期间
+      不强制锁屏常亮 —— 那会显著耗电且用户不需要屏幕亮着）、`READ/WRITE_EXTERNAL_STORAGE`
+      （SAF 的 tree URI 授权已覆盖，不需要宽泛存储权限）。
+    -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <!--
+      Live Update（系统状态栏胶囊 / 灵动岛风格）升格权限。
+
+      这是**普通权限**，不是运行时权限 —— 声明即生效，不弹窗、不需要用户点同意
+      （对比 `POST_NOTIFICATIONS` 是运行时权限）。官方「Live Updates」文档把
+      「请求 `android.permission.POST_PROMOTED_NOTIFICATIONS`」列为升格的硬条件之一，
+      缺这条则 `setRequestPromotedOngoing(true)` 无效，通知只会以普通样式挂在
+      通知中心里，不进胶囊区。
+
+      2026-10-19 真机教训（PJX110 / Android 16 / ColorOS）：首版**漏了这条**，
+      也漏了 `setRequestPromotedOngoing(true)`，于是打包通知只以普通通知出现；
+      当时误判成「ROM 不支持」，实际是自家少做了升格请求 —— 同机别的非国产应用
+      能正常显示实时活动即是反证。
+    -->
+    <uses-permission android:name="android.permission.POST_PROMOTED_NOTIFICATIONS" />
+    <!--
       android:enableOnBackInvokedCallback="true" —— 启用 Android 13+ 的预测性返回
       (predictive back)。targetSdk 33+ 默认即为 true,这里**显式声明**以表明意图:
       应用已适配"系统提前拿到返回手势、绘制退场动画"的模型。
@@ -39,5 +73,21 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+
+        <!--
+          D2b「后台任务与进度」：打包任务跑在前台服务里，这样用户切到别的应用、
+          或系统回收 Activity 时，几次几十分钟的打包不会半途死掉（死掉会留下
+          没写完的 CBZ）。
+
+          foregroundServiceType="dataSync" —— 本服务确实是在写用户数据（CBZ 文件）。
+          **必须声明**：Android 14+ 若服务在 startForeground 时用了一个没在清单里
+          声明的类型，会抛 `MissingForegroundServiceTypeException` 直接崩。
+
+          exported="false"：只由本应用启动，不需要任何外部组件访问它。
+        -->
+        <service
+            android:name=".data.task.PackTaskService"
+            android:exported="false"
+            android:foregroundServiceType="dataSync" />
     </application>
 </manifest>
