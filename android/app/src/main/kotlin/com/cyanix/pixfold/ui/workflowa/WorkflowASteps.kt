@@ -186,13 +186,23 @@ fun WorkflowASteps(
     // 模式与 `SortAndPreviewPage` / `NamingPage` 一致:**本地状态权威,初值取自上层,
     // 每次变更上报**。刻意不用 `externalState ?: local` —— 那样上层一旦传值,
     // 就地编辑就永不显示(该踩坑记录见 `NamingPage` 的同名注释)。
-    var state by remember { mutableStateOf(externalState ?: workflowAStateOf(collections)) }
+    //
+    // ⚠️ `remember(collections)` 的 key **不是**可选的(2026-10-19 真机缺陷):
+    // 上层 `PixFoldApp` 用 `remember(collections)` 播种,换工作区时会传下**新的**
+    // `externalState`(新集合 id 的 orders);本组件若无 key,组合实例不销毁 ⇒ 仍持
+    // 旧工作区的 state,下层 `SortAndPreviewPage` 查不到新集合的 order ⇒ 白屏
+    // (真机实测:冷启动正常、工作流内「更换」后全黑)。加 key 后与上层同一步调。
+    var state by remember(collections) {
+        mutableStateOf(externalState ?: workflowAStateOf(collections))
+    }
     fun updateState(next: WorkflowAState) {
         state = next
         onStateChange(next)
     }
     // 初值取上层给的值(若给):预览往返会让本目的地整体重建,靠它恢复所选集合。
-    var activeId by remember {
+    // 同样带 `collections` key:换工作区后旧的 activeId 可能指向已不存在的集合
+    // (虽然下游有 `?: firstOrNull()` 兜底,但那样会"跳"到第一个集合却不通知上层)。
+    var activeId by remember(collections) {
         mutableStateOf(initialActiveCollectionId ?: collections.firstOrNull()?.id.orEmpty())
     }
     // 命名结构与覆盖是**批次级**(规格 §6.3:overrides 全局一份,不属于某个集合),
@@ -204,7 +214,7 @@ fun WorkflowASteps(
     // 领域层的 `Msg`(语言无关);成品文案由 ExecutionReportPage 现场解析
     var undoMessage by remember { mutableStateOf<Msg?>(null) }
 
-    var namingState by remember {
+    var namingState by remember(collections) {
         mutableStateOf(
             initialNamingState ?: NamingState(
                 NamingScheme(rootDirName = collections.firstOrNull()?.rootDirName.orEmpty()),
@@ -382,6 +392,17 @@ fun WorkflowASteps(
                                 onStateChange = { updateNamingState(it) },
                                 onBack = { navController.popWorkflowStep() },
                                 onNext = { navController.navigate(WorkflowAPlanRoute) },
+                                // 步骤 2 的集合芯片**与步骤 1 共用同一个 `activeId`**
+                                // (用户 2026-10-19 裁决「共用同一个选中项」)。
+                                // 这里只上报,`activeId` 的唯一持有者仍是本组件 ——
+                                // 于是步骤 2 切到的集合,回步骤 1 也是同一个,不需要同步逻辑。
+                                collections = collections,
+                                onSelectCollection = { id ->
+                                    if (id != activeId) {
+                                        activeId = id
+                                        onActiveCollectionChange(id)
+                                    }
+                                },
                                 modifier = Modifier.weight(1f),
                             )
                         }

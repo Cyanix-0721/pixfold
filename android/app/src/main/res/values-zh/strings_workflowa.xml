@@ -26,6 +26,7 @@
     -->
     <string name="a_collection_chip">%1$s (%2$d)</string>
     <string name="a_collection_cd">集合 %1$s</string>
+    <string name="a_series_cd">系列 %1$s</string>
     <plurals name="a_image_count">
         <item quantity="other">共 %1$d 张</item>
     </plurals>
@@ -36,6 +37,7 @@
     <!-- 同一处全角括号字形缺陷的邻居(见上条 a_collection_chip 注释):「重置人工调整(0 处)」
          尾部的全角 `）` 同样只占 em 框一侧。一并改为半角,避免同一行出现两种括号形态。 -->
     <string name="a_reset_manual">重置人工调整 (%1$d 处)</string>
+    <string name="a_sort_empty">这个集合没有排序状态，请重新打开工作区。</string>
     <string name="a_custom_rule">本组独立</string>
     <string name="a_custom_rule_cd">本组独立规则</string>
     <string name="a_next">下一步</string>

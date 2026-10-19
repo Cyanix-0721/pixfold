@@ -57,6 +57,14 @@ class ChipRowWrappingTest {
             // 2026-10-18 起卷切换芯片行抽成共享组件(步骤 2/3 共用),守卫必须跟过来,
             // 否则"把共享组件改回横向滚动"这条路绕过守卫。
             "ui/components/VolumeChipRow.kt",
+            // 2026-10-19 起卷芯片与集合芯片共用同一底层 `SingleSelectChipRow`;
+            // 真正的容器在那里,守卫也必须跟过去 —— 否则改底层绕过了前五条。
+            "ui/components/SingleSelectChipRow.kt",
+            "ui/workflowa/CollectionChipRows.kt",
+            // 2026-10-19 两级芯片:状态逻辑抽到 TwoLevelChipRows,卷芯片再包一层 VolumeChipRows
+            // —— 两者都可能成为「在这里偷偷加横向滚动」的新落点。
+            "ui/components/TwoLevelChipRows.kt",
+            "ui/components/VolumeChipRows.kt",
         )
         files.forEach { rel ->
             val src = mainSource(rel)
@@ -76,24 +84,71 @@ class ChipRowWrappingTest {
      *
      * 与上一条互补:上一条拦"用回横向滚动",这一条拦"把容器换成不会换行的普通 `Row`"
      * —— 后者同样会让靠后的芯片溢出,而且**连横向滚动都没有**,比原缺陷更糟(彻底够不着)。
+     *
+     * ⚠️ 2026-10-19 芯片抽象后,**唯一**的 `FlowRow` 搬到了 `SingleSelectChipRow.kt`;
+     * 三个调用方(`VolumeChipRow` / `CollectionChipRows` / `SortAndPreviewPage`)自身
+     * 的 FlowRow 计数已归零。这张表必须跟着搬,否则会拿旧口径判新结构(直接红)。
      */
     @Test
     fun chip_rows_use_flow_row() {
         // 文件 -> 该文件里应为 FlowRow 的芯片行数量
         val expected = mapOf(
-            "ui/workflowa/SortAndPreviewPage.kt" to 1, // 集合切换芯片
+            // 改写后集合芯片整体搬去 CollectionChipRows(自身也不再有 FlowRow)
+            "ui/workflowa/SortAndPreviewPage.kt" to 0,
             "ui/workflowa/SortRuleEditor.kt" to 1, // 每级排序字段芯片
             // 2026-10-18:卷切换行已上移到共享组件,本文件只剩批量字段芯片
             "ui/workflowb/MetadataPage.kt" to 1,
             // 2026-10-18:同上,只剩冲突策略 + 源处置策略
             "ui/workflowb/PackPreviewPage.kt" to 2,
-            // 卷切换芯片行(工作流 B 步骤 2/3 共用)
-            "ui/components/VolumeChipRow.kt" to 1,
+            // 2026-10-18:卷切换芯片行(工作流 B 步骤 2/3 共用)现在是薄壳,容器在底层
+            "ui/components/VolumeChipRow.kt" to 0,
+            // 2026-10-19:全站唯一的芯片行容器(卷芯片 + 集合芯片共用)
+            "ui/components/SingleSelectChipRow.kt" to 1,
+            // 2026-10-19:两级集合芯片行 —— 两个 SingleSelectChipRow 调用,自身无 FlowRow
+            "ui/workflowa/CollectionChipRows.kt" to 0,
+            // 2026-10-19:两级状态逻辑的唯一实现(集合芯片与卷芯片共用),自身无 FlowRow
+            "ui/components/TwoLevelChipRows.kt" to 0,
+            // 2026-10-19:两级卷芯片行 —— 只有一层适配,容器在 TwoLevelChipRows 里
+            "ui/components/VolumeChipRows.kt" to 0,
         )
         expected.forEach { (rel, count) ->
             val src = mainSource(rel)
             val actual = src.lines().count { it.trimStart().startsWith("FlowRow(") }
             assertEquals(count, actual, "$rel 的 FlowRow 数量变了;芯片行容器被改动")
         }
+    }
+
+    /**
+     * 两级芯片行的**结构**不得退化(2026-10-19 用户裁决)。
+     *
+     * 用户原话:「芯片分2级别,series或单本作为1级,series作为2级,如果选择series,
+     * 收缩series芯片组到一行,下面添加显示2级芯片组选择series下的单本」。
+     *
+     * 这个结构在 Robolectric 里无法靠布局断言证明(芯片宽度 ~0),但**能**证明:
+     * 两个级别各自只有一个 `SingleSelectChipRow` 调用,且 2 级只在选中系列时渲染。
+     *
+     * ⚠️ 2026-10-19 卷芯片也改成两级后,断言目标从 `CollectionChipRows.kt` 移到
+     * `TwoLevelChipRows.kt` —— 两级结构只在这一处实现,两个调用方都是薄适配。
+     * 仍盯原来的文件会变成「断言一个只剩参数透传的文件」,毫无杀伤力。
+     */
+    @Test
+    fun two_level_chips_stay_two_level() {
+        val src = mainSource("ui/components/TwoLevelChipRows.kt")
+        val calls = src.lines().count { it.trimStart().startsWith("SingleSelectChipRow(") }
+        assertEquals(
+            2,
+            calls,
+            "两级芯片必须恰好两个 SingleSelectChipRow(1 级 = series/单本,2 级 = 选中 series 下的单本)",
+        )
+        // 1 级行在选中系列时收缩到一行(maxLines = 1),否则不压缩。
+        assertTrue(
+            src.contains("maxLines = if (activeGroup.isSeries) 1 else Int.MAX_VALUE"),
+            "1 级芯片行必须在选中系列时收缩到一行(用户 2026-10-19 裁决)",
+        )
+        // 2 级行只在选中系列时出现 —— 单本没有 2 级。
+        assertTrue(
+            src.contains("if (activeGroup.isSeries) {"),
+            "2 级芯片行必须只在选中 series 时渲染",
+        )
     }
 }

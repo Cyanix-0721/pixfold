@@ -13,6 +13,16 @@
         <item quantity="other">全部 %1$d 卷</item>
     </plurals>
 
+    <!-- 1 级「系列」行的「全部 N 项」入口(2026-10-19 卷芯片改两级后新增)。 -->
+    <plurals name="volume_group_all">
+        <item quantity="other">全部 %1$d 项</item>
+    </plurals>
+
+    <!-- ============ 集合切换(工作流 A 步骤 1 的 CollectionChipRows) ============ -->
+    <plurals name="collection_all">
+        <item quantity="other">全部 %1$d 项</item>
+    </plurals>
+
     <!-- ============ 首页(HomeScreen) ============ -->
     <string name="home_settings_cd">设置</string>
     <!--

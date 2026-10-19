@@ -14,6 +14,26 @@
         <item quantity="other">All %1$d volumes</item>
     </plurals>
 
+    <!--
+      1 级「系列」行溢出时的「全部 N 项」入口(2026-10-19 卷芯片改两级后新增)。
+      量词用「项」而不是「个系列」:1 级行既有系列又有单本卷,两者都算一项,
+      「全部 12 项」比「全部 12 个系列」更贴实际(与 collection_all 同一口径)。
+    -->
+    <plurals name="volume_group_all">
+        <item quantity="one">All %1$d item</item>
+        <item quantity="other">All %1$d items</item>
+    </plurals>
+
+    <!-- ============ 集合切换(工作流 A 步骤 1 的 CollectionChipRows) ============ -->
+    <!--
+      量词用「项」而不是「个集合」:1 级芯片里既有系列又有单本,两者都算一项,
+      「全部 12 项」比「全部 12 个集合」更贴实际(系列本身也是集合的容器)。
+    -->
+    <plurals name="collection_all">
+        <item quantity="one">All %1$d item</item>
+        <item quantity="other">All %1$d items</item>
+    </plurals>
+
     <!-- ============ Home screen (HomeScreen) ============ -->
     <string name="home_settings_cd">Settings</string>
     <!--

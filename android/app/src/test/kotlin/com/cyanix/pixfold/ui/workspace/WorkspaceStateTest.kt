@@ -9,6 +9,7 @@ import org.junit.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertIs
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 /**
@@ -99,6 +100,21 @@ class WorkspaceStateTest {
         assertTrue(WorkspaceState.Denied(handle).canOrganize)
         assertTrue(WorkspaceState.Failed("x").canOrganize)
         assertTrue(WorkspaceState.Ready(handle, realCollections).canOrganize)
+    }
+
+    @Test
+    fun `只有 Ready 与 Denied 能取出授权`() {
+        // 刷新（WorkspaceController.refresh）与「是否换了工作区」的判断全靠它。
+        // 判错的形态：某个状态下刷新静默失效（用户改完文件回来看不到变化），
+        // 或者换工作区时把旧状态当成同一个工作区而对账到错误的集合上。
+        assertEquals(handle, WorkspaceState.Ready(handle, realCollections).handleOrNull())
+        assertEquals(handle, WorkspaceState.Denied(handle).handleOrNull())
+
+        assertNull(WorkspaceState.None.handleOrNull())
+        assertNull(WorkspaceState.Loading.handleOrNull())
+        assertNull(WorkspaceState.Failed("x").handleOrNull())
+        // Denied 的 handle 可空（「从不曾选过目录」也会失效），此时当然取不到。
+        assertNull(WorkspaceState.Denied(handle = null).handleOrNull())
     }
 }
 

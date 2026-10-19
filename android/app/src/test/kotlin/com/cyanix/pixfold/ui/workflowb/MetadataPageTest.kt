@@ -25,6 +25,7 @@ import com.cyanix.pixfold.domain.mock.MockDataB
 import com.cyanix.pixfold.domain.model.ComicVolume
 import com.cyanix.pixfold.domain.model.MetaField
 import com.cyanix.pixfold.domain.model.MetaValue
+import com.cyanix.pixfold.domain.source.SERIES_PREFIX
 import com.cyanix.pixfold.domain.workflowb.WorkflowBState
 import com.cyanix.pixfold.domain.workflowb.workflowBStateOf
 import org.junit.Rule
@@ -73,6 +74,23 @@ class MetadataPageTest {
 
     private fun scrollTo(tag: String) {
         rule.onNodeWithTag(TAG_METADATA_LIST).performScrollToNode(hasTestTag(tag))
+        rule.waitForIdle()
+    }
+
+    /**
+     * 切到指定卷 —— **走用户真实路径**。
+     *
+     * 2026-10-19 卷芯片改两级后,另一系列的卷不在当前 2 级行里(它属于别的系列的分支)。
+     * 用户实际是:先点 1 级系列芯片(自动切到该系列第一本),再点目标卷。
+     * 测试必须走同一条路 —— 否则要么直接找不到节点,要么被迫去断言内部实现。
+     */
+    private fun switchToVolume(id: String) {
+        if (rule.onAllNodesWithTag(volumeChipTag(id)).fetchSemanticsNodes().isEmpty()) {
+            val series = library.volumes.first { it.id == id }.series
+            rule.onNodeWithTag(volumeGroupTag(SERIES_PREFIX + series)).performClick()
+            rule.waitForIdle()
+        }
+        rule.onNodeWithTag(volumeChipTag(id)).performClick()
         rule.waitForIdle()
     }
 
@@ -157,8 +175,7 @@ class MetadataPageTest {
         show()
         assertEquals("进击的巨人", fieldText(MetaField.Title))
 
-        rule.onNodeWithTag(volumeChipTag("op-101")).performClick()
-        rule.waitForIdle()
+        switchToVolume("op-101")
         assertEquals("海贼王", fieldText(MetaField.Title))
     }
 
@@ -217,8 +234,7 @@ class MetadataPageTest {
         rule.onNodeWithText(TestText.of(R.string.domain_pending_language), substring = true).assertIsDisplayed()
 
         // aot-0 缺卷号 -> 出现"卷号缺失"
-        rule.onNodeWithTag(volumeChipTag("aot-0")).performClick()
-        rule.waitForIdle()
+        switchToVolume("aot-0")
         scrollTo(TAG_PENDING_ISSUES)
         assertTrue(
             rule.onAllNodesWithText(TestText.of(R.string.domain_pending_volume), substring = true).fetchSemanticsNodes().isNotEmpty(),
@@ -235,8 +251,7 @@ class MetadataPageTest {
         rule.waitForIdle()
 
         // 切到另一卷:语言仍是"未设置"(逐卷不同,不被全局选项静默覆盖)
-        rule.onNodeWithTag(volumeChipTag("aot-2")).performClick()
-        rule.waitForIdle()
+        switchToVolume("aot-2")
         scrollTo(TAG_LANGUAGE_FIELD)
         rule.onNodeWithText(TestText.of(R.string.domain_lang_unset)).assertIsDisplayed()
     }
@@ -273,8 +288,7 @@ class MetadataPageTest {
         rule.onNodeWithText(TestText.plural(R.plurals.meta_batch_applied_skipped, 4, 4, 1)).assertIsDisplayed()
 
         // 被跳过的卷值真的没变
-        rule.onNodeWithTag(volumeChipTag("aot-1")).performClick()
-        rule.waitForIdle()
+        switchToVolume("aot-1")
         assertEquals("我改过的系列", fieldText(MetaField.Series))
     }
 
@@ -294,8 +308,7 @@ class MetadataPageTest {
 
         scrollTo(TAG_BATCH_RESULT)
         rule.onNodeWithText(TestText.plural(R.plurals.meta_batch_applied, 5, 5), substring = true).assertIsDisplayed()
-        rule.onNodeWithTag(volumeChipTag("aot-1")).performClick()
-        rule.waitForIdle()
+        switchToVolume("aot-1")
         assertEquals("强制系列", fieldText(MetaField.Series))
     }
 
@@ -317,8 +330,7 @@ class MetadataPageTest {
         rule.onNodeWithText(TestText.plural(R.plurals.meta_batch_applied, 5, 5), substring = true)
             .assertIsDisplayed()
         // 值真的被第二次改写
-        rule.onNodeWithTag(volumeChipTag("aot-1")).performClick()
-        rule.waitForIdle()
+        switchToVolume("aot-1")
         assertEquals("第二次", fieldText(MetaField.Series))
     }
 
@@ -333,8 +345,7 @@ class MetadataPageTest {
     fun `unchecking a volume excludes it from batch apply`() {
         show()
         // 取消勾选 op-102(第 5 卷);勾选框在卷头,切卷后即可点
-        rule.onNodeWithTag(volumeChipTag("op-102")).performClick()
-        rule.waitForIdle()
+        switchToVolume("op-102")
         rule.onNodeWithTag(volumeIncludedTag("op-102")).performClick()
         rule.waitForIdle()
 
@@ -350,8 +361,7 @@ class MetadataPageTest {
     @Test
     fun `output conflict volume is flagged`() {
         show()
-        rule.onNodeWithTag(volumeChipTag("op-102")).performClick()
-        rule.waitForIdle()
+        switchToVolume("op-102")
         assertTrue(
             rule.onAllNodesWithText(TestText.of(R.string.lib_output_conflict), substring = true).fetchSemanticsNodes().isNotEmpty(),
             "输出冲突卷必须在元数据页有明确提示",

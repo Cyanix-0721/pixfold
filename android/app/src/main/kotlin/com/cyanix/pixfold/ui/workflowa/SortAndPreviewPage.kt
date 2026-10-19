@@ -5,7 +5,6 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
@@ -19,7 +18,6 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -86,6 +84,15 @@ const val TAG_RESET_MANUAL = "reset-manual"
 const val TAG_SORT_RULE_EDITOR = "sort-rule-editor"
 const val TAG_CUSTOM_RULE_TOGGLE = "custom-rule-toggle"
 const val TAG_COLLECTION_ROW = "collection-row"
+
+/**
+ * 状态错配时的显式空态 testTag(2026-10-19)。
+ *
+ * 正常情况下不该出现 —— 出现即意味着本地 `state.orders` 缺当前集合的键。
+ * 之所以仍给它 tag:让「白屏」这种**不可断言**的失败模式变成**可断言**的显式文案。
+ */
+const val TAG_SORT_EMPTY = "sort-empty"
+
 const val TAG_NEXT_STEP = "next-step"
 const val TAG_RULE_SUMMARY_BAR = "rule-summary-bar"
 const val TAG_RULE_SUMMARY_TOGGLE = "rule-summary-toggle"
@@ -218,7 +225,16 @@ fun SortAndPreviewPage(
     var mode by remember { mutableStateOf(initialMode) }
     // 本地状态权威,初值取自 externalState,每次变更上报上层(理由同 NamingPage:
     // `externalState ?: local` 会让上层的值冻结就地编辑)。
-    var state by remember { mutableStateOf(externalState ?: workflowAStateOf(collections)) }
+    //
+    // ⚠️ `remember(collections)` 的 key **不是**可选的(2026-10-19 真机缺陷):
+    // 上层 `PixFoldApp` 用 `remember(collections)` 播种整个工作流状态,换工作区时
+    // 会重建并传下**新的** `externalState`;但本页若无 key,组合实例不销毁 ⇒ 仍持有
+    // 旧工作区的 state,其 `orders` 里只有旧集合 id,查不到新集合 ⇒ 整页渲染成空白
+    // (真机实测:工作流内点「更换」换目录后全黑,冷启动却正常 —— 冷启首帧就播种正确)。
+    // 加 key 后:collections 一变(换工作区/重扫)就重新播种,与上层同一步调。
+    var state by remember(collections) {
+        mutableStateOf(externalState ?: workflowAStateOf(collections))
+    }
     fun updateState(next: WorkflowAState) {
         state = next
         onStateChange(next)
@@ -264,7 +280,32 @@ fun SortAndPreviewPage(
     androidx.compose.runtime.LaunchedEffect(activeId) { onActiveCollectionChange(activeId) }
 
     val activeCollection = collections.firstOrNull { it.id == activeId } ?: collections.firstOrNull()
-    val order = activeCollection?.let { state.orders[it.id] } ?: return
+    val order = activeCollection?.let { state.orders[it.id] }
+    // ⚠️ 这里**不能**写成 `?: return`(2026-10-19 真机缺陷的直接原因)。
+    // 曾经是静默 `return` —— 一旦状态错配(本地 state 的 orders 里没有当前集合 id,
+    // 典型场景:热切换工作区后旧 state 残留),整页渲染成**白屏且无任何提示**,
+    // 用户只能看到一片黑,既不知道出了什么事也没法自救。
+    // 现在改为显式空态:任何状态错配都**可见**,白屏不再是可能的结果。
+    // 注:集合列表为空这种情况由上层 `WorkflowASteps` 的 `EmptyWorkspace` 处理,
+    // 走不到这里 —— 这里专门覆盖「有集合、但它的排序状态缺失」这种内部错配。
+    if (order == null) {
+        Column(
+            modifier = modifier
+                .fillMaxSize()
+                .windowInsetsPadding(contentInsets),
+        ) {
+            Text(
+                text = stringResource(R.string.a_sort_empty),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier
+                    .padding(16.dp)
+                    .testTag(TAG_SORT_EMPTY)
+                    .align(Alignment.CenterHorizontally),
+            )
+        }
+        return
+    }
     val isCustom = activeId in state.customRuleCollections
 
     // 先进局部变量:多处要进 semantics{} 或作为 String 参数
@@ -289,46 +330,29 @@ fun SortAndPreviewPage(
         // (组件卡片横向滚动 -> 靠后按钮落在视口外 -> 改两行卡片)的既有裁决同源。
         // 改用 FlowRow 自动换行:集合再多也只是增高,不会有控件不可达。
         //
+        // 2026-10-19:芯片行改为**两级**(series / 单本),逻辑整体搬到
+        // [CollectionChipRows];本页只负责「选中哪个集合」与切集合回顶。
+        //
         // 注:Robolectric 不做真实文本测量(芯片标签宽度都算成 ~0),单测**证明不了**
         // 换行是否真的发生,故此处没有对应的 UI 断言,只能靠真机坐标核对。
-        if (collections.size > 1) {
-            FlowRow(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 12.dp, vertical = 4.dp)
-                    .testTag(TAG_COLLECTION_ROW),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalArrangement = Arrangement.spacedBy(4.dp),
-            ) {
-                collections.forEach { c ->
-                    // stringResource 不能进 semantics{} 的 lambda,先取出来
-                    val chipCd = stringResource(R.string.a_collection_cd, c.name)
-                    FilterChip(
-                        selected = c.id == activeId,
-                        onClick = {
-                            // W1(2026-09-17 实测缺陷):切集合必须**回到顶部**。
-                            // 原因:切换集合的语义是"换一批图看",沿用上一个集合的滚动偏移
-                            // 会让用户看到"中段"而非第一张,需手动滑回顶部才知道切换成功;
-                            // 该残留状态还会**误导测试**(语义树只含可见项,读到的是视口中段)。
-                            //
-                            // 复用 W4 已建立的同一条通道(signal 自增 -> requestScrollToItem(0)):
-                            // 两处需求本质相同 —— 视口位置失去意义时归位。
-                            // 只有真的换了集合才自增,重复点同一个 chip 不该把用户拽回顶部。
-                            if (c.id != activeId) {
-                                activeId = c.id
-                                scrollSignal++
-                            }
-                        },
-                        label = {
-                            Text(stringResource(R.string.a_collection_chip, c.name, c.images.size))
-                        },
-                        modifier = Modifier
-                            .testTag(collectionTag(c.id))
-                            .semantics { contentDescription = chipCd },
-                    )
+        CollectionChipRows(
+            collections = collections,
+            activeId = activeId,
+            onSelect = { id ->
+                // W1(2026-09-17 实测缺陷):切集合必须**回到顶部**。
+                // 原因:切换集合的语义是"换一批图看",沿用上一个集合的滚动偏移
+                // 会让用户看到"中段"而非第一张,需手动滑回顶部才知道切换成功;
+                // 该残留状态还会**误导测试**(语义树只含可见项,读到的是视口中段)。
+                //
+                // 复用 W4 已建立的同一条通道(signal 自增 -> requestScrollToItem(0)):
+                // 两处需求本质相同 —— 视口位置失去意义时归位。
+                // 只有真的换了集合才自增,重复点同一个 chip 不该把用户拽回顶部。
+                if (id != activeId) {
+                    activeId = id
+                    scrollSignal++
                 }
-            }
-        }
+            },
+        )
 
         Row(
             modifier = Modifier

@@ -54,14 +54,36 @@ import com.cyanix.pixfold.domain.workflowb.batchApplyToLibrary
 import com.cyanix.pixfold.domain.workflowb.selectVolume
 import com.cyanix.pixfold.domain.workflowb.setVolumeIncluded
 import com.cyanix.pixfold.domain.workflowb.updateVolume
+import com.cyanix.pixfold.ui.components.ChipRowTags
 import com.cyanix.pixfold.ui.components.PageActionBar
-import com.cyanix.pixfold.ui.components.VolumeChipRow
+import com.cyanix.pixfold.ui.components.VolumeChipRows
 import com.cyanix.pixfold.ui.text.textOf
 import com.cyanix.pixfold.ui.text.textOfOrNull
 
 const val TAG_METADATA_PAGE = "metadata-page"
 const val TAG_METADATA_LIST = "metadata-list"
+
+/**
+ * 1 级「系列」行(2026-10-19 起卷选择器分两级,见 [VolumeChipRows])。
+ *
+ * 与 2 级的 [TAG_VOLUME_SELECTOR] 分开:同一个界面里两行同时存在,
+ * Compose 的 `onNodeWithTag` 在多节点匹配时会直接失败,两行**不能共用一个 tag**。
+ */
+const val TAG_VOLUME_SERIES_ROW = "metadata-volume-series-row"
+
+/** 2 级「卷」行(单级时代它就是唯一的卷选择行,名字保持不变)。 */
 const val TAG_VOLUME_SELECTOR = "metadata-volume-selector"
+
+/** 1 级系列芯片。key 是 `series:` / `single:` 前缀化的分组键。 */
+fun volumeGroupTag(key: String) = "metadata-volume-group-$key"
+
+/** 1 级「全部 N 项」入口。 */
+const val TAG_VOLUME_GROUP_ALL = "metadata-volume-group-all"
+
+/** 1 级 sheet 的标题容器 / 列表 / 列表内芯片。 */
+const val TAG_VOLUME_GROUP_SHEET = "metadata-volume-group-sheet"
+const val TAG_VOLUME_GROUP_SHEET_LIST = "metadata-volume-group-sheet-list"
+fun volumeGroupSheetTag(key: String) = "metadata-volume-group-sheet-chip-$key"
 const val TAG_PENDING_ISSUES = "metadata-pending-issues"
 const val TAG_BATCH_ROW = "metadata-batch-row"
 const val TAG_BATCH_APPLY = "metadata-batch-apply"
@@ -151,18 +173,51 @@ fun MetadataPage(
         // 故移出 LazyColumn 常驻于其上方 —— 结构与本步骤 3 的卷选择器一致
         // (`PackPreviewPage.kt` 的 FlowRow 也在 LazyColumn 之外)。
         // 附带效果:切卷时 LazyColumn 的 item key 全部不变,LazyListState 得以保留滚动位置。
-        VolumeChipRow(
+        //
+        // 2026-10-19 用户要求「打包漫画的元数据步骤也改下支持刚才的双层芯片选取」⇒
+        // 由单级 [VolumeChipRow] 换成两级 [VolumeChipRows]。**2 级卷芯片与单本 1 级芯片
+        // 沿用原来的 `volumeChipTag`** —— 既有 20 余处测试按它点卷,语义没变。
+        VolumeChipRows(
             volumes = state.volumes,
             activeId = state.activeVolume.id,
             onSelect = { update(selectVolume(state, it)) },
-            selectorTag = TAG_VOLUME_SELECTOR,
-            chipTag = ::volumeChipTag,
-            allEntryTag = TAG_VOLUME_ALL,
-            sheetTag = TAG_VOLUME_SHEET,
-            sheetListTag = TAG_VOLUME_SHEET_LIST,
-            sheetChipTag = ::volumeSheetChipTag,
-            chipDescription = { id -> stringResource(R.string.meta_volume_chip_cd, id) },
-            chipLabel = { v -> Text(v.title.ifEmpty { v.id }) },
+            topTags = ChipRowTags(
+                selectorTag = TAG_VOLUME_SERIES_ROW,
+                chipTag = ::volumeGroupTag,
+                allEntryTag = TAG_VOLUME_GROUP_ALL,
+                sheetTag = TAG_VOLUME_GROUP_SHEET,
+                sheetListTag = TAG_VOLUME_GROUP_SHEET_LIST,
+                sheetChipTag = ::volumeGroupSheetTag,
+            ),
+            childTags = ChipRowTags(
+                selectorTag = TAG_VOLUME_SELECTOR,
+                chipTag = ::volumeChipTag,
+                allEntryTag = TAG_VOLUME_ALL,
+                sheetTag = TAG_VOLUME_SHEET,
+                sheetListTag = TAG_VOLUME_SHEET_LIST,
+                sheetChipTag = ::volumeSheetChipTag,
+            ),
+            singleTopChipTag = ::volumeChipTag,
+            topChipDescription = { group ->
+                if (group.isSeries) {
+                    stringResource(R.string.meta_series_cd, group.name)
+                } else {
+                    stringResource(R.string.meta_volume_chip_cd, group.members.first().id)
+                }
+            },
+            topChipLabel = { group ->
+                // 系列芯片显示组名 + 卷数;单本芯片显示卷标题(与 2 级行同一文案,
+                // 因为单本只有自己一卷,再标「1 卷」是噪声)。
+                if (group.isSeries) {
+                    Text(stringResource(R.string.meta_series_chip, group.name, group.members.size))
+                } else {
+                    Text(group.name)
+                }
+            },
+            topAllEntryText = { n -> pluralStringResource(R.plurals.volume_group_all, n, n) },
+            childChipDescription = { v -> stringResource(R.string.meta_volume_chip_cd, v.id) },
+            childChipLabel = { v -> Text(v.title.ifEmpty { v.id }) },
+            childAllEntryText = { n -> pluralStringResource(R.plurals.volume_all, n, n) },
         )
 
         LazyColumn(

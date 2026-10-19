@@ -3,17 +3,22 @@ package com.cyanix.pixfold.data.saf
 import android.content.ContentResolver
 import android.content.Context
 import android.content.Intent
+import android.database.ContentObserver
 import android.database.Cursor
 import android.net.Uri
+import android.os.Handler
+import android.os.Looper
 import androidx.core.net.toUri
 import android.provider.DocumentsContract
 import android.util.Log
 import com.cyanix.pixfold.domain.model.SourceItem
 import com.cyanix.pixfold.domain.source.LoadResult
 import com.cyanix.pixfold.domain.source.SourceDoc
+import com.cyanix.pixfold.domain.source.WorkspaceChangeWatcher
 import com.cyanix.pixfold.domain.source.WorkspaceHandle
 import com.cyanix.pixfold.domain.source.WorkspaceSource
 import com.cyanix.pixfold.domain.source.collectionsFrom
+import java.util.concurrent.atomic.AtomicBoolean
 
 /**
  * 基于 SAF（`DocumentsContract` + `ContentResolver`）的只读工作区来源（D2a）。
@@ -132,6 +137,65 @@ class AndroidSafSource(context: Context) : WorkspaceSource {
     }
 
     /**
+     * 订阅 SAF provider 的变更通知（D4「工作区实时刷新」）。
+     *
+     * **为什么用 `ContentObserver` 而不是轮询**：轮询要么慢（几秒一次，用户删了图
+     * 界面还挂着已删的图）、要么贵（每次都要递归 query 整棵树）。`DocumentsProvider`
+     * 在文件变化时会向 `ContentResolver` 发通知，这是系统级的「真·实时」通道。
+     *
+     * **为什么必须 `notifyForDescendants = true`**：我们监听的是**树根** URI，而实际
+     * 变更发生在深层的 `.../tree/primary:DCIM/document/...` 子文档上。传 `false`
+     * 就只收根节点自身的通知 —— 而根节点几乎永远不会变，等于白挂一个 observer。
+     *
+     * **为什么要去抖**：一次「粘贴 20 张图」往往触发几十条通知（有的 provider 连
+     * 元数据更新都发）。逐条转成重扫会把主线程/IO 打满，而用户看到的效果完全一样。
+     * 这里用 400ms 的**尾沿**去抖：每来一条通知就重置计时，安静下来才回调一次。
+     *
+     * **注册失败不抛**：授权已失效时 `registerContentObserver` 会抛
+     * `SecurityException`。实时监听只是增强能力，失败就让调用方退回「回前台重扫 +
+     * 手动刷新」，不该让界面崩掉或误判成「工作区坏了」。
+     */
+    override fun watchChanges(handle: WorkspaceHandle, onChange: () -> Unit): WorkspaceChangeWatcher? {
+        val mainHandler = Handler(Looper.getMainLooper())
+        // close() 与 onReceive 可能在不同线程（observer 回调在主线程，close 由
+        // 控制器/Compose 的 DisposableEffect 调用），必须原子地只生效一次。
+        val closed = AtomicBoolean(false)
+        val notify = Runnable {
+            if (!closed.get()) onChange()
+        }
+        val observer = object : ContentObserver(mainHandler) {
+            override fun onChange(selfChange: Boolean, uri: Uri?) {
+                if (closed.get()) return
+                mainHandler.removeCallbacks(notify)
+                mainHandler.postDelayed(notify, CHANGE_DEBOUNCE_MILLIS)
+            }
+        }
+
+        return try {
+            resolver.registerContentObserver(handle.treeUri.toUri(), true, observer)
+            WorkspaceChangeWatcher {
+                if (closed.compareAndSet(false, true)) {
+                    // 先摘掉还没触发的去抖任务，否则 close 之后 400ms 还会回调一次，
+                    // 让已经废弃的工作区再扫一遍。
+                    mainHandler.removeCallbacks(notify)
+                    try {
+                        resolver.unregisterContentObserver(observer)
+                    } catch (e: Exception) {
+                        // 注销失败最坏只是多收几条通知（已被 closed 挡住），不抛。
+                        Log.w(TAG, "watchChanges: 注销失败 ${handle.treeUri}", e)
+                    }
+                }
+            }
+        } catch (e: SecurityException) {
+            Log.w(TAG, "watchChanges: 授权失效，跳过实时监听 ${handle.treeUri}", e)
+            null
+        } catch (e: Exception) {
+            Log.w(TAG, "watchChanges: 注册失败 ${handle.treeUri}", e)
+            null
+        }
+    }
+
+    /**
      * 递归收集文档。
      *
      * 用显式 `parentDocId` 而不是从 URI 反解 —— `DocumentsContract` 的子项查询
@@ -206,5 +270,15 @@ class AndroidSafSource(context: Context) : WorkspaceSource {
          * 漫画库常见结构是 `库/系列/卷/图`，4 层够用；再深说明用户选错了目录。
          */
         const val MAX_DEPTH = 4
+
+        /**
+         * 变更通知的尾沿去抖窗口。
+         *
+         * 400ms 的依据：一次 `DocumentsContract.deleteDocument` / 复制操作在真机上
+         * 的连续通知间隔通常 < 100ms，而用户在文件管理器里做完一个动作到切回本应用
+         * 至少几百毫秒。太短（< 150ms）去抖不住批量操作，太长（> 1s）用户会觉得
+         * 「删了图界面半天没反应」。
+         */
+        const val CHANGE_DEBOUNCE_MILLIS = 400L
     }
 }

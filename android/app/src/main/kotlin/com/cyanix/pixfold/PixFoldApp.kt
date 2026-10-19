@@ -9,6 +9,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.LaunchedEffect
@@ -17,17 +18,23 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.toRoute
 import com.cyanix.pixfold.domain.mock.MockData
 import com.cyanix.pixfold.domain.mock.MockDataB
+import com.cyanix.pixfold.domain.model.ImageCollection
 import com.cyanix.pixfold.domain.model.NamingScheme
 import com.cyanix.pixfold.domain.model.NamingState
 import com.cyanix.pixfold.domain.model.effectiveScheme
 import com.cyanix.pixfold.domain.naming.buildProposals
 import com.cyanix.pixfold.domain.naming.setOverride
 import com.cyanix.pixfold.domain.workflowa.WorkflowAState
+import com.cyanix.pixfold.domain.workflowa.reconcileNamingState
+import com.cyanix.pixfold.domain.workflowa.reconcileWorkflowAState
 import com.cyanix.pixfold.domain.workflowa.workflowAStateOf
 import com.cyanix.pixfold.data.SharedPrefsSettingsStore
 import com.cyanix.pixfold.data.saf.AndroidSafSource
@@ -54,8 +61,10 @@ import com.cyanix.pixfold.ui.theme.PixFoldTheme
 import com.cyanix.pixfold.ui.workspace.LocalThumbnailSource
 import com.cyanix.pixfold.ui.workspace.WorkspaceController
 import com.cyanix.pixfold.ui.workspace.collectionsOr
+import com.cyanix.pixfold.ui.workspace.handleOrNull
 import com.cyanix.pixfold.ui.workflowa.WorkflowASteps
 import com.cyanix.pixfold.ui.workflowb.WorkflowBSteps
+import java.util.concurrent.atomic.AtomicBoolean
 
 /**
  * 应用根:主题、设置、演示数据与**根导航图**。
@@ -113,8 +122,49 @@ fun PixFoldApp(store: SettingsStore? = null) {
     // 目录内容随时会变，显示过期列表比重新扫一遍更糟。
     LaunchedEffect(Unit) { workspaceController.restore() }
     val workspaceState = workspaceController.state
+    // 「当前打开的是哪个工作区目录」的稳定标识。**下游凡是「该不该重置」的判断
+    // 都用它，而不是 `collections`**：`collections` 会在同一个目录里随文件增删
+    // 而变化（实时刷新），拿它当 key 等于「用户改一下文件就把界面状态全清掉」。
+    // 未授权 / 扫描中 / 失败时它是 `null`，那时 `collections` 是 mock ——
+    // 对 UI 而言仍是一个完整可用的工作区。
+    val workspaceHandle = workspaceState.handleOrNull()
     // 工作区切换后旧 uri 全部不可读，缓存留着只会占内存并让新图被提前淘汰。
-    LaunchedEffect(workspaceState) { thumbnailSource.clearCache() }
+    // ⚠️ key 用 handle 不用 `workspaceState`：后者每次刷新都会变一个新实例，
+    // 用它当 key 等于「每次都清空缩略图缓存」—— 刷新时满屏重新解码，正是
+    // 「刷新不该闪烁」要避免的那种抖动。
+    LaunchedEffect(workspaceHandle) { thumbnailSource.clearCache() }
+
+    // ---- 回前台自动刷新（D4「工作区实时刷新」2026-10-19 用户裁决）----
+    //
+    // 用户原话是「我可能看到图片有问题或者缺失，会用文件管理器删除或添加或重命名
+    // 图片，工作区应该实时刷新」。三条触发路径里，这条管的是「用户去别的应用改完
+    // 文件再切回来」—— 此时 ContentObserver 的通知往往已经在后台丢失或被子线程
+    // 攒着，靠 ON_RESUME 补一次重扫最可靠。
+    //
+    // ⚠️ **首次 ON_RESUME 必须跳过**：`restore()` 在 `LaunchedEffect(Unit)` 里发出，
+    // 而 Activity 首次 RESUMED 与首帧组合的先后**没有保证**。不跳过的话冷启动会
+    // 连扫两遍（千级目录下是肉眼可见的卡顿），且第二遍扫完紧接着又触发一次对账。
+    val lifecycleOwner = LocalLifecycleOwner.current
+    val skipFirstResume = remember { AtomicBoolean(true) }
+    DisposableEffect(lifecycleOwner, workspaceController) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) {
+                // compareAndSet 而不是读一个 Boolean：ON_RESUME 理论上只来一次，
+                // 但多窗口/分屏下重建后可能再收一次，用原子量保证「只跳过一次」。
+                if (!skipFirstResume.compareAndSet(true, false)) {
+                    workspaceController.refresh()
+                }
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose {
+            lifecycleOwner.lifecycle.removeObserver(observer)
+            // `ContentObserver` 是注册在 `ContentResolver` 上的**全局**对象，不注销会
+            // 一直活到进程结束；而 Compose 里控制器随组合重建（旋转 / 多窗口），
+            // 泄漏会随重建次数累积，且旧观察者还会替已废弃的目录触发刷新。
+            workspaceController.close()
+        }
+    }
 
     // 选目录：ACTION_OPEN_DOCUMENT_TREE 是**唯一**能拿到可持久化 tree URI 的通道
     // （HANGOFF §4：没有「以 SAF 树形式授权目录」的标准分享通道）。
@@ -158,13 +208,27 @@ fun PixFoldApp(store: SettingsStore? = null) {
             // 预览跟随**当前集合**:切集合后打开预览应看到该集合的图,
             // 否则页码与图片会对不上(索引来自当前集合)。
             //
-            // ⚠️ 两个 key 都必要:
-            //  - `collections` 作 key:工作区切换后集合列表整个换掉,必须重新播种,
-            //    否则 `activeCollectionId` 会指向一个已不存在的集合 id(表现为预览取不到图)。
-            //  - `.orEmpty()` 而不是 `.first().id`:真实扫描可能扫出**空目录**
-            //    (用户选了个没有图片的文件夹),`first()` 会直接抛 NoSuchElementException。
-            var activeCollectionId by remember(collections) {
+            // ⚠️ key 用 `workspaceHandle` 而不是 `collections`（2026-10-19 改，理由
+            // 见下方「工作流 A 的两份共享状态」处同一段说明）：同一个工作区刷新出
+            // 新列表时，不该把用户正在看的集合重置回第一个。
+            var activeCollectionId by remember(workspaceHandle) {
                 mutableStateOf(collections.firstOrNull()?.id.orEmpty())
+            }
+            // 刷新后原先选中的集合**可能已被删掉**（用户删了这个子目录）。
+            // 派生一个「当前真正可用的集合 id」供下游使用：
+            //  - 仍存在 ⇒ 原样返回（刷新不该把用户从正在看的集合拽走）；
+            //  - 已消失 ⇒ 退回第一个；空目录时是空串。
+            // **不在组合期直接给 `activeCollectionId` 赋值**：那等于在组合中写快照
+            // 状态，Compose 会把本轮判为失效再跑一遍；而且「先渲染旧 id、下一帧才修」
+            // 的那一帧里，子组件可能已经把索引记成空（预览打不开第一张图）。
+            val currentCollectionId = collections.firstOrNull { it.id == activeCollectionId }?.id
+                ?: collections.firstOrNull()?.id.orEmpty()
+            // 把修正结果回写进状态：否则用户下一次手动切集合时，
+            // `onActiveCollectionChange` 会以那个已消失的 id 为起点，界面看起来「没反应」。
+            LaunchedEffect(collections) {
+                if (activeCollectionId != currentCollectionId) {
+                    activeCollectionId = currentCollectionId
+                }
             }
 
             // ---- 工作流 A 的两份共享状态提升到应用根(2026-09-25)----
@@ -179,19 +243,42 @@ fun PixFoldApp(store: SettingsStore? = null) {
             //  2. **命名状态**(`NamingState`)—— 预览页的重命名入口写回的就是它的
             //     `overrides`,与命名页共用同一份,故两处改名结果必然一致。
             //
-            // 默认值刻意与 `WorkflowASteps` 内部的兜底取值保持**同一表达式**,
-            // 否则"上层初始值"与"组件自持初值"会算出不同结果。
-            // ⚠️ `remember(collections)`:工作区切换 = 换了一整套集合,
-            // 旧集合的页序/排序规则对新集合毫无意义(集合 id 都不同),必须重建。
-            // 同一工作区重扫时,若内容未变则 `List.equals` 为真、不会重置,
-            // 用户的手工排序因此不会被无谓清掉 —— 这是刻意选 equals 作 key 的原因。
-            var workflowAState by remember(collections) { mutableStateOf(workflowAStateOf(collections)) }
-            var namingState by remember(collections) {
+            // 工作流 A 的两份共享状态提升到应用根(2026-09-25)—— 理由见上方注释 1./2.
+            //
+            // ⚠️ **key 为什么是「工作区句柄」而不是「集合列表」（2026-10-19 改）**：
+            //
+            // 用户裁决「工作区应该实时刷新」，于是集合列表会在**同一个工作区里**变化
+            // （他在文件管理器里删了图 / 加了图）。若 key 仍是 `collections`，那次变化
+            // 会把这个 `remember` 重建 ⇒ 用户刚拖好的顺序、刚改好的文件名全被清掉。
+            // 反过来，key 用 handle 就只区分「换了目录」(必须全重置 —— 旧集合 id 对新
+            // 目录毫无意义) 与「同一目录内容变了」(用对账保留人工调整)。
+            //
+            // 对账必须**在组合期同步完成**，不能放进 `LaunchedEffect`：子组件
+            // `WorkflowASteps` 自己也是 `remember(collections)` 播种本地状态,而它的
+            // 初值来自这里的 `externalState`。若先以旧状态组合子组件、事后再用副作用
+            // 更新，子组件的 key 已经消费过 ⇒ 它不会重新播种 ⇒ 对账结果在界面上看不见
+            // (预览页读上层那份反而是对的，两处会不一致)。写在子组件之前则同一次组合
+            // 就能拿到对账后的值。
+            var workflowAState by remember(workspaceHandle) {
+                mutableStateOf(workflowAStateOf(collections))
+            }
+            var namingState by remember(workspaceHandle) {
                 mutableStateOf(
                     NamingState(
                         NamingScheme(rootDirName = collections.firstOrNull()?.rootDirName.orEmpty()),
                     ),
                 )
+            }
+            // 上一次对账所依据的集合列表。刻意用**普通字段**而不是 `mutableStateOf`：
+            // 它只在组合期读写，写成快照状态会让「读它的这段组合」被自己刚才的写入
+            // 判为失效、白白多重跑一次组合（刷新在千级目录下不算便宜）。
+            val lastReconciled = remember(workspaceHandle) { LastReconciled(collections) }
+            if (lastReconciled.collections != collections) {
+                // `!=` 而不是 `!==`：控制器已保证「内容没变不发新实例」，但这里再用
+                // 结构相等兜一层 —— 等值的新实例不该白跑一次对账。
+                lastReconciled.collections = collections
+                workflowAState = reconcileWorkflowAState(workflowAState, collections)
+                namingState = reconcileNamingState(namingState, collections)
             }
 
             // 返回手势/返回键:由 NavHost 自带的 handler 统一处理(它会随返回栈深度
@@ -265,7 +352,7 @@ fun PixFoldApp(store: SettingsStore? = null) {
                             // ⚠️ 必须回传当前集合:打开预览会让本目的地离开组合,
                             // 内部的 `remember { activeId }` 随之销毁;关闭预览回来是
                             // 新的组合实例,不给种子就会退回首个集合(2026-09-25 修复)。
-                            initialActiveCollectionId = activeCollectionId,
+                            initialActiveCollectionId = currentCollectionId,
                             externalState = workflowAState,
                             onStateChange = { workflowAState = it },
                             initialNamingState = namingState,
@@ -290,7 +377,7 @@ fun PixFoldApp(store: SettingsStore? = null) {
                     // 空列表时（用户选了空目录）没有可预览的图 —— 直接不渲染内容。
                     // 注意这里**不能**用 `?: collections.first()`：空目录是合法状态，
                     // 抛 NoSuchElementException 会让预览页崩掉。
-                    val activeCollection = collections.firstOrNull { it.id == activeCollectionId }
+                    val activeCollection = collections.firstOrNull { it.id == currentCollectionId }
                         ?: collections.firstOrNull()
                     if (activeCollection == null) {
                         DestinationSurface { }
@@ -347,6 +434,20 @@ fun PixFoldApp(store: SettingsStore? = null) {
         }
     }
 }
+
+/**
+ * 「上一次对账依据的集合列表」的**可变容器**（不是快照状态）。
+ *
+ * **为什么不用 `mutableStateOf`**：对账这段逻辑在**组合期**同步执行 ——
+ * 它读上一份列表、必要时写入新列表并立刻改 `workflowAState`。若把「上一份列表」
+ * 写成快照状态，那么这次的写入会让「正在读它的这段组合」自己也失效，
+ * 于是刚算完又重跑一遍（千级目录下 `reconcileWorkflowAState` 是 O(n) 带排序的，
+ * 白跑一次很显眼）。用普通可变字段则只有 `workflowAState` 的写入触发重组，
+ * 而那次重组读到的「上一份列表」已经等于当前列表，不会重复对账。
+ *
+ * 容器本身仍需 `remember`：它要跨重组存活，且随工作区句柄一起重建。
+ */
+private class LastReconciled(var collections: List<ImageCollection>)
 
 /**
  * 把设置里的语言应用到系统的 **per-app locale**。

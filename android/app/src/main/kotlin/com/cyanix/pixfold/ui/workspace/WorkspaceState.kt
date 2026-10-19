@@ -96,6 +96,20 @@ val WorkspaceState.canOrganize: Boolean
         is WorkspaceState.Failed -> true
     }
 
+/**
+ * 当前状态里能取到的授权（[Ready] / [Denied] 才有）。
+ *
+ * **为什么需要它**：刷新（`WorkspaceController.refresh`）与「是否换了工作区」的
+ * 判断都只需要知道「现在是哪个目录」，却各自手写一遍 `when` 分支的话，将来新增
+ * 一个状态变体很容易漏改其中一处 —— 漏在刷新侧的表现是「某个状态下刷新静默失效」，
+ * 没有任何报错。收成一个扩展函数，编译器会在新增变体时直接报穷尽性错误。
+ */
+fun WorkspaceState.handleOrNull(): WorkspaceHandle? = when (this) {
+    is WorkspaceState.Ready -> handle
+    is WorkspaceState.Denied -> handle
+    WorkspaceState.None, WorkspaceState.Loading, is WorkspaceState.Failed -> null
+}
+
 // ==================== 授权失效恢复（D2b 退出条件 ③） ====================
 
 /**

@@ -106,10 +106,25 @@ fun NamingPage(
     onStateChange: (NamingState) -> Unit = {},
     onBack: (() -> Unit)? = null,
     onNext: (() -> Unit)? = null,
+    // ---- 集合芯片行(2026-10-19 用户要求「整理图片的步骤2也加上芯片选取」)----
+    //
+    // 三个参数都给默认值,让既有调用点(38 个测试用例的 `show()`、`ReplacementFieldTest`)
+    // 零改动兼容 —— 不传就没有芯片行,行为与改前完全一致。
+    //
+    // **选中项与步骤 1 共用同一个 `activeId`**(用户 2026-10-19 裁决「共用同一个选中项」):
+    // 步骤 2 只有 `onSelectCollection` 上报,由上层改写那个唯一的 activeId,
+    // 于是「步骤 2 切了集合 → 回步骤 1 也是新选的」自然成立,不需要任何同步逻辑。
+    collections: List<ImageCollection> = emptyList(),
+    onSelectCollection: (String) -> Unit = {},
 ) {
     // 状态模式:**本地状态权威,初值取自 initialState,每次变更上报上层**。
     // 不用 `initialState ?: local` —— 那样一旦上层传值,就地编辑就永不显示(实测踩过)。
-    var state by remember {
+    //
+    // `remember(collection)` 的 key(2026-10-19,与 `SortAndPreviewPage` 同源缺陷):
+    // 换工作区 / 刷新后集合变了,旧命名状态的 `overrides` 键是旧集合项的 id,
+    // 与新集合完全不匹配 —— 不重播种就会带着一堆指向不存在项的覆盖继续算建议。
+    // `ImageCollection` 是 data class,内容相同的重扫结果 equals 相等 ⇒ 不会误重置。
+    var state by remember(collection) {
         mutableStateOf(initialState ?: NamingState(NamingScheme(rootDirName = collection.rootDirName)))
     }
     fun update(next: NamingState) {
@@ -149,7 +164,18 @@ fun NamingPage(
             .windowInsetsPadding(contentInsets)
             .testTag(TAG_NAMING_PAGE),
     ) {
-        // ---- 固定区(不随列表滚动):标题 + 折叠摘要栏 + 冲突提示 + 汇总 ----
+        // ---- 固定区(不随列表滚动):集合芯片 + 标题 + 折叠摘要栏 + 冲突提示 + 汇总 ----
+
+        // 集合芯片行放最上方(与步骤 1 同一位置语义):先选在哪一本上命名,再看这一本的标题。
+        // **不在外层判 `collections.size > 1`**:该判据在 [CollectionChipRows] 内部已有,外面再判
+        // 一层就是冗余守卫 —— 变异实测把外层改成 `if (true)` 后没有任何断言能红(2026-10-19 M13),
+        // 留着只会让后来者以为两层都在承重。
+        CollectionChipRows(
+            collections = collections,
+            activeId = collection.id,
+            onSelect = onSelectCollection,
+        )
+
         Text(
             text = pluralStringResource(R.plurals.a_naming_title, pageOrder.size, collection.name, pageOrder.size),
             style = MaterialTheme.typography.titleMedium,

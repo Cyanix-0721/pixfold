@@ -36,6 +36,9 @@
         <item quantity="other">已设置到 %1$d 卷（跳过 %2$d 卷逐项例外）</item>
     </plurals>
     <string name="meta_volume_chip_cd">卷 %1$s</string>
+    <!-- 1 级「系列」芯片(2026-10-19 卷芯片改两级后新增):%1$s = 系列名,%2$d = 系列内卷数。 -->
+    <string name="meta_series_chip">%1$s（%2$d）</string>
+    <string name="meta_series_cd">系列 %1$s</string>
         <string name="meta_include_cd">勾选卷 %1$s</string>
     <plurals name="meta_volume_status">
         <item quantity="other">参与打包 · %1$d 页 · 已覆盖 %2$d 个字段</item>

@@ -15,6 +15,20 @@ data class WorkspaceHandle(
 )
 
 /**
+ * 变更观察句柄。
+ *
+ * **为什么需要句柄而不是只有回调**：监听是平台资源的占用（`ContentObserver`、
+ * 文件监视器、轮询定时器……），不显式释放就会在工作区切换后继续回调旧目录的变更，
+ * 既泄漏又会让界面显示上一个目录的内容。[close] 必须幂等 —— 界面层的
+ * `DisposableEffect` / 控制器清理路径都可能调用它。
+ */
+fun interface WorkspaceChangeWatcher {
+
+    /** 停止监听并释放平台资源。重复调用必须无副作用。 */
+    fun close()
+}
+
+/**
  * 平台侧只读来源端口（D2a）。
  *
  * **为什么是接口**：`domain/` 必须零 Android 依赖（`AdapterBoundaryTest` 四层强制），
@@ -50,6 +64,24 @@ interface WorkspaceSource {
 
     /** 读一个来源文件的原始字节（预览 / 打包用）。读不到返回 `null`。 */
     fun readBytes(item: SourceItem): ByteArray?
+
+    /**
+     * 监听工作区变更（用户在文件管理器里增删改图片后，希望界面自动跟上）。
+     *
+     * **为什么带默认实现返回 `null`**：观察能力是**可选增强**，不是端口的必需品。
+     * 给默认实现，测试里的假源（`WorkspaceControllerTest.ScriptedSource` 等）与
+     * 未来只读/离线的实现都不用被迫写一个空壳方法；返回 `null` 的语义明确为
+     * 「这个实现不支持观察」，调用方据此静默降级到回前台重扫 / 手动刷新。
+     *
+     * **回调契约**：可能在任意线程回调，且**可能连续多次**（一次文件操作往往产生
+     * 多个 provider 通知）—— 调用方需自行合并/去抖，不要在回调里直接重扫。
+     * [onChange] 只在变更后通知，**不承诺**变更内容；重扫职责仍归
+     * [loadCollections]。
+     *
+     * **返回值**：`null` = 不支持；非 `null` 时调用方**必须**在不再需要时
+     * （换工作区 / 忘记工作区 / 界面销毁）[WorkspaceChangeWatcher.close]。
+     */
+    fun watchChanges(handle: WorkspaceHandle, onChange: () -> Unit): WorkspaceChangeWatcher? = null
 }
 
 /** [WorkspaceSource.loadCollections] 的结果。授权失效是**预期内**状态，不是异常。 */

@@ -18,6 +18,7 @@
     <string name="a_rule_scope_default">Batch default rule</string>
     <string name="a_collection_chip">%1$s (%2$d)</string>
     <string name="a_collection_cd">Set %1$s</string>
+    <string name="a_series_cd">Series %1$s</string>
     <plurals name="a_image_count">
         <item quantity="one">%1$d image</item>
         <item quantity="other">%1$d images</item>
@@ -28,6 +29,7 @@
     </plurals>
     <string name="a_reset_manual_cd">Reset manual adjustments</string>
     <string name="a_reset_manual">Reset manual adjustments (%1$d)</string>
+    <string name="a_sort_empty">This set has no sort state. Reopen the workspace.</string>
     <string name="a_custom_rule">Custom for this set</string>
     <string name="a_custom_rule_cd">Custom rule for this set</string>
     <string name="a_next">Next</string>

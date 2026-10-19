@@ -12,6 +12,7 @@ import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollToNode
 import com.cyanix.pixfold.domain.mock.MockDataB
+import com.cyanix.pixfold.domain.source.SERIES_PREFIX
 import com.cyanix.pixfold.ui.components.visibleVolumeChips
 import com.cyanix.pixfold.domain.model.ComicVolume
 import com.cyanix.pixfold.domain.workflowb.WorkflowBState
@@ -101,7 +102,10 @@ class MetadataVolumeChipStickyTest {
      * 40 卷时芯片区吃掉整个视口、字段永久不可达，见本轮回归记录）。
      */
     private fun manyVolumes(count: Int): List<ComicVolume> = (1..count).map { i ->
-        val base = library.volumes[(i - 1) % library.volumes.size]
+        // 全部取同一个 base(同一 series):规模缺陷的真实形态就是「一个系列几十卷」,
+        // 此时 2 级卷行才会溢出。轮流取 5 个 mock 卷会得到 2 个系列、成员分散在两条
+        // 分支上,「第 6 卷不进常驻行」这类断言会因成员 id 不连续而误判(2026-10-19 实测)。
+        val base = library.volumes.first()
         base.copy(
             id = "scale-$i",
             title = "规模测试 $i",
@@ -116,6 +120,8 @@ class MetadataVolumeChipStickyTest {
         // 芯片区必须限高，否则 40 卷时它会吃掉整个视口 —— 真机实测（2026-10-18）
         // 13 行芯片占 834.9dp（视口 835.3dp），11 次全屏 swipe 后字段仍全部不可见。
         // 限高后溢出卷必须有一个入口，否则后面的卷切换不了。
+        // 40 卷同属一个系列 ⇒ 1 级行只有 1 个芯片、不溢出;溢出发生在 **2 级卷行**,
+        // 故这里断言的是 2 级「全部 N 卷」入口(`TAG_VOLUME_ALL`)。
         rule.onNodeWithTag(TAG_VOLUME_ALL).assertIsDisplayed()
 
         // 常驻行必须**真的只组合 5 个芯片**，第 6 卷起不进常驻行。
@@ -136,8 +142,9 @@ class MetadataVolumeChipStickyTest {
         rule.onNodeWithTag(TAG_VOLUME_ALL).performClick()
         rule.waitForIdle()
 
-        // 溢出的卷必须在 sheet 里能点到（scale-40 是第 40 卷，2 行芯片必然装不下）。
-        // sheet 内是可滚动的全量列表，先滚到最后一卷再点。
+        // 溢出的卷必须在 sheet 里能点到（scale-40 是第 40 卷，常驻行只放 5 个）。
+        // sheet 列出的是**当前系列的全部卷**（两级下 2 级 sheet 的口径，不是全库），
+        // 本夹具全在同一系列 ⇒ 40 卷都在里面。sheet 内可滚动，先滚到最后一卷再点。
         rule.onNodeWithTag(TAG_VOLUME_SHEET_LIST)
             .performScrollToNode(hasTestTag(volumeSheetChipTag("scale-40")))
         rule.waitForIdle()
@@ -151,13 +158,28 @@ class MetadataVolumeChipStickyTest {
     }
 
     @Test
-    fun `five volumes show no all-volumes entry`() {
+    fun `five volumes show no child all-volumes entry`() {
         show()
 
-        // 5 卷恰好 2 行排满 ⇒ 不降级：不出现多余入口，5 个芯片全部可见。
+        // mock 5 卷 = 两个系列（进击的巨人 3 卷 / 海贼王 2 卷）。
+        // 2 级行最多 3 卷 ⇒ 不溢出、不出现多余的 2 级入口；当前系列第一本可见。
         rule.onNodeWithTag(TAG_VOLUME_ALL).assertDoesNotExist()
         rule.onNodeWithTag(volumeChipTag("aot-1")).assertIsDisplayed()
+
+        // 另一系列的卷不在当前 2 级行里 —— 必须走用户真实路径：
+        // 先点 1 级系列芯片（自动切到该系列第一本），再到 2 级行点目标卷。
+        rule.onNodeWithTag(volumeGroupTag(SERIES_PREFIX + "海贼王")).performClick()
+        rule.waitForIdle()
         rule.onNodeWithTag(volumeChipTag("op-102")).assertIsDisplayed()
+    }
+
+    @Test
+    fun `series row cramped to one line keeps an all entry`() {
+        // 1 级行在选中系列时收缩到 1 行（用户 2026-10-19 裁决）。收缩后看不见的系列芯片
+        // 不能再靠换行够到 ⇒ 必须给「全部 N 项」入口。真机长系列名 1 行可能只放得下 1 个，
+        // 而 Robolectric 量不出宽度 ⇒ 规则取「宁可多给入口」。
+        show()
+        rule.onNodeWithTag(TAG_VOLUME_GROUP_ALL).assertIsDisplayed()
     }
 
     // ---- visibleVolumeChips：溢出时常驻哪几卷（纯函数，直接断言，不依赖布局测量）----

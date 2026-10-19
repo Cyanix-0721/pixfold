@@ -38,6 +38,9 @@
         <item quantity="other">Applied to %1$d volumes (skipped %2$d with per-item overrides)</item>
     </plurals>
     <string name="meta_volume_chip_cd">Volume %1$s</string>
+    <!-- 1 级「系列」芯片(2026-10-19 卷芯片改两级后新增):%1$s = 系列名,%2$d = 系列内卷数。 -->
+    <string name="meta_series_chip">%1$s (%2$d)</string>
+    <string name="meta_series_cd">Series %1$s</string>
         <string name="meta_include_cd">Include volume %1$s</string>
     <plurals name="meta_volume_status">
         <item quantity="one">Included · %1$d page · %2$d fields overridden</item>
