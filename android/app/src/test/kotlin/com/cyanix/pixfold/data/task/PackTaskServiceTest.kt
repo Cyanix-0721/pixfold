@@ -43,12 +43,26 @@ class PackTaskServiceTest {
     private fun startedService(): PackTaskService =
         Robolectric.buildService(PackTaskService::class.java).create().get()
 
+    /**
+     * 渠道必须建出来，且 importance **不得低于 DEFAULT**。
+     *
+     * 这条断言原先断的是 `IMPORTANCE_LOW`。2026-10-19 真机实测把它改成
+     * DEFAULT 后同步改断言 —— 但断言口径刻意写成「不得低于 DEFAULT」而不是
+     * 「等于 DEFAULT」：本渠道的真实前提是「不被系统归入 unimportant」，
+     * 而 IMPORTANCE_HIGH 同样满足该前提。若将来因为 UX 理由提到 HIGH，
+     * 这条测试不该跟着红。
+     *
+     * 反过来说，**降到 LOW 必须红**：那是升格消失的直接原因。
+     */
     @Test
-    fun `channel is created with low importance`() {
+    fun `channel is created with at least default importance`() {
         startedService()
         val channel = manager.getNotificationChannel(PackTaskService.CHANNEL_ID)
         assertNotNull("前台服务必须建好通知渠道，否则 notify 静默失败", channel)
-        assertEquals(NotificationManager.IMPORTANCE_LOW, channel.importance)
+        assertTrue(
+            "渠道 importance 必须 >= IMPORTANCE_DEFAULT（LOW 会被系统归入 unimportant，实时活动无法升格）",
+            channel.importance >= NotificationManager.IMPORTANCE_DEFAULT,
+        )
     }
 
     /**
@@ -167,5 +181,126 @@ class PackTaskServiceTest {
         )
         store.clear()
         assertNull(PackTaskStore(context).load())
+    }
+
+    /**
+     * 系统超时回收前台服务时，必须留下**可见的失败痕迹**。
+     *
+     * ## 为什么这条必须存在
+     *
+     * `FOREGROUND_SERVICE_TYPE_DATA_SYNC` 有时长上限（Android 15+）。超限时
+     * 系统直接回收服务，`stopSelf` 不是我们调的，`runTask` 的 `finally` 也不保证
+     * 走到 —— 没有 `onTimeout` 覆写的话，结局是：
+     *
+     * - 进度通知停在某个百分比永远不动；
+     * - `PackTaskStore` 留着 `Running` 快照；
+     * - 用户等不到任何完成/失败反馈，只能重启应用。
+     *
+     * 这条测试钉住三件事：快照必须转成 `Aborted`、必须发结束通知、**不能被
+     * 误判成正常完成**。
+     */
+    @Test
+    fun `onTimeout turns the running snapshot into an aborted one and notifies`() {
+        val service = startedService()
+        // 种进「任务正在跑」的状态。**必须走 Service 自己的字段**，不能只往
+        // store 里写 —— `onTimeout` 读的是字段，store 里那条只是被覆盖的对象。
+        val running = PackTaskSnapshot(
+            taskId = "pack-timeout",
+            phase = PackTaskPhase.Running,
+            startedAtMillis = 1_000L,
+            updatedAtMillis = 2_000L,
+            progress = TaskProgress(total = 5, done = 2),
+            outputTargets = listOf("a.cbz", "b.cbz"),
+        )
+        PackTaskStore(context).save(running)
+        service.snapshot = running
+        // 真机上超时那一刻前台进度通知是挂着的。这里先造出来，才能验证它被撤掉。
+        manager.notify(
+            PackTaskService.NOTIFICATION_ID,
+            androidx.core.app.NotificationCompat.Builder(context, PackTaskService.CHANNEL_ID)
+                .setSmallIcon(androidx.core.R.drawable.ic_call_answer)
+                .setContentTitle("running")
+                .build(),
+        )
+        assertNotNull(shadowOf(manager).getNotification(PackTaskService.NOTIFICATION_ID))
+
+        service.onTimeout(1)
+
+        val saved = PackTaskStore(context).load()
+        assertNotNull("超时后必须有快照落盘，否则用户重启后什么都看不到", saved)
+        assertEquals(
+            "超时必须以 Aborted 收尾；若停在 Running，恢复提示会把「被系统掐断」误报成「上次打包未完成」",
+            PackTaskPhase.Aborted,
+            saved!!.phase,
+        )
+        assertEquals("pack-timeout", saved.taskId)
+        // 进度不能被抹掉：用户要能看到「跑到 2/5 被掐断」。
+        assertEquals(5, saved.progress.total)
+        assertEquals(2, saved.progress.done)
+
+        assertNotNull(
+            "超时必须发一条结束通知，否则用户完全不知道任务已经没了",
+            shadowOf(manager).getNotification(PackTaskService.FINAL_NOTIFICATION_ID),
+        )
+        assertNull(
+            "超时后前台进度通知必须撤掉 —— 留着会显示成「还在跑」",
+            shadowOf(manager).getNotification(PackTaskService.NOTIFICATION_ID),
+        )
+    }
+
+    /**
+     * 超时必须**真的把取消令牌置位**，不能只改 UI 状态。
+     *
+     * ## 为什么单开一条
+     *
+     * `onTimeout` 里最容易写漏、后果最重的是 `PackTaskBus.requestCancel()`：
+     * 系统判定超时后进程随时可能被杀，而 `runPackPlans` 的取消检查只在
+     * **卷与卷之间**（`PackRunner.kt` 的 `shouldStop(beforeStartingItem)`）。
+     * 令牌不置位的话，服务侧收尾完成、界面显示「已中止」，底层却还在往
+     * 目标文件写 —— 产出的就是半成品 CBZ。
+     *
+     * 断言口径：先让总线进入 `Running` 并拿到当前令牌，调 `onTimeout`，
+     * 再确认令牌 `isCancelled`。这条只有真调 `requestCancel` 才会绿。
+     */
+    @Test
+    fun `onTimeout actually cancels the running token`() {
+        val service = startedService()
+        // 让总线进 Running 并建出令牌（requestStart 立即建令牌，见 PackTaskBus）。
+        val request = PackTaskRequest(
+            treeUri = "content://test/tree/root",
+            rootDisplayName = "root",
+            plans = emptyList(),
+            workspaceName = "root",
+        )
+        assertTrue("前置条件：总线应当接受新请求", PackTaskBus.requestStart(request))
+        val token = PackTaskBus.begin()
+        assertTrue("前置条件：总线应当处于 Running", PackTaskBus.isRunning())
+        assertTrue("前置条件：令牌刚建出来时未取消", !token.isCancelled)
+        service.snapshot = PackTaskSnapshot(
+            taskId = "pack-cancel",
+            phase = PackTaskPhase.Running,
+            startedAtMillis = 1L,
+            updatedAtMillis = 2L,
+            progress = TaskProgress(total = 2, done = 0),
+        )
+
+        service.onTimeout(1)
+
+        assertTrue(
+            "超时必须置位取消令牌。否则服务侧收尾了、底层 runPackPlans 还在写，" +
+                "留下的是半成品 CBZ",
+            token.isCancelled,
+        )
+        PackTaskBus.resetForTest()
+    }
+
+    /** 两个 `onTimeout` 重载必须都收敛到同一处理路径（API 35 / 36 各调一个）。 */
+    @Test
+    fun `both onTimeout overloads are safe to call`() {
+        val service = startedService()
+        service.onTimeout(7)
+        service.onTimeout(7, 1)
+        // 走到这里没抛异常即达标：重载分歧会让某些系统版本上的超时变成崩溃。
+        assertTrue(true)
     }
 }

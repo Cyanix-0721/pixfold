@@ -65,9 +65,35 @@ import java.util.concurrent.atomic.AtomicBoolean
  *
  * ## 通知形态
  *
- * Android 16（API 36）起用 `Notification.ProgressStyle`，系统把它渲染成状态栏
- * 胶囊 / Live Update；低版本回退到 `BigTextStyle` + 系统进度条。两条路径都要实现 ——
- * `minSdk 34`，只用 `ProgressStyle` 会让 Android 14/15 的进度显示彻底消失。
+ * 进度通知一律用 `NotificationCompat.ProgressStyle`（Android 16 的 Live Update
+ * 形态）。`minSdk` 已提到 36，故**没有低版本降级分支** —— 原先那条
+ * `SDK_INT >= 36` 判断在 minSdk 36 下恒真，lint `ObsoleteSdkInt` 会硬失败。
+ *
+ * 注意区分两件事：
+ * - **ProgressStyle 本身**是 API 36 的公开 API，进度条在 36.0 上正常渲染；
+ * - **升格成状态栏胶囊（Live Update / OPPO 流体云）**在 36.0 上**也能生效**，
+ *   但多一道用户开关。
+ *
+ * ## 升格的真正前置条件（真机实测，2026-10-19）
+ *
+ * 一度以为「API 36.0 上 `canPostPromotedNotifications()` 恒为 false，要等 36.1」，
+ * 并把 StackOverflow 上几位 Pixel 用户「36.0 上拿不到胶囊」的报告当作平台限制。
+ * **这个结论是错的**，真机反证如下：
+ *
+ * 1. 本机 `ro.build.version.sdk_full = 36.0`（不是 36.1），`ColorOS V16.0.0`；
+ * 2. 系统设置里有「流体云 - 显示实时活动」总开关，**默认关闭**；
+ * 3. 打开它之后再跑打包 ⇒ `dumpsys notification` 里该通知出现
+ *    `flags=...|PROMOTED_ONGOING|...`，`logcat` 见
+ *    `NotificationLiveAlertProvider-->post sbn: [...PROMOTED_ONGOING...]`，
+ *    截图抓到了状态栏胶囊实体（`ic_pack_progress` 图标 + `60%` 文本）。
+ *
+ * ⇒ 所以「拿不到升格」是**用户级开关没开**，不是 API level 不够。Pixel 那几位
+ * 用户大概率也是同一个开关（Android 16 设置里叫 Live Updates）。
+ *
+ * 这条经验对代码的影响：**必须无条件写 `setRequestPromotedOngoing(true)`**。
+ * 升格是「位」而不是「能力查询」——用户随时可能在设置里打开开关，下一次
+ * `notify()` 就该自动升格，不需要应用重启或改代码。所以**不要**把
+ * `canPostPromotedNotifications()` 当门禁来跳过设置请求位。
  */
 class PackTaskService : Service() {
 
@@ -78,6 +104,20 @@ class PackTaskService : Service() {
 
     /** `startForeground` 只能成功调一次（重复调用抛 `IllegalStateException`）。 */
     private val foregroundStarted = AtomicBoolean(false)
+
+    /**
+     * 当前任务的快照。
+     *
+     * **必须是字段而不是 `runTask` 的局部变量**：[onTimeout] 是系统在别的时机调进来的
+     * 回调，它要能读到「任务跑到哪儿了」才能写出正确的收尾快照。做成局部变量时
+     * `onTimeout` 只能写一条空快照，恢复提示会丢失进度。
+     *
+     * 只在主线程读写（`CoroutineScope` 用 `Dispatchers.Main.immediate`），故不加锁。
+     *
+     * 声明为 `internal`（而非 private）**只为了可测**：[onTimeout] 的整条路径在
+     * Robolectric 里没有别的入口能种进「任务跑到一半」的状态。
+     */
+    internal var snapshot: PackTaskSnapshot? = null
 
     override fun onCreate() {
         super.onCreate()
@@ -121,6 +161,7 @@ class PackTaskService : Service() {
             progress = TaskProgress(total = request.plans.size),
             outputTargets = request.plans.map { it.outputPath },
         )
+        this.snapshot = snapshot
         store.save(snapshot)
 
         val executor = SafPackExecutor(this, request.treeUri.toUri(), request.rootDisplayName)
@@ -143,6 +184,8 @@ class PackTaskService : Service() {
                             lastEmitted = progress
                             lastEmitAt = now
                             snapshot = snapshot.withProgress(progress, nowMillis = now)
+                            // 字段同步更新：`onTimeout` 读的是字段，不是这个局部变量。
+                            this@PackTaskService.snapshot = snapshot
                             store.save(snapshot)
                             PackTaskBus.publish(progress, cancelling = token.isCancelled)
                             updateNotification(progress.fraction, countsText(progress))
@@ -239,7 +282,19 @@ class PackTaskService : Service() {
         val channel = NotificationChannel(
             CHANNEL_ID,
             getString(R.string.pack_notify_channel),
-            NotificationManager.IMPORTANCE_LOW,
+            // **必须是 DEFAULT，不能是 LOW。**
+            //
+            // 真机实测（2026-10-19，ColorOS / Android 16.0）：`IMPORTANCE_LOW`
+            // 建出来的渠道在系统侧是 `mUnimportant=true`，而本机上所有渠道
+            // `mUnimportant=false` 的应用才具备被升格成实时活动的前提。官方
+            // 文档只写「不得是 IMPORTANCE_MIN」，但 LOW 在这台机器上同样被归入
+            // unimportant —— 升格条件第 9 条比文档字面更严，按实测取 DEFAULT。
+            //
+            // 渠道 importance 一旦被用户改过就无法用代码改回（系统忽略入参），
+            // 所以这里**同时换渠道 id**（`pack_task` → `pack_task_live`）：
+            // 换 id 等于新建一个干净渠道，旧渠道顺手删掉，避免设置页里留一个
+            // 永远不会再有通知的空条目。
+            NotificationManager.IMPORTANCE_DEFAULT,
         ).apply {
             description = getString(R.string.pack_notify_channel_desc)
             // 进度通知不该响铃/震动：用户可能正在别的应用里做事。
@@ -247,6 +302,7 @@ class PackTaskService : Service() {
             enableVibration(false)
         }
         notifications.createNotificationChannel(channel)
+        notifications.deleteNotificationChannel(LEGACY_CHANNEL_ID)
     }
 
     private fun startForegroundIfNeeded(notification: Notification) {
@@ -265,64 +321,29 @@ class PackTaskService : Service() {
         notifications.notify(NOTIFICATION_ID, buildProgressNotification(fraction, text))
     }
 
-    private fun buildProgressNotification(fraction: Float, text: String): Notification {
-        val percent = (fraction.coerceIn(0f, 1f) * 100).toInt()
-        val builder = NotificationCompat.Builder(this, CHANNEL_ID)
-            .setSmallIcon(R.drawable.ic_pack_progress)
-            .setContentTitle(getString(R.string.pack_notify_title))
-            .setContentText(text)
-            .setOngoing(true)
-            .setSilent(true)
-            .setOnlyAlertOnce(true)
-            .setContentIntent(openAppIntent())
-            // Live Update 升格请求 —— 这是「让系统把它渲染成状态栏胶囊/灵动岛」的
-            // 唯一开关，缺它就只是普通通知。
-            //
-            // 官方列出的升格硬条件共 9 条，本处逐条对齐：
-            //   1. style ∈ Standard / BigText / Call / **ProgressStyle** / Metric
-            //      ⇒ 下面用 `NotificationCompat.ProgressStyle`，满足。
-            //   2. manifest 声明 `POST_PROMOTED_NOTIFICATIONS` ⇒ 已加。
-            //   3. 调用本方法请求升格 ⇒ 本行。
-            //   4. `setOngoing(true)` ⇒ 上面已有。
-            //   5. 必须有 contentTitle ⇒ 上面已有。
-            //   6. 不得设 `customContentView`（禁 RemoteViews）⇒ 未设。
-            //   7. 不得是 `setGroupSummary(true)` 的组摘要 ⇒ 未设。
-            //   8. 不得 `setColorized(true)` ⇒ **刻意不设**。这条与框架
-            //      `Notification.ProgressStyle` 官方示例（那个示例里写了
-            //      `.setColorized(true)`）冲突，按 Live Update 的约束走：
-            //      要胶囊效果就只能放弃 colorized。
-            //   9. 渠道 importance 不得是 IMPORTANCE_MIN ⇒ 本渠道是 LOW。
-            .setRequestPromotedOngoing(true)
+    /**
+     * [updateNotification] 的测试入口。
+     *
+     * 声明为 `internal`（而非 private）**只为了可测**：`OngoingProgressNotification`
+     * 本身的断言只能证明「抽象是对的」，证明不了「服务真的改用了它」。少了这一条，
+     * 把 `buildProgressNotification` 改回自己拼 `Builder` 仍然是全绿。
+     */
+    internal fun updateNotificationForTest(fraction: Float, text: String) =
+        updateNotification(fraction, text)
 
-        // 胶囊区最大宽度只有 96dp，放不下「第 2 / 5 卷 · 系列名」这种长文本。
-        // `setShortCriticalText` 是官方为状态芯片提供的短状态位（不足 7 字符会
-        // 整段显示，超了就按比例截断/退化成只显示图标），这里给纯百分比数字，
-        // 长度可控且跨语言无歧义。
-        runCatching { builder.setShortCriticalText("$percent%") }
-
-        // 安卓 16 起系统把这类持续进行的进度渲染成状态栏胶囊 / Live Update。
-        //
-        // 用 **androidx 的** `NotificationCompat.ProgressStyle`，不是框架的
-        // `Notification.ProgressStyle`：`NotificationCompat.Builder.setStyle()`
-        // 只接受 `NotificationCompat.Style`，传框架那个直接编译失败
-        // （`Argument type mismatch: actual type is 'Notification.ProgressStyle',
-        // but 'NotificationCompat.Style?' was expected`）。
-        //
-        // minSdk 已提到 36，因此**不再有低版本降级分支**：原先那条
-        // `SDK_INT >= 36` 判断在 minSdk 36 下恒真，lint `ObsoleteSdkInt`
-        // 会以「Unnecessary; SDK_INT is always >= 36」硬失败
-        // （`warningsAsErrors = true`）。降级分支连同 `ANDROID_16` 常量一并删除。
-        return builder.setStyle(
-            NotificationCompat.ProgressStyle()
-                .setProgress(percent)
-                .setStyledByProgress(false)
-                // Segment 只有 length/id/color/semanticStyle 四个属性，**没有 label** ——
-                // 文案一律走 `setContentText`。单段 100 表示「整条进度条就是这一个任务」。
-                .setProgressSegments(
-                    listOf(NotificationCompat.ProgressStyle.Segment(100)),
-                ),
-        ).build()
-    }
+    private fun buildProgressNotification(fraction: Float, text: String): Notification =
+        OngoingProgressNotification.build(
+            context = this,
+            channelId = CHANNEL_ID,
+            smallIcon = R.drawable.ic_pack_progress,
+            title = getString(R.string.pack_notify_title),
+            text = text,
+            fraction = fraction,
+            // 胶囊区最大宽度只有 96dp，放不下「第 2 / 5 卷 · 系列名」这种长文本。
+            // 给纯百分比数字：长度可控、跨语言无歧义。
+            shortText = "${(fraction.coerceIn(0f, 1f) * 100).toInt()}%",
+            contentIntent = openAppIntent(),
+        )
 
     /**
      * 发「结束通知」。
@@ -385,9 +406,73 @@ class PackTaskService : Service() {
 
     override fun onBind(intent: Intent?): IBinder? = null
 
+    /**
+     * `dataSync` 类型前台服务的超时回调。
+     *
+     * ## 为什么必须覆写
+     *
+     * Android 15（API 35）起，`FOREGROUND_SERVICE_TYPE_DATA_SYNC` 受**时长上限**
+     * 约束：前台累计 6 小时、后台（经 `dataSync` 从后台启动）累计 24 小时。超限时
+     * 系统不再让服务继续跑 —— 但**不会**替你收尾：`stopSelf` 不是你调的，
+     * `finally` 块也不一定走到（进程可能被直接回收），结果是
+     *
+     * - 进度通知停在某个百分比，永远不动；
+     * - `PackTaskStore` 里留着 `Running` 快照，下次冷启会报「上次打包未完成」；
+     * - 用户既等不到完成通知，也没有任何「失败了」的反馈。
+     *
+     * 覆写本回调后，系统在回收前先叫这里一次，于是能把「为什么停」如实告诉用户。
+     *
+     * ## 两个重载都要覆写
+     *
+     * 框架有 `onTimeout(int)`（API 35）和 `onTimeout(int, int)`（API 36，多一个
+     * `fgsType` 参数，用于同时声明多种类型时区分）。`minSdk = 36` ⇒ 两个都存在，
+     * 都指向同一个处理函数，避免不同系统版本走不同分支。
+     *
+     * 真机实测（2026-10-19）：5 卷 × 24 页 ≈ 190 MB 的任务约 3 秒完成，离限额极远。
+     * 这条路径是为「上百卷」这种规模准备的 —— 那时任务可能跑几十分钟，用户也可能
+     * 把应用放在后台很久。
+     */
+    override fun onTimeout(startId: Int) {
+        handleTimeout()
+    }
+
+    override fun onTimeout(startId: Int, fgsType: Int) {
+        handleTimeout()
+    }
+
+    private fun handleTimeout() {
+        Log.w(TAG, "前台服务超时，系统即将回收；主动收尾以免任务状态永远停在 Running")
+        val now = System.currentTimeMillis()
+        val detail = getString(R.string.pack_error_timeout)
+        // 取消令牌要真的置位，否则已经在跑的那层 `runPackPlans` 感知不到，
+        // 会继续往磁盘写直到进程被杀 —— 半成品 CBZ 就是这么产生的。
+        PackTaskBus.requestCancel()
+        runCatching {
+            // 快照可能为 null（服务起来了但请求还没进来就被判定超时）。
+            // 那时没有任务可收尾，只需把错误告诉 UI。
+            snapshot?.let { store.save(it.finished(PackTaskPhase.Aborted, now, detail)) }
+            PackTaskBus.settle(PackTaskSettled.Error(detail))
+            notifyFinal(R.string.pack_notify_failed, detail)
+        }
+        job?.cancel()
+        stopSelf()
+    }
+
     companion object {
         private const val TAG = "PackTaskService"
-        const val CHANNEL_ID = "pack_task"
+
+        /**
+         * 进度通知渠道。
+         *
+         * `_live` 后缀是 2026-10-19 从 `pack_task` 改过来的：渠道 importance
+         * 只能降不能升（用户改过之后系统忽略代码入参），而 LOW → DEFAULT 的
+         * 改动对已有渠道无效，只能换 id 重建。旧 id 见 [LEGACY_CHANNEL_ID]。
+         */
+        const val CHANNEL_ID = "pack_task_live"
+
+        /** 上一版渠道 id，仅用于在 [createChannel] 里删掉它。 */
+        private const val LEGACY_CHANNEL_ID = "pack_task"
+
         const val NOTIFICATION_ID = 4101
 
         /**

@@ -53,6 +53,12 @@
 
     <!-- 已有打包任务在跑。并发写同一批输出路径会互相覆盖，故必须拒绝。 -->
     <string name="pack_error_busy">A packing task is already running. Try again when it finishes.</string>
+
+    <!-- 前台服务被系统超时回收（dataSync 类型有时长上限，Android 15+）。
+         刻意说「可能没写完」而不是「失败」：系统在哪一刻掐断不可知，
+         已写的卷可能是完整的。 -->
+    <string name="pack_error_timeout">The packing task ran past the system time limit and was stopped. Some output files may be incomplete.</string>
+
     <!-- 上次打包被中断（D2b 第 2 项）。三项读数：处理了几卷 / 共几卷 / 几个目标文件。 -->
     <string name="b_interrupted_notice">Last packing run did not finish (%1$d / %2$d). Incomplete output files: up to %3$d.</string>
 </resources>
