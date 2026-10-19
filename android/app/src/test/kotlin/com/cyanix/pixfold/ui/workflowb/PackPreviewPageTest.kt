@@ -44,7 +44,7 @@ import kotlin.test.assertTrue
  * 若 UI 把两份预览分别算错(或算的是不同的卷),这个用例会失败。
  */
 @RunWith(RobolectricTestRunner::class)
-@Config(sdk = [34], qualifiers = "w400dp-h2000dp")
+@Config(sdk = [36], qualifiers = "w400dp-h2000dp")
 class PackPreviewPageTest {
 
     @get:Rule

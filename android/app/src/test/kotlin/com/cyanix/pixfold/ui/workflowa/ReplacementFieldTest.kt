@@ -43,7 +43,7 @@ import kotlin.test.assertTrue
  *  3. 留空的语义被**说清** —— 留空 = 删除非法字符(不是"没填")。
  */
 @RunWith(RobolectricTestRunner::class)
-@Config(sdk = [34], qualifiers = "w400dp-h2000dp")
+@Config(sdk = [36], qualifiers = "w400dp-h2000dp")
 class ReplacementFieldTest {
 
     @get:Rule

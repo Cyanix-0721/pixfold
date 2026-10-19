@@ -31,7 +31,7 @@ import kotlin.test.assertTrue
  * 而不是另接一套滚动逻辑 —— 两处需求相同(视口位置失去意义),共用一条通道。
  */
 @RunWith(RobolectricTestRunner::class)
-@Config(sdk = [34], qualifiers = "w400dp-h1000dp")
+@Config(sdk = [36], qualifiers = "w400dp-h1000dp")
 class CollectionSwitchScrollTest {
 
     @get:Rule

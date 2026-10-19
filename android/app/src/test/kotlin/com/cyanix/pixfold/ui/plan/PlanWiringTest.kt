@@ -45,7 +45,7 @@ import kotlin.test.assertTrue
  * 故这里从**真实的步骤容器**进入:切 Tab / 点下一步 / 点确认,一路点到报告。
  */
 @RunWith(RobolectricTestRunner::class)
-@Config(sdk = [34], qualifiers = "w400dp-h2000dp")
+@Config(sdk = [36], qualifiers = "w400dp-h2000dp")
 class PlanWiringTest {
 
     @get:Rule
@@ -87,7 +87,7 @@ class PlanWiringTest {
      * 那会让这个守卫假绿。这里单独用真机视口(361dp × 794dp,与 PJX110 一致)跑一次。
      */
     @Test
-    @Config(sdk = [34], qualifiers = "w361dp-h794dp-560dpi")
+    @Config(sdk = [36], qualifiers = "w361dp-h794dp-560dpi")
     fun `workflow A confirm stays visible on the device viewport`() {
         openWorkflowAPlanStep()
         // 视口自检:Qualifiers 写错时直接失败,而不是悄悄换一个宽松视口
@@ -162,7 +162,7 @@ class PlanWiringTest {
     }
 
     @Test
-    @Config(sdk = [34], qualifiers = "w361dp-h794dp-560dpi")
+    @Config(sdk = [36], qualifiers = "w361dp-h794dp-560dpi")
     fun `workflow B next and confirm stay visible on the device viewport`() {
         val lib = MockDataB.library
         rule.setContent { WorkflowBSteps(rootPath = lib.rootPath, volumes = lib.volumes) }
@@ -304,7 +304,7 @@ class PlanWiringTest {
      * 这里用 `getBoundsInRoot()` 比较两者的水平位置,并额外确认退回类确实落在左半屏。
      */
     @Test
-    @Config(sdk = [34], qualifiers = "w361dp-h794dp-560dpi")
+    @Config(sdk = [36], qualifiers = "w361dp-h794dp-560dpi")
     fun `workflow B bottom bar puts back on the left and next on the right`() {
         val lib = MockDataB.library
         rule.setContent { WorkflowBSteps(rootPath = lib.rootPath, volumes = lib.volumes) }
@@ -330,7 +330,7 @@ class PlanWiringTest {
 
     /** 工作流 A 步骤 2 同理:底栏左 = 返回排序、右 = 下一步 执行计划。 */
     @Test
-    @Config(sdk = [34], qualifiers = "w361dp-h794dp-560dpi")
+    @Config(sdk = [36], qualifiers = "w361dp-h794dp-560dpi")
     fun `workflow A naming step bottom bar puts back on the left and next on the right`() {
         val collections = MockData.workspaceA.collections
         rule.setContent { WorkflowASteps(collections = collections) }
@@ -347,7 +347,7 @@ class PlanWiringTest {
 
     /** 报告页底栏:左 = 撤销本次执行、右 = 完成。 */
     @Test
-    @Config(sdk = [34], qualifiers = "w361dp-h794dp-560dpi")
+    @Config(sdk = [36], qualifiers = "w361dp-h794dp-560dpi")
     fun `report bottom bar puts undo on the left and done on the right`() {
         openWorkflowAPlanStep()
         clickAPlanConfirm()
@@ -371,7 +371,7 @@ class PlanWiringTest {
      * 既钉住「按钮在底栏右侧」,也钉住「点了真的能推进」。
      */
     @Test
-    @Config(sdk = [34], qualifiers = "w361dp-h794dp-560dpi")
+    @Config(sdk = [36], qualifiers = "w361dp-h794dp-560dpi")
     fun `workflow A step 1 next sits in the bottom bar and advances`() {
         val collections = MockData.workspaceA.collections
         rule.setContent { WorkflowASteps(collections = collections) }

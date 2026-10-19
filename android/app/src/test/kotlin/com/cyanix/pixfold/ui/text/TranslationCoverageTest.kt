@@ -49,7 +49,7 @@ import kotlin.test.assertTrue
  * 不是从资源里算出来的。新增一项都必须写明理由,否则就是漏翻或抄串了。
  */
 @RunWith(RobolectricTestRunner::class)
-@Config(sdk = [34])
+@Config(sdk = [36])
 class TranslationCoverageTest {
 
     private val english: Context get() = ApplicationProvider.getApplicationContext()

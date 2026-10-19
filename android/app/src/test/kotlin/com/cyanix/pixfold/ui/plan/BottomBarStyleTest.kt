@@ -64,7 +64,7 @@ import kotlin.test.assertTrue
  * `captureToImage().asAndroidBitmap()`(Robolectric 的 LEGACY 图形后端画不出真实颜色)。
  */
 @RunWith(RobolectricTestRunner::class)
-@Config(sdk = [34], qualifiers = "w361dp-h794dp-560dpi")
+@Config(sdk = [36], qualifiers = "w361dp-h794dp-560dpi")
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 class BottomBarStyleTest {
 

@@ -65,7 +65,7 @@ import kotlin.test.assertTrue
  * (LEGACY 后端画不出真实颜色)。
  */
 @RunWith(RobolectricTestRunner::class)
-@Config(sdk = [34], qualifiers = "w400dp-h2000dp-560dpi")
+@Config(sdk = [36], qualifiers = "w400dp-h2000dp-560dpi")
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 class UndoScopeDialogStyleTest {
 

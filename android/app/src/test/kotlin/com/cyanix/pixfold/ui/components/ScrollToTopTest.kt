@@ -33,7 +33,7 @@ import kotlin.test.assertTrue
  *  - 下滑中 -> **显示**,点击后回顶。
  */
 @RunWith(RobolectricTestRunner::class)
-@Config(sdk = [34], qualifiers = "w400dp-h800dp")
+@Config(sdk = [36], qualifiers = "w400dp-h800dp")
 class ScrollToTopTest {
 
     @get:Rule

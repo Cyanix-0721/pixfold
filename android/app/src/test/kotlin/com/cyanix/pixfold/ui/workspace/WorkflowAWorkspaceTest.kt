@@ -45,7 +45,7 @@ import kotlin.test.assertEquals
  * - 缩略图是否真的是那张图（同上，需要真实图片字节）。这里只钉「取不到时回退」。
  */
 @RunWith(RobolectricTestRunner::class)
-@Config(sdk = [34], qualifiers = "w361dp-h794dp-560dpi")
+@Config(sdk = [36], qualifiers = "w361dp-h794dp-560dpi")
 class WorkflowAWorkspaceTest {
 
     @get:Rule

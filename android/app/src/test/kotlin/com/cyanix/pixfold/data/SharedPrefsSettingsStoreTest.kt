@@ -33,7 +33,7 @@ import kotlin.test.assertNull
  * (改了会让所有老用户的设置一次性丢失,而其它测试不会发现)。
  */
 @RunWith(RobolectricTestRunner::class)
-@Config(sdk = [34])
+@Config(sdk = [36])
 class SharedPrefsSettingsStoreTest {
 
     /** 与 [SharedPrefsSettingsStore] companion 中的常量逐字一致(见类注释的说明)。 */

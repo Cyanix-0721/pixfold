@@ -45,7 +45,7 @@ import kotlin.test.assertEquals
  * "回调触发但界面没换"的缺陷。
  */
 @RunWith(RobolectricTestRunner::class)
-@Config(sdk = [34])
+@Config(sdk = [36])
 class AppNavigationTest {
 
     @get:Rule

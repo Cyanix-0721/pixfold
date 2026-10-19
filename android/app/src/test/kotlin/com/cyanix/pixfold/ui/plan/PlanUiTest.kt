@@ -54,7 +54,7 @@ import kotlin.test.assertTrue
  * "**界面上**真的弹了两次、按钮真的能用、报告真的显示三类"。
  */
 @RunWith(RobolectricTestRunner::class)
-@Config(sdk = [34], qualifiers = "w400dp-h2000dp")
+@Config(sdk = [36], qualifiers = "w400dp-h2000dp")
 class PlanUiTest {
 
     @get:Rule

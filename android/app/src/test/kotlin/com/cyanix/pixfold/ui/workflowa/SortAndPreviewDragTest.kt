@@ -30,7 +30,7 @@ import kotlin.test.assertTrue
  * **首格显示的文本真的变了**,而不只是断言内部顺序。
  */
 @RunWith(RobolectricTestRunner::class)
-@Config(sdk = [34], qualifiers = "w400dp-h1000dp")
+@Config(sdk = [36], qualifiers = "w400dp-h1000dp")
 class SortAndPreviewDragTest {
 
     @get:Rule

@@ -54,7 +54,7 @@ import kotlin.test.assertTrue
  * 步骤区被弹空后 `TAG_GRID_CARD` / `TAG_METADATA_PAGE` 都不再存在。
  */
 @RunWith(RobolectricTestRunner::class)
-@Config(sdk = [34], qualifiers = "w400dp-h1000dp")
+@Config(sdk = [36], qualifiers = "w400dp-h1000dp")
 class StepBackGuardTest {
 
     @get:Rule

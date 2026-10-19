@@ -25,7 +25,7 @@ import kotlin.test.assertTrue
  * 故本测试**既数像素(挡 1),也专门检查圆内存在"洞"(挡 2)**。
  */
 @RunWith(RobolectricTestRunner::class)
-@Config(sdk = [34])
+@Config(sdk = [36])
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 class ExclamationIconRenderTest {
 

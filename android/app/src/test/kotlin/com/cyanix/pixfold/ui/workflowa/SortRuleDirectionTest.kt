@@ -34,7 +34,7 @@ import kotlin.test.assertTrue
  *  5. 增删排序级同样**即时生效**。
  */
 @RunWith(RobolectricTestRunner::class)
-@Config(sdk = [34], qualifiers = "w400dp-h800dp")
+@Config(sdk = [36], qualifiers = "w400dp-h800dp")
 class SortRuleDirectionTest {
 
     /**

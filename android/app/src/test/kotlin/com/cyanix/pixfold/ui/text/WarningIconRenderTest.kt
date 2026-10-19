@@ -42,7 +42,7 @@ import kotlin.test.assertTrue
  * 探针实测非透明像素 3260/9216。
  */
 @RunWith(RobolectricTestRunner::class)
-@Config(sdk = [34])
+@Config(sdk = [36])
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 class WarningIconRenderTest {
 

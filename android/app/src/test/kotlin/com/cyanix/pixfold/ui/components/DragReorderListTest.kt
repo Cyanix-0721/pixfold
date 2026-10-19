@@ -27,7 +27,7 @@ import kotlin.test.assertTrue
  * 缺口背景:第 4 项曾被误记为完成,实际 `ThumbRow` 无任何拖拽处理。
  */
 @RunWith(RobolectricTestRunner::class)
-@Config(sdk = [34], qualifiers = "w400dp-h1000dp")
+@Config(sdk = [36], qualifiers = "w400dp-h1000dp")
 class DragReorderListTest {
 
     @get:Rule

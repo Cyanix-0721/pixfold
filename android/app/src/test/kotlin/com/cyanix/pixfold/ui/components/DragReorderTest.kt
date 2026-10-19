@@ -36,7 +36,7 @@ import kotlin.test.assertTrue
  *     一守「不给领域层制造抖动」,缺任一都会放过一整类错误实现。
  */
 @RunWith(RobolectricTestRunner::class)
-@Config(sdk = [34], qualifiers = "w400dp-h800dp")
+@Config(sdk = [36], qualifiers = "w400dp-h800dp")
 class DragReorderTest {
 
     @get:Rule

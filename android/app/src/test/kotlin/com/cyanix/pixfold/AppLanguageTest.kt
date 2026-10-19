@@ -39,7 +39,7 @@ import kotlin.test.assertEquals
  * 故这里读到/写入的就是系统侧的那份状态。
  */
 @RunWith(RobolectricTestRunner::class)
-@Config(sdk = [34])
+@Config(sdk = [36])
 class AppLanguageTest {
 
     @get:Rule

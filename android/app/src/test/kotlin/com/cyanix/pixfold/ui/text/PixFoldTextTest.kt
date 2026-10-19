@@ -37,7 +37,7 @@ import kotlin.test.assertTrue
  * 其余 7 条经同一实验确认与语言无关。
  */
 @RunWith(RobolectricTestRunner::class)
-@Config(sdk = [34])
+@Config(sdk = [36])
 class PixFoldTextTest {
 
     private val context: Context get() = ApplicationProvider.getApplicationContext()
@@ -131,7 +131,7 @@ class PixFoldTextTest {
      * 故这里显式钉死英文,而非假装它与语言无关。
      */
     @Test
-    @Config(sdk = [34], qualifiers = "en")
+    @Config(sdk = [36], qualifiers = "en")
     fun `plural key with quantity in second position uses that position as the count`() {
         // 与"下标被误登记成 0"划清界限:那样会拿 `%1$s`(建议名,String)当 count,
         // `as? Int` 落空后回退 0,英文的 `0` 不匹配 `one` -> 落到 other 变体,
@@ -205,7 +205,7 @@ class PixFoldTextTest {
      * 故中文槽位**不会被任何用例加载**;删掉中文占位符或把中英抄错都抓不到。
      */
     @Test
-    @Config(sdk = [34], qualifiers = "zh-rCN")
+    @Config(sdk = [36], qualifiers = "zh-rCN")
     fun `the chinese missing from order wording is chinese and keeps both numbers in order`() {
         val rendered = resolveText(context, Msg(TextKey.PageIssueMissingFromOrder, listOf(3, 47)))
         assertTrue(
@@ -306,7 +306,7 @@ class PixFoldTextTest {
      * 判据仍是**与语言无关的形状**(两个名字都在、原名在前),不写死中文措辞。
      */
     @Test
-    @Config(sdk = [34], qualifiers = "zh-rCN")
+    @Config(sdk = [36], qualifiers = "zh-rCN")
     fun `the chinese rename plan line keeps both names with the original first`() {
         val original = "第01卷_p001.jpg"
         val renamed = "进击的巨人 第01卷 001.jpg"

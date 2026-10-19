@@ -66,7 +66,7 @@ import kotlin.test.assertTrue
  * 第一条用例立即失败:人工调整还在,首格文本与重置前相同。
  */
 @RunWith(RobolectricTestRunner::class)
-@Config(sdk = [34], qualifiers = "w400dp-h1000dp")
+@Config(sdk = [36], qualifiers = "w400dp-h1000dp")
 class ResetAllTest {
 
     @get:Rule
@@ -232,7 +232,7 @@ class ResetAllTest {
         rule.onNodeWithText(TestText.of(R.string.common_reset_all_hint)).assertExists()
     }
 
-    @Config(sdk = [34], qualifiers = "w400dp-h2000dp")
+    @Config(sdk = [36], qualifiers = "w400dp-h2000dp")
     @Test
     fun `workflow B reset restores volume selection and returns to step 1`() {
         val lib = MockDataB.library
@@ -275,7 +275,7 @@ class ResetAllTest {
         )
     }
 
-    @Config(sdk = [34], qualifiers = "w400dp-h2000dp")
+    @Config(sdk = [36], qualifiers = "w400dp-h2000dp")
     @Test
     fun `workflow B reset button sits at the right end of the step tab row`() {
         val lib = MockDataB.library

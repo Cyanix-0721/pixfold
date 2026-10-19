@@ -43,7 +43,7 @@ import kotlin.test.assertTrue
  * 所以这里每项都断言**回调真的带出了新值**。
  */
 @RunWith(RobolectricTestRunner::class)
-@Config(sdk = [34], qualifiers = "w400dp-h2000dp")
+@Config(sdk = [36], qualifiers = "w400dp-h2000dp")
 class SettingsScreenTest {
 
     @get:Rule

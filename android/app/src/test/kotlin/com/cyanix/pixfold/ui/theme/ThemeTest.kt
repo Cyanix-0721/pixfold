@@ -20,7 +20,7 @@ import kotlin.test.assertTrue
  * 用 `dynamicColor = false` 走静态 scheme,使断言在测试环境**确定**(动态取色依赖系统壁纸资源)。
  */
 @RunWith(RobolectricTestRunner::class)
-@Config(sdk = [34])
+@Config(sdk = [36])
 class ThemeTest {
 
     @get:Rule

@@ -29,7 +29,7 @@ import kotlin.test.assertTrue
  * 本测试断言界面真的把该能力暴露出来,而非只存在于领域层。
  */
 @RunWith(RobolectricTestRunner::class)
-@Config(sdk = [34], qualifiers = "w400dp-h1000dp")
+@Config(sdk = [36], qualifiers = "w400dp-h1000dp")
 class BatchRuleUiTest {
 
     private val context: Context get() = ApplicationProvider.getApplicationContext()

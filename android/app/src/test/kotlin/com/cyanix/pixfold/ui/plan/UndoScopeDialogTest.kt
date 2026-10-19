@@ -56,7 +56,7 @@ import kotlin.test.assertTrue
  * 所以这里两次点击都断言**回调真的收到了那一档**。
  */
 @RunWith(RobolectricTestRunner::class)
-@Config(sdk = [34], qualifiers = "w400dp-h2000dp")
+@Config(sdk = [36], qualifiers = "w400dp-h2000dp")
 class UndoScopeDialogTest {
 
     @get:Rule
@@ -185,7 +185,7 @@ class UndoScopeDialogTest {
      * 这是 W19 的 M31 变异(删掉中文正文里的 `%1$d`)存活的原因,故这里显式切到中文 locale。
      */
     @Test
-    @Config(sdk = [34], qualifiers = "zh-rCN-w400dp-h2000dp")
+    @Config(sdk = [36], qualifiers = "zh-rCN-w400dp-h2000dp")
     fun `the chinese warning body also contains the count`() {
         val report = overwritingReport()
         host(report, mutableListOf())
@@ -337,7 +337,7 @@ class UndoScopeDialogTest {
      * 而真机上中文用户会看到两个一模一样的按钮。故中文侧必须单独断言一次。
      */
     @Test
-    @Config(sdk = [34], qualifiers = "zh-rCN-w400dp-h2000dp")
+    @Config(sdk = [36], qualifiers = "zh-rCN-w400dp-h2000dp")
     fun `the chinese choices are worded differently from each other`() {
         host(overwritingReport(), mutableListOf())
         rule.onNodeWithTag(TAG_REPORT_UNDO).performClick()

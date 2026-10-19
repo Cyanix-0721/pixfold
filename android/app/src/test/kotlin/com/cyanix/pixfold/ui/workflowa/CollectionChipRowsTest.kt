@@ -46,7 +46,7 @@ import kotlin.test.assertTrue
  * (`ChipRowWrappingTest.collection_chips_are_two_level`),视觉留真机核对。
  */
 @RunWith(RobolectricTestRunner::class)
-@Config(sdk = [34], qualifiers = "w361dp-h794dp-560dpi")
+@Config(sdk = [36], qualifiers = "w361dp-h794dp-560dpi")
 class CollectionChipRowsTest {
 
     @get:Rule

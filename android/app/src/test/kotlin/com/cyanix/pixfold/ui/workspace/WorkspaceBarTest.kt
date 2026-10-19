@@ -38,7 +38,7 @@ import kotlin.test.assertEquals
  * 属主题体系的事，已由既有 `ThemeTest` 一类覆盖。
  */
 @RunWith(RobolectricTestRunner::class)
-@Config(sdk = [34], qualifiers = "w361dp-h794dp-560dpi")
+@Config(sdk = [36], qualifiers = "w361dp-h794dp-560dpi")
 class WorkspaceBarTest {
 
     @get:Rule

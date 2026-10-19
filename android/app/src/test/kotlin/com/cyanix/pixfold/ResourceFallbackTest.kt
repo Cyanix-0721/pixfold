@@ -32,7 +32,7 @@ class ResourceFallbackTest {
 
     private val context: Context get() = ApplicationProvider.getApplicationContext()
 
-    @Config(sdk = [34], qualifiers = "zh-rCN")
+    @Config(sdk = [36], qualifiers = "zh-rCN")
     @Test
     fun chinese_locale_resolves_the_chinese_strings() {
         assertEquals("设置", context.getString(R.string.settings_title))
@@ -40,7 +40,7 @@ class ResourceFallbackTest {
         assertEquals("文件名(自然)", context.getString(R.string.domain_sort_natural_name))
     }
 
-    @Config(sdk = [34], qualifiers = "ja")
+    @Config(sdk = [36], qualifiers = "ja")
     @Test
     fun third_language_falls_back_to_the_english_default() {
         // 日语没有对应资源目录 ⇒ 必须落到默认槽位 `values/`,而默认槽位是英文。
@@ -49,14 +49,14 @@ class ResourceFallbackTest {
         assertEquals("File name (natural)", context.getString(R.string.domain_sort_natural_name))
     }
 
-    @Config(sdk = [34])
+    @Config(sdk = [36])
     @Test
     fun english_locale_also_resolves_the_default_slot() {
         // Robolectric 默认 locale 是 en_US,没有 `values-en/`,只有默认 `values/`。
         assertEquals("Settings", context.getString(R.string.settings_title))
     }
 
-    @Config(sdk = [34], qualifiers = "zh-rCN")
+    @Config(sdk = [36], qualifiers = "zh-rCN")
     @Test
     fun chinese_and_fallback_disagree_on_at_least_one_key() {
         // 反向守卫:若哪天有人把 values-zh/ 的内容误抄成英文(或把两份目录对调),
@@ -68,7 +68,7 @@ class ResourceFallbackTest {
         )
     }
 
-    @Config(sdk = [34], qualifiers = "zh-rCN")
+    @Config(sdk = [36], qualifiers = "zh-rCN")
     @Test
     fun chinese_plurals_resolve_without_a_one_variant() {
         // 中文侧只有 `other` 一档(lint `UnusedQuantity` 不允许 zh 出现 one)。
@@ -80,7 +80,7 @@ class ResourceFallbackTest {
         assertEquals(one, two)
     }
 
-    @Config(sdk = [34], qualifiers = "zh-rCN")
+    @Config(sdk = [36], qualifiers = "zh-rCN")
     @Test
     fun manual_adjustment_segment_keeps_its_leading_space() {
         // ⚠️ **AAPT2 会 trim 资源字面量的首尾空白**:`<item> · %1$d …</item>` 编译后前导空格消失,
@@ -99,7 +99,7 @@ class ResourceFallbackTest {
         assertEquals("x.jpg · 2 个组件启用\u0020· 含 3 处手工调整", withHead + manual)
     }
 
-    @Config(sdk = [34])
+    @Config(sdk = [36])
     @Test
     fun manual_adjustment_segment_in_the_english_default_keeps_its_leading_space() {
         // 英文侧同一坑(与中文断言分开,因为两边的复数形态与用词都不同)。

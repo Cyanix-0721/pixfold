@@ -20,7 +20,7 @@ android {
         // 而 33 与 34 的代码清理成本完全相同(都删那 3 处版本守卫),
         // 34 还能拿到 HDR gainmap(`Gainmap`/`Bitmap.getGainmap`)供 D3/D4 图片管线用。
         // 取舍见 HANGOFF.md §12.6 与 docs/notes/d1-toolchain-evidence.md §9。
-        minSdk = 34
+        minSdk = 36
         targetSdk = 36
         versionCode = 1
         versionName = "0.1.0-dev"
@@ -44,6 +44,26 @@ android {
                 // U0 负向对照预期失败,默认任务中排除;单独用 -PincludeNegativeControl 运行
                 if (!project.hasProperty("includeNegativeControl")) {
                     it.exclude("**/NegativeControlTest.class")
+                }
+                // Robolectric 在 SDK 36 沙箱下初始化 `ApplicationSharedMemory` 时,
+                // 用反射读写 `java.io.FileDescriptor` 的私有 int 字段,并经由
+                // `jdk.internal.access.SharedSecrets` 拿到它 —— 这条路在 JDK 17 上
+                // 只是 warning,在 **JDK 21 上被强封装直接拒绝**:
+                //
+                //   IllegalAccessException: class ...$FileDescriptorInterceptor
+                //   cannot access class jdk.internal.access.SharedSecrets
+                //   (in module java.base) because module java.base does not
+                //   export jdk.internal.access to unnamed module
+                //
+                // 抛出点在 `AndroidTestEnvironment.setUpApplicationState` 里,
+                // 即**每个** Robolectric 用例都会撞上 ⇒ 不修则 616 个用例全红。
+                // 只给测试 JVM 开这个口子:不影响生产字节码,也不进 APK。
+                with(it) {
+                    jvmArgs(
+                        "--add-exports=java.base/jdk.internal.access=ALL-UNNAMED",
+                        "--add-opens=java.base/jdk.internal.access=ALL-UNNAMED",
+                        "--add-opens=java.base/java.io=ALL-UNNAMED",
+                    )
                 }
             }
         }

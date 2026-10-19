@@ -29,7 +29,7 @@ import kotlin.test.assertTrue
  * 系列头聚合"待确认"、每卷有 included 勾选、建议值带来源、输出冲突有标记。
  */
 @RunWith(RobolectricTestRunner::class)
-@Config(sdk = [34], qualifiers = "w400dp-h2000dp")
+@Config(sdk = [36], qualifiers = "w400dp-h2000dp")
 class LibraryPageTest {
 
     @get:Rule

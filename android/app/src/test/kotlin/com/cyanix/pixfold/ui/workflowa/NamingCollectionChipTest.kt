@@ -36,7 +36,7 @@ import org.robolectric.annotation.Config
  * 最直接的可见证据。
  */
 @RunWith(RobolectricTestRunner::class)
-@Config(sdk = [34], qualifiers = "w361dp-h794dp-560dpi")
+@Config(sdk = [36], qualifiers = "w361dp-h794dp-560dpi")
 class NamingCollectionChipTest {
 
     @get:Rule

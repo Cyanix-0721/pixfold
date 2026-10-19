@@ -43,7 +43,7 @@ import kotlin.test.assertTrue
  * (否则 lint 报 `UnnecessaryQualifier` 而本项目 `warningsAsErrors = true` 直接失败)。
  */
 @RunWith(RobolectricTestRunner::class)
-@Config(sdk = [34])
+@Config(sdk = [36])
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 class LauncherIconTest {
 

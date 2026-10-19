@@ -26,7 +26,7 @@ import kotlin.test.assertTrue
 
 /** U1:首页必须同时渲染两条工作流入口(产品级并列结构,不可合并/隐藏)。 */
 @RunWith(RobolectricTestRunner::class)
-@Config(sdk = [34])
+@Config(sdk = [36])
 class HomeScreenTest {
 
     @get:Rule

@@ -40,7 +40,7 @@ import kotlin.test.assertEquals
  * 构成「换卷 → 回顶 → 再滚回原字段」的来回。
  */
 @RunWith(RobolectricTestRunner::class)
-@Config(sdk = [34], qualifiers = "w361dp-h794dp-560dpi")
+@Config(sdk = [36], qualifiers = "w361dp-h794dp-560dpi")
 class MetadataVolumeChipStickyTest {
 
     @get:Rule

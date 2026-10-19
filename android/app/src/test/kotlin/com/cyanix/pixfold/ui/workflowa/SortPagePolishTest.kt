@@ -72,7 +72,7 @@ import kotlin.test.assertTrue
  * 因为 Robolectric 不做真实文本测量,`TextAlign` 的效果在节点 `bounds` 上不可见。
  */
 @RunWith(RobolectricTestRunner::class)
-@Config(sdk = [34], qualifiers = "w400dp-h800dp")
+@Config(sdk = [36], qualifiers = "w400dp-h800dp")
 class SortPagePolishTest {
 
     @get:Rule
@@ -720,7 +720,7 @@ class SortPagePolishTest {
      * 这是"默认列数跟随机器分辨率"这条用户诉求的离线守卫。
      */
     @Test
-    @Config(sdk = [34], qualifiers = "w320dp-h800dp")
+    @Config(sdk = [36], qualifiers = "w320dp-h800dp")
     fun adaptive_column_count_follows_the_available_width() {
         setPage()
         val adaptive = firstCardWidth()
@@ -761,7 +761,7 @@ class SortPagePolishTest {
      * 会播报 5 ⇒ 本用例红。
      */
     @Test
-    @Config(sdk = [34], qualifiers = "w800dp-h400dp")
+    @Config(sdk = [36], qualifiers = "w800dp-h400dp")
     fun landscape_uses_the_landscape_default() {
         setPage(portraitDefaultColumns = 5, landscapeDefaultColumns = 2)
 
@@ -776,7 +776,7 @@ class SortPagePolishTest {
      * 若不并入,列表最高只到 9,界面就在**说谎**(勾在 9,网格实际 14 列)。
      */
     @Test
-    @Config(sdk = [34], qualifiers = "w1200dp-h800dp")
+    @Config(sdk = [36], qualifiers = "w1200dp-h800dp")
     fun out_of_range_adaptive_value_is_merged_into_the_menu() {
         setPage()
         openColumnMenu()

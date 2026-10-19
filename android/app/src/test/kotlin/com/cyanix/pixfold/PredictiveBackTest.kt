@@ -57,7 +57,7 @@ import kotlin.test.assertTrue
  * 正是挂在同一条 dispatcher 链路上,故这与系统手势走的是**同一条链路**。
  */
 @RunWith(RobolectricTestRunner::class)
-@Config(sdk = [34], qualifiers = "w400dp-h1000dp")
+@Config(sdk = [36], qualifiers = "w400dp-h1000dp")
 class PredictiveBackTest {
 
     @get:Rule

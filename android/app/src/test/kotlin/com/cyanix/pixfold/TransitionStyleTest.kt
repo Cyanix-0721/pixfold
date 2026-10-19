@@ -71,7 +71,7 @@ import kotlin.test.assertTrue
  * 与本仓库其他预测性返回测试的边界说明一致。
  */
 @RunWith(RobolectricTestRunner::class)
-@Config(sdk = [34], qualifiers = "w400dp-h1000dp")
+@Config(sdk = [36], qualifiers = "w400dp-h1000dp")
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 class TransitionStyleTest {
 

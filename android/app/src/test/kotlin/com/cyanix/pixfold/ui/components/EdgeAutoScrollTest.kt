@@ -33,7 +33,7 @@ import kotlin.test.assertTrue
  * 故必须走真实拖拽并观察**落点下标**。
  */
 @RunWith(RobolectricTestRunner::class)
-@Config(sdk = [34], qualifiers = "w400dp-h800dp")
+@Config(sdk = [36], qualifiers = "w400dp-h800dp")
 class EdgeAutoScrollTest {
 
     // 指针推出容器外之后的落点下界。实测双读数(诚实记录,便于日后回归判断):

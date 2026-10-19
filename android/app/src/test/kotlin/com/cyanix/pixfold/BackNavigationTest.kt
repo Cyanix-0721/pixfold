@@ -45,7 +45,7 @@ import kotlin.test.assertTrue
  * 手势动画本身属系统绘制,无法在单测中断言(真机走查确认)。
  */
 @RunWith(RobolectricTestRunner::class)
-@Config(sdk = [34], qualifiers = "w400dp-h1000dp")
+@Config(sdk = [36], qualifiers = "w400dp-h1000dp")
 class BackNavigationTest {
 
     @get:Rule

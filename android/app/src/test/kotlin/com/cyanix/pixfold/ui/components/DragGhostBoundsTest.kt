@@ -45,7 +45,7 @@ import kotlin.test.assertTrue
  * 该重新评估 tag 位置策略),生产测试红才说明代码被改坏了。
  */
 @RunWith(RobolectricTestRunner::class)
-@Config(sdk = [34], qualifiers = "w400dp-h800dp")
+@Config(sdk = [36], qualifiers = "w400dp-h800dp")
 class DragGhostBoundsTest {
 
     @get:Rule

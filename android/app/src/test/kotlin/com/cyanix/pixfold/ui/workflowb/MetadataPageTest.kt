@@ -44,7 +44,7 @@ import kotlin.test.assertTrue
  * 因此每个用例都以"界面上出现了什么 / 点了之后界面怎么变"为准。
  */
 @RunWith(RobolectricTestRunner::class)
-@Config(sdk = [34], qualifiers = "w400dp-h2000dp")
+@Config(sdk = [36], qualifiers = "w400dp-h2000dp")
 class MetadataPageTest {
 
     @get:Rule

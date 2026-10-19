@@ -30,7 +30,7 @@ import kotlin.test.assertTrue
 
 /** 验收第 2 项:大图预览——自适应窗口、可缩放、可拖动平移、可翻页。 */
 @RunWith(RobolectricTestRunner::class)
-@Config(sdk = [34])
+@Config(sdk = [36])
 class ImagePreviewTest {
 
     @get:Rule

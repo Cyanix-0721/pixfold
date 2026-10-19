@@ -36,7 +36,7 @@ import org.robolectric.annotation.Config
  *     `Text` 的语义节点就与 tag 节点分离,`assertTextEquals` 随即失败。
  */
 @RunWith(RobolectricTestRunner::class)
-@Config(sdk = [34])
+@Config(sdk = [36])
 class WarnLineTest {
 
     @get:Rule

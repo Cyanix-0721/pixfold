@@ -30,7 +30,7 @@ import kotlin.test.assertTrue
  * 必须**栅格化后数非透明像素**(本测试),否则"空白资源"能一路通过所有测试。
  */
 @RunWith(RobolectricTestRunner::class)
-@Config(sdk = [34])
+@Config(sdk = [36])
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 class DirectionIconRenderTest {
 

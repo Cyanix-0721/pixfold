@@ -49,7 +49,7 @@ import kotlin.test.assertTrue
  * ① 渲染走通了;② `orders` 里确实有新集合 id(否则会渲染 `a_sort_empty` 空态)。
  */
 @RunWith(RobolectricTestRunner::class)
-@Config(sdk = [34], qualifiers = "w361dp-h794dp-560dpi")
+@Config(sdk = [36], qualifiers = "w361dp-h794dp-560dpi")
 class WorkspaceSwitchTest {
 
     @get:Rule

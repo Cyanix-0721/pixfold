@@ -35,7 +35,7 @@ import kotlin.test.assertEquals
  * **证明不了真机行为**（项目既有教训）。故这里用真机等价尺寸 `w361dp-h794dp-560dpi`。
  */
 @RunWith(RobolectricTestRunner::class)
-@Config(sdk = [34], qualifiers = "w361dp-h794dp-560dpi")
+@Config(sdk = [36], qualifiers = "w361dp-h794dp-560dpi")
 class PackVolumeChipScaleTest {
 
     @get:Rule

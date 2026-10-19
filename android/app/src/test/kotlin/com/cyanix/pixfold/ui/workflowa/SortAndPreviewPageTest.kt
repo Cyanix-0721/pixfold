@@ -22,7 +22,7 @@ import kotlin.test.assertTrue
 
 /** 验收第 1 项:缩略图网格/列表双视图可切换,缩略图渲染正确。 */
 @RunWith(RobolectricTestRunner::class)
-@Config(sdk = [34])
+@Config(sdk = [36])
 class SortAndPreviewPageTest {
 
     @get:Rule

@@ -28,7 +28,7 @@ import org.robolectric.annotation.Config
  * 需显式验证时运行:gradlew :app:testDebugUnitTest -PincludeNegativeControl
  */
 @RunWith(RobolectricTestRunner::class)
-@Config(sdk = [34])
+@Config(sdk = [36])
 class NegativeControlTest {
 
     @get:Rule

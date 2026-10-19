@@ -43,7 +43,7 @@ import kotlin.test.assertTrue
  * 后者存在即证明没有走 `Image` 分支）。
  */
 @RunWith(RobolectricTestRunner::class)
-@Config(sdk = [34], qualifiers = "w361dp-h794dp-560dpi")
+@Config(sdk = [36], qualifiers = "w361dp-h794dp-560dpi")
 class ItemThumbTest {
 
     @get:Rule

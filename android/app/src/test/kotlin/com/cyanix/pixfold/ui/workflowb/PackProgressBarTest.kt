@@ -45,7 +45,7 @@ import kotlin.test.assertTrue
  * 唯一的例外是"纯数字 / 斜杠"这类**语言无关**的计数文本,它们本来就是拼出来的。
  */
 @RunWith(RobolectricTestRunner::class)
-@Config(sdk = [34], qualifiers = "w400dp-h800dp")
+@Config(sdk = [36], qualifiers = "w400dp-h800dp")
 class PackProgressBarTest {
 
     @get:Rule

@@ -55,7 +55,7 @@ import kotlin.test.assertTrue
  * 防止共享组件被改回"各写一份"。
  */
 @RunWith(RobolectricTestRunner::class)
-@Config(sdk = [34], qualifiers = "w400dp-h2000dp")
+@Config(sdk = [36], qualifiers = "w400dp-h2000dp")
 class IssueFilterTest {
 
     @get:Rule

@@ -27,7 +27,7 @@ import kotlin.test.assertTrue
  * 也才能挡住"上报了但没接上"这类缺陷(归档原型 4 轮未定位的缺陷类别)。
  */
 @RunWith(RobolectricTestRunner::class)
-@Config(sdk = [34], qualifiers = "w400dp-h1000dp")
+@Config(sdk = [36], qualifiers = "w400dp-h1000dp")
 class RuleAutoApplyPageTest {
 
     @get:Rule

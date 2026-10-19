@@ -45,7 +45,7 @@ import kotlin.test.assertTrue
  * (P3 的教训:领域做完 + 单测全绿,但界面没用上 = 死代码)。
  */
 @RunWith(RobolectricTestRunner::class)
-@Config(sdk = [34], qualifiers = "w400dp-h1000dp")
+@Config(sdk = [36], qualifiers = "w400dp-h1000dp")
 class NamingPageTest {
 
     @get:Rule

@@ -81,7 +81,7 @@ import kotlin.test.assertTrue
  * (标题经 `TestText.of` 取,与资源同源,故本文件不因改文案而失效。)
  */
 @RunWith(RobolectricTestRunner::class)
-@Config(sdk = [34], qualifiers = "w361dp-h794dp-560dpi")
+@Config(sdk = [36], qualifiers = "w361dp-h794dp-560dpi")
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 class HomeCardStyleTest {
 

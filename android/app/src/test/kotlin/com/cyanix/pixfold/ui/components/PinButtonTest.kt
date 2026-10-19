@@ -32,7 +32,7 @@ import kotlin.test.assertTrue
  * 经 `painterResource` 渲染;并保留"不得回退成 ★/☆"的护栏。
  */
 @RunWith(RobolectricTestRunner::class)
-@Config(sdk = [34], qualifiers = "w400dp-h800dp")
+@Config(sdk = [36], qualifiers = "w400dp-h800dp")
 class PinButtonTest {
 
     @get:Rule

@@ -51,7 +51,7 @@ import kotlin.test.assertTrue
  * 也可能因为别的原因对得上；首格是谁才真正反映用户看到的顺序。
  */
 @RunWith(RobolectricTestRunner::class)
-@Config(sdk = [34], qualifiers = "w400dp-h1000dp")
+@Config(sdk = [36], qualifiers = "w400dp-h1000dp")
 class RefreshKeepsManualOrderTest {
 
     @get:Rule

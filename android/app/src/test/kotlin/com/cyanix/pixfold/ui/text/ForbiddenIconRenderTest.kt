@@ -46,7 +46,7 @@ import kotlin.test.assertTrue
  * 二者形状不同,而非只靠颜色区分(色盲用户同样能分辨;与 `PinToggle` 的实心/空心同判)。
  */
 @RunWith(RobolectricTestRunner::class)
-@Config(sdk = [34])
+@Config(sdk = [36])
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 class ForbiddenIconRenderTest {
 
