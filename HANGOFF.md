@@ -3535,7 +3535,9 @@ core+extended 11,398 class ⇒ `classes.dex` **3,272 B**),故 35.7 MB 是 **debu
 - Python 脚本现有样例作为回归参考；
 - 相同输入和相同人工决策下，核心结果可重复；
 - ComicInfo.xml 字段和页码数量一致；
-- CBZ 可被目标漫画阅读器打开；
+- CBZ 可被目标漫画阅读器打开 —— ✅ **已取证（2026-10-19）**，分两层：
+  - **真机**：真机产出的 `Vol 01 第01卷.cbz`（38,085,388 B / 24 页）在 **Kuro Reader Pro 1.6.7** 上打开，首屏正常渲染、进度条拖到末页 `24 / 24` 正常显示、全程无解码报错。（Mihon 0.21.2 也在机器上，但它的本地 CBZ 走应用内本地源、不注册 `application/vnd.comicbook+zip`，`am start` 拉不起来；系统对 `.cbz` 的 `resolve-activity` 返回 `ResolverActivity` —— 没有应用独占该 MIME，正是「压缩文件打开方式选择」。）
+  - **离线可执行检查**：`android/domain/src/test/kotlin/com/cyanix/pixfold/domain/pack/CbzReaderCompatTest.kt`（9 项）。**关键**：此前全工程回读一律用 `ZipInputStream`（顺序读局部头），`grep -rn "ZipFile"` 在测试里零命中；而真实阅读器几乎都用 `ZipFile`/libzip/minizip **读中央目录**再随机访问。本测试全部改走 `ZipFile`，断：条目顺序 = `ComicInfo.xml` + 页序、按名取条目可读、无目录前缀、全 STORED、CRC 与 size 字段与数据一致、JPEG 的 SOI/EOI 完整、`ComicInfo.xml` 可被真 XML 解析器吃完；且**流式路径（生产路径）单独覆盖**。变异 M2（STORED→DEFLATED）/ M3（不调 `finish()` 即不写中央目录）/ M4（条目名加目录前缀）/ M5（页序反转）全部 KILLED。
 - 执行中断后不会留下无法解释的半成品，或能明确标记待恢复状态。
 
 ### 平台
