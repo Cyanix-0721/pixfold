@@ -51,6 +51,7 @@ import com.cyanix.pixfold.domain.model.LangChoice
 import com.cyanix.pixfold.domain.library.LibraryState
 import com.cyanix.pixfold.domain.library.selectVolume
 import com.cyanix.pixfold.ui.components.PageActionBar
+import com.cyanix.pixfold.ui.components.TaskProgressBar
 import com.cyanix.pixfold.ui.components.VolumeChipRow
 import com.cyanix.pixfold.ui.text.WarnLine
 import com.cyanix.pixfold.ui.text.textOf
@@ -449,14 +450,14 @@ fun PackPreviewPage(
         // 再启一次任务。此时唯一有意义的动作是**取消**,故右侧换成取消按钮,
         // 左侧的返回也一并撤掉 —— 返回会离开这个目的地,而任务还在后台跑。
         if (showPlanSection && executing) {
-            // 进度与取消由 `PackProgressBar` 一体承担（进度条 + 行内取消,见其 KDoc
+            // 进度与取消由 `TaskProgressBar` 一体承担（进度条 + 行内取消,见其 KDoc
             // 「为什么取消按钮在进度条行内」）。**不在这里自作主张再写一套** ——
-            // 同一屏出现两个挂 TAG_PACK_PROGRESS 的进度条时,`onNodeWithTag` 会直接
+            // 同一屏出现两个挂 TAG_TASK_PROGRESS 的进度条时,`onNodeWithTag` 会直接
             // 撞到多个节点而失败,而且两条进度条的读数还可能不同源。
             //
             // 底栏在执行期整条撤掉:左侧「返回」会离开这个目的地(任务却还在后台跑),
             // 右侧「确认打包」再按一次就是并发写同一批文件。
-            PackProgressBar(
+            TaskProgressBar(
                 progress = progress ?: TaskProgress(total = 0),
                 onCancel = onCancelExecution,
                 cancelling = cancelling,

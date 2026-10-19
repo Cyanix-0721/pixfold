@@ -32,6 +32,7 @@ import com.cyanix.pixfold.R
 import com.cyanix.pixfold.domain.model.ImageCollection
 import com.cyanix.pixfold.domain.model.NamingState
 import com.cyanix.pixfold.domain.naming.RenameOp
+import com.cyanix.pixfold.domain.task.TaskProgress
 import com.cyanix.pixfold.domain.plan.ConfirmFlowState
 import com.cyanix.pixfold.domain.plan.ConfirmStep
 import com.cyanix.pixfold.domain.plan.DangerAction
@@ -42,6 +43,7 @@ import com.cyanix.pixfold.domain.plan.organizeDangerActions
 import com.cyanix.pixfold.domain.sort.PageOrderState
 import com.cyanix.pixfold.ui.components.IssueFilterRow
 import com.cyanix.pixfold.ui.components.PageActionBar
+import com.cyanix.pixfold.ui.components.TaskProgressBar
 import com.cyanix.pixfold.ui.plan.ConfirmDialog
 import com.cyanix.pixfold.ui.text.WarnLine
 import com.cyanix.pixfold.ui.plan.PlanHeader
@@ -83,6 +85,20 @@ fun RenamePlanPage(
     modifier: Modifier = Modifier,
     contentInsets: WindowInsets = WindowInsets.safeDrawing,
     onBack: (() -> Unit)? = null,
+    /**
+     * 执行中(D4b 真实改名)。
+     *
+     * 为 `true` 时底栏整条换成进度条 —— 与库侧打包页同一形态(`PackPreviewPage`)。
+     * 计划已经定稿且正在落地,此时「确认执行」再按一次只会再启一次;
+     * 左侧「返回命名结构」也会离开这个目的地,而改名还在跑。
+     *
+     * 默认 `false` = 模拟执行那条路(既有 UI 测试全走它),行为一行不变。
+     */
+    executing: Boolean = false,
+    /** 执行进度。仅 [executing] 为 true 时渲染。 */
+    progress: TaskProgress? = null,
+    /** 请求中断。中断只在**项之间**生效(见 `executeRenamePlanReal`)。 */
+    onCancelExecution: () -> Unit = {},
 ) {
     // 计划是纯函数的结果,但本页**现在会因本地筛选状态而重组** —— 不再每次重组都重算。
     val plan = remember(collections, orders, namingState) {
@@ -196,27 +212,36 @@ fun RenamePlanPage(
         // 且未滚到之前按钮根本没被组合。移出 LazyColumn 后与 [TAG_TO_PLAN] 一致。
         // 左 = 退回(返回命名结构),右 = 终局(确认执行)—— 与全站底栏一致(用户 2026-09-25)。
         // `onBack` 为 null 表示本页被单独使用(无多步骤流程),此时左侧为空槽。
-        val back = onBack
-        PageActionBar(
-            leading = {
-                if (back != null) {
-                    FilledTonalButton(
-                        onClick = back,
+        if (executing) {
+            // 执行期只留进度条 + 行内取消。取消按钮挂在进度条行内由组件自己负责
+            // (见 TaskProgressBar 的 KDoc「为什么取消按钮在进度条行内」)。
+            TaskProgressBar(
+                progress = progress ?: TaskProgress(total = 0),
+                onCancel = onCancelExecution,
+            )
+        } else {
+            val back = onBack
+            PageActionBar(
+                leading = {
+                    if (back != null) {
+                        FilledTonalButton(
+                            onClick = back,
+                            modifier = Modifier
+                                .testTag(TAG_STEP_BACK)
+                                .semantics { contentDescription = backCd },
+                        ) { Text(stringResource(R.string.a_plan_back)) }
+                    }
+                },
+                trailing = {
+                    Button(
+                        onClick = onStartConfirm,
                         modifier = Modifier
-                            .testTag(TAG_STEP_BACK)
-                            .semantics { contentDescription = backCd },
-                    ) { Text(stringResource(R.string.a_plan_back)) }
-                }
-            },
-            trailing = {
-                Button(
-                    onClick = onStartConfirm,
-                    modifier = Modifier
-                        .testTag(TAG_A_PLAN_CONFIRM)
-                        .semantics { contentDescription = confirmCd },
-                ) { Text(stringResource(R.string.a_plan_confirm)) }
-            },
-        )
+                            .testTag(TAG_A_PLAN_CONFIRM)
+                            .semantics { contentDescription = confirmCd },
+                    ) { Text(stringResource(R.string.a_plan_confirm)) }
+                },
+            )
+        }
     }
 
     // 确认对话框:严格按领域层给出的序列推进(通用 → 危险)

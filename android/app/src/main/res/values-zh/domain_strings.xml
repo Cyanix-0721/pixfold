@@ -157,7 +157,14 @@
     <string name="domain_pack_fail_write">写入失败：%1$s</string>
     <string name="domain_pack_fail_not_started">尚未开始（用户已取消）</string>
     <string name="domain_rename_fail_empty_name">新名称为空</string>
+    <string name="domain_rename_fail_no_uri">没有可访问的文件 URI，该项未改名</string>
+    <string name="domain_rename_fail_io">改名失败；文件可能只读、已被移走，或被系统拒绝</string>
     <string name="domain_undo_nothing">没有可撤销的操作</string>
+    <!-- 复数键 -->
+    <plurals name="domain_undo_applied">
+        <item quantity="other">已撤销 %1$d 项</item>
+    </plurals>
+    <string name="domain_undo_applied_partly">撤销了 %1$d / %2$d 项，其余失败</string>
     <!-- 复数键 -->
     <plurals name="domain_undo_recorded">
         <item quantity="other">已记录 %1$d 项逆向操作；正式版将基于 UndoRecord 逐项回滚（原型不触碰真实文件系统）</item>

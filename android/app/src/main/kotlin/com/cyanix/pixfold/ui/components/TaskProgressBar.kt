@@ -1,4 +1,4 @@
-package com.cyanix.pixfold.ui.library
+package com.cyanix.pixfold.ui.components
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -23,12 +23,12 @@ import com.cyanix.pixfold.domain.task.TaskProgress
  * 曾经一度被临时写在 `PackPreviewPage.kt` 里,导致本文件无法再声明同名的同包顶层
  * 常量(编译冲突)。现已收敛为**只在本文件声明** —— 标签属于组件,跟着组件走;
  * 落在调用方文件里会让「这个 tag 到底有几个实现挂着」无法在组件侧自证。
- * 全工程只有 [PackProgressBar] 一个实现挂它。
+ * 全工程只有 [TaskProgressBar] 一个实现挂它。
  */
-const val TAG_PACK_PROGRESS = "pack-progress"
+const val TAG_TASK_PROGRESS = "task-progress"
 
 /** 取消按钮的测试 tag（禁用态、点击回调数都挂在这里）。 */
-const val TAG_PACK_CANCEL = "pack-cancel"
+const val TAG_TASK_CANCEL = "task-cancel"
 
 /**
  * 打包执行进度条(D2b「后台任务与进度」的界面落点)。
@@ -99,7 +99,7 @@ const val TAG_PACK_CANCEL = "pack-cancel"
  *   —— 保留文案与占位,避免按钮消失导致行内元素重排。
  */
 @Composable
-fun PackProgressBar(
+fun TaskProgressBar(
     progress: TaskProgress,
     onCancel: () -> Unit,
     modifier: Modifier = Modifier,
@@ -115,7 +115,7 @@ fun PackProgressBar(
             progress = { progress.fraction },
             modifier = Modifier
                 .fillMaxWidth()
-                .testTag(TAG_PACK_PROGRESS),
+                .testTag(TAG_TASK_PROGRESS),
         )
 
         Row(
@@ -134,7 +134,7 @@ fun PackProgressBar(
                 onClick = onCancel,
                 // 已请求取消就禁用:再点一次没有新语义,反而可能让上层重复发信号。
                 enabled = !cancelling,
-                modifier = Modifier.testTag(TAG_PACK_CANCEL),
+                modifier = Modifier.testTag(TAG_TASK_CANCEL),
             ) {
                 Text(stringResource(R.string.common_cancel))
             }

@@ -20,6 +20,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -31,6 +32,9 @@ import androidx.compose.ui.unit.dp
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import com.cyanix.pixfold.domain.naming.namingSchemeSeedOf
 import com.cyanix.pixfold.R
 import com.cyanix.pixfold.domain.model.ImageCollection
@@ -38,13 +42,19 @@ import com.cyanix.pixfold.domain.model.NamingScheme
 import com.cyanix.pixfold.domain.model.NamingState
 import com.cyanix.pixfold.domain.organize.OrganizeState
 import com.cyanix.pixfold.domain.plan.ConfirmFlowState
+import com.cyanix.pixfold.domain.task.CancellationToken
+import com.cyanix.pixfold.domain.task.TaskProgress
 import com.cyanix.pixfold.domain.plan.ExecutionReport
 import com.cyanix.pixfold.domain.plan.buildConfirmSequence
 import com.cyanix.pixfold.domain.plan.buildLibraryRenamePlan
 import com.cyanix.pixfold.domain.plan.cancel
 import com.cyanix.pixfold.domain.plan.confirmCurrent
 import com.cyanix.pixfold.domain.plan.executeRenamePlan
+import com.cyanix.pixfold.domain.plan.executeRenamePlanReal
 import com.cyanix.pixfold.domain.plan.performUndo
+import com.cyanix.pixfold.domain.plan.performUndoReal
+import com.cyanix.pixfold.domain.plan.RenameActions
+import com.cyanix.pixfold.domain.plan.UndoActions
 import com.cyanix.pixfold.domain.plan.renameSummaryLines
 import com.cyanix.pixfold.domain.plan.startConfirmFlow
 import com.cyanix.pixfold.domain.plan.UndoScope
@@ -192,6 +202,27 @@ fun OrganizeSteps(
      * 就静默失效的那一类（没有异常、没有日志，只是永远不响）。
      */
     onTaskCompleted: ((ExecutionReport) -> Unit)? = null,
+    /**
+     * 真实改名的平台端口（D4b）。`null` = **走 D1 的确定性模拟**。
+     *
+     * 注意它与 [onTaskCompleted] 的 `null` 含义**不同**：那个是"不发通知"（可选增强），
+     * 这个是不碰文件系统（整条执行换实现）。
+     *
+     * **为什么是可空端口而不是 Boolean 开关**：与 `PackExecutorPort` 同一理由。
+     * `SafRenameActions` 携带 `Context`，测试里构造不出真实现；用 Boolean 会让
+     * 「忘了传」与「故意走模拟」在代码里长得一样，而这个功能的失效形态恰恰是
+     * **静默的**：界面报「成功 56 项」而磁盘上一个文件都没动。
+     */
+    renameActions: RenameActions? = null,
+    /**
+     * 真实撤销的平台端口（D4b）。`null` = 沿用 `performUndo`（D1 mock，明说"未真正回滚"）。
+     *
+     * 与 [renameActions] 独立传，但**实际必须成对**：模拟报告没有 uri，真实撤销会
+     * 逐项报失败；反过来真实执行配 mock 撤销，则界面明明动了文件却说"正式版才回滚"。
+     * 两者的错配都**看得见**（撤销结果文案不同），故不做编译期强制 ——
+     * 在 `PixFoldApp` 一处同时构造即不会配错。
+     */
+    undoActions: UndoActions? = null,
 ) {
     // 跨步骤共享的唯一状态源。这些状态**必须留在嵌套 NavHost 之外** ——
     // 它们要跨步骤存活,而 NavHost 里每个 destination 都是独立作用域。
@@ -226,6 +257,22 @@ fun OrganizeSteps(
     var report by remember { mutableStateOf<ExecutionReport?>(null) }
     // 领域层的 `Msg`(语言无关);成品文案由 ExecutionReportPage 现场解析
     var undoMessage by remember { mutableStateOf<Msg?>(null) }
+
+    // 真实改名的执行状态(D4b)。
+    //
+    // ⚠️ 改名**必须离开主线程**:一次 renameDocument 是一次同步 Binder 往返,
+    // 120 项串行就是 120 次。2026-10-19 真机实测 —— 主线程卡在
+    // `DocumentsContract.renameDocument` 的 `transact` 上超过 5 秒,系统判 ANR,
+    // 进程在前台被系统杀掉(dropbox 的 data_app_anr 里主线程栈顶就是它),
+    // 而磁盘上已经改了 86/120 个名字。**改成协程 + IO 之前,这个功能是
+    // 「一点就崩」的**,只是本地测试全在 Robolectric 里跑、没有真实 provider
+    // 往返才没暴露。
+    var executing by remember { mutableStateOf(false) }
+    // 撤销是独立的执行期：它发生在报告页（executing 已复位），两者互斥但不是同一个状态。
+    var undoing by remember { mutableStateOf(false) }
+    var progress by remember { mutableStateOf<TaskProgress?>(null) }
+    var cancelToken by remember { mutableStateOf<CancellationToken?>(null) }
+    val scope = rememberCoroutineScope()
 
     var namingState by remember(collections) {
         mutableStateOf(
@@ -266,6 +313,13 @@ fun OrganizeSteps(
         confirmFlow = ConfirmFlowState()
         report = null
         undoMessage = null
+        // 执行中重置 = 先叫停。不叫停就复位界面，会让「界面归零、磁盘还在改名」
+        // 同时存在（与库侧 resetAll 同一取舍）。
+        cancelToken?.cancel()
+        cancelToken = null
+        executing = false
+        undoing = false
+        progress = null
         // 当前集合也复位(重置后停在第一个集合,与初值一致)
         val firstId = collections.firstOrNull()?.id.orEmpty()
         activeId = firstId
@@ -443,10 +497,31 @@ fun OrganizeSteps(
                             ExecutionReportPage(
                                 report = currentReport,
                                 undoMessage = undoMessage,
-                                onUndoScope = { scope ->
+                                undoing = undoing,
+                                onUndoScope = { undoScope ->
                                     // 用户选的档位必须传到领域层:危险档多删的就是
                                     // 「被本次覆盖掉的那些位置」(见 UndoScope)。
-                                    undoMessage = performUndo(undoRecordOf(currentReport, scope)).message
+                                    val record = undoRecordOf(currentReport, undoScope)
+                                    // 撤销同样是一次文件操作序列（改名 / 删除都是 Binder
+                                    // 往返），与执行同源风险：**不能在主线程上跑**。
+                                    val platformUndo = undoActions
+                                    if (platformUndo != null) {
+                                        undoing = true
+                                        scope.launch {
+                                            try {
+                                                val applied = withContext(Dispatchers.IO) {
+                                                    performUndoReal(record, platformUndo)
+                                                }
+                                                undoMessage = applied.message
+                                            } finally {
+                                                // 与执行路径同一理由：留在 true 会让按钮永远停在
+                                                // 「撤销中…」且不可点，用户再也撤不了第二次。
+                                                undoing = false
+                                            }
+                                        }
+                                    } else {
+                                        undoMessage = performUndo(record).message
+                                    }
                                 },
                                 onDone = {
                                     // 执行完回到步骤 1:报告是一次执行的终点,不该留在计划页
@@ -482,14 +557,53 @@ fun OrganizeSteps(
                                     confirmFlow = next
                                     if (done) {
                                         val plan = buildLibraryRenamePlan(collections, state.orders, namingState)
-                                        val finished = executeRenamePlan(plan.ops)
-                                        report = finished
-                                        // 完成通知在这里发，**不**在成功分支里发：
-                                        // 用户要的是「任务结束了」这个信号，全失败也
-                                        // 同样结束了 —— 把通知挂在 succeededCount > 0
-                                        // 上会让「全失败」变成一声不吭，而那正是最需要
-                                        // 让用户知道的场合。
-                                        onTaskCompleted?.invoke(finished)
+                                        // 执行器二选一：注入了平台端口就走真实改名，
+                                        // 否则沿用 D1 的确定性模拟（既有 UI 测试全走这条）。
+                                        //
+                                        // 真实路径**必须**在 IO 线程上跑（见 `executing` 的注释：
+                                        // 主线程上 120 次 Binder 往返 = ANR）。模拟路径是纯计算，
+                                        // 留在原地即可 —— 它没有阻塞调用，也不需要进度。
+                                        val platformActions = renameActions
+                                        if (platformActions != null) {
+                                            val token = CancellationToken()
+                                            cancelToken = token
+                                            executing = true
+                                            progress = TaskProgress(total = plan.ops.size)
+                                            scope.launch {
+                                                val finished = try {
+                                                    withContext(Dispatchers.IO) {
+                                                        executeRenamePlanReal(
+                                                            plan.ops,
+                                                            platformActions,
+                                                            token = token,
+                                                            // 回调在 IO 线程上。`mutableStateOf` 的写入
+                                                            // 本身线程安全（写快照 + 通知全局版本），
+                                                            // 与库侧 `LibrarySteps` 的进度回调同一种做法 ——
+                                                            // 那里已在真机上验证进度条会走字。
+                                                            onProgress = { p -> progress = p },
+                                                        )
+                                                    }
+                                                } finally {
+                                                    // 无论成功、取消还是异常都必须复位 ——
+                                                    // 留在 executing 会让底栏永远停在进度条上，
+                                                    // 用户再也点不到「确认执行」。
+                                                    executing = false
+                                                    cancelToken = null
+                                                }
+                                                report = finished
+                                                progress = null
+                                                // 完成通知在这里发，**不**在成功分支里发：
+                                                // 用户要的是「任务结束了」这个信号，全失败也
+                                                // 同样结束了 —— 把通知挂在 succeededCount > 0
+                                                // 上会让「全失败」变成一声不吭，而那正是最需要
+                                                // 让用户知道的场合。
+                                                onTaskCompleted?.invoke(finished)
+                                            }
+                                        } else {
+                                            val finished = executeRenamePlan(plan.ops)
+                                            report = finished
+                                            onTaskCompleted?.invoke(finished)
+                                        }
                                     }
                                 },
                                 onCancelConfirm = { confirmFlow = confirmFlow.cancel() },
@@ -499,6 +613,9 @@ fun OrganizeSteps(
                                 contentInsets = innerInsets,
                                 modifier = Modifier.weight(1f),
                                 onBack = { navController.popWorkflowStep() },
+                                executing = executing,
+                                progress = progress,
+                                onCancelExecution = { cancelToken?.cancel() },
                             )
                         }
                     }

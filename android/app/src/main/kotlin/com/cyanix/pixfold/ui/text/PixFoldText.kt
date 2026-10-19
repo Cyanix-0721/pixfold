@@ -134,6 +134,7 @@ private fun TextKey.pluralQuantityIndex(): Int? = when (this) {
     TextKey.ExecSummary,
     TextKey.PackFailMissingPages,
     TextKey.UndoRecorded,
+    TextKey.UndoApplied,
     TextKey.WarnCaseCollision,
     TextKey.WarnDuplicate,
     TextKey.WarnTooLong,
@@ -289,8 +290,12 @@ internal fun TextKey.resId(): Int = when (this) {
     TextKey.PackFailWrite -> R.string.domain_pack_fail_write
     TextKey.PackFailNotStarted -> R.string.domain_pack_fail_not_started
     TextKey.RenameFailEmptyName -> R.string.domain_rename_fail_empty_name
+    TextKey.RenameFailNoUri -> R.string.domain_rename_fail_no_uri
+    TextKey.RenameFailIo -> R.string.domain_rename_fail_io
     TextKey.UndoNothing -> R.string.domain_undo_nothing
     TextKey.UndoRecorded -> R.plurals.domain_undo_recorded
+    TextKey.UndoApplied -> R.plurals.domain_undo_applied
+    TextKey.UndoAppliedPartly -> R.string.domain_undo_applied_partly
 
     // 重命名警告
     TextKey.WarnDuplicate -> R.plurals.domain_warn_duplicate

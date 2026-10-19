@@ -206,8 +206,37 @@ enum class TextKey {
      */
     PackFailNotStarted,
     RenameFailEmptyName,
+
+    /**
+     * 这张图没有可访问的 URI,无法真实改名。
+     *
+     * 与「跳过」分开的关键:跳过是**计划层定的**(用户看得到原因),而这条是
+     * **执行环境缺信息**(mock 数据 / 扫描没拿到 uri) —— 用户无从预期,
+     * 混成跳过会让人以为是自己选的。
+     */
+    RenameFailNoUri,
+
+    /** 平台层改名失败(目标名被占 / 介质被移除 / 授权失效 / ROM 拒绝)。 */
+    RenameFailIo,
     UndoNothing,
     UndoRecorded,
+
+    /**
+     * 「已撤销 N 项」—— 真实撤销全部成功。
+     *
+     * 参数:%1$d = 实际回滚的项数。
+     */
+    UndoApplied,
+
+    /**
+     * 「撤销了 N / M 项,其余失败」—— 真实撤销部分失败。
+     *
+     * 参数:%1$d = 成功项数,%2$d = 总项数。
+     *
+     * 为什么成功项也报:用户点撤销时并不知道会动手删/改名多少个文件,
+     * 只报总数会让"到底撤干净没有"无法回答。
+     */
+    UndoAppliedPartly,
 
     // ---------------- 重命名警告(attachWarnings) ----------------
     WarnDuplicate,

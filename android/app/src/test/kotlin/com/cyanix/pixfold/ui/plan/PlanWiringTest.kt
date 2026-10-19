@@ -43,6 +43,9 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
+import com.cyanix.pixfold.ui.components.TAG_TASK_PROGRESS
+import com.cyanix.pixfold.ui.components.TAG_TASK_CANCEL
+import androidx.compose.ui.test.onAllNodesWithTag
 
 /**
  * 端到端:两条工作流的**步骤 3** 真的接上了 P6 能力(验收第 15、16、17 项)。
@@ -60,13 +63,59 @@ class PlanWiringTest {
 
     // ================= 工作流 A =================
 
-    private fun openOrganizePlanStep(onTaskCompleted: ((ExecutionReport) -> Unit)? = null) {
-        val collections = MockData.workspaceA.collections
+    private fun openOrganizePlanStep(
+        onTaskCompleted: ((ExecutionReport) -> Unit)? = null,
+        renameActions: com.cyanix.pixfold.domain.plan.RenameActions? = null,
+        undoActions: com.cyanix.pixfold.domain.plan.UndoActions? = null,
+        collections: List<com.cyanix.pixfold.domain.model.ImageCollection> =
+            MockData.workspaceA.collections,
+    ) {
         rule.setContent {
-            OrganizeSteps(collections = collections, onTaskCompleted = onTaskCompleted)
+            OrganizeSteps(
+                collections = collections,
+                onTaskCompleted = onTaskCompleted,
+                renameActions = renameActions,
+                undoActions = undoActions,
+            )
         }
         rule.onNodeWithTag(TAG_STEP_NAMING).performClick()
         rule.onNodeWithTag(TAG_TO_PLAN).performClick()
+    }
+
+    /**
+     * 带 `uri` 的集合 —— 真实改名的**唯一**可用夹具。
+     *
+     * ⚠️ 不能直接用 `MockData.workspaceA`：那些 `SourceItem` 的 `uri` 全是 `null`
+     * （mock 只填了 9 个位置参数，第 10 个 `uri` 走默认值）。真实执行器遇到
+     * 「没有 uri」会逐项报失败并**一次都不碰平台端口** ⇒ 用 mock 测「接线是否生效」
+     * 会得到「端口没被调用」的假阴性，看起来像接线断了，实际是夹具没有 uri。
+     *
+     * 真实扫描（`SourceGroups.kt` 的 `toSourceItem`）里 `uri = documentUri`，
+     * 且 `id` 也等于 `documentUri` —— 这里照那个形态造两条。
+     */
+    private fun collectionsWithUris(): List<com.cyanix.pixfold.domain.model.ImageCollection> {
+        val images = listOf("a", "b").map { key ->
+            com.cyanix.pixfold.domain.model.SourceItem(
+                id = "content://doc/$key",
+                collectionId = "c1",
+                dir = "",
+                baseName = "IMG_$key",
+                ext = "jpg",
+                sizeBytes = 1024,
+                modifiedEpochMillis = 0,
+                createdEpochMillis = null,
+                seed = key.hashCode(),
+                uri = "content://doc/$key",
+            )
+        }
+        return listOf(
+            com.cyanix.pixfold.domain.model.ImageCollection(
+                id = "c1",
+                name = "c1",
+                rootDirName = "c1",
+                images = images,
+            ),
+        )
     }
 
     /**
@@ -197,6 +246,102 @@ class PlanWiringTest {
     // 变异实测（2026-10-19）佐证：把调用点改成
     // `if (finished.succeededCount > 0) onTaskCompleted?.invoke(finished)`
     // 后上面的测试**全部存活** ⇒ 那条断言原本就没有杀伤力，删掉是对的。
+
+    // ================= 真实改名接线（D4b）=================
+
+    /**
+     * 注入平台端口后，执行必须**真的走真实路径**，而不是继续模拟。
+     *
+     * 为什么必须有这一条：真实改名与模拟执行的**界面读数完全一样**（都出现报告页、
+     * 都显示「成功 N 项」）。也就是说「忘了把端口传给执行器」在界面上零表现，
+     * 只有磁盘上什么都没动。这正是 P3 踩过的「能力做完、界面没用」同款失效。
+     *
+     * 变异实测（2026-10-19）：把 `renameActions = renameActions` 改成
+     * `renameActions = null` 后，**原本一条测试都没红**（M7 SURVIVED）——
+     * 这条就是为它补的。
+     */
+    @Test
+    fun `workflow A really renames through the injected platform port`() {
+        val calls = mutableListOf<Pair<String, String>>()
+        val actions = object : com.cyanix.pixfold.domain.plan.RenameActions {
+            override fun rename(uri: String, newName: String): String {
+                calls += uri to newName
+                return "$uri#renamed"
+            }
+        }
+        openOrganizePlanStep(renameActions = actions, collections = collectionsWithUris())
+
+        clickAPlanConfirm()
+        rule.onNodeWithTag(TAG_CONFIRM_OK).performClick()
+        rule.onNodeWithTag(TAG_REPORT_PAGE).assertIsDisplayed()
+
+        // 🚨 模拟执行时这里恒为 0 —— 界面照样显示「成功 N 项」。
+        assertTrue(
+            calls.isNotEmpty(),
+            "注入了真实端口却一次都没调用 ⇒ 执行器还在走模拟路径",
+        )
+        assertTrue(
+            calls.all { (uri, name) -> uri.startsWith("content://") && name.isNotBlank() },
+            "传下去的必须是真实 uri 与新名，实际 $calls",
+        )
+    }
+
+    /**
+     * 注入真实撤销端口后，撤销必须真的动手（而不是弹「正式版才回滚」）。
+     *
+     * 与上一条同源：`performUndo` 与 `performUndoReal` 都返回 `UndoResult`，
+     * 界面都显示一行消息 —— 不点进去看明细分不出走的是哪条。
+     */
+    @Test
+    fun `workflow A really undoes through the injected platform port`() {
+        val deleted = mutableListOf<String>()
+        val renamed = mutableListOf<Pair<String, String>>()
+        val renameActions = object : com.cyanix.pixfold.domain.plan.RenameActions {
+            override fun rename(uri: String, newName: String): String = "$uri#renamed"
+        }
+        val undoActions = object : com.cyanix.pixfold.domain.plan.UndoActions {
+            override fun delete(uri: String): Boolean {
+                deleted += uri
+                return true
+            }
+
+            override fun rename(uri: String, newName: String): Boolean {
+                renamed += uri to newName
+                return true
+            }
+        }
+        openOrganizePlanStep(
+            renameActions = renameActions,
+            undoActions = undoActions,
+            collections = collectionsWithUris(),
+        )
+
+        clickAPlanConfirm()
+        rule.onNodeWithTag(TAG_CONFIRM_OK).performClick()
+        rule.onNodeWithTag(TAG_REPORT_PAGE).assertIsDisplayed()
+        // 改名不存在「覆盖项」⇒ `needsUndoWarning == false` ⇒ **不弹**范围对话框，
+        // 点撤销直接按安全档(ThisRun)执行。这一条同时钉住了那个分支：
+        // 若误改成「一律弹框」，下面第一行就会失败。
+        rule.onNodeWithTag(TAG_UNDO_SCOPE_DIALOG).assertDoesNotExist()
+        rule.onNodeWithTag(TAG_REPORT_UNDO).performClick()
+        // 撤销跑在 Dispatchers.IO 上（与执行同源：一次删除/改名就是一次 Binder
+        // 往返，主线程上做会 ANR）。`waitForIdle` 等不到普通协程的完成 ——
+        // 它会等 Compose 自身的空闲，而这条协程在 IO 线程池上，与 Compose
+        // 的帧循环无关。故这里显式轮询端口调用记录。
+        rule.waitUntil(timeoutMillis = 5_000) { renamed.isNotEmpty() || deleted.isNotEmpty() }
+
+        // 改名流程的撤销是「改回原名」：必须走 rename 而不是 delete。
+        assertTrue(
+            renamed.isNotEmpty(),
+            "撤销没有调用平台端口 ⇒ 还在走 mock 的 performUndo（磁盘上什么都没变）",
+        )
+        assertTrue(deleted.isEmpty(), "改名撤销不该删文件，实际删了 $deleted")
+        // 改回去的必须是**原名**（R1 缺陷就是这里写成了新名，成了空操作）。
+        assertTrue(
+            renamed.all { (_, target) -> target.startsWith("IMG_") },
+            "撤销应把文件改回原名（IMG_*），实际 $renamed",
+        )
+    }
 
     // ================= 工作流 B =================
 
@@ -434,5 +579,54 @@ class PlanWiringTest {
         rule.onNodeWithTag(TAG_NEXT_STEP).performClick()
         // 推进到了步骤 2(命名结构):其底栏的「下一步 执行计划」出现
         rule.onNodeWithTag(TAG_TO_PLAN).assertIsDisplayed()
+    }
+    /**
+     * 执行期底栏必须换成进度条，且**不再**渲染「确认执行」。
+     *
+     * 这条对应用户 2026-10-19 的真机反馈：120 项真实改名在主线程上跑 ⇒ ANR。
+     * 修复后执行在 IO 线程上、底栏换成进度条。这里钉住「底栏形态真的换了」——
+     * 只测领域层的进度回调抓不到「界面还停在确认按钮上」这种接线遗漏。
+     *
+     * 用 `waitUntil` 而不是 `waitForIdle`：执行协程在 `Dispatchers.IO` 上，
+     * Compose 的空闲判定看不见它（与撤销那条测试同一理由）。
+     */
+    @Test
+    fun `executing replaces the confirm button with a progress bar`() {
+        // 端口故意**同步立刻返回** —— 我们要观察的是执行期与结束期的界面差异，
+        // 不是「执行有多慢」。先让它卡住不返回，才能稳定看到执行中的底栏。
+        val gate = java.util.concurrent.CountDownLatch(1)
+        val entered = java.util.concurrent.CountDownLatch(1)
+        val renameActions = object : com.cyanix.pixfold.domain.plan.RenameActions {
+            override fun rename(uri: String, newName: String): String {
+                entered.countDown()
+                // 阻塞到主线程断言完执行期形态 —— 这条协程在 IO 线程池上，
+                // 阻塞它不会卡住 Compose 的帧循环。
+                gate.await(5, java.util.concurrent.TimeUnit.SECONDS)
+                return "$uri#renamed"
+            }
+        }
+        openOrganizePlanStep(
+            renameActions = renameActions,
+            undoActions = null,
+            collections = collectionsWithUris(),
+        )
+
+        clickAPlanConfirm()
+        rule.onNodeWithTag(TAG_CONFIRM_OK).performClick()
+
+        // 执行期：进度条在，确认按钮不在。
+        assertTrue(entered.await(5, java.util.concurrent.TimeUnit.SECONDS), "平台端口没被调用")
+        rule.waitUntil(timeoutMillis = 5_000) {
+            rule.onAllNodesWithTag(TAG_TASK_PROGRESS).fetchSemanticsNodes().isNotEmpty()
+        }
+        rule.onNodeWithTag(TAG_A_PLAN_CONFIRM).assertDoesNotExist()
+        rule.onNodeWithTag(TAG_TASK_CANCEL).assertIsDisplayed()
+
+        // 放行 ⇒ 执行结束，底栏回到「确认执行」/报告页。
+        gate.countDown()
+        rule.waitUntil(timeoutMillis = 10_000) {
+            rule.onAllNodesWithTag(TAG_REPORT_PAGE).fetchSemanticsNodes().isNotEmpty()
+        }
+        rule.onNodeWithTag(TAG_TASK_PROGRESS).assertDoesNotExist()
     }
 }

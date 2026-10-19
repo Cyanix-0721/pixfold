@@ -29,6 +29,7 @@
 
     <!-- ============ Execution report page (ExecutionReportPage) ============ -->
     <string name="report_undo">Undo this run</string>
+    <string name="report_undoing">Undoing…</string>
     <string name="report_done">Done</string>
     <string name="report_empty">Nothing ran (the plan was empty)</string>
     <string name="report_nothing_to_undo">Nothing ran successfully, so there is nothing to undo</string>

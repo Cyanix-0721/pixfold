@@ -47,6 +47,8 @@ import com.cyanix.pixfold.data.saf.AndroidSafSource
 import com.cyanix.pixfold.data.saf.AndroidThumbnailSource
 import com.cyanix.pixfold.data.saf.SafOutputExistsProbe
 import com.cyanix.pixfold.data.saf.SafPackExecutor
+import com.cyanix.pixfold.data.saf.SafRenameActions
+import com.cyanix.pixfold.data.saf.SafUndoActions
 import com.cyanix.pixfold.data.task.TaskCompletionNotification
 import com.cyanix.pixfold.domain.library.LibraryState
 import com.cyanix.pixfold.domain.library.reconcileLibrary
@@ -474,6 +476,18 @@ fun PixFoldApp(store: SettingsStore? = null) {
                     val organizeDoneTitle = stringResource(R.string.organize_notify_done)
                     val workspaceLabel = workspaceHandle?.displayName.orEmpty()
                     val resources = LocalResources.current
+                    // 真实改名 / 撤销的平台端口（D4b）。两者**必须成对**注入：
+                    // 真实报告靠 `ExecEntry.uri` 支撑撤销，模拟报告里它是 null。
+                    //
+                    // 没有工作区时（演示数据）不注入 —— mock 的 `SourceItem.uri` 全是
+                    // null，真实改名会逐项报「缺少文件标识」。这时走 D1 模拟才是对的：
+                    // 界面明确显示「未选择工作区」，用户不会误以为动过磁盘。
+                    val renameActions = remember(packTreeUri) {
+                        packTreeUri?.let { SafRenameActions(context) }
+                    }
+                    val undoActions = remember(packTreeUri) {
+                        packTreeUri?.let { SafUndoActions(context) }
+                    }
                     DestinationSurface {
                         OrganizeSteps(
                             collections = collections,
@@ -523,6 +537,8 @@ fun PixFoldApp(store: SettingsStore? = null) {
                                     ),
                                 )
                             },
+                            renameActions = renameActions,
+                            undoActions = undoActions,
                         )
                     }
                 }

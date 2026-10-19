@@ -275,6 +275,7 @@ class TranslationCoverageTest {
             "PackFailMissingPages",
             "ExecSummary",
             "UndoRecorded",
+            "UndoApplied",
             "WarnDuplicate",
             "WarnCaseCollision",
             "WarnTooLong",

@@ -29,6 +29,7 @@
 
     <!-- ============ 执行报告页(ExecutionReportPage) ============ -->
     <string name="report_undo">撤销本次执行</string>
+    <string name="report_undoing">撤销中…</string>
     <string name="report_done">完成</string>
     <string name="report_empty">本次没有任何操作（计划为空）</string>
     <string name="report_nothing_to_undo">没有成功执行的操作，无需撤销</string>

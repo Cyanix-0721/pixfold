@@ -106,6 +106,16 @@ fun ExecutionReportPage(
     onDone: () -> Unit,
     modifier: Modifier = Modifier,
     contentInsets: WindowInsets = WindowInsets.safeDrawing,
+    /**
+     * 撤销正在执行（D4b）。
+     *
+     * 撤销是**一次文件操作序列** —— 120 项就是 120 次 Binder 往返，跑在
+     * `Dispatchers.IO` 上。这段时间里按钮若仍可点，用户会以为没反应而连点：
+     * 每次都派发一整轮撤销。故执行期间禁用，并把按钮文案换成「撤销中…」。
+     *
+     * 默认 `false` = 模拟路径（既有 UI 测试全走它），行为一行不变。
+     */
+    undoing: Boolean = false,
 ) {
     // 筛选状态是**本页的**显示偏好。默认「全部」是硬约束而不是口味:
     // 报告是「刚才到底跑了什么」的凭证,默认收窄会让用户以为成功项根本没执行
@@ -210,12 +220,16 @@ fun ExecutionReportPage(
                         // 有覆盖项 ⇒ 先问范围,不直接执行(用户 m04079 第③项)。
                         if (report.needsUndoWarning) scopeDialogOpen = true else onUndoScope(UndoScope.ThisRun)
                     },
-                    enabled = report.canUndo,
+                    enabled = report.canUndo && !undoing,
                     colors = dangerActionButtonColors(),
                     modifier = Modifier
                         .testTag(TAG_REPORT_UNDO)
                         .semantics { contentDescription = undoLabel },
-                ) { Text(undoLabel) }
+                ) {
+                    Text(
+                        if (undoing) stringResource(R.string.report_undoing) else undoLabel,
+                    )
+                }
             },
             trailing = {
                 val done = stringResource(R.string.report_done)

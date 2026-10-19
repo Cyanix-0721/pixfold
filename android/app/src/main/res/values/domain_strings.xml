@@ -167,7 +167,14 @@
     <string name="domain_pack_fail_write">Write failed: %1$s</string>
     <string name="domain_pack_fail_not_started">Not started (cancelled by user)</string>
     <string name="domain_rename_fail_empty_name">New name is empty</string>
+    <string name="domain_rename_fail_no_uri">No accessible file URI; this item was not renamed</string>
+    <string name="domain_rename_fail_io">Rename failed; the file may be read-only, moved, or blocked by the system</string>
     <string name="domain_undo_nothing">Nothing to undo</string>
+    <plurals name="domain_undo_applied">
+        <item quantity="one">Rolled back %1$d operation</item>
+        <item quantity="other">Rolled back %1$d operations</item>
+    </plurals>
+    <string name="domain_undo_applied_partly">Rolled back %1$d / %2$d; the rest failed</string>
     <plurals name="domain_undo_recorded">
         <item quantity="one">Recorded %1$d inverse operation; the release version will roll it back from the UndoRecord (the prototype does not touch the real file system)</item>
         <item quantity="other">Recorded %1$d inverse operations; the release version will roll them back from the UndoRecord (the prototype does not touch the real file system)</item>

@@ -491,7 +491,7 @@ Android 第一版应优先保证“选目录 → 预览 → 手工确认 → 生
 | D2b 完整平台能力        | ⚠️ **代码五项齐 + 真机 3/5 完整**(2026-10-19 深夜;`dataSync` 前台服务 + Live Update 升格 + 完成通知双渠道;第 1 项只测到 56 张、第 5 项只测到 33MB 级,详见 §9 D2b「逐项取证状态」) | **五项**:缩略图策略 / 后台任务与进度 / 授权失效恢复 / 存储空间预检与不足退路 / 大归档写入(Zip64·中断·文件系统上限),均须真机可复现且有失败路径提示(2026-09-19 校正:原文写"三项"但实列五项,系列举不全;§10《平台》已把后两项列为验收标准。Windows/Linux 验证项与 §7/§10"桌面无验收项"矛盾,已移出——见 D2b 节)。**2026-10-12 夜间离线推进**:第 4 项「存储空间预检」领域层已落地(`domain/storage/SpaceCheck.kt`,22 tests,3 变异全捕获);第 5 项「Zip64 需求判定 + 中断半成品识别」领域层已落地(`domain/pack/Zip64Assessment.kt`,22 tests,3 变异全捕获)。两项的平台层接线(真机验证)仍待 D2b 后续。**2026-10-18 D2a 平台层在 `android/` 里重建(只读闭环)**:`domain/source/`(SourceDoc / WorkspaceSource 端口 / `collectionsFrom` 分组,21 tests)+ `app/data/saf/`(AndroidSafSource 递归遍历 / SafTreeStore 持久授权 / AndroidThumbnailSource `loadThumbnail`)+ `ui/workspace/`(WorkspaceState 映射 / WorkspaceController / WorkspaceBar)+ 5 处缩略图改走 `ItemThumb`(真实图失败回退程序化)。第 1 项「千级缩略图策略」的**只读部分**与第 3 项「授权失效恢复」的**最小形态**(SecurityException → `LoadResult.Denied` → 工作区条给重选入口)已落地;后台任务与进度、千级并发/缓存上限、写入侧仍待。**真机核对顺延至 2026-10-19**。**2026-10-19 凌晨 D2b 第 1 项「千级缩略图生成策略」领域层+平台策略落地**:`domain/thumb/ThumbBudget.kt`(21 tests)+ `ui/workspace/ThumbnailCache.kt`(按字节淘汰的 LRU,11 tests)+ `ui/workspace/CachingThumbnailSource.kt`(缓存/并发闸门/在途请求合并,10 tests);平台实现 `AndroidThumbnailSource` 退回成**只管读**(`loadThumbnail`)的纯实现。**同时第 3 项「授权失效恢复」补上决策层**:领域状态机 `domain/source/WorkspaceRecovery.kt`(17 tests)+ 自动重试策略(`Denied`/`Failed` 都先试一次,`Revoked` 不试;重试仍失败才落 `Denied(autoRetried=1)` 并换文案)+ `WorkspaceController` 的 IO 调度器可注入 + `WorkspaceControllerTest`(8 tests)。四道闸门 app **554** / domain **542** / lint 零告警 / APK **34,421,019 B**,变异 M1–M8 全 KILLED(首轮 M4/M5/M6 存活 = 断言不足,已补)。**同时第 2 项「后台任务与进度」领域层落地**:`domain/task/TaskProgress.kt`(26 tests)= 进度快照(失败项也推进进度,否则失败 30% 时进度条卡在 70%)+ 上报节流六条判据(首次必报/完成必报/失败数变化必报/倒退必报/跨 5 个点/超 250ms)+ `@Volatile` 中断令牌(只在一项开始前检查,避免留半个文件)+ 结果判定**先判完成再判取消**(取消瞬间恰好跑完时报「已取消」是骗人的)。四道闸门 app **554** / domain **568** / lint 零告警 / APK **34,421,078 B**,变异 M1–M10(其中 M8 为**等价变异**,据此删掉一条冗余判据)。平台层接线与真机验证仍待。**2026-10-19 真机核对**(PJX110 / Android 16 / zh-CN / 测试工作区 `/storage/emulated/0/test`):缩略图策略 ✅ 真实页面缩略图已加载(Native Heap 24MB / PSS 115MB)、授权失效恢复 ✅ `am force-stop` 后重启自动恢复工作区、**工作区实时刷新 ✅ 回前台重扫 56→55 生效**。同时真机暴露并修掉三类真实缺陷:①热切换工作区白屏(无参 `remember` 播种 + 静默 `?: return`);②集合分级错误(一级子目录≠一本书,改为「直接含图片的目录 = 集合」+ 两级芯片);③重命名后 `order` 保留旧元数据(`ExternalStorageProvider` 重命名不换 `documentUri`)。四道闸门 app **582** / domain **699** / lint 零告警 / APK **34,563,062 B**,变异 M1–M11(M8 SURVIVED 且刻意保留 = `notifyForDescendants` 无离线断言)。**2026-10-19 芯片两级化续做**:步骤 2 命名页加集合芯片行(与步骤 1 **共用同一 `activeId`**,真机三跳验证)、工作流 B 元数据页卷芯片改两级(`domain/comic/VolumeGroups.kt` 13 tests,与 `groupCollections` 复用同一组前缀常量;步骤 3 打包预览页刻意不改 —— 勾选状态与两级叠加无法表达「系列里几卷被排除」)。抽出第二层通用底层 `ui/components/TwoLevelChipRows<T>` 并**实测出真实缺陷**:它没有自带 `Column`,非 `Column` 容器下两行芯片 bounds 完全重合、点击命中最上层(1 级 `A` 与 2 级 `A/第01卷` 都在 `(67,42)-(185,154)`)⇒ 已修。四道闸门 app **587** / domain **712** / lint 零告警 / APK **35,228,506 B**,变异 M11–M18(M13 查出冗余守卫并删除、M16 查出断言太弱并改断选中态)。 |
 | D3 领域核心与适配层     | ✅ **完成**(2026-10-05) | 三项退出条件**逐条达成**:① **打包核心**落地并单测通过(CBZ 生成/写入计划 `PackagePlan`/`OperationPlan` 语义、执行报告 `ExecutionReport`、撤销记录 `UndoRecord`);② **适配层边界有可执行检查**(`domain/` 零 Android 依赖 —— `AdapterBoundaryTest` 四层断言 + 自检,随 `:domain:test` 常跑,经真实注入变异验证**四层皆可红**、0 逃逸);③ `domain/` 既有测试基线**连续**(全分支零测试文件删除,现 **483 项**全绿,不以重写替代)。**真机验证层级**:阶段分支共 **5 轮**真机核对(轮 23 覆盖度审计:`WARN_ICONS` 中文覆盖 8/11 → **11/11**;轮 25 O1 撤销范围对话框两档视觉分级**逐位复核** —— 浅色安全档透明底 + `#B3261E` 描边 vs 危险档 `#B3261E` 填充、深色安全档透明底 + `#F2B8B5` 描边 vs 危险档 `#8C1D18` 填充);**打包核心仍未端到端**(原型不连真实文件系统,见下方 D3 节追记)。详见下方 D3 节 |
 | **D4a** UI 层真实功能    | 🔄 **进行中**(2026-09-20 起) | **不依赖文件系统**的真实功能:设置页、主题体系、i18n、开源许可页等。**无前置依赖**(与 D1 一脉相承),故可先做 |
-| **D4b** 真实文件闭环    | ⬜ 未开始               | Android 完成一次**真实文件**的端到端闭环(扫描→预览→排序→元数据→**真实产出 CBZ**)。**硬依赖 D2b + D3**;打包真实产出、SAF 读写、真实扫描均在此段 |
+| **D4b** 真实文件闭环    | 🔄 **进行中**(2026-10-19;真实改名+真实撤销已真机跑通,打包真实产出已跑通;剩 CBZ 可被阅读器打开、1GB 级) | Android 完成一次**真实文件**的端到端闭环(扫描→预览→排序→元数据→**真实产出 CBZ**)。**硬依赖 D2b + D3**;打包真实产出、SAF 读写、真实扫描均在此段 |
 | D5 增强功能             | ⬜ 待办                 | 按需排期,不阻塞 D4                                                      |
 
 > **决策门(2026-09-10 更新;① 于 2026-09-21 重述)**:① ~~**正式工程创建**的触发 = D1 退出条件达成~~ 
@@ -3468,6 +3468,38 @@ core+extended 11,398 class ⇒ `classes.dex` **3,272 B**),故 35.7 MB 是 **debu
 > ⚠️ **首轮 3 红又是夹具 bug**:夹具一律用 `Rename` 策略,而 `overwritesExisting` 要求 `conflictPolicy == Overwrite` ⇒ 覆盖用例本来就不算覆盖。**教训:读判据实现再写夹具,别按字段名猜。**
 > ⚠️ **新增复数键必须同步 `TranslationCoverageTest.PLURAL_KEYS`** —— 那是「复数键集合」的显式契约,漏改直接红。
 >
+
+
+> **✅ 2026-10-19 深夜:D4b 的真实改名与真实撤销已在真机跑通(ANR 修复轮)**
+>
+> 这一轮才把「执行」从模拟变成真的动文件,并当场撞出一个只在真机出现的缺陷。
+>
+> **真实改名/撤销的落地形状**(领域层零 Android 依赖):
+> - `domain/plan/RenameExecution.kt`: `RenameActions.rename(uri, newName): String?` —— **返回新 uri 而不是 `Boolean`**。`ExternalStorageProvider` 改名后 document id 由路径派生 ⇒ uri 变了,**撤销必须拿新 uri**,只回 `true/false` 会让撤销改错人。返回 `null` = 失败(正常业务分支,平台实现不得抛)。
+> - `executeRenamePlanReal` 的四个分支顺序**逐条对齐**模拟版 `executeRenameOp`:跳过(不碰平台)→ 目标名为空(`RenameFailEmptyName`)→ **缺 uri(`RenameFailNoUri`)** → 平台调用。**缺 uri 记失败而不是跳过**:跳过是「计划里就定了」,缺 uri 是「执行环境缺信息」,两者对用户的含义完全不同。
+> - `UndoOp` 三个子类各加 `val uri: String? = null`(接口级),`undoOpsOf` 从 `ExecEntry.uri` 透传;撤销时缺 uri 记失败而不是静默跳过。`performUndoReal` 逐项 `runCatching`(**单点失败不中断**:已删掉的文件不会因为后面失败而回来),全成报 `UndoApplied`,否则 `UndoAppliedPartly`。
+> - 平台层 `data/saf/SafRenamePlatform.kt`:`renameDocument` 抽成构造参数**只为可测** —— Robolectric 的 shadow 只能回放固定结果,「provider 返回 null」这条契约无法从外部触发。
+>
+> **真机撞出的 ANR(本轮最重要的发现)**:首轮 120 项一起改名,磁盘改到第 86 个时应用消失。`adb logcat -b crash` **空**、主日志无 FATAL ⇒ 不是崩溃。`dumpsys dropbox --print data_app_anr` 拿到主线程栈顶逐字 `android.provider.DocumentsContract.renameDocument+292` → `android.content.ContentResolver.call+612` → `SafRenameActions._init_$lambda$0`。
+> **根因**:`executeRenamePlanReal` 在**主线程**逐项调 `renameDocument`,每项一次同步 Binder 往返,120 项串行 > 5 秒 ⇒ 系统判 ANR。
+> **为什么 655 个测试全绿也没发现**:Robolectric 里没有真实 provider 往返,一秒能跑完几千项。**这是「本地测试覆盖不到、只能真机撞」的一类缺陷**:凡「N 次同步 IPC 串行」都必须假定 N 会大到超时。
+>
+> **修法**(三件,缺一不可):
+> 1. 领域层 `executeRenamePlanReal` 加 `token: CancellationToken` + `onProgress: (TaskProgress) -> Unit`,`buildList { for ((index, op) in ops.withIndex()) }` 逐项**先检查中断再执行**;中断后把剩余项补成 `Skipped` + `PackFailNotStarted`(「尚未开始(用户已取消)」,与计划里的跳过语义区分)。**计数与 `entry.outcome` 严格同源**,每项上报一次(一项就是一次 IPC,「动一格」必须对应一次真实变化,不做时间节流)。
+> 2. UI 把执行与撤销都挪到 `withContext(Dispatchers.IO)`,执行期用 `TaskProgressBar` 顶替底栏的「确认执行」。
+> 3. 进度条通用化:`ui/library/PackProgressBar.kt` → **`ui/components/TaskProgressBar.kt`**(`TAG_PACK_PROGRESS`/`TAG_PACK_CANCEL` 一并改名为 `TAG_TASK_PROGRESS`/`TAG_TASK_CANCEL`,**字符串值也换** —— 两个页面同时挂同名 tag 时 `onNodeWithTag` 会撞多节点直接失败)。
+>
+> **撤销期单独加 `undoing` 状态**:撤销发生在报告页(`executing` 已复位),两者互斥但不是同一个状态。期间按钮禁用 + 文案换「撤销中…」—— 否则界面无变化,用户会连点,每次派发一整轮撤销。
+>
+> **真机复验读数**(PJX110 / Android 16 / ColorOS / `/storage/emulated/0/test/Stress` 5 卷 × 24 页 = 120 张):
+> - 执行:进程存活(PID 11490)、报告 **「共 120 项:成功 120 · 跳过 0 · 失败 0」**、磁盘 **120/120 真改名、原名残留 0、文件数仍 120**。
+> - 撤销:磁盘 **120/120 全部回原名**、界面 **「已撤销 120 项」**。
+> - 进度条真机抓不到:24 项约 1–2 秒跑完,比一次 `dumpui` 还快 ⇒ 进度条接线由离线测试钉住(`executing replaces the confirm button with a progress bar`),真机只验证「不 ANR」。
+>
+> **中途一次假警报**(记下来免得下次误判):第二次改名报告「120 全失败」,原因是**磁盘文件已被上一轮改过名**,目标名与现状同名 ⇒ provider 拒绝。不是代码缺陷。**测试前必须先恢复素材到已知状态**。
+>
+> 四道闸门:app **657** / domain **877** / lint 零告警 / APK **34,204,030 B**。变异 **M1–M6 全 KILLED**(M1 执行回主线程、M2 底栏不换进度条、M3 去掉中断检查、M4 尚未开始原因置空、M5 成功不计入进度、M6 跳过不计入进度)。M5 首轮写成重复 `when` 分支导致编译失败 —— **编译失败不算 KILLED,必须重做成语义合法但行为错误的变异**。
+
 
 优先交付（**GUI 仅 Android**，2026-09-10 变更）：
 

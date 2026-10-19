@@ -43,6 +43,22 @@ data class ExecEntry(
     val reason: Msg? = null,
     val createdPath: String? = null,
     val originalPath: String? = null,
+    /**
+     * 本项对应的**真实文件标识**(SAF 的 `documentUri`),`null` 表示这行是模拟/mock 数据。
+     *
+     * ## 为什么不能拿 [id] 顶替
+     *
+     * 真实扫描下 [id] **恰好**等于 `documentUri`(见 `SourceGroups.toSourceItem`),
+     * 但那是实现巧合,不是契约:mock 数据的 id 是 `"trip-1"` 这种普通串。
+     * 撤销若按 [id] 去删/改名,mock 报告一旦漏进真实路径就会静默失败或删错东西。
+     * 用一个**显式可空**的字段,让"这行能不能被真实回滚"在类型上就问得出来。
+     *
+     * ## 为什么加在末尾且带默认值
+     *
+     * 既有构造点(含 26 处测试夹具与 `PackReportBridge`)全部不传它 —— 模拟执行
+     * 本就产不出 uri,`null` 正是它们的正确取值。
+     */
+    val uri: String? = null,
 ) {
     init {
         // ---- 不变式:只有"成功"才产生输出(createdPath 非空 ⟺ Succeeded) ----
@@ -191,8 +207,25 @@ fun executeRenamePlan(ops: List<RenameOp>): ExecutionReport =
 
 /** 逆向操作。正式版据此真正回滚;D1 只记录与展示。 */
 sealed interface UndoOp {
+    /**
+     * 本项要操作的**真实文件标识**(SAF 的 `documentUri`),`null` = 无从下手。
+     *
+     * ## 为什么放在接口上而不是每个子类各加一份
+     *
+     * `performUndoReal` 要对三种逆向操作**统一**问一句"这条能落到哪个文件上"。
+     * 放接口上,新增一种逆向操作就必须回答这个问题(编译器强制);
+     * 分散在子类里的话,将来加类型时漏写只会表现为"撤销时这条静默不生效"。
+     *
+     * ## 为什么可空且带默认值
+     *
+     * D1 的模拟报告产不出 uri,既有 `undoOpsOf` 从 `ExecEntry.createdPath`(文件名,
+     * 不是 uri)推导 —— 那些记录天然没有文件标识。给默认 `null` 让既有 21 处
+     * 构造点零改动,同时让"这条撤不了"变成显式事实而不是靠路径字符串去猜。
+     */
+    val uri: String?
+
     /** 删除本次新建的文件。 */
-    data class DeleteCreated(val path: String) : UndoOp
+    data class DeleteCreated(val path: String, override val uri: String? = null) : UndoOp
 
     /**
      * 删除**被本次覆盖掉**的那个位置上的文件([UndoScope.Everything] 才产生)。
@@ -202,12 +235,15 @@ sealed interface UndoOp {
      * "撤销本次新建"不同,界面与正式版执行器才有机会对它区别对待 ——
      * 混成一个类型的话,"哪些项是真的危险"就只剩注释在说。
      */
-    data class DeleteOverwritten(val path: String) : UndoOp
+    data class DeleteOverwritten(val path: String, override val uri: String? = null) : UndoOp
 
     /** 把改名后的文件改回去。 */
-    data class RestoreRenamed(val from: String, val to: String) : UndoOp
+    data class RestoreRenamed(
+        val from: String,
+        val to: String,
+        override val uri: String? = null,
+    ) : UndoOp
 }
-
 /**
  * 一次执行的撤销记录。
  *
@@ -283,9 +319,9 @@ internal fun undoOpsOf(
         // 安全档跳过覆盖项:本次没新建任何东西,删它只会删掉用户原有的文件。
         if (overwritten && scope == UndoScope.ThisRun) return@mapNotNull null
         when {
-            overwritten -> UndoOp.DeleteOverwritten(path)
-            kind == ExecKind.Package -> UndoOp.DeleteCreated(path)
-            else -> UndoOp.RestoreRenamed(from = path, to = e.originalPath ?: path)
+            overwritten -> UndoOp.DeleteOverwritten(path, uri = e.uri)
+            kind == ExecKind.Package -> UndoOp.DeleteCreated(path, uri = e.uri)
+            else -> UndoOp.RestoreRenamed(from = path, to = e.originalPath ?: path, uri = e.uri)
         }
     }
     return ops.ifEmpty { null }

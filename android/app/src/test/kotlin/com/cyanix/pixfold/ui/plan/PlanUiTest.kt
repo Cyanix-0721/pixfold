@@ -8,6 +8,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.junit4.createComposeRule
@@ -317,5 +318,39 @@ class PlanUiTest {
                 onCancel = { flow = flow.cancel() },
             )
         }
+    }
+    /**
+     * 撤销执行中：按钮必须禁用并改文案（D4b）。
+     *
+     * 撤销是 120 次 Binder 往返的文件操作序列。期间按钮若还点得动，用户看到
+     * 界面没变化就会连点 —— 每次派发一整轮撤销。这条钉住「执行期不可点」。
+     */
+    @Test
+    fun `undo button is disabled and relabelled while undoing`() {
+        val aot1 = library.volumes.first { it.id == "aot-1" }
+        val report = executePackagePlans(buildPackagePlans(listOf(aot1)))
+        // 执行中状态必须是 **Compose 状态**并在同一份内容里切换 —— 测试规则不允许
+        // 两次 `setContent`（`ComponentActivity has already set content`）。
+        var undoing by mutableStateOf(true)
+        rule.setContent {
+            ExecutionReportPage(
+                report = report,
+                undoMessage = null,
+                onUndoScope = {},
+                onDone = {},
+                undoing = undoing,
+            )
+        }
+
+        rule.onNodeWithTag(TAG_REPORT_UNDO).assertIsNotEnabled()
+        rule.onNodeWithTag(TAG_REPORT_UNDO)
+            .assertTextEquals(context.getString(R.string.report_undoing))
+
+        // 未撤销时必须能点 —— 否则上面那条「禁用」可能只是恒禁用造成的假绿。
+        undoing = false
+        rule.waitForIdle()
+        rule.onNodeWithTag(TAG_REPORT_UNDO).assertIsEnabled()
+        rule.onNodeWithTag(TAG_REPORT_UNDO)
+            .assertTextEquals(context.getString(R.string.report_undo))
     }
 }

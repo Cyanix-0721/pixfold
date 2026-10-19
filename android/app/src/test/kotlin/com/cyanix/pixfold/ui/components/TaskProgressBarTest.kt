@@ -1,4 +1,4 @@
-package com.cyanix.pixfold.ui.library
+package com.cyanix.pixfold.ui.components
 
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -26,7 +26,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
 /**
- * [PackProgressBar] 的界面层断言(D2b 第 2 项「后台任务与进度」的 UI 落点)。
+ * [TaskProgressBar] 的界面层断言(D2b 第 2 项「后台任务与进度」的 UI 落点)。
  *
  * ## 这层为什么必须测(而不是"领域层的 `TaskProgress` 已经有 26 个用例了")
  *
@@ -46,7 +46,7 @@ import kotlin.test.assertTrue
  */
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [36], qualifiers = "w400dp-h800dp")
-class PackProgressBarTest {
+class TaskProgressBarTest {
 
     @get:Rule
     val rule = createComposeRule()
@@ -59,7 +59,7 @@ class PackProgressBarTest {
     ) {
         rule.setContent {
             PixFoldTheme(darkTheme = false, dynamicColor = false) {
-                PackProgressBar(progress = progress, onCancel = onCancel, cancelling = cancelling)
+                TaskProgressBar(progress = progress, onCancel = onCancel, cancelling = cancelling)
             }
         }
     }
@@ -72,7 +72,7 @@ class PackProgressBarTest {
     @Test
     fun `two of five processed shows the count`() {
         show(TaskProgress(total = 5, done = 2))
-        rule.onNodeWithTag(TAG_PACK_PROGRESS).assertIsDisplayed()
+        rule.onNodeWithTag(TAG_TASK_PROGRESS).assertIsDisplayed()
         rule.onNodeWithText(countText(2, 5)).assertIsDisplayed()
     }
 
@@ -108,15 +108,15 @@ class PackProgressBarTest {
     /**
      * 完成后**不隐藏**取消按钮:①隐藏/出现会改变行高造成布局跳动;
      * ②"点取消的瞬间任务刚好跑完"是真实会发生的,按钮先消失会让点击落到别处。
-     * 组件的策略见 `PackProgressBar.kt` 的 KDoc「关于完成后取消按钮还在」。
+     * 组件的策略见 `TaskProgressBar.kt` 的 KDoc「关于完成后取消按钮还在」。
      */
     @Test
     fun `progress bar and cancel button survive completion`() {
         show(TaskProgress(total = 3, done = 3))
-        rule.onNodeWithTag(TAG_PACK_PROGRESS).assertIsDisplayed()
+        rule.onNodeWithTag(TAG_TASK_PROGRESS).assertIsDisplayed()
         rule.onNodeWithText(countText(3, 3)).assertIsDisplayed()
-        rule.onNodeWithTag(TAG_PACK_CANCEL).assertIsDisplayed()
-        rule.onNodeWithTag(TAG_PACK_CANCEL).assertIsEnabled()
+        rule.onNodeWithTag(TAG_TASK_CANCEL).assertIsDisplayed()
+        rule.onNodeWithTag(TAG_TASK_CANCEL).assertIsEnabled()
     }
 
     // ================= 3. cancelling 时禁用但保留文案 =================
@@ -124,10 +124,10 @@ class PackProgressBarTest {
     @Test
     fun `cancelling disables the button but keeps its label`() {
         show(TaskProgress(total = 5, done = 2), cancelling = true)
-        rule.onNodeWithTag(TAG_PACK_CANCEL).assertIsNotEnabled()
+        rule.onNodeWithTag(TAG_TASK_CANCEL).assertIsNotEnabled()
         // 按钮禁用 ≠ 按钮消失:文案必须还在,否则整行会重排(布局跳动)。
         // 走合并语义树取按钮自身的文本(TextButton 会 mergeDescendants)。
-        rule.onNodeWithTag(TAG_PACK_CANCEL)
+        rule.onNodeWithTag(TAG_TASK_CANCEL)
             .assertTextEquals(TestText.of(R.string.common_cancel))
     }
 
@@ -136,7 +136,7 @@ class PackProgressBarTest {
     fun `a disabled cancel button does not invoke the callback`() {
         var clicks = 0
         show(TaskProgress(total = 5, done = 2), cancelling = true, onCancel = { clicks++ })
-        rule.onNodeWithTag(TAG_PACK_CANCEL).performClick()
+        rule.onNodeWithTag(TAG_TASK_CANCEL).performClick()
         rule.waitForIdle()
         assertEquals(0, clicks, "已请求取消后不应再向上一层重复发信号")
     }
@@ -147,7 +147,7 @@ class PackProgressBarTest {
     fun `tapping cancel invokes the callback exactly once`() {
         var clicks = 0
         show(TaskProgress(total = 5, done = 2), onCancel = { clicks++ })
-        rule.onNodeWithTag(TAG_PACK_CANCEL).performClick()
+        rule.onNodeWithTag(TAG_TASK_CANCEL).performClick()
         rule.waitForIdle()
         assertEquals(1, clicks, "一次点击只能产生一次回调(0 与 2 都是缺陷)")
     }
@@ -161,9 +161,9 @@ class PackProgressBarTest {
     @Test
     fun `an empty task shows zero of zero instead of crashing`() {
         show(TaskProgress(total = 0))
-        rule.onNodeWithTag(TAG_PACK_PROGRESS).assertIsDisplayed()
+        rule.onNodeWithTag(TAG_TASK_PROGRESS).assertIsDisplayed()
         rule.onNodeWithText(countText(0, 0)).assertIsDisplayed()
-        rule.onNodeWithTag(TAG_PACK_CANCEL).assertIsEnabled()
+        rule.onNodeWithTag(TAG_TASK_CANCEL).assertIsEnabled()
     }
 
     /** 空任务在领域层已算"完成",但组件不据此隐藏按钮(见用例 2 的理由)。 */
@@ -171,7 +171,7 @@ class PackProgressBarTest {
     fun `an empty task still offers cancel just like any other state`() {
         var clicks = 0
         show(TaskProgress(total = 0), onCancel = { clicks++ })
-        rule.onNodeWithTag(TAG_PACK_CANCEL).performClick()
+        rule.onNodeWithTag(TAG_TASK_CANCEL).performClick()
         rule.waitForIdle()
         assertEquals(1, clicks)
     }
@@ -189,12 +189,12 @@ class PackProgressBarTest {
         rule.setContent {
             var progress by remember { mutableStateOf(TaskProgress(total = 5, done = 1)) }
             PixFoldTheme(darkTheme = false, dynamicColor = false) {
-                PackProgressBar(progress = progress, onCancel = { progress = progress.copy(done = 4) })
+                TaskProgressBar(progress = progress, onCancel = { progress = progress.copy(done = 4) })
             }
         }
         rule.onNodeWithText(countText(1, 5)).assertIsDisplayed()
 
-        rule.onNodeWithTag(TAG_PACK_CANCEL).performClick()
+        rule.onNodeWithTag(TAG_TASK_CANCEL).performClick()
         rule.waitForIdle()
 
         rule.onNodeWithText(countText(4, 5)).assertIsDisplayed()
