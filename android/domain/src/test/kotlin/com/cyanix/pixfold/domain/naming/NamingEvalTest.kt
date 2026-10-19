@@ -422,7 +422,7 @@ class NamingEvalTest {
 
     @Test
     fun `clear override drops just that one id`() {
-        // 「恢复建议值」按钮走的就是这条路径(ui/workflowa/NamingPage.kt 的 onResetOverride)。
+        // 「恢复建议值」按钮走的就是这条路径(ui/organize/NamingPage.kt 的 onResetOverride)。
         // 若它变成空操作,按钮点下去毫无反应 —— 用户只能靠手输改回建议值;
         // 若它清多了,用户给别的行手填的名字会被一起抹掉。
         val state = NamingState(

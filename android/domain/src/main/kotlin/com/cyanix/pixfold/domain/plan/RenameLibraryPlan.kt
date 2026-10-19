@@ -62,7 +62,7 @@ fun buildLibraryRenamePlan(
  * A 侧只有这一项危险动作 —— 与 B 侧的删除源目录/覆盖区分开,
  * 避免 UI 把"该工作流根本没有的动作"也列出来让用户确认。
  */
-fun workflowADangerActions(cleanEmptyDirs: Boolean): Set<DangerAction> =
+fun organizeDangerActions(cleanEmptyDirs: Boolean): Set<DangerAction> =
     if (cleanEmptyDirs) setOf(DangerAction.CleanEmptyDirs) else emptySet()
 
 /** 工作流 A 通用确认框要列出的影响范围(键 + 参数,见 `text/Msg.kt`)。 */

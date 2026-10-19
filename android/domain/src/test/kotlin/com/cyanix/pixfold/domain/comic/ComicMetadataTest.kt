@@ -550,7 +550,7 @@ class ComicMetadataTest {
     fun `empty series falls into the unnamed group keyed by the empty string`() {
         // 兜底组的键是**空串**而非「（未命名系列）」:分组键参与 testTag 与相等性判断,
         // 若把译文当键,切换语言就会把同一批卷"换"成另一个分组。
-        // 译文只在 UI 渲染时补上(见 ui/workflowb/LibraryPage.kt)。
+        // 译文只在 UI 渲染时补上(见 ui/library/LibraryPage.kt)。
         val renamed = replaceVolume(library.volumes, aot0.copy(series = ""))
         val groups = com.cyanix.pixfold.domain.model.groupVolumesBySeries(renamed)
         assertContains(groups.map { it.first }, "")

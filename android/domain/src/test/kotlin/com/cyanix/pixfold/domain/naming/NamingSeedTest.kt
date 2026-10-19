@@ -23,7 +23,7 @@ import kotlin.test.assertTrue
  *
  * ## 为什么单独抽一个函数
  *
- * 这个初值在 5 处被重复构造(`PixFoldApp` 两次 / `WorkflowASteps` 两次 / `NamingPage` 一次)。
+ * 这个初值在 5 处被重复构造(`PixFoldApp` 两次 / `OrganizeSteps` 两次 / `NamingPage` 一次)。
  * 分散构造意味着「哪一处忘了改」只有真机才看得出来 —— 抽成单一入口才能被单测钉住。
  */
 class NamingSeedTest {

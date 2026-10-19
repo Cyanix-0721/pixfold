@@ -24,8 +24,8 @@ import com.cyanix.pixfold.domain.task.PackTaskPhase
 import com.cyanix.pixfold.domain.task.PackTaskSnapshot
 import com.cyanix.pixfold.domain.task.TaskProgress
 import com.cyanix.pixfold.domain.task.shouldEmitProgress
-import com.cyanix.pixfold.ui.workflowb.PackUiOutcome
-import com.cyanix.pixfold.ui.workflowb.humanBytes
+import com.cyanix.pixfold.ui.library.PackUiOutcome
+import com.cyanix.pixfold.ui.library.humanBytes
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -205,7 +205,7 @@ class PackTaskService : Service() {
     /**
      * 预检拒绝的人话。
      *
-     * 不直接复用 `WorkflowBSteps.rejectionText`：那个函数额外带「请回步骤 2 改名字」
+     * 不直接复用 `LibrarySteps.rejectionText`：那个函数额外带「请回步骤 2 改名字」
      * 这类引导，通知里塞引导没用（用户点通知才看得到界面）。这里只给结论。
      */
     private fun rejectionMessageOf(outcome: PackUiOutcome.Rejected): String {

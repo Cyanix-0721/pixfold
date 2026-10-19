@@ -69,7 +69,7 @@ fun warnIcon(msg: Msg): Int? = WARN_ICONS[msg.key.resId()]
  *
  * 图标 `contentDescription = null`:警示语义在**正文里已经用文字说清**
  * (如"打包完成后源目录将被删除,且不可恢复"),图标只是视觉冗余;给了描述反而
- * 会让读屏把同一件事念两遍。这与 [com.cyanix.pixfold.ui.workflowa.SchemeEditor] /
+ * 会让读屏把同一件事念两遍。这与 [com.cyanix.pixfold.ui.organize.SchemeEditor] /
  * [com.cyanix.pixfold.ui.components.PinToggle] 的判法一致。
  *
  * @param textModifier 给 `Text` **自身**的修饰符。需要按文本断言的 testTag

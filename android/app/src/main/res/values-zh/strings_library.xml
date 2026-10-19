@@ -1,0 +1,116 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  工作流 B 页面文案(中文)。
+
+  ⚠️ 与默认文件 `values/strings_library.xml` 必须同步增删 —— 缺一边会让 lint 的
+  `MissingTranslation` / `ExtraTranslation` 在 `warningsAsErrors = true` 下硬失败。
+  `translatable="false"` 的条目在默认文件里,本文件不出现。
+
+  命名:`meta_*` = 步骤 2 元数据页、`pack_*` = 步骤 3 打包预览页、`lib_*` = 步骤 1 漫画库页、
+  `b_*` = 工作流 B 步骤容器。
+-->
+<resources
+    xmlns:tools="http://schemas.android.com/tools">
+
+    <!-- ============ 步骤容器(LibrarySteps) ============ -->
+    <string name="b_step_back">← 返回上一步</string>
+    <string name="b_step_back_cd">返回上一步</string>
+    <string name="b_step_label_library">漫画库</string>
+    <string name="b_step_label_metadata">元数据</string>
+    <string name="b_step_label_pack">打包</string>
+
+    <!-- ============ 步骤 2 · 元数据(MetadataPage) ============ -->
+    <!-- 建议值 + 来源的括号形态中英不同(中文全角「（）」/ 英文半角「(...)」),故整体成键。 -->
+    <string name="meta_suggestion_with_source">%1$s（%2$s）</string>
+    <string name="meta_suggestion_prefix">建议：%1$s</string>
+    <string name="meta_no_value">无</string>
+    <string name="meta_writer_clean">一键清理</string>
+    <string name="meta_writer_clean_cd">一键清理作者</string>
+    <string name="meta_writer_cleaned_hint">清理建议：%1$s（%2$s）</string>
+    <string name="meta_cbz_name_hint">它将命名为：%1$s</string>
+    <string name="meta_output_dir_hint">建议输出目录（%1$s）</string>
+    <plurals name="meta_batch_applied">
+        <item quantity="other">已设置到 %1$d 卷</item>
+    </plurals>
+    <plurals name="meta_batch_applied_skipped">
+        <item quantity="other">已设置到 %1$d 卷（跳过 %2$d 卷逐项例外）</item>
+    </plurals>
+    <string name="meta_volume_chip_cd">卷 %1$s</string>
+    <!-- 1 级「系列」芯片(2026-10-19 卷芯片改两级后新增):%1$s = 系列名,%2$d = 系列内卷数。 -->
+    <string name="meta_series_chip">%1$s（%2$d）</string>
+    <string name="meta_series_cd">系列 %1$s</string>
+        <string name="meta_include_cd">勾选卷 %1$s</string>
+    <plurals name="meta_volume_status">
+        <item quantity="other">参与打包 · %1$d 页 · 已覆盖 %2$d 个字段</item>
+    </plurals>
+    <string name="meta_output_conflict">输出冲突：输出目录已存在同名 CBZ（%1$s）</string>
+    <string name="meta_pending_prefix">待确认：</string>
+    <string name="meta_reset">恢复建议</string>
+    <string name="meta_reset_cd">恢复建议值 %1$s</string>
+    <string name="meta_lang_unset_error">语言默认未设置，需人工确认</string>
+    <string name="meta_lang_code_label" tools:ignore="TypographyDashes">ISO 639-1 代码</string>
+    <string name="meta_batch_title">批量设置（跳过已人工修改的字段）</string>
+    <string name="meta_batch_field_cd">批量设置字段 %1$s</string>
+    <string name="meta_batch_value_label">批量值</string>
+    <string name="meta_batch_apply">应用</string>
+    <string name="meta_batch_apply_cd">应用批量设置</string>
+    <string name="meta_batch_force_on">强制覆盖逐项例外</string>
+    <string name="meta_batch_force_off">尊重逐项例外</string>
+    <string name="meta_batch_force_cd">强制覆盖逐项例外</string>
+    <string name="meta_next">下一步 打包计划</string>
+    <string name="meta_next_cd">下一步 打包计划</string>
+
+    <!-- ============ 步骤 1 · 漫画库(LibraryPage) ============ -->
+    <string name="lib_root">漫画库：%1$s</string>
+    <plurals name="lib_summary">
+        <item quantity="other">识别到 %1$d 个系列 / %2$d 卷 · 已勾选 %3$d 卷 · 待确认 %4$d 卷</item>
+    </plurals>
+    <plurals name="lib_series_volume_count">
+        <item quantity="other">%1$d 卷</item>
+    </plurals>
+    <string name="lib_series_pending">%1$d 卷待确认</string>
+    <string name="lib_volume_cd">卷 %1$s%2$s</string>
+    <string name="lib_volume_cd_selected">（当前选中）</string>
+    <string name="lib_include_cd">勾选卷 %1$s</string>
+    <string name="lib_volume_current">\u0020· 当前</string>
+    <plurals name="lib_volume_suggestion">
+        <item quantity="other">%1$d 页 · 建议 Title「%2$s」（%3$s）</item>
+    </plurals>
+    <string name="lib_issue_separator">\u0020/\u0020</string>
+    <string name="lib_output_conflict">输出冲突</string>
+    <string name="lib_next">下一步 编辑元数据</string>
+    <string name="lib_next_cd">下一步 编辑元数据</string>
+
+    <!-- ============ 步骤 3 · 打包预览(PackPreviewPage) ============ -->
+    <string name="pack_volume_chip_cd">预览卷 %1$s</string>
+    <string name="pack_volume_excluded">%1$s（未勾选）</string>
+    <string name="pack_xml_title">ComicInfo.xml 预览</string>
+    <plurals name="pack_page_header">
+        <item quantity="other">页码预览（按当前页序重编号，共 %1$d 项）</item>
+    </plurals>
+    <string name="pack_page_hint">（序号从 001 起，扩展名统一小写；标「人工调整」的页被拖拽过）</string>
+    <string name="pack_page_issues">页码与页序不一致：%1$s</string>
+    <string name="pack_page_issue_separator">；</string>
+    <string name="pack_page_manual">人工调整</string>
+    <string name="pack_plan_title">执行计划</string>
+    <string name="pack_conflict_policy_title">输出冲突策略</string>
+    <string name="pack_source_policy_title">源目录处置</string>
+    <string name="pack_clean_empty_on">清理空目录：开（危险）</string>
+    <string name="pack_clean_empty_off">清理空目录：关（默认）</string>
+    <string name="pack_delete_warning">已选择删除源目录：执行前需独立二次确认</string>
+    <string name="pack_confirm">确认打包</string>
+    <string name="pack_confirm_cd">确认打包</string>
+    <string name="pack_output">输出：%1$s</string>
+    <string name="pack_output_exists">（已存在同名文件）</string>
+    <string name="pack_language_iso">LanguageISO：%1$s</string>
+    <string name="pack_excluded_warning">本卷未勾选，本次不会打包（在步骤 1 或步骤 2 的卷头可重新勾选）</string>
+    <plurals name="pack_included_count">
+        <item quantity="other">本次将打包 %1$d / %2$d 卷</item>
+    </plurals>
+    <string name="pack_included_count_hint">（未勾选的卷不会打包）</string>
+    <string name="pack_lang_other_empty">（未填代码，不写入）</string>
+    <string name="pack_lang_unset">不写入（语言未确认）</string>
+    <string name="pack_lang_unknown">不写入（未知）</string>
+    <string name="pack_lang_skip">不写入</string>
+
+</resources>

@@ -34,11 +34,11 @@ data object LicensesRoute
 
 /** 工作流 A:图片整理与命名。 */
 @Serializable
-data object WorkflowARoute
+data object OrganizeRoute
 
 /** 工作流 B:CBZ 制作。 */
 @Serializable
-data object WorkflowBRoute
+data object LibraryRoute
 
 /**
  * 图片预览。
@@ -54,26 +54,26 @@ data class PreviewRoute(val index: Int)
 
 /** 工作流 A · 步骤1 排序与预览。 */
 @Serializable
-data object WorkflowASortRoute
+data object OrganizeSortRoute
 
 /** 工作流 A · 步骤2 命名结构。 */
 @Serializable
-data object WorkflowANamingRoute
+data object OrganizeNamingRoute
 
 /** 工作流 A · 步骤3 执行计划。 */
 @Serializable
-data object WorkflowAPlanRoute
+data object OrganizePlanRoute
 
 // ------------------------------------------------- 工作流 B 的步骤(嵌套导航图,3 个目的地)
 
 /** 工作流 B · 步骤1 漫画库。 */
 @Serializable
-data object WorkflowBLibraryRoute
+data object LibraryShelfRoute
 
 /** 工作流 B · 步骤2 元数据。 */
 @Serializable
-data object WorkflowBMetadataRoute
+data object LibraryMetadataRoute
 
 /** 工作流 B · 步骤3 打包计划。 */
 @Serializable
-data object WorkflowBPackRoute
+data object LibraryPackRoute

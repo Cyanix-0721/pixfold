@@ -9,7 +9,7 @@ import com.cyanix.pixfold.domain.naming.OpStatus
 import com.cyanix.pixfold.domain.naming.RenameOp
 import com.cyanix.pixfold.domain.text.Msg
 import com.cyanix.pixfold.domain.text.TextKey
-import com.cyanix.pixfold.domain.workflowa.workflowAStateOf
+import com.cyanix.pixfold.domain.organize.organizeStateOf
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -21,7 +21,7 @@ import kotlin.test.assertTrue
  *
  * **为什么需要它**:在此之前,"一份计划有多少项、跳过几项""这次会触发哪些危险动作"
  * 有**两套互不相干的实现** —— 打包侧走 `planCountsOf` / `effectiveDangerActions(plans, …)`,
- * 改名侧走 `LibraryRenamePlan.counts` / `workflowADangerActions(clean)`。同一件事两处算,
+ * 改名侧走 `LibraryRenamePlan.counts` / `organizeDangerActions(clean)`。同一件事两处算,
  * 迟早漂移。本文件钉死统一后的词汇,并**交叉核对**它与既有两条实现给出相同结果 ——
  * 等价是这一步唯一可接受的验收标准(既有公开契约与可观测行为逐字不变)。
  */
@@ -33,7 +33,7 @@ class OperationPlanTest {
     private val op102 = volumes.first { it.id == "op-102" }
 
     private val collections = MockData.workspaceA.collections
-    private val orders = workflowAStateOf(collections).orders
+    private val orders = organizeStateOf(collections).orders
     private val naming = NamingState(NamingScheme(rootDirName = "任意"))
 
     // ---- 种类与计数 ----
@@ -140,7 +140,7 @@ class OperationPlanTest {
     fun `rename danger actions agree with the existing derivation`() {
         listOf(false, true).forEach { clean ->
             assertEquals(
-                workflowADangerActions(clean),
+                organizeDangerActions(clean),
                 operationPlanOfRenames(emptyList(), clean).dangerActions,
             )
         }

@@ -42,7 +42,7 @@ class HomeScreenTest {
     @Test
     fun `clicking workflow A entry invokes callback`() {
         var clicked = 0
-        rule.setContent { HomeScreen(onOpenWorkflowA = { clicked++ }, onOpenWorkflowB = {}) }
+        rule.setContent { HomeScreen(onOpenOrganize = { clicked++ }, onOpenLibrary = {}) }
         rule.onNodeWithText(TestText.of(R.string.home_workflow_a)).performClick()
         assertEquals(1, clicked)
     }
@@ -50,7 +50,7 @@ class HomeScreenTest {
     @Test
     fun `clicking workflow B entry invokes callback`() {
         var clicked = 0
-        rule.setContent { HomeScreen(onOpenWorkflowA = {}, onOpenWorkflowB = { clicked++ }) }
+        rule.setContent { HomeScreen(onOpenOrganize = {}, onOpenLibrary = { clicked++ }) }
         rule.onNodeWithText(TestText.of(R.string.home_workflow_b)).performClick()
         assertEquals(1, clicked)
     }
@@ -68,8 +68,8 @@ class HomeScreenTest {
         val paddingDp = 16
         rule.setContent {
             HomeScreen(
-                onOpenWorkflowA = {},
-                onOpenWorkflowB = {},
+                onOpenOrganize = {},
+                onOpenLibrary = {},
                 contentInsets = WindowInsets(top = insetDp.dp),
             )
         }

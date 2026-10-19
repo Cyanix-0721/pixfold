@@ -11,7 +11,7 @@ import com.cyanix.pixfold.domain.naming.derivedNamesOf
  * 没有系列概念,两字段取默认空串 ⇒ 每个集合自身就是一个 1 级条目。
  *
  * 为什么不把系列做成嵌套结构:集合是**唯一**被排序/命名/打包消费的单位,
- * 系列只是芯片行的分组视图。把系列做成外层容器会让 `WorkflowAState.orders`
+ * 系列只是芯片行的分组视图。把系列做成外层容器会让 `OrganizeState.orders`
  * 这类按集合 id 索引的状态全部要改索引口径,得不偿失。
  *
  * ## [name] 与 [derived] 的分工(2026-10-19 统一抽象)

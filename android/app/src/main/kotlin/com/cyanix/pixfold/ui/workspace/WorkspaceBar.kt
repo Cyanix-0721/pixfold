@@ -33,8 +33,8 @@ const val TAG_WORKSPACE_ACTION = "workspace-action"
  * 应用内选目录 → **工作流内部**；外部分享 → Activity 级入口；恢复上次授权 → 首页**从属层**。
  * 理由原文是「Workspace 是**范围**，两个工作流是**任务**，层级不同」，摆成三张等权卡会误导用户。
  *
- * 所以这里**不是**第 4 个步骤页签（那会打破 3 步线性流程，并牵动 `workflowAStepIndex()` /
- * `goToWorkflowAStep()` / `popWorkflowStep()` 与 ~30 条导航测试）；它是一行**从属信息**，
+ * 所以这里**不是**第 4 个步骤页签（那会打破 3 步线性流程，并牵动 `organizeStepIndex()` /
+ * `goToOrganizeStep()` / `popWorkflowStep()` 与 ~30 条导航测试）；它是一行**从属信息**，
  * 和页签行同属容器层，不参与步骤推进。
  *
  * ## 状态到文案的映射

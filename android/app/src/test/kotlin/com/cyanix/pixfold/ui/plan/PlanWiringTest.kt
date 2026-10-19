@@ -13,23 +13,23 @@ import com.cyanix.pixfold.domain.mock.MockData
 import com.cyanix.pixfold.domain.mock.MockDataB
 import com.cyanix.pixfold.domain.plan.OutputConflictPolicy
 import com.cyanix.pixfold.domain.plan.SourcePolicy
-import com.cyanix.pixfold.ui.workflowa.TAG_A_PLAN_CLEAN_TOGGLE
-import com.cyanix.pixfold.ui.workflowa.TAG_A_PLAN_CONFIRM
-import com.cyanix.pixfold.ui.workflowa.TAG_A_PLAN_PAGE
-import com.cyanix.pixfold.ui.workflowa.TAG_NEXT_STEP
-import com.cyanix.pixfold.ui.workflowa.TAG_STEP_NAMING
-import com.cyanix.pixfold.ui.workflowa.TAG_STEP_PLAN
-import com.cyanix.pixfold.ui.workflowa.TAG_STEP_SORT
-import com.cyanix.pixfold.ui.workflowa.TAG_STEP_BACK
-import com.cyanix.pixfold.ui.workflowa.TAG_TO_PLAN
-import com.cyanix.pixfold.ui.workflowa.WorkflowASteps
-import com.cyanix.pixfold.ui.workflowb.TAG_B_STEP_BACK
-import com.cyanix.pixfold.ui.workflowb.TAG_B_STEP_PACK
-import com.cyanix.pixfold.ui.workflowb.TAG_CLEAN_EMPTY_TOGGLE
-import com.cyanix.pixfold.ui.workflowb.TAG_DELETE_WARNING
-import com.cyanix.pixfold.ui.workflowb.TAG_LIBRARY_NEXT
-import com.cyanix.pixfold.ui.workflowb.TAG_METADATA_NEXT
-import com.cyanix.pixfold.ui.workflowb.WorkflowBSteps
+import com.cyanix.pixfold.ui.organize.TAG_A_PLAN_CLEAN_TOGGLE
+import com.cyanix.pixfold.ui.organize.TAG_A_PLAN_CONFIRM
+import com.cyanix.pixfold.ui.organize.TAG_A_PLAN_PAGE
+import com.cyanix.pixfold.ui.organize.TAG_NEXT_STEP
+import com.cyanix.pixfold.ui.organize.TAG_STEP_NAMING
+import com.cyanix.pixfold.ui.organize.TAG_STEP_PLAN
+import com.cyanix.pixfold.ui.organize.TAG_STEP_SORT
+import com.cyanix.pixfold.ui.organize.TAG_STEP_BACK
+import com.cyanix.pixfold.ui.organize.TAG_TO_PLAN
+import com.cyanix.pixfold.ui.organize.OrganizeSteps
+import com.cyanix.pixfold.ui.library.TAG_B_STEP_BACK
+import com.cyanix.pixfold.ui.library.TAG_B_STEP_PACK
+import com.cyanix.pixfold.ui.library.TAG_CLEAN_EMPTY_TOGGLE
+import com.cyanix.pixfold.ui.library.TAG_DELETE_WARNING
+import com.cyanix.pixfold.ui.library.TAG_LIBRARY_NEXT
+import com.cyanix.pixfold.ui.library.TAG_METADATA_NEXT
+import com.cyanix.pixfold.ui.library.LibrarySteps
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -53,9 +53,9 @@ class PlanWiringTest {
 
     // ================= 工作流 A =================
 
-    private fun openWorkflowAPlanStep() {
+    private fun openOrganizePlanStep() {
         val collections = MockData.workspaceA.collections
-        rule.setContent { WorkflowASteps(collections = collections) }
+        rule.setContent { OrganizeSteps(collections = collections) }
         rule.onNodeWithTag(TAG_STEP_NAMING).performClick()
         rule.onNodeWithTag(TAG_TO_PLAN).performClick()
     }
@@ -74,7 +74,7 @@ class PlanWiringTest {
 
     @Test
     fun `workflow A has a third step that opens the plan page`() {
-        openWorkflowAPlanStep()
+        openOrganizePlanStep()
         rule.onNodeWithTag(TAG_A_PLAN_PAGE).assertIsDisplayed()
         // 确认按钮常驻底栏:计划有 56 行,但按钮不滚也该可见
         rule.onNodeWithTag(TAG_A_PLAN_CONFIRM).assertIsDisplayed()
@@ -89,7 +89,7 @@ class PlanWiringTest {
     @Test
     @Config(sdk = [36], qualifiers = "w361dp-h794dp-560dpi")
     fun `workflow A confirm stays visible on the device viewport`() {
-        openWorkflowAPlanStep()
+        openOrganizePlanStep()
         // 视口自检:Qualifiers 写错时直接失败,而不是悄悄换一个宽松视口
         val rootHeightDp =
             (rule.onRoot().getBoundsInRoot().bottom - rule.onRoot().getBoundsInRoot().top).value
@@ -99,7 +99,7 @@ class PlanWiringTest {
 
     @Test
     fun `workflow A plan lists every collection not just the active one`() {
-        openWorkflowAPlanStep()
+        openOrganizePlanStep()
         // 计划行数 = 全部集合的图片总数(trip 30 + scan 14 + misc 12 + cn 16 = 72);
         // 输入打乱且中阿混排的 cn 集合后,该总数不再只靠阿拉伯数字样本支撑。
         val total = MockData.workspaceA.collections.sumOf { it.images.size }
@@ -110,7 +110,7 @@ class PlanWiringTest {
 
     @Test
     fun `workflow A safe rename needs exactly one confirmation`() {
-        openWorkflowAPlanStep()
+        openOrganizePlanStep()
         clickAPlanConfirm()
         rule.onNodeWithTag(TAG_CONFIRM_GENERAL).assertIsDisplayed()
         // 未勾选清理空目录 -> 不应出现危险确认
@@ -119,7 +119,7 @@ class PlanWiringTest {
 
     @Test
     fun `workflow A clean empty dirs requires the independent second confirmation then reports`() {
-        openWorkflowAPlanStep()
+        openOrganizePlanStep()
 
         // 打开危险动作(默认关闭 -> 打开)
         rule.onNodeWithTag(TAG_A_PLAN_CLEAN_TOGGLE).performClick()
@@ -139,7 +139,7 @@ class PlanWiringTest {
 
     @Test
     fun `workflow A report exposes the undo entry`() {
-        openWorkflowAPlanStep()
+        openOrganizePlanStep()
         clickAPlanConfirm()
         rule.onNodeWithTag(TAG_CONFIRM_OK).performClick()
         rule.onNodeWithTag(TAG_REPORT_PAGE).assertIsDisplayed()
@@ -149,9 +149,9 @@ class PlanWiringTest {
 
     // ================= 工作流 B =================
 
-    private fun openWorkflowBPackStep() {
+    private fun openLibraryPackStep() {
         val lib = MockDataB.library
-        rule.setContent { WorkflowBSteps(rootPath = lib.rootPath, volumes = lib.volumes) }
+        rule.setContent { LibrarySteps(rootPath = lib.rootPath, volumes = lib.volumes) }
         rule.onNodeWithTag(TAG_B_STEP_PACK).performClick()
     }
 
@@ -165,7 +165,7 @@ class PlanWiringTest {
     @Config(sdk = [36], qualifiers = "w361dp-h794dp-560dpi")
     fun `workflow B next and confirm stay visible on the device viewport`() {
         val lib = MockDataB.library
-        rule.setContent { WorkflowBSteps(rootPath = lib.rootPath, volumes = lib.volumes) }
+        rule.setContent { LibrarySteps(rootPath = lib.rootPath, volumes = lib.volumes) }
 
         // 库步骤:下一步常驻底栏(卷多时不必滚到底)
         rule.onNodeWithTag(TAG_LIBRARY_NEXT).assertIsDisplayed()
@@ -179,14 +179,14 @@ class PlanWiringTest {
 
     @Test
     fun `workflow B pack step shows the plan section not just the preview`() {
-        openWorkflowBPackStep()
+        openLibraryPackStep()
         rule.onNodeWithTag(TAG_PLAN_SUMMARY).assertExists()
         rule.onNodeWithTag(TAG_PLAN_CONFIRM).assertIsDisplayed()
     }
 
     @Test
     fun `workflow B default policy requires only the general confirmation`() {
-        openWorkflowBPackStep()
+        openLibraryPackStep()
         clickBPackConfirm()
         rule.onNodeWithTag(TAG_CONFIRM_GENERAL).assertIsDisplayed()
         rule.onNodeWithTag(TAG_CONFIRM_DANGER).assertDoesNotExist()
@@ -194,7 +194,7 @@ class PlanWiringTest {
 
     @Test
     fun `workflow B delete source policy needs two confirmations and then reports`() {
-        openWorkflowBPackStep()
+        openLibraryPackStep()
 
         // 选择"打包后删除源目录"(危险动作)
         rule.onNodeWithTag("policy-source-" + SourcePolicy.Delete.name).performClick()
@@ -221,7 +221,7 @@ class PlanWiringTest {
 
     @Test
     fun `workflow B overwrite policy triggers a danger confirmation only because a conflict exists`() {
-        openWorkflowBPackStep()
+        openLibraryPackStep()
         // mock 里 op-102 的 outputExists = true
         rule.onNodeWithTag("policy-conflict-" + OutputConflictPolicy.Overwrite.name).performClick()
         clickBPackConfirm()
@@ -232,7 +232,7 @@ class PlanWiringTest {
 
     @Test
     fun `workflow B skip policy marks the conflicting volume as skipped in the plan`() {
-        openWorkflowBPackStep()
+        openLibraryPackStep()
         rule.onNodeWithTag("policy-conflict-" + OutputConflictPolicy.Skip.name).performClick()
         // 计划头部应体现"将执行 4 卷 · 跳过 1 卷"
         rule.onNodeWithTag(TAG_PLAN_SUMMARY).assertExists()
@@ -242,7 +242,7 @@ class PlanWiringTest {
      * **端到端**:Overwrite 策略 → 两次确认 → 报告页 → 点撤销 → 弹出范围警告。
      *
      * 前面那些用例各自只守一段(策略选择触发危险确认、报告页会弹范围框),
-     * 这条把整条**真实生产路径**串起来:`WorkflowBSteps` 里选的 `conflictPolicy`
+     * 这条把整条**真实生产路径**串起来:`LibrarySteps` 里选的 `conflictPolicy`
      * 必须真的变成报告里的「覆盖痕迹」,否则界面永远不会警告 ——
      * 而领域层的单测照样全绿(它们直接构造计划,不经过界面选策略那一步)。
      *
@@ -251,7 +251,7 @@ class PlanWiringTest {
      */
     @Test
     fun `workflow B overwrite run warns about undo scope end to end`() {
-        openWorkflowBPackStep()
+        openLibraryPackStep()
         rule.onNodeWithTag("policy-conflict-" + OutputConflictPolicy.Overwrite.name).performClick()
         clickBPackConfirm()
         rule.onNodeWithTag(TAG_CONFIRM_OK).performClick()
@@ -273,7 +273,7 @@ class PlanWiringTest {
     /** 反向守卫:默认 Rename 策略下没有任何覆盖 ⇒ 点撤销**直接执行**,不弹框。 */
     @Test
     fun `workflow B default run undoes without a scope warning`() {
-        openWorkflowBPackStep()
+        openLibraryPackStep()
         clickBPackConfirm()
         rule.onNodeWithTag(TAG_CONFIRM_OK).performClick()
 
@@ -286,7 +286,7 @@ class PlanWiringTest {
 
     @Test
     fun `workflow B clean empty toggle is off by default and adds a danger step when on`() {
-        openWorkflowBPackStep()
+        openLibraryPackStep()
         rule.onNodeWithTag(TAG_CLEAN_EMPTY_TOGGLE).performClick()
         clickBPackConfirm()
         rule.onNodeWithTag(TAG_CONFIRM_OK).performClick()
@@ -307,7 +307,7 @@ class PlanWiringTest {
     @Config(sdk = [36], qualifiers = "w361dp-h794dp-560dpi")
     fun `workflow B bottom bar puts back on the left and next on the right`() {
         val lib = MockDataB.library
-        rule.setContent { WorkflowBSteps(rootPath = lib.rootPath, volumes = lib.volumes) }
+        rule.setContent { LibrarySteps(rootPath = lib.rootPath, volumes = lib.volumes) }
 
         rule.onNodeWithTag(TAG_LIBRARY_NEXT).performClick() // 进入步骤 2:两个按钮同时在
 
@@ -333,7 +333,7 @@ class PlanWiringTest {
     @Config(sdk = [36], qualifiers = "w361dp-h794dp-560dpi")
     fun `workflow A naming step bottom bar puts back on the left and next on the right`() {
         val collections = MockData.workspaceA.collections
-        rule.setContent { WorkflowASteps(collections = collections) }
+        rule.setContent { OrganizeSteps(collections = collections) }
         rule.onNodeWithTag(TAG_STEP_NAMING).performClick()
 
         val back = rule.onNodeWithTag(TAG_STEP_BACK).getBoundsInRoot()
@@ -349,7 +349,7 @@ class PlanWiringTest {
     @Test
     @Config(sdk = [36], qualifiers = "w361dp-h794dp-560dpi")
     fun `report bottom bar puts undo on the left and done on the right`() {
-        openWorkflowAPlanStep()
+        openOrganizePlanStep()
         clickAPlanConfirm()
         rule.onNodeWithTag(TAG_CONFIRM_OK).performClick()
         rule.onNodeWithTag(TAG_REPORT_PAGE).assertIsDisplayed()
@@ -374,7 +374,7 @@ class PlanWiringTest {
     @Config(sdk = [36], qualifiers = "w361dp-h794dp-560dpi")
     fun `workflow A step 1 next sits in the bottom bar and advances`() {
         val collections = MockData.workspaceA.collections
-        rule.setContent { WorkflowASteps(collections = collections) }
+        rule.setContent { OrganizeSteps(collections = collections) }
 
         val next = rule.onNodeWithTag(TAG_NEXT_STEP).getBoundsInRoot()
         val rootWidth = rule.onRoot().getBoundsInRoot().right

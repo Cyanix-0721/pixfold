@@ -9,7 +9,7 @@ import kotlin.test.assertTrue
  * 列数算式与选项拼装的**纯 JVM 单测**(无需 Robolectric)。
  *
  * 为什么值得单独一层:[adaptiveColumnCount] 是"自适应默认列数"这条用户诉求的
- * 唯一事实来源 —— 设置页预览、排序页默认值、以及 [com.cyanix.pixfold.ui.workflowa.SortPagePolishTest]
+ * 唯一事实来源 —— 设置页预览、排序页默认值、以及 [com.cyanix.pixfold.ui.organize.SortPagePolishTest]
  * 里那些走真实布局的断言,全都以它为准。把它压到纯函数层,就不必为了改一个常量
  * 去跑整套 Robolectric 页面测试。
  *

@@ -9,7 +9,7 @@ import com.cyanix.pixfold.domain.naming.OpStatus
 import com.cyanix.pixfold.domain.naming.RenameOp
 import com.cyanix.pixfold.domain.text.Msg
 import com.cyanix.pixfold.domain.text.TextKey
-import com.cyanix.pixfold.domain.workflowa.workflowAStateOf
+import com.cyanix.pixfold.domain.organize.organizeStateOf
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -45,7 +45,7 @@ class UndoAlignmentTest {
     private val op102 = library.volumes.first { it.id == "op-102" }
 
     private val collections = MockData.workspaceA.collections
-    private val orders = workflowAStateOf(collections).orders
+    private val orders = organizeStateOf(collections).orders
     private val naming = NamingState(NamingScheme(rootDirName = "任意"))
 
     private fun renameOp(

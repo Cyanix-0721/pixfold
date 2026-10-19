@@ -18,7 +18,7 @@ import com.cyanix.pixfold.domain.model.NamingScheme
  *
  * ## 为什么收成一个函数
  *
- * 这个初值曾在 **5 处**被就地构造(`PixFoldApp` 两次 / `WorkflowASteps` 两次 /
+ * 这个初值曾在 **5 处**被就地构造(`PixFoldApp` 两次 / `OrganizeSteps` 两次 /
  * `NamingPage` 一次)。分散构造意味着「哪一处忘了改」只有真机上才看得出来;
  * 收成单一入口才能被 `NamingSeedTest` 一次钉住。
  *

@@ -43,7 +43,7 @@
         1. 用 `BackHandler`(androidx.activity)处理返回,而不是重写 onBackPressed ——
            前者注册到 OnBackInvokedDispatcher,系统才能在**手势进行中**查询
            "返回会去哪"并播放预览动画;
-        2. 各层级都要有返回去处(见 PixFoldApp / WorkflowASteps),
+        2. 各层级都要有返回去处(见 PixFoldApp / OrganizeSteps),
            否则系统在根级直接执行"退出应用"。
       真机实测(2026-09-18):未处理返回时,在"步骤2 命名结构"按返回会**直接退出应用**。
 

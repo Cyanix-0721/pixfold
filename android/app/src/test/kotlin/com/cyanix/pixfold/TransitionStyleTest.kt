@@ -16,9 +16,9 @@ import com.cyanix.pixfold.domain.settings.InMemorySettingsStore
 import com.cyanix.pixfold.domain.settings.PixFoldSettings
 import com.cyanix.pixfold.ui.TAG_SETTINGS_BUTTON
 import com.cyanix.pixfold.ui.settings.TAG_SETTINGS_PAGE
-import com.cyanix.pixfold.ui.workflowa.TAG_STEP_BACK
-import com.cyanix.pixfold.ui.workflowa.TAG_STEP_NAMING
-import com.cyanix.pixfold.ui.workflowa.TAG_STEP_TABS
+import com.cyanix.pixfold.ui.organize.TAG_STEP_BACK
+import com.cyanix.pixfold.ui.organize.TAG_STEP_NAMING
+import com.cyanix.pixfold.ui.organize.TAG_STEP_TABS
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith

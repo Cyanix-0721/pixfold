@@ -23,14 +23,14 @@ import com.cyanix.pixfold.ui.preview.TAG_PREVIEW_RENAME
 import com.cyanix.pixfold.ui.preview.TAG_PREVIEW_RENAME_FIELD
 import com.cyanix.pixfold.ui.preview.TAG_PREVIEW_RENAME_SAVE
 import com.cyanix.pixfold.ui.preview.TAG_PREVIEW_RENAMED
-import com.cyanix.pixfold.ui.workflowa.TAG_GRID
-import com.cyanix.pixfold.ui.workflowa.TAG_NEXT_STEP
-import com.cyanix.pixfold.ui.workflowa.TAG_PROPOSAL_LIST
-import com.cyanix.pixfold.ui.workflowa.TAG_STEP_BACK
-import com.cyanix.pixfold.ui.workflowa.collectionTag
-import com.cyanix.pixfold.ui.workflowa.proposalFieldTag
-import com.cyanix.pixfold.ui.workflowb.TAG_LIBRARY_PAGE
-import com.cyanix.pixfold.ui.workflowb.volumeCardTag
+import com.cyanix.pixfold.ui.organize.TAG_GRID
+import com.cyanix.pixfold.ui.organize.TAG_NEXT_STEP
+import com.cyanix.pixfold.ui.organize.TAG_PROPOSAL_LIST
+import com.cyanix.pixfold.ui.organize.TAG_STEP_BACK
+import com.cyanix.pixfold.ui.organize.collectionTag
+import com.cyanix.pixfold.ui.organize.proposalFieldTag
+import com.cyanix.pixfold.ui.library.TAG_LIBRARY_PAGE
+import com.cyanix.pixfold.ui.library.volumeCardTag
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -126,7 +126,7 @@ class AppNavigationTest {
         rule.onAllNodesWithTag(TAG_GRID_CARD)[0].performClick()
 
         // 总数即"跟随的是哪个集合",与页序无关:cn 有 16 张、首个集合 trip 有 30 张。
-        // 缺陷:`WorkflowASteps` 的 `onActiveCollectionChange` 参数从未被转发给根层,
+        // 缺陷:`OrganizeSteps` 的 `onActiveCollectionChange` 参数从未被转发给根层,
         // 故根层的 activeCollectionId 永远停在 trip。
         rule.onNodeWithTag(TAG_PREVIEW_PAGE_LABEL)
             .assertTextEquals(TestText.of(R.string.preview_page_label, 1, 16))
@@ -167,13 +167,13 @@ class AppNavigationTest {
 
     // ============ 命名页的编辑必须上报到应用根(状态提升的守卫) ============
     //
-    // 这条是**变异存活后补的**:把 `WorkflowASteps` 命名步骤的
+    // 这条是**变异存活后补的**:把 `OrganizeSteps` 命名步骤的
     // `onStateChange = { updateNamingState(it) }` 改成只写本地的
     // `{ namingState = it }`,上面那条端到端改名测试**依然全绿** —— 因为
     // `NamingPage` 自己就持有本地 `state`,单页内看不出漏上报。
     //
-    // 要暴露它必须让 `WorkflowASteps` **整个离开组合再重建**,使本地状态归零:
-    // 预览是根导航的兄弟目的地,点开预览时 `WorkflowARoute` 目的地被销毁,
+    // 要暴露它必须让 `OrganizeSteps` **整个离开组合再重建**,使本地状态归零:
+    // 预览是根导航的兄弟目的地,点开预览时 `OrganizeRoute` 目的地被销毁,
     // 回来是全新实例,只能从应用根拿 `initialNamingState`。
     // 漏上报时根里仍是旧值,重建后命名页就会退回建议名。
     @Test

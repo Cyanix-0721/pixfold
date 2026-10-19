@@ -14,11 +14,11 @@ import androidx.compose.ui.test.performClick
 import com.cyanix.pixfold.domain.settings.InMemorySettingsStore
 import com.cyanix.pixfold.domain.settings.PixFoldSettings
 import com.cyanix.pixfold.ui.components.TAG_GRID_CARD
-import com.cyanix.pixfold.ui.workflowa.TAG_STEP_BACK
-import com.cyanix.pixfold.ui.workflowa.TAG_STEP_NAMING
-import com.cyanix.pixfold.ui.workflowb.TAG_B_STEP_PACK
-import com.cyanix.pixfold.ui.workflowb.TAG_METADATA_PAGE
-import com.cyanix.pixfold.ui.workflowb.TAG_PACK_PAGE
+import com.cyanix.pixfold.ui.organize.TAG_STEP_BACK
+import com.cyanix.pixfold.ui.organize.TAG_STEP_NAMING
+import com.cyanix.pixfold.ui.library.TAG_B_STEP_PACK
+import com.cyanix.pixfold.ui.library.TAG_METADATA_PAGE
+import com.cyanix.pixfold.ui.library.TAG_PACK_PAGE
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith

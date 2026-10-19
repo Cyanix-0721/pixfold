@@ -18,7 +18,7 @@ import kotlin.test.assertTrue
  * 三角形警示图标(`ic_warning_triangle`)的**真实可绘制性**守护
  * (2026-10-05 用户要求把 `⚠️` emoji 换成矢量图后补)。
  *
- * 与 [com.cyanix.pixfold.ui.workflowa.ExclamationIconRenderTest] 同一教训:
+ * 与 [com.cyanix.pixfold.ui.organize.ExclamationIconRenderTest] 同一教训:
  * 语义层断言「节点存在」**不等于**「图标看得见」,更不等于「图标长得对」。
  * 矢量资源的以下两类错误都能骗过语义测试:
  *  1. 图形被画到画布外(负坐标 / `viewportWidth` 不符)-> **零像素**;

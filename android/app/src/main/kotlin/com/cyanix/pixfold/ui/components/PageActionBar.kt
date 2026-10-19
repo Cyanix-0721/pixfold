@@ -24,8 +24,8 @@ const val TAG_PAGE_ACTION_BAR = "page-action-bar"
  * A 侧整库计划有 56 行,用户要连滑 **8–12 次**才够得到「确认执行」;而且 `LazyColumn`
  * 只组合可见项 —— 按钮在滚到之前**根本没被组合**,连测试点击都得先 `performScrollToNode`。
  *
- * **为什么不是靠顶部 Tab 解决**:Tab 行在嵌套 `NavHost` **之外**(见 `WorkflowASteps` /
- * `WorkflowBSteps` 里挂 `Modifier.weight(1f)` 的那层),滚动任何列表都不会把它移出视口。
+ * **为什么不是靠顶部 Tab 解决**:Tab 行在嵌套 `NavHost` **之外**(见 `OrganizeSteps` /
+ * `LibrarySteps` 里挂 `Modifier.weight(1f)` 的那层),滚动任何列表都不会把它移出视口。
  * 但 Tab 解决的是「切换目的地」,而这里的动作是**不可逆操作**(确认执行会真的改文件名),
  * Tab 里没有对应项;`下一步` 则是向导式推进,与 Tab 的平级视图索引语义不同。
  *

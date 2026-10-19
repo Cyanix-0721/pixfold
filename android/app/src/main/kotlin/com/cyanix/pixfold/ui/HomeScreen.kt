@@ -51,8 +51,8 @@ import com.cyanix.pixfold.R
  */
 @Composable
 fun HomeScreen(
-    onOpenWorkflowA: () -> Unit,
-    onOpenWorkflowB: () -> Unit,
+    onOpenOrganize: () -> Unit,
+    onOpenLibrary: () -> Unit,
     // Modifier 必须是**第一个可选参数**(Compose 约定,lint ModifierParameter 强制)。
     modifier: Modifier = Modifier,
     onOpenSettings: () -> Unit = {},
@@ -60,10 +60,10 @@ fun HomeScreen(
 ) {
     // `stringResource` 不能在 `semantics {}` 里调用(那不是 @Composable lambda),须先取出。
     val settingsCd = stringResource(R.string.home_settings_cd)
-    val workflowATitle = stringResource(R.string.home_workflow_a)
-    val workflowASubtitle = stringResource(R.string.home_workflow_a_subtitle)
-    val workflowBTitle = stringResource(R.string.home_workflow_b)
-    val workflowBSubtitle = stringResource(R.string.home_workflow_b_subtitle)
+    val organizeTitle = stringResource(R.string.home_workflow_a)
+    val organizeSubtitle = stringResource(R.string.home_workflow_a_subtitle)
+    val libraryTitle = stringResource(R.string.home_workflow_b)
+    val librarySubtitle = stringResource(R.string.home_workflow_b_subtitle)
     Column(
         modifier = modifier
             .fillMaxSize()
@@ -98,8 +98,8 @@ fun HomeScreen(
                 )
             }
         }
-        WorkflowEntry(workflowATitle, workflowASubtitle, onOpenWorkflowA)
-        WorkflowEntry(workflowBTitle, workflowBSubtitle, onOpenWorkflowB)
+        WorkflowEntry(organizeTitle, organizeSubtitle, onOpenOrganize)
+        WorkflowEntry(libraryTitle, librarySubtitle, onOpenLibrary)
     }
 }
 

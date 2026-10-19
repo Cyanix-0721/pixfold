@@ -147,7 +147,7 @@ class HomeCardStyleTest {
     }
 
     private fun home() = setContentPureBlackDark {
-        HomeScreen(onOpenWorkflowA = {}, onOpenWorkflowB = {})
+        HomeScreen(onOpenOrganize = {}, onOpenLibrary = {})
     }
 
     // ================= 1. 文案:不再出现「工作流 A/B」 =================

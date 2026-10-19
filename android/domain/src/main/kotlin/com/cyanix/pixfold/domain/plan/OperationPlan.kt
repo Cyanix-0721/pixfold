@@ -12,7 +12,7 @@ import com.cyanix.pixfold.domain.text.TextKey
  * §5 把 `OperationPlan` 与 `PackagePlan` 并列列进统一领域模型,但到 D3 为止它**全仓零命中**:
  * 「计划有多少项、跳过几项、会触发哪些危险动作」在打包侧与改名侧各自实现了一遍 ——
  * 打包走 `planCountsOf` / `effectiveDangerActions(plans, …)`,改名走
- * `LibraryRenamePlan.counts` / `workflowADangerActions(clean)`。同一件事两处算,
+ * `LibraryRenamePlan.counts` / `organizeDangerActions(clean)`。同一件事两处算,
  * 迟早漂移;而且新增第三种操作(复制/移动)时没有任何结构提示"你还得再补一份"。
  *
  * 这里把两者收进**一个** sealed 词汇:每加一种操作,`executePlan` 的穷尽 `when`
@@ -161,7 +161,7 @@ fun operationPlanOf(
  * 从改名计划构建统一操作计划。
  *
  * 改名侧的危险动作只有"清理空目录"且是批次级开关,故 [dangerActions] 只可能来自
- * [cleanEmptyDirs](复用 [workflowADangerActions])。
+ * [cleanEmptyDirs](复用 [organizeDangerActions])。
  */
 fun operationPlanOfRenames(
     ops: List<RenameOp>,
@@ -169,7 +169,7 @@ fun operationPlanOfRenames(
 ): OperationPlan = OperationPlan(
     kind = ExecKind.Rename,
     ops = ops.map { RenamePlannedOp(it) },
-    dangerActions = workflowADangerActions(cleanEmptyDirs),
+    dangerActions = organizeDangerActions(cleanEmptyDirs),
 )
 
 /**

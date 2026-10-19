@@ -1,6 +1,6 @@
 package com.cyanix.pixfold.domain.mock
 
-import com.cyanix.pixfold.domain.workflowa.workflowAStateOf
+import com.cyanix.pixfold.domain.organize.organizeStateOf
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
@@ -63,7 +63,7 @@ class MockDataTest {
     @Test
     fun `chapters collection sorts into numeric order through the real pipeline`() {
         val cn = MockData.workspaceA.collections.first { it.id == "cn" }
-        val state = workflowAStateOf(MockData.workspaceA.collections)
+        val state = organizeStateOf(MockData.workspaceA.collections)
         val order = state.orders.getValue("cn")
         assertEquals(
             listOf(

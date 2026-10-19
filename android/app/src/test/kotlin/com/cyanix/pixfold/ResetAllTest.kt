@@ -25,18 +25,18 @@ import com.cyanix.pixfold.ui.components.TAG_GRID_CARD
 import com.cyanix.pixfold.ui.components.TAG_RESET_ALL
 import com.cyanix.pixfold.ui.components.TAG_RESET_ALL_CONFIRM
 import com.cyanix.pixfold.ui.components.TAG_RESET_ALL_DIALOG
-import com.cyanix.pixfold.ui.workflowa.TAG_STEP_BACK
-import com.cyanix.pixfold.ui.workflowa.collectionTag
-import com.cyanix.pixfold.ui.workflowa.TAG_STEP_NAMING
-import com.cyanix.pixfold.ui.workflowa.TAG_STEP_TABS
-import com.cyanix.pixfold.ui.workflowa.WorkflowASteps
-import com.cyanix.pixfold.ui.workflowb.TAG_B_STEP_TABS
-import com.cyanix.pixfold.ui.workflowb.TAG_LIBRARY_LIST
-import com.cyanix.pixfold.ui.workflowb.TAG_LIBRARY_NEXT
-import com.cyanix.pixfold.ui.workflowb.TAG_LIBRARY_PAGE
-import com.cyanix.pixfold.ui.workflowb.TAG_LIBRARY_SUMMARY
-import com.cyanix.pixfold.ui.workflowb.WorkflowBSteps
-import com.cyanix.pixfold.ui.workflowb.volumeIncludedTag
+import com.cyanix.pixfold.ui.organize.TAG_STEP_BACK
+import com.cyanix.pixfold.ui.organize.collectionTag
+import com.cyanix.pixfold.ui.organize.TAG_STEP_NAMING
+import com.cyanix.pixfold.ui.organize.TAG_STEP_TABS
+import com.cyanix.pixfold.ui.organize.OrganizeSteps
+import com.cyanix.pixfold.ui.library.TAG_B_STEP_TABS
+import com.cyanix.pixfold.ui.library.TAG_LIBRARY_LIST
+import com.cyanix.pixfold.ui.library.TAG_LIBRARY_NEXT
+import com.cyanix.pixfold.ui.library.TAG_LIBRARY_PAGE
+import com.cyanix.pixfold.ui.library.TAG_LIBRARY_SUMMARY
+import com.cyanix.pixfold.ui.library.LibrarySteps
+import com.cyanix.pixfold.ui.library.volumeIncludedTag
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -55,14 +55,14 @@ import kotlin.test.assertTrue
  * - 二次确认:需要,弹「重置全部调整?· 将清除排序规则、人工调整、命名覆盖与元数据编辑」。
  * - 重置后**回到步骤 1**。
  *
- * ## 为什么必须端到端组合 `WorkflowASteps` / `WorkflowBSteps`
+ * ## 为什么必须端到端组合 `OrganizeSteps` / `LibrarySteps`
  *
  * 「重置全部」的价值就在于**跨步骤生效**:在第 2 步点一下,第 1 步的人工调整要没了。
  * 单页级断言(只组合 `SortAndPreviewPage`)看不到这条 —— 那时重置按钮根本不在树上。
  *
  * ## 这条断言为什么有杀伤力
  *
- * 把 `resetAll()` 里的 `updateState(workflowAStateOf(collections))` 删掉(只做导航),
+ * 把 `resetAll()` 里的 `updateState(organizeStateOf(collections))` 删掉(只做导航),
  * 第一条用例立即失败:人工调整还在,首格文本与重置前相同。
  */
 @RunWith(RobolectricTestRunner::class)
@@ -97,7 +97,7 @@ class ResetAllTest {
 
     @Test
     fun `reset all clears manual adjustment and returns to step 1`() {
-        rule.setContent { WorkflowASteps(collections = collections) }
+        rule.setContent { OrganizeSteps(collections = collections) }
 
         val before = firstCardText()
         assertTrue(before.isNotEmpty(), "首格应有可读描述")
@@ -130,7 +130,7 @@ class ResetAllTest {
 
     @Test
     fun `reset all returns to the first collection`() {
-        rule.setContent { WorkflowASteps(collections = collections) }
+        rule.setContent { OrganizeSteps(collections = collections) }
 
         // 切到第二个集合 —— 制造与初值的可见差异
         val secondId = collections[1].id
@@ -150,10 +150,10 @@ class ResetAllTest {
     /**
      * 用户 2026-10-14 裁决:「默认返回到主页改为触发重置。**只有工作流内部切换不会自动重置**」。
      *
-     * ## 为什么必须走真的 `PixFoldApp`(而不是裸组合 `WorkflowASteps`)
+     * ## 为什么必须走真的 `PixFoldApp`(而不是裸组合 `OrganizeSteps`)
      *
      * 这条规则是**导航层**的:工作流 A 的共享状态提升在 `PixFoldApp` 里,「回主页」
-     * 是根 NavHost 的一次 pop。裸组合 `WorkflowASteps` 时那条 pop 根本不存在,
+     * 是根 NavHost 的一次 pop。裸组合 `OrganizeSteps` 时那条 pop 根本不存在,
      * 断言会假绿。
      *
      * ## 与上一条用例互补
@@ -202,7 +202,7 @@ class ResetAllTest {
 
     @Test
     fun `workflow A reset button sits at the right end of the step tab row`() {
-        rule.setContent { WorkflowASteps(collections = collections) }
+        rule.setContent { OrganizeSteps(collections = collections) }
 
         val tabs = rule.onNodeWithTag(TAG_STEP_TABS).getBoundsInRoot()
         val reset = rule.onNodeWithTag(TAG_RESET_ALL).getBoundsInRoot()
@@ -224,7 +224,7 @@ class ResetAllTest {
 
     @Test
     fun `workflow A long pressing reset shows its label`() {
-        rule.setContent { WorkflowASteps(collections = collections) }
+        rule.setContent { OrganizeSteps(collections = collections) }
 
         rule.onNodeWithTag(TAG_RESET_ALL).performTouchInput { longClick() }
         rule.waitForIdle()
@@ -236,7 +236,7 @@ class ResetAllTest {
     @Test
     fun `workflow B reset restores volume selection and returns to step 1`() {
         val lib = MockDataB.library
-        rule.setContent { WorkflowBSteps(rootPath = lib.rootPath, volumes = lib.volumes) }
+        rule.setContent { LibrarySteps(rootPath = lib.rootPath, volumes = lib.volumes) }
 
         fun summary(): String =
             rule.onNodeWithTag(TAG_LIBRARY_SUMMARY, useUnmergedTree = true)
@@ -279,7 +279,7 @@ class ResetAllTest {
     @Test
     fun `workflow B reset button sits at the right end of the step tab row`() {
         val lib = MockDataB.library
-        rule.setContent { WorkflowBSteps(rootPath = lib.rootPath, volumes = lib.volumes) }
+        rule.setContent { LibrarySteps(rootPath = lib.rootPath, volumes = lib.volumes) }
 
         val tabs = rule.onNodeWithTag(TAG_B_STEP_TABS).getBoundsInRoot()
         val reset = rule.onNodeWithTag(TAG_RESET_ALL).getBoundsInRoot()

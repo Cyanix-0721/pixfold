@@ -24,7 +24,7 @@ import kotlin.test.assertTrue
  * **为什么值得单独守护**:图标是**唯一一类"坏掉也全绿"的资源** ——
  * 它不出现在任何 Compose 语义树里,没有 `testTag` 可查,单元测试与 UI 测试都不会碰到它;
  * 真机上也只有在桌面翻到该应用时才看得见。历史上本仓库已经踩过一次同类坑:
- * `ic_arrow_drop_up` 因坐标系错误**画到画布外**(见 [com.cyanix.pixfold.ui.workflowa.DirectionIconRenderTest]),
+ * `ic_arrow_drop_up` 因坐标系错误**画到画布外**(见 [com.cyanix.pixfold.ui.organize.DirectionIconRenderTest]),
  * 语义层断言全绿、图标却完全空白。
  *
  * **本测试钉住四件事**:

@@ -122,7 +122,7 @@ object PackTaskBus {
         }
     }
 
-    /** 进程内是否有任务正在跑（`WorkflowBSteps` 用它决定底栏形态）。 */
+    /** 进程内是否有任务正在跑（`LibrarySteps` 用它决定底栏形态）。 */
     fun isRunning(): Boolean = mutableState.value is PackTaskState.Running
 
     /** 仅供测试：把总线拨回初始态。生产代码不要调（会与真实 Service 状态失配）。 */

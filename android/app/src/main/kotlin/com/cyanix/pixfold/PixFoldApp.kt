@@ -37,17 +37,17 @@ import com.cyanix.pixfold.domain.model.effectiveScheme
 import com.cyanix.pixfold.domain.naming.buildProposals
 import com.cyanix.pixfold.domain.naming.namingSchemeSeedOf
 import com.cyanix.pixfold.domain.naming.setOverride
-import com.cyanix.pixfold.domain.workflowa.WorkflowAState
-import com.cyanix.pixfold.domain.workflowa.reconcileNamingState
-import com.cyanix.pixfold.domain.workflowa.reconcileWorkflowAState
-import com.cyanix.pixfold.domain.workflowa.workflowAStateOf
+import com.cyanix.pixfold.domain.organize.OrganizeState
+import com.cyanix.pixfold.domain.organize.reconcileNamingState
+import com.cyanix.pixfold.domain.organize.reconcileOrganizeState
+import com.cyanix.pixfold.domain.organize.organizeStateOf
 import com.cyanix.pixfold.data.SharedPrefsSettingsStore
 import com.cyanix.pixfold.data.saf.AndroidSafSource
 import com.cyanix.pixfold.data.saf.AndroidThumbnailSource
 import com.cyanix.pixfold.data.saf.SafOutputExistsProbe
 import com.cyanix.pixfold.data.saf.SafPackExecutor
-import com.cyanix.pixfold.domain.workflowb.WorkflowBState
-import com.cyanix.pixfold.domain.workflowb.reconcileLibrary
+import com.cyanix.pixfold.domain.library.LibraryState
+import com.cyanix.pixfold.domain.library.reconcileLibrary
 import com.cyanix.pixfold.ui.workspace.CachingThumbnailSource
 import com.cyanix.pixfold.domain.settings.AppLanguage
 import com.cyanix.pixfold.domain.settings.PixFoldSettings
@@ -59,8 +59,8 @@ import com.cyanix.pixfold.nav.NavTransitionStyle
 import com.cyanix.pixfold.nav.PixFoldNavHost
 import com.cyanix.pixfold.nav.PreviewRoute
 import com.cyanix.pixfold.nav.SettingsRoute
-import com.cyanix.pixfold.nav.WorkflowARoute
-import com.cyanix.pixfold.nav.WorkflowBRoute
+import com.cyanix.pixfold.nav.OrganizeRoute
+import com.cyanix.pixfold.nav.LibraryRoute
 import com.cyanix.pixfold.ui.HomeScreen
 import com.cyanix.pixfold.ui.preview.ImagePreview
 import com.cyanix.pixfold.ui.preview.PreviewRename
@@ -71,8 +71,8 @@ import com.cyanix.pixfold.ui.workspace.LocalThumbnailSource
 import com.cyanix.pixfold.ui.workspace.WorkspaceController
 import com.cyanix.pixfold.ui.workspace.collectionsOr
 import com.cyanix.pixfold.ui.workspace.handleOrNull
-import com.cyanix.pixfold.ui.workflowa.WorkflowASteps
-import com.cyanix.pixfold.ui.workflowb.WorkflowBSteps
+import com.cyanix.pixfold.ui.organize.OrganizeSteps
+import com.cyanix.pixfold.ui.library.LibrarySteps
 import java.util.concurrent.atomic.AtomicBoolean
 
 /**
@@ -314,17 +314,17 @@ fun PixFoldApp(store: SettingsStore? = null) {
                 ?: MockDataB.library.rootPath
             // 工作流 B 也有「实时刷新 + 增量对账」(与 A 同构):用户在文件管理器里
             // 增删图片/目录后,卷列表会重扫;重扫**不能**清掉用户填好的元数据与勾选。
-            // 对账责任在这一层 —— `WorkflowBSteps` 只负责不缓存(见其 KDoc)。
-            var workflowBVolumes by remember(workspaceHandle) {
+            // 对账责任在这一层 —— `LibrarySteps` 只负责不缓存(见其 KDoc)。
+            var libraryVolumes by remember(workspaceHandle) {
                 mutableStateOf(scannedVolumes)
             }
             val lastReconciledB = remember(workspaceHandle) { LastReconciledVolumes(scannedVolumes) }
             if (lastReconciledB.volumes != scannedVolumes) {
                 lastReconciledB.volumes = scannedVolumes
-                workflowBVolumes = reconcileLibrary(
-                    previous = WorkflowBState(
+                libraryVolumes = reconcileLibrary(
+                    previous = LibraryState(
                         rootPath = libraryRootPath,
-                        volumes = workflowBVolumes,
+                        volumes = libraryVolumes,
                         activeVolumeId = "",
                     ),
                     scanned = scannedVolumes,
@@ -358,7 +358,7 @@ fun PixFoldApp(store: SettingsStore? = null) {
 
             // ---- 工作流 A 的两份共享状态提升到应用根(2026-09-25)----
             //
-            // **为什么必须提上来**:预览页是**根导航的兄弟目的地**,与 `WorkflowASteps`
+            // **为什么必须提上来**:预览页是**根导航的兄弟目的地**,与 `OrganizeSteps`
             // 内的嵌套图不在同一棵树上,因此它够不到工作流内部的任何状态。而预览页需要两样东西:
             //
             //  1. **当前页序**(`PageOrderState.order`)—— 点击回传的 `index` 是**页序下标**
@@ -379,13 +379,13 @@ fun PixFoldApp(store: SettingsStore? = null) {
             // 目录毫无意义) 与「同一目录内容变了」(用对账保留人工调整)。
             //
             // 对账必须**在组合期同步完成**，不能放进 `LaunchedEffect`：子组件
-            // `WorkflowASteps` 自己也是 `remember(collections)` 播种本地状态,而它的
+            // `OrganizeSteps` 自己也是 `remember(collections)` 播种本地状态,而它的
             // 初值来自这里的 `externalState`。若先以旧状态组合子组件、事后再用副作用
             // 更新，子组件的 key 已经消费过 ⇒ 它不会重新播种 ⇒ 对账结果在界面上看不见
             // (预览页读上层那份反而是对的，两处会不一致)。写在子组件之前则同一次组合
             // 就能拿到对账后的值。
-            var workflowAState by remember(workspaceHandle) {
-                mutableStateOf(workflowAStateOf(collections))
+            var organizeState by remember(workspaceHandle) {
+                mutableStateOf(organizeStateOf(collections))
             }
             var namingState by remember(workspaceHandle) {
                 mutableStateOf(
@@ -402,12 +402,12 @@ fun PixFoldApp(store: SettingsStore? = null) {
                 // `!=` 而不是 `!==`：控制器已保证「内容没变不发新实例」，但这里再用
                 // 结构相等兜一层 —— 等值的新实例不该白跑一次对账。
                 lastReconciled.collections = collections
-                workflowAState = reconcileWorkflowAState(workflowAState, collections)
+                organizeState = reconcileOrganizeState(organizeState, collections)
                 namingState = reconcileNamingState(namingState, collections)
             }
 
             // 返回手势/返回键:由 NavHost 自带的 handler 统一处理(它会随返回栈深度
-            // 自动 enable/disable)。返回首页 = pop 掉 WorkflowA/B;首页(栈深 1)时
+            // 自动 enable/disable)。返回首页 = pop 掉 Organize/B;首页(栈深 1)时
             // NavHost 不再注册 handler,交回系统退出应用 —— 与迁移前 `rootBack = null` 同义。
             //
             // 注意:返回栈是**唯一**事实来源,不再有 `screen` 这样的第二份状态。
@@ -421,17 +421,17 @@ fun PixFoldApp(store: SettingsStore? = null) {
                 composable<HomeRoute> {
                     // 用户 2026-10-14 裁决:「默认返回到主页改为触发重置。**只有工作流内部切换不会自动重置**」。
                     //
-                    // **为什么复位挂在「回到主页」这一侧,而不是 `WorkflowARoute` 的 `DisposableEffect`**:
+                    // **为什么复位挂在「回到主页」这一侧,而不是 `OrganizeRoute` 的 `DisposableEffect`**:
                     // 预览页是**根导航的兄弟目的地**(见上方 :100-113),`navigate(PreviewRoute)` 一样会让
-                    // `WorkflowARoute` 离开组合 —— 在离场时复位,预览读到的 `PageOrderState` 会当场变成
+                    // `OrganizeRoute` 离开组合 —— 在离场时复位,预览读到的 `PageOrderState` 会当场变成
                     // 自动序,点开的图与网格对不上(正是 2026-09-25 修过的那类缺陷)。
                     // 挂在 `HomeRoute` 上则只在"真的回到主页"时触发;首次启动时复位到初值是幂等的。
                     //
-                    // 复位三样:页序/排序规则(`workflowAState`)、命名结构与覆盖(`namingState`)、
-                    // 当前集合(`activeCollectionId`)。工作流 B 的共享状态全在 `WorkflowBSteps`
+                    // 复位三样:页序/排序规则(`organizeState`)、命名结构与覆盖(`namingState`)、
+                    // 当前集合(`activeCollectionId`)。工作流 B 的共享状态全在 `LibrarySteps`
                     // 内部自持,离开组合即自然归零,无需在此处写第二遍。
                     LaunchedEffect(Unit) {
-                        workflowAState = workflowAStateOf(collections)
+                        organizeState = organizeStateOf(collections)
                         namingState =
                             NamingState(
                                 namingSchemeSeedOf(collections),
@@ -440,8 +440,8 @@ fun PixFoldApp(store: SettingsStore? = null) {
                     }
                     DestinationSurface {
                         HomeScreen(
-                            onOpenWorkflowA = { navController.navigate(WorkflowARoute) },
-                            onOpenWorkflowB = { navController.navigate(WorkflowBRoute) },
+                            onOpenOrganize = { navController.navigate(OrganizeRoute) },
+                            onOpenLibrary = { navController.navigate(LibraryRoute) },
                             onOpenSettings = { navController.navigate(SettingsRoute) },
                         )
                     }
@@ -464,9 +464,9 @@ fun PixFoldApp(store: SettingsStore? = null) {
                     }
                 }
 
-                composable<WorkflowARoute> {
+                composable<OrganizeRoute> {
                     DestinationSurface {
-                        WorkflowASteps(
+                        OrganizeSteps(
                             collections = collections,
                             // 步骤级返回同样跟随手势进度:开关透传进嵌套 NavHost 的转场策略。
                             predictiveBackAnimation = settings.predictiveBackAnimation,
@@ -476,8 +476,8 @@ fun PixFoldApp(store: SettingsStore? = null) {
                             // 内部的 `remember { activeId }` 随之销毁;关闭预览回来是
                             // 新的组合实例,不给种子就会退回首个集合(2026-09-25 修复)。
                             initialActiveCollectionId = currentCollectionId,
-                            externalState = workflowAState,
-                            onStateChange = { workflowAState = it },
+                            externalState = organizeState,
+                            onStateChange = { organizeState = it },
                             initialNamingState = namingState,
                             onNamingStateChange = { namingState = it },
                             // 网格默认列数(设置在设置页;排序页按屏幕方向二选一,
@@ -511,7 +511,7 @@ fun PixFoldApp(store: SettingsStore? = null) {
                     // `items = order.order`);两者只在"页序 == 声明序"时碰巧一致,
                     // 而 `cn` 集合的声明序是故意打乱的 —— 用声明序会打开另一张图
                     // (2026-09-25 修复,由 AppNavigationTest 钉住)。
-                    val pageOrder = workflowAState.orders[activeCollection.id]?.order
+                    val pageOrder = organizeState.orders[activeCollection.id]?.order
                         ?: activeCollection.images
                     // 预览的重命名要显示**当前生效的最终名**(覆盖优先于建议名),
                     // 故与命名页用同一条求值链:`effectiveScheme` + `buildProposals`。
@@ -542,11 +542,11 @@ fun PixFoldApp(store: SettingsStore? = null) {
                     }
                 }
 
-                composable<WorkflowBRoute> {
+                composable<LibraryRoute> {
                     DestinationSurface {
-                        WorkflowBSteps(
+                        LibrarySteps(
                             rootPath = libraryRootPath,
-                            volumes = workflowBVolumes,
+                            volumes = libraryVolumes,
                             // 同上:步骤级返回跟随手势进度。
                             predictiveBackAnimation = settings.predictiveBackAnimation,
                             // 工作区条 + 空态:与工作流 A 同一份状态(用户裁决「复用工作区」),
@@ -583,10 +583,10 @@ fun PixFoldApp(store: SettingsStore? = null) {
  * 「上一次对账依据的集合列表」的**可变容器**（不是快照状态）。
  *
  * **为什么不用 `mutableStateOf`**：对账这段逻辑在**组合期**同步执行 ——
- * 它读上一份列表、必要时写入新列表并立刻改 `workflowAState`。若把「上一份列表」
+ * 它读上一份列表、必要时写入新列表并立刻改 `organizeState`。若把「上一份列表」
  * 写成快照状态，那么这次的写入会让「正在读它的这段组合」自己也失效，
- * 于是刚算完又重跑一遍（千级目录下 `reconcileWorkflowAState` 是 O(n) 带排序的，
- * 白跑一次很显眼）。用普通可变字段则只有 `workflowAState` 的写入触发重组，
+ * 于是刚算完又重跑一遍（千级目录下 `reconcileOrganizeState` 是 O(n) 带排序的，
+ * 白跑一次很显眼）。用普通可变字段则只有 `organizeState` 的写入触发重组，
  * 而那次重组读到的「上一份列表」已经等于当前列表，不会重复对账。
  *
  * 容器本身仍需 `remember`：它要跨重组存活，且随工作区句柄一起重建。

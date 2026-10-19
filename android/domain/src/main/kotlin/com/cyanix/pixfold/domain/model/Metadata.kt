@@ -131,7 +131,7 @@ data class ComicVolume(
  *
  * ⚠️ 兜底组的键是**空字符串**,不是「（未命名系列）」这类文案 —— 分组键参与
  * `testTag` 与相等性判断,若把译文当键,切换语言就会把分组"换"成另一个键。
- * UI 渲染时把空串映射成 [TextKey.UnnamedSeries](见 `ui/workflowb/LibraryPage.kt`)。
+ * UI 渲染时把空串映射成 [TextKey.UnnamedSeries](见 `ui/library/LibraryPage.kt`)。
  */
 fun groupVolumesBySeries(volumes: List<ComicVolume>): List<Pair<String, List<ComicVolume>>> {
     val map = LinkedHashMap<String, MutableList<ComicVolume>>()

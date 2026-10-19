@@ -13,7 +13,7 @@ import kotlin.test.assertTrue
  * 如果选择series,收缩series芯片组到一行,下面添加显示2级芯片组选择series下的单本」。
  *
  * 本类只测**分组**(哪些集合归到同一个 1 级条目、它是 series 还是单本);
- * 芯片渲染与两级联动在 `ui/workflowa/CollectionChipRows` 侧另测。
+ * 芯片渲染与两级联动在 `ui/organize/CollectionChipRows` 侧另测。
  */
 class SeriesGroupsTest {
 

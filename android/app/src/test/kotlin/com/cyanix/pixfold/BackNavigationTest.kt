@@ -10,16 +10,16 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import com.cyanix.pixfold.ui.components.TAG_GRID_CARD
 import com.cyanix.pixfold.ui.preview.TAG_PREVIEW
-import com.cyanix.pixfold.ui.workflowa.TAG_A_PLAN_PAGE
-import com.cyanix.pixfold.ui.workflowa.TAG_STEP_BACK
-import com.cyanix.pixfold.ui.workflowa.TAG_STEP_NAMING
-import com.cyanix.pixfold.ui.workflowa.TAG_STEP_SORT
-import com.cyanix.pixfold.ui.workflowa.TAG_TO_PLAN
-import com.cyanix.pixfold.ui.workflowb.TAG_B_STEP_LIBRARY
-import com.cyanix.pixfold.ui.workflowb.TAG_B_STEP_PACK
-import com.cyanix.pixfold.ui.workflowb.TAG_LIBRARY_PAGE
-import com.cyanix.pixfold.ui.workflowb.TAG_METADATA_PAGE
-import com.cyanix.pixfold.ui.workflowb.TAG_PACK_PAGE
+import com.cyanix.pixfold.ui.organize.TAG_A_PLAN_PAGE
+import com.cyanix.pixfold.ui.organize.TAG_STEP_BACK
+import com.cyanix.pixfold.ui.organize.TAG_STEP_NAMING
+import com.cyanix.pixfold.ui.organize.TAG_STEP_SORT
+import com.cyanix.pixfold.ui.organize.TAG_TO_PLAN
+import com.cyanix.pixfold.ui.library.TAG_B_STEP_LIBRARY
+import com.cyanix.pixfold.ui.library.TAG_B_STEP_PACK
+import com.cyanix.pixfold.ui.library.TAG_LIBRARY_PAGE
+import com.cyanix.pixfold.ui.library.TAG_METADATA_PAGE
+import com.cyanix.pixfold.ui.library.TAG_PACK_PAGE
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -157,7 +157,7 @@ class BackNavigationTest {
      * 返回栈会变成 `[步骤1, 步骤2, 步骤3, 步骤1]` —— 此时按返回会退到**步骤3**,
      * 而不是退到首页,层级返回就断了。
      *
-     * 这条断言是**变异存活后补的**:把 `goToWorkflowAStep` 的往回分支改成
+     * 这条断言是**变异存活后补的**:把 `goToOrganizeStep` 的往回分支改成
      * `navigate` 时,原有 6 条用例全部通过 —— 说明该约束此前无人守护。
      */
     @Test
@@ -178,7 +178,7 @@ class BackNavigationTest {
         rule.onNodeWithText(TestText.of(R.string.home_workflow_b)).assertIsDisplayed()
     }
 
-    /** 同上,工作流 B 走的是独立的 `goToWorkflowBStep`。 */
+    /** 同上,工作流 B 走的是独立的 `goToLibraryStep`。 */
     @Test
     fun `a backward tab jump in workflow B keeps the back chain linear`() {
         rule.setContent { PixFoldApp() }

@@ -12,8 +12,8 @@ import com.cyanix.pixfold.domain.plan.VolumePackPlan
 import com.cyanix.pixfold.domain.storage.SpaceThreshold
 import com.cyanix.pixfold.domain.task.CancellationToken
 import com.cyanix.pixfold.domain.task.TaskProgress
-import com.cyanix.pixfold.ui.workflowb.PackExecutorPort
-import com.cyanix.pixfold.ui.workflowb.PackUiOutcome
+import com.cyanix.pixfold.ui.library.PackExecutorPort
+import com.cyanix.pixfold.ui.library.PackUiOutcome
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
@@ -36,7 +36,7 @@ import kotlinx.coroutines.withContext
  * 这个平台实现上，见 [execute] 里的 `withContext(Dispatchers.IO)`。
  *
  * ### 进度回调的线程
- * `onProgress` 在 IO 线程上被调用。本类**不替你切主线程** —— 调用方（`WorkflowBSteps`）
+ * `onProgress` 在 IO 线程上被调用。本类**不替你切主线程** —— 调用方（`LibrarySteps`）
  * 用 `withContext(Dispatchers.Main)` 或快照状态原位写入。为什么不在这里切：
  * 每页一次 `withContext(Main)` 在千级文件下是真实开销，调用方更清楚该节流到什么粒度。
  *

@@ -17,15 +17,15 @@ import com.cyanix.pixfold.domain.mock.MockData
 import com.cyanix.pixfold.domain.mock.MockDataB
 import com.cyanix.pixfold.ui.components.TAG_PAGE_ACTION_BAR
 import com.cyanix.pixfold.ui.theme.PixFoldTheme
-import com.cyanix.pixfold.ui.workflowa.TAG_A_PLAN_CONFIRM
-import com.cyanix.pixfold.ui.workflowa.TAG_STEP_BACK
-import com.cyanix.pixfold.ui.workflowa.TAG_STEP_NAMING
-import com.cyanix.pixfold.ui.workflowa.TAG_TO_PLAN
-import com.cyanix.pixfold.ui.workflowa.WorkflowASteps
-import com.cyanix.pixfold.ui.workflowb.TAG_B_STEP_BACK
-import com.cyanix.pixfold.ui.workflowb.TAG_LIBRARY_NEXT
-import com.cyanix.pixfold.ui.workflowb.TAG_METADATA_NEXT
-import com.cyanix.pixfold.ui.workflowb.WorkflowBSteps
+import com.cyanix.pixfold.ui.organize.TAG_A_PLAN_CONFIRM
+import com.cyanix.pixfold.ui.organize.TAG_STEP_BACK
+import com.cyanix.pixfold.ui.organize.TAG_STEP_NAMING
+import com.cyanix.pixfold.ui.organize.TAG_TO_PLAN
+import com.cyanix.pixfold.ui.organize.OrganizeSteps
+import com.cyanix.pixfold.ui.library.TAG_B_STEP_BACK
+import com.cyanix.pixfold.ui.library.TAG_LIBRARY_NEXT
+import com.cyanix.pixfold.ui.library.TAG_METADATA_NEXT
+import com.cyanix.pixfold.ui.library.LibrarySteps
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -103,7 +103,7 @@ class BottomBarStyleTest {
     /**
      * 组合内容时**必须包 `PixFoldTheme`**。
      *
-     * 这是本文件第一版的**假绿根因**:当时四条守卫全是裸组合 `rule.setContent { WorkflowASteps(…) }`,
+     * 这是本文件第一版的**假绿根因**:当时四条守卫全是裸组合 `rule.setContent { OrganizeSteps(…) }`,
      * 拿到的是 material3 的**基线浅色** `colorScheme`(即 `lightColorScheme()`,error `#B3261E`),
      * 而设备上是**深色**(error `#F2B8B5`)。两条分支的像素完全不同,守卫却全绿 ——
      * 于是「深色下撤销按钮是淡粉」这个真实缺陷被放过去了。
@@ -149,7 +149,7 @@ class BottomBarStyleTest {
     @Test
     fun `bottom bar height dropped without going under the touch target floor`() {
         val lib = MockDataB.library
-        setContentLight { WorkflowBSteps(rootPath = lib.rootPath, volumes = lib.volumes) }
+        setContentLight { LibrarySteps(rootPath = lib.rootPath, volumes = lib.volumes) }
         // 步骤 2 是最"满"的形态:左右两个按钮同时在
         rule.onNodeWithTag(TAG_LIBRARY_NEXT).performClick()
 
@@ -172,7 +172,7 @@ class BottomBarStyleTest {
     @Test
     fun `both bottom bar buttons on workflow B step 2 are filled`() {
         val lib = MockDataB.library
-        setContentLight { WorkflowBSteps(rootPath = lib.rootPath, volumes = lib.volumes) }
+        setContentLight { LibrarySteps(rootPath = lib.rootPath, volumes = lib.volumes) }
         rule.onNodeWithTag(TAG_LIBRARY_NEXT).performClick()
 
         val bmp = rootBitmap()
@@ -203,7 +203,7 @@ class BottomBarStyleTest {
     /** 工作流 A 步骤 2 同理:左「← 返回排序」也必须有底色。 */
     @Test
     fun `bottom bar back button on workflow A step 2 is filled`() {
-        setContentLight { WorkflowASteps(collections = MockData.workspaceA.collections) }
+        setContentLight { OrganizeSteps(collections = MockData.workspaceA.collections) }
         rule.onNodeWithTag(TAG_STEP_NAMING).performClick()
 
         val bmp = rootBitmap()
@@ -273,14 +273,14 @@ class BottomBarStyleTest {
 
     @Test
     fun `report undo button is painted dark red in light theme`() {
-        setContentLight { WorkflowASteps(collections = MockData.workspaceA.collections) }
+        setContentLight { OrganizeSteps(collections = MockData.workspaceA.collections) }
         navigateToReport()
         assertUndoIsDarkRed()
     }
 
     @Test
     fun `report undo button is painted dark red in dark theme`() {
-        setContentDark { WorkflowASteps(collections = MockData.workspaceA.collections) }
+        setContentDark { OrganizeSteps(collections = MockData.workspaceA.collections) }
         navigateToReport()
         assertUndoIsDarkRed()
     }

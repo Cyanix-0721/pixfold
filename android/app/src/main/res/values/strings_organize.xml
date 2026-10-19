@@ -1,0 +1,150 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Workflow A screen strings (English, default / fallback).
+
+  ⚠️ Keep in sync with `values-zh/strings_organize.xml` — a key missing on either side
+  makes lint's `MissingTranslation` / `ExtraTranslation` hard-fail under
+  `warningsAsErrors = true`. Entries marked `translatable="false"` do not appear in the
+  Chinese file.
+
+  Naming: `a_sort_*` = step 1 sort-rule editor, `a_*` = step 1/2/3 pages,
+  `a_step_*` = the workflow A step container.
+-->
+<resources
+    xmlns:tools="http://schemas.android.com/tools">
+
+    <!-- ============ Step 1 · sort and preview (SortAndPreviewPage) ============ -->
+    <string name="a_rule_scope_custom">Custom rule for this set</string>
+    <string name="a_rule_scope_default">Batch default rule</string>
+    <string name="a_collection_chip">%1$s (%2$d)</string>
+    <string name="a_collection_cd">Set %1$s</string>
+    <string name="a_series_cd">Series %1$s</string>
+    <plurals name="a_image_count">
+        <item quantity="one">%1$d image</item>
+        <item quantity="other">%1$d images</item>
+    </plurals>
+    <plurals name="a_manual_count">
+        <item quantity="one">%1$d manual adjustment</item>
+        <item quantity="other">%1$d manual adjustments</item>
+    </plurals>
+    <string name="a_reset_manual_cd">Reset manual adjustments</string>
+    <string name="a_reset_manual">Reset manual adjustments (%1$d)</string>
+    <string name="a_sort_empty">This set has no sort state. Reopen the workspace.</string>
+    <string name="a_custom_rule">Custom for this set</string>
+    <string name="a_custom_rule_cd">Custom rule for this set</string>
+    <string name="a_next">Next</string>
+    <string name="a_next_cd">Next: naming structure</string>
+    <string name="a_rule_summary">Sort rule: %1$s</string>
+    <string name="a_rule_summary_collapse_cd">Collapse sort rule</string>
+    <string name="a_rule_summary_expand_cd">Expand sort rule</string>
+    <string name="a_view_grid">Grid</string>
+    <string name="a_view_list">List</string>
+    <string name="a_view_cd">%1$s view</string>
+    <!-- Grid column-count control (user ruling 2026-09-26, revised):
+         an icon-only button whose long-press tooltip is this label; the current value
+         is shown only inside the dropdown. -->
+    <string name="a_cols_label">Columns</string>
+    <string name="a_cols_cd">Columns: %1$d</string>
+
+    <!-- ============ Step 1 · sort rule editor (SortRuleEditor) ============ -->
+    <plurals name="a_sort_levels">
+        <item quantity="one">Sort rule (%1$d/%2$d level)</item>
+        <item quantity="other">Sort rule (%1$d/%2$d levels)</item>
+    </plurals>
+    <string name="a_sort_add">Add</string>
+    <string name="a_sort_add_cd">Add sort level</string>
+    <string name="a_sort_level">Level %1$d</string>
+    <string name="a_sort_ascending">ascending</string>
+    <string name="a_sort_descending">descending</string>
+    <string name="a_sort_level_cd">Level %1$d %2$s %3$s</string>
+    <string name="a_sort_level_cd_bare">Level %1$d %2$s</string>
+    <string name="a_sort_remove">Remove</string>
+    <string name="a_sort_remove_cd">Remove level %1$d</string>
+
+    <!-- ============ Step 2 · naming structure (SchemeEditor) ============ -->
+    <plurals name="a_scheme_title">
+        <item quantity="one">Naming structure (%1$d component enabled)</item>
+        <item quantity="other">Naming structure (%1$d components enabled)</item>
+    </plurals>
+    <string name="a_scheme_add">Add component</string>
+    <string name="a_scheme_add_cd">Add naming component</string>
+    <string name="a_scheme_toggle_collapse_cd">Collapse naming structure</string>
+    <string name="a_scheme_toggle_expand_cd">Expand naming structure</string>
+    <string name="a_scheme_root_dir">Root folder name</string>
+    <string name="a_scheme_index_start">Start number</string>
+    <string name="a_scheme_index_padding">Zero padding</string>
+    <string name="a_scheme_root_override">Root folder name: set manually (no longer follows the set)</string>
+    <string name="a_scheme_root_follow">Root folder name: follows the current set</string>
+    <string name="a_scheme_root_follow_btn">Follow set</string>
+    <string name="a_scheme_root_follow_cd">Make the root folder name follow the set again</string>
+    <string name="a_scheme_sanitize">Auto clean</string>
+    <string name="a_scheme_sanitize_cd">Auto clean illegal characters</string>
+    <string name="a_scheme_sanitize_info_cd">About auto clean</string>
+    <string name="a_scheme_sanitize_title">Auto clean</string>
+    <string name="a_scheme_sanitize_body">When enabled, illegal characters in file names (\\ / : * ? \" &lt; &gt; | and control characters) are replaced with \"_\".\n\nNote: cleaning only replaces characters; it does not deduplicate — different file names may end up identical and will still be reported as duplicates.</string>
+    <string name="a_scheme_replace_label">Replace with</string>
+    <string name="a_scheme_replace_cd">Replace illegal characters with</string>
+    <string name="a_scheme_replace_reset">Default</string>
+    <string name="a_scheme_replace_reset_cd">Restore the default replacement character</string>
+    <string name="a_scheme_replace_empty">Empty = delete illegal characters</string>
+    <string name="a_scheme_replace_hint">Illegal characters will be replaced with this character</string>
+    <string name="a_scheme_example">Example: %1$s → %2$s</string>
+    <string name="a_scheme_example_cd">Cleaning example</string>
+    <string name="a_scheme_got_it">Got it</string>
+    <string name="a_scheme_got_it_cd">Got it</string>
+    <string name="a_scheme_comp_enable_cd">Enable component %1$d</string>
+    <string name="a_scheme_comp_remove">Remove</string>
+    <string name="a_scheme_comp_remove_cd">Remove component %1$d</string>
+    <string name="a_scheme_comp_sep">Separator</string>
+    <string name="a_scheme_comp_text">Text</string>
+    <string name="a_scheme_comp_up_cd">Move component %1$d up</string>
+    <string name="a_scheme_comp_down_cd" tools:ignore="PluralsCandidate">Move component %1$d down</string>
+    <string name="a_scheme_kind_label">Component</string>
+    <string name="a_scheme_case_label">Case</string>
+    <string name="a_scheme_ext_label">Extension</string>
+
+    <!-- ============ Step 2 · proposal table (ProposalTable) ============ -->
+    <plurals name="a_table_summary">
+        <item quantity="one">%1$d item · %2$d conflicts · %3$d warnings</item>
+        <item quantity="other">%1$d items · %2$d conflicts · %3$d warnings</item>
+    </plurals>
+    <string name="a_table_new_name">New name</string>
+    <string name="a_table_new_name_overridden">New name (overridden)</string>
+    <string name="a_table_restore">Use suggestion</string>
+    <string name="a_table_restore_cd">Use suggested value for %1$s</string>
+
+    <!-- ============ Step 2 · naming page (NamingPage) ============ -->
+    <plurals name="a_naming_title">
+        <item quantity="one">Naming structure · %1$s (%2$d image)</item>
+        <item quantity="other">Naming structure · %1$s (%2$d images)</item>
+    </plurals>
+    <plurals name="a_naming_conflicts">
+        <item quantity="one">%1$d item has conflicts and will be skipped (see the red text below)</item>
+        <item quantity="other">%1$d items have conflicts and will be skipped (see the red text below)</item>
+    </plurals>
+    <string name="a_naming_empty_issues">No conflicts or warnings</string>
+    <string name="a_naming_empty_images">No images to name</string>
+    <string name="a_naming_back">← Back to sorting</string>
+    <string name="a_naming_back_cd">Back to step 1</string>
+    <string name="a_naming_next">Next: execution plan</string>
+    <string name="a_naming_next_cd">Next: execution plan</string>
+
+    <!-- ============ Step 3 · execution plan (RenamePlanPage) ============ -->
+    <string name="a_plan_clean_empty_on">Clean empty folders: on (dangerous)</string>
+    <string name="a_plan_clean_empty_off">Clean empty folders: off (default)</string>
+    <string name="a_plan_clean_empty_cd">Clean empty folders toggle</string>
+    <string name="a_plan_clean_empty_hint">Off by default; still needs another confirmation in the dialog</string>
+    <string name="a_plan_back">← Back to naming structure</string>
+    <string name="a_plan_back_cd">Back to step 2</string>
+    <string name="a_plan_confirm">Confirm run</string>
+    <string name="a_plan_confirm_cd">Confirm run</string>
+    <string name="a_plan_status_rename">Will rename</string>
+    <string name="a_plan_status_skip">Will skip</string>
+    
+    <!-- ============ Step container (OrganizeSteps) ============ -->
+    <string name="a_step_label_sort">Step 1 Sort and preview</string>
+    <string name="a_step_label_naming">Step 2 Naming structure</string>
+    <string name="a_step_label_plan">Step 3 Execution plan</string>
+    <string name="a_step_empty">No set to name</string>
+
+</resources>

@@ -50,17 +50,17 @@ class ChipRowWrappingTest {
     @Test
     fun chip_rows_do_not_use_horizontal_scroll() {
         val files = listOf(
-            "ui/workflowa/SortAndPreviewPage.kt",
-            "ui/workflowa/SortRuleEditor.kt",
-            "ui/workflowb/MetadataPage.kt",
-            "ui/workflowb/PackPreviewPage.kt",
+            "ui/organize/SortAndPreviewPage.kt",
+            "ui/organize/SortRuleEditor.kt",
+            "ui/library/MetadataPage.kt",
+            "ui/library/PackPreviewPage.kt",
             // 2026-10-18 起卷切换芯片行抽成共享组件(步骤 2/3 共用),守卫必须跟过来,
             // 否则"把共享组件改回横向滚动"这条路绕过守卫。
             "ui/components/VolumeChipRow.kt",
             // 2026-10-19 起卷芯片与集合芯片共用同一底层 `SingleSelectChipRow`;
             // 真正的容器在那里,守卫也必须跟过去 —— 否则改底层绕过了前五条。
             "ui/components/SingleSelectChipRow.kt",
-            "ui/workflowa/CollectionChipRows.kt",
+            "ui/organize/CollectionChipRows.kt",
             // 2026-10-19 两级芯片:状态逻辑抽到 TwoLevelChipRows,卷芯片再包一层 VolumeChipRows
             // —— 两者都可能成为「在这里偷偷加横向滚动」的新落点。
             "ui/components/TwoLevelChipRows.kt",
@@ -94,18 +94,18 @@ class ChipRowWrappingTest {
         // 文件 -> 该文件里应为 FlowRow 的芯片行数量
         val expected = mapOf(
             // 改写后集合芯片整体搬去 CollectionChipRows(自身也不再有 FlowRow)
-            "ui/workflowa/SortAndPreviewPage.kt" to 0,
-            "ui/workflowa/SortRuleEditor.kt" to 1, // 每级排序字段芯片
+            "ui/organize/SortAndPreviewPage.kt" to 0,
+            "ui/organize/SortRuleEditor.kt" to 1, // 每级排序字段芯片
             // 2026-10-18:卷切换行已上移到共享组件,本文件只剩批量字段芯片
-            "ui/workflowb/MetadataPage.kt" to 1,
+            "ui/library/MetadataPage.kt" to 1,
             // 2026-10-18:同上,只剩冲突策略 + 源处置策略
-            "ui/workflowb/PackPreviewPage.kt" to 2,
+            "ui/library/PackPreviewPage.kt" to 2,
             // 2026-10-18:卷切换芯片行(工作流 B 步骤 2/3 共用)现在是薄壳,容器在底层
             "ui/components/VolumeChipRow.kt" to 0,
             // 2026-10-19:全站唯一的芯片行容器(卷芯片 + 集合芯片共用)
             "ui/components/SingleSelectChipRow.kt" to 1,
             // 2026-10-19:两级集合芯片行 —— 两个 SingleSelectChipRow 调用,自身无 FlowRow
-            "ui/workflowa/CollectionChipRows.kt" to 0,
+            "ui/organize/CollectionChipRows.kt" to 0,
             // 2026-10-19:两级状态逻辑的唯一实现(集合芯片与卷芯片共用),自身无 FlowRow
             "ui/components/TwoLevelChipRows.kt" to 0,
             // 2026-10-19:两级卷芯片行 —— 只有一层适配,容器在 TwoLevelChipRows 里

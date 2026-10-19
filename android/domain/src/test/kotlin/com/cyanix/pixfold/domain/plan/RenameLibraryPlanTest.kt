@@ -6,7 +6,7 @@ import com.cyanix.pixfold.domain.model.NamingState
 import com.cyanix.pixfold.domain.naming.setRootDirNameOnScheme
 import com.cyanix.pixfold.domain.text.Msg
 import com.cyanix.pixfold.domain.text.TextKey
-import com.cyanix.pixfold.domain.workflowa.workflowAStateOf
+import com.cyanix.pixfold.domain.organize.organizeStateOf
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
@@ -19,7 +19,7 @@ import kotlin.test.assertTrue
 class RenameLibraryPlanTest {
 
     private val collections = MockData.workspaceA.collections
-    private val state = workflowAStateOf(collections)
+    private val state = organizeStateOf(collections)
     private val naming = NamingState(NamingScheme(rootDirName = "任意"))
 
     @Test
@@ -84,8 +84,8 @@ class RenameLibraryPlanTest {
 
     @Test
     fun `clean empty dirs is off by default`() {
-        assertTrue(workflowADangerActions(cleanEmptyDirs = false).isEmpty())
-        assertEquals(setOf(DangerAction.CleanEmptyDirs), workflowADangerActions(cleanEmptyDirs = true))
+        assertTrue(organizeDangerActions(cleanEmptyDirs = false).isEmpty())
+        assertEquals(setOf(DangerAction.CleanEmptyDirs), organizeDangerActions(cleanEmptyDirs = true))
     }
 
     @Test
@@ -115,7 +115,7 @@ class RenameLibraryPlanTest {
     @Test
     fun `rename danger sequence is general plus one danger step`() {
         val plan = buildLibraryRenamePlan(collections, state.orders, naming)
-        val dangers = workflowADangerActions(cleanEmptyDirs = true)
+        val dangers = organizeDangerActions(cleanEmptyDirs = true)
         val seq = buildConfirmSequence(dangers, renameSummaryLines(plan, dangers))
         assertEquals(2, seq.size, "通用 + 清理空目录独立确认 = 恰好两次")
         assertEquals(DangerAction.CleanEmptyDirs, (seq[1] as ConfirmStep.Danger).action)
@@ -132,7 +132,7 @@ class RenameLibraryPlanTest {
     @Test
     fun `collection names carry the collection name not its root dir name`() {
         // 计划页每一行的行首标注"这条属于哪个集合",读的就是这张表
-        // (ui/workflowa/RenamePlanPage.kt 用 collectionId 取)。
+        // (ui/organize/RenamePlanPage.kt 用 collectionId 取)。
         // 若这里记成 rootDirName,当集合名与根目录名不同(用户改过根名)时,
         // 用户就会看到"旅行的照片"被标成"旅行照片"这类**看起来对但认不出**的标签。
         val plan = buildLibraryRenamePlan(collections, state.orders, naming)

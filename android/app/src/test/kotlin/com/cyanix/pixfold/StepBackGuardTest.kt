@@ -8,12 +8,12 @@ import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import com.cyanix.pixfold.ui.components.TAG_GRID_CARD
-import com.cyanix.pixfold.ui.workflowa.TAG_STEP_BACK
-import com.cyanix.pixfold.ui.workflowa.TAG_STEP_NAMING
-import com.cyanix.pixfold.ui.workflowb.TAG_B_STEP_BACK
-import com.cyanix.pixfold.ui.workflowb.TAG_B_STEP_METADATA
-import com.cyanix.pixfold.ui.workflowb.TAG_LIBRARY_PAGE
-import com.cyanix.pixfold.ui.workflowb.TAG_METADATA_PAGE
+import com.cyanix.pixfold.ui.organize.TAG_STEP_BACK
+import com.cyanix.pixfold.ui.organize.TAG_STEP_NAMING
+import com.cyanix.pixfold.ui.library.TAG_B_STEP_BACK
+import com.cyanix.pixfold.ui.library.TAG_B_STEP_METADATA
+import com.cyanix.pixfold.ui.library.TAG_LIBRARY_PAGE
+import com.cyanix.pixfold.ui.library.TAG_METADATA_PAGE
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -39,8 +39,8 @@ import kotlin.test.assertTrue
  *    把**步骤 1 也弹掉了** ⇒ 栈空 ⇒ `NavHost` 无内容可组合。
  *    ⚠️ 注释里写的「内层栈深为 1 时自动让位给外层」保护的是**系统返回手势**
  *    (`enabled = currentBackStack.size > 1`),页面底栏的按钮**绕过了那道护栏**。
- * 2. `workflowAStepIndex()` 对 null 目的地返回 0 ⇒ 栈空时"当前步骤"读作 0,
- *    点「步骤 1」算 `target == current` 被 `goToWorkflowAStep` 直接 return ⇒ 修不回来。
+ * 2. `organizeStepIndex()` 对 null 目的地返回 0 ⇒ 栈空时"当前步骤"读作 0,
+ *    点「步骤 1」算 `target == current` 被 `goToOrganizeStep` 直接 return ⇒ 修不回来。
  *
  * ## 本测试怎么在 Robolectric 下卡住转场窗口
  *
@@ -99,7 +99,7 @@ class StepBackGuardTest {
 
     @Test
     fun `double tapping back on the metadata step must not empty the nested stack`() {
-        // 工作流 B 的步骤容器是**另一份实现**(`WorkflowBSteps`),护栏必须同样接上
+        // 工作流 B 的步骤容器是**另一份实现**(`LibrarySteps`),护栏必须同样接上
         rule.setContent { PixFoldApp() }
         rule.onNodeWithText(TestText.of(R.string.home_workflow_b)).performClick()
         rule.onNodeWithTag(TAG_B_STEP_METADATA).performClick()

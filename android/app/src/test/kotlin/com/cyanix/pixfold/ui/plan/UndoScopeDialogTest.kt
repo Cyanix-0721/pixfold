@@ -82,7 +82,7 @@ class UndoScopeDialogTest {
     /**
      * 报告页宿主:把回调收到的**档位**记进状态,便于断言。
      *
-     * 与生产接线同形(`WorkflowASteps.kt` / `WorkflowBSteps.kt`),否则这里测的
+     * 与生产接线同形(`OrganizeSteps.kt` / `LibrarySteps.kt`),否则这里测的
      * 就是另一个世界的行为。
      */
     private fun host(report: ExecutionReport, received: MutableList<UndoScope>) {

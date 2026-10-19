@@ -14,17 +14,17 @@ import androidx.navigation.NavDestination.Companion.hasRoute
  * **为什么用手势/转场也安全**:返回手势进行中 `NavHost` 的 currentBackStackEntry 不变
  * (只有 commit 时才 pop),所以序号在整段手势里是稳定的 —— 不会出现"卡在 1.5 步"。
  */
-fun NavDestination?.workflowAStepIndex(): Int = when {
-    this?.hasRoute<WorkflowANamingRoute>() == true -> 1
-    this?.hasRoute<WorkflowAPlanRoute>() == true -> 2
-    else -> 0 // 含 null(图尚未建立)与 WorkflowASortRoute
+fun NavDestination?.organizeStepIndex(): Int = when {
+    this?.hasRoute<OrganizeNamingRoute>() == true -> 1
+    this?.hasRoute<OrganizePlanRoute>() == true -> 2
+    else -> 0 // 含 null(图尚未建立)与 OrganizeSortRoute
 }
 
-/** 工作流 B 的步骤序号。理由同 [workflowAStepIndex]。 */
-fun NavDestination?.workflowBStepIndex(): Int = when {
-    this?.hasRoute<WorkflowBMetadataRoute>() == true -> 1
-    this?.hasRoute<WorkflowBPackRoute>() == true -> 2
-    else -> 0 // 含 null 与 WorkflowBLibraryRoute
+/** 工作流 B 的步骤序号。理由同 [organizeStepIndex]。 */
+fun NavDestination?.libraryStepIndex(): Int = when {
+    this?.hasRoute<LibraryMetadataRoute>() == true -> 1
+    this?.hasRoute<LibraryPackRoute>() == true -> 2
+    else -> 0 // 含 null 与 LibraryShelfRoute
 }
 
 /**
@@ -41,8 +41,8 @@ fun NavDestination?.workflowBStepIndex(): Int = when {
  * 1. 嵌套图的**起始目的地(步骤 1)与后续步骤在同一个返回栈里**。第一次 pop 只让
  *    命名页进入**退场转场** —— 退场中的页面仍在组合树上、按钮仍可命中,于是第二次
  *    点击落在同一个按钮上,把**步骤 1 也弹掉了** ⇒ 栈空 ⇒ NavHost 无内容可组合。
- * 2. `workflowAStepIndex()` 对 null 目的地返回 0 ⇒ 栈空时"当前步骤"读作 0,点
- *    「步骤 1」算出 `target == current` 被 [goToWorkflowAStep] 直接 return ⇒ 卡死。
+ * 2. `organizeStepIndex()` 对 null 目的地返回 0 ⇒ 栈空时"当前步骤"读作 0,点
+ *    「步骤 1」算出 `target == current` 被 [goToOrganizeStep] 直接 return ⇒ 卡死。
  *
  * ⚠️ 本组件注释里那句「内层栈深为 1 时自动让位给外层」保护的是**系统返回手势**
  * (NavHost 的 `enabled = currentBackStack.size > 1`),**页面底栏的按钮绕过了那道护栏**
@@ -65,7 +65,7 @@ fun NavController.popWorkflowStep(): Boolean {
  * 点 Tab 跳转到工作流 A 的某一步,**并保持返回栈是规范的线性链**。
  *
  * **为什么不能直接 `navigate(target)`**:步骤容器是线性流程,返回键的语义是"退一步"。
- * 若在步骤 3 直接 `navigate(WorkflowASortRoute)` 跳到步骤 1,栈会变成
+ * 若在步骤 3 直接 `navigate(OrganizeSortRoute)` 跳到步骤 1,栈会变成
  * `[Sort, Naming, Plan, Sort]`,按一次返回回到 **Plan** —— 与用户的"退一步"预期不符
  * (且 `BackNavigationTest` 用例 5/6 断言了线性后退)。
  * 故**往回跳一律用 pop**,只有往前才 push。
@@ -74,31 +74,31 @@ fun NavController.popWorkflowStep(): Boolean {
  * (`route::class.serializer()`)解析 route,丢掉 type-safe 的编译期检查 ——
  * 那正是本次迁移要换掉的东西。显式 `when` 虽然啰嗦,但每个分支都是具体类型。
  */
-fun NavController.goToWorkflowAStep(current: Int, target: Int) {
+fun NavController.goToOrganizeStep(current: Int, target: Int) {
     if (target == current) return
     if (target < current) {
         // 往回:pop 到目标步(不含目标自身,保留它)
         when (target) {
-            0 -> popBackStack(WorkflowASortRoute, inclusive = false)
-            1 -> popBackStack(WorkflowANamingRoute, inclusive = false)
+            0 -> popBackStack(OrganizeSortRoute, inclusive = false)
+            1 -> popBackStack(OrganizeNamingRoute, inclusive = false)
         }
     } else {
         // 往前:逐级 push,保证中间步骤都在栈上
-        if (current < 1 && target >= 1) navigate(WorkflowANamingRoute)
-        if (current < 2 && target >= 2) navigate(WorkflowAPlanRoute)
+        if (current < 1 && target >= 1) navigate(OrganizeNamingRoute)
+        if (current < 2 && target >= 2) navigate(OrganizePlanRoute)
     }
 }
 
-/** 工作流 B 的点 Tab 跳转。理由同 [goToWorkflowAStep]。 */
-fun NavController.goToWorkflowBStep(current: Int, target: Int) {
+/** 工作流 B 的点 Tab 跳转。理由同 [goToOrganizeStep]。 */
+fun NavController.goToLibraryStep(current: Int, target: Int) {
     if (target == current) return
     if (target < current) {
         when (target) {
-            0 -> popBackStack(WorkflowBLibraryRoute, inclusive = false)
-            else -> popBackStack(WorkflowBMetadataRoute, inclusive = false)
+            0 -> popBackStack(LibraryShelfRoute, inclusive = false)
+            else -> popBackStack(LibraryMetadataRoute, inclusive = false)
         }
     } else {
-        if (current < 1 && target >= 1) navigate(WorkflowBMetadataRoute)
-        if (current < 2 && target >= 2) navigate(WorkflowBPackRoute)
+        if (current < 1 && target >= 1) navigate(LibraryMetadataRoute)
+        if (current < 2 && target >= 2) navigate(LibraryPackRoute)
     }
 }

@@ -19,8 +19,8 @@ import com.cyanix.pixfold.R
  *
  * **为什么抽成共享组件**:台账 §3(P1)记的正是「建议表已有『仅问题 / 全部』筛选,
  * 计划页与报告页都没有」—— 即同一种交互在三处各写一遍,必然漂移。现在命名页
- * ([com.cyanix.pixfold.ui.workflowa.ProposalSummary])、计划页
- * ([com.cyanix.pixfold.ui.workflowa.RenamePlanPage])、报告页
+ * ([com.cyanix.pixfold.ui.organize.ProposalSummary])、计划页
+ * ([com.cyanix.pixfold.ui.organize.RenamePlanPage])、报告页
  * ([com.cyanix.pixfold.ui.plan.ExecutionReportPage]) 共用这一份。
  *
  * **调用方必须自己决定的两件事**(组件不替它猜):
