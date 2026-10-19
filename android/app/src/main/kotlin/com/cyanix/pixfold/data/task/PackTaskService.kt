@@ -269,10 +269,18 @@ class PackTaskService : Service() {
         }
     }
 
-    private fun summaryText(report: ExecutionReport, request: PackTaskRequest): String = getString(
-        R.string.pack_notify_summary,
+    internal fun summaryText(report: ExecutionReport, request: PackTaskRequest): String = getString(
+        // 与「整理图片」共用同一个摘要键（`task_done_summary`）。
+        //
+        // 此前打包侧用的是自己的 `pack_notify_summary`，少了「跳过」这一档 —— 用户
+        // 会看到整理通知写「成功 120 · 跳过 0 · 失败 0」而打包通知只有「成功 5 · 失败 0」，
+        // 同一类结果两种排版。**打包侧的「跳过」不是可省略的细节**：中断后未处理的
+        // 卷会被补成「尚未开始」（`packRunAsExecutionReport` 的 `PackFailNotStarted`），
+        // 它们计入 `skippedCount` —— 不显示这一档，报告就会漏掉「还剩几卷没跑」。
+        R.string.task_done_summary,
         request.workspaceName,
         report.succeededCount,
+        report.skippedCount,
         report.failedCount,
     )
 
@@ -368,15 +376,22 @@ class PackTaskService : Service() {
         // 可划掉的通知，否则等于没发。
         notifications.notify(
             FINAL_NOTIFICATION_ID,
-            NotificationCompat.Builder(this, CHANNEL_ID)
-                .setSmallIcon(R.drawable.ic_pack_progress)
-                .setContentTitle(getString(titleRes))
-                .setContentText(body)
-                .setStyle(NotificationCompat.BigTextStyle().bigText(body))
-                .setAutoCancel(true)
-                .setOngoing(false)
-                .setContentIntent(openAppIntent())
-                .build(),
+            // 走**完成通知**那条渠道（`task_done`），不走进度渠道。
+            //
+            // 进度渠道是**强制静音**的（每几百毫秒更新一次，响铃会炸），而完成
+            // 通知正是该响的那一声。两条渠道分开是唯一能同时满足两者的做法 ——
+            // 渠道的声音设置作用于整条渠道，改不了单条通知。
+            //
+            // 用户 2026-10-19 裁决：「声音和震动就跟随系统吧不做按钮了」。所以
+            // `TaskCompletionNotification` 刻意**不**调 `setSound(null, null)`，
+            // 系统按用户自己设的铃声与震动强度发声。
+            TaskCompletionNotification.build(
+                context = this,
+                smallIcon = R.drawable.ic_pack_progress,
+                title = getString(titleRes),
+                body = body,
+                contentIntent = openAppIntent(),
+            ),
         )
         // 顺带把还挂着的前台进度通知撤掉，避免屏幕上同时留两条（用户从后台
         // 直接点通知回来时，那条 ONGOING 的进度条会误导成「还在跑」）。

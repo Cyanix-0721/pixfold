@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="task_done_channel">任务已完成</string>
+    <string name="task_done_channel_desc">任务结束时发出一条通知。声音与震动跟随系统设置。</string>
+
+    <string name="organize_notify_done">图片整理完成</string>
+
+    <string name="task_done_summary">%1$s · 成功 %2$d · 跳过 %3$d · 失败 %4$d</string>
+</resources>

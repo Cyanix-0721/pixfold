@@ -180,6 +180,18 @@ fun OrganizeSteps(
     workspaceState: WorkspaceState? = null,
     /** 用户要求选择/更换工作区目录。仅 [workspaceState] 非 null 时会被调用。 */
     onPickWorkspace: () -> Unit = {},
+    /**
+     * 任务完成通知的出口（用户 m09108：「让整理图片和打包完成结束后都触发下」）。
+     *
+     * 默认 `null` = **不发通知**，与既有 491 个 UI 测试的行为完全一致
+     * （它们不关心系统通知，注入真实现只会让它们要求通知权限）。
+     *
+     * **为什么用可空端口而不是 Boolean 开关**：与 `PackExecutorPort` 同一理由 ——
+     * 执行/通知这类会碰系统资源的东西，测试里构造不出真实现；用 Boolean 会让
+     * 「忘了传」与「故意不传」在代码里长得一模一样，而这个功能恰恰是「忘了接」
+     * 就静默失效的那一类（没有异常、没有日志，只是永远不响）。
+     */
+    onTaskCompleted: ((ExecutionReport) -> Unit)? = null,
 ) {
     // 跨步骤共享的唯一状态源。这些状态**必须留在嵌套 NavHost 之外** ——
     // 它们要跨步骤存活,而 NavHost 里每个 destination 都是独立作用域。
@@ -470,7 +482,14 @@ fun OrganizeSteps(
                                     confirmFlow = next
                                     if (done) {
                                         val plan = buildLibraryRenamePlan(collections, state.orders, namingState)
-                                        report = executeRenamePlan(plan.ops)
+                                        val finished = executeRenamePlan(plan.ops)
+                                        report = finished
+                                        // 完成通知在这里发，**不**在成功分支里发：
+                                        // 用户要的是「任务结束了」这个信号，全失败也
+                                        // 同样结束了 —— 把通知挂在 succeededCount > 0
+                                        // 上会让「全失败」变成一声不吭，而那正是最需要
+                                        // 让用户知道的场合。
+                                        onTaskCompleted?.invoke(finished)
                                     }
                                 },
                                 onCancelConfirm = { confirmFlow = confirmFlow.cancel() },

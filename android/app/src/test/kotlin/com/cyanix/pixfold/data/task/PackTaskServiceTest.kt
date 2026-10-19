@@ -2,6 +2,11 @@ package com.cyanix.pixfold.data.task
 
 import android.app.NotificationManager
 import androidx.test.core.app.ApplicationProvider
+import com.cyanix.pixfold.R
+import com.cyanix.pixfold.domain.plan.ExecEntry
+import com.cyanix.pixfold.domain.plan.ExecKind
+import com.cyanix.pixfold.domain.plan.ExecOutcome
+import com.cyanix.pixfold.domain.plan.ExecutionReport
 import com.cyanix.pixfold.domain.task.PackTaskPhase
 import com.cyanix.pixfold.domain.task.PackTaskSnapshot
 import com.cyanix.pixfold.domain.task.TaskProgress
@@ -126,6 +131,96 @@ class PackTaskServiceTest {
             shadowOf(manager).getNotification(PackTaskService.NOTIFICATION_ID),
         )
         assertNotNull(shadowOf(manager).getNotification(PackTaskService.FINAL_NOTIFICATION_ID))
+    }
+
+    /**
+     * 结束通知必须走**完成渠道**，不能走进度渠道。
+     *
+     * 进度渠道是刻意静音的（每几百毫秒更新一次，响铃会炸成一片）。结束通知正是
+     * 该响的那一声 —— 如果它复用进度渠道，用户永远听不到「打包好了」。
+     *
+     * 判据取**真的发出来的那条通知**的 `channelId`，不是断常量：变异改的是
+     * `notifyFinal` 里的调用，只断常量的断言照样绿。
+     */
+    @Test
+    fun `notifyFinal posts on the completion channel not the silent progress one`() {
+        val service = startedService()
+        service.notifyFinal(android.R.string.ok, "done")
+
+        val posted = shadowOf(manager).getNotification(PackTaskService.FINAL_NOTIFICATION_ID)
+        assertNotNull(posted)
+        assertEquals(
+            "结束通知必须走不静音的完成渠道 —— 它正是该响的那一声",
+            TaskCompletionNotification.CHANNEL_ID,
+            posted.channelId,
+        )
+        assertNotEquals(
+            "结束通知绝不能落在静音的进度渠道上",
+            PackTaskService.CHANNEL_ID,
+            posted.channelId,
+        )
+    }
+
+    /**
+     * 「打包完成」与「整理完成」的通知正文必须是**同一种排版**。
+     *
+     * 2026-10-19 用户裁决「统一下」之前的真实差异：整理侧写
+     * 「成功 120 · 跳过 0 · 失败 0」，打包侧只有「成功 5 · 失败 0」。
+     *
+     * ## 为什么断言「跳过」这一档，而不是只断「用了同一个键」
+     *
+     * 只断键名的话，把 `task_done_summary` 的参数顺序写错（比如跳过与失败
+     * 互换）照样绿 —— 而用户读到的就是「跳过 3 · 失败 0」这种假读数。
+     * 夹具刻意让三档**数值互不相同**（2 / 3 / 4），再用「跳过与失败互换」
+     * 的那一版做反向断言。
+     *
+     * 打包侧的「跳过」不是可省略的细节：中断后没轮到的卷会被
+     * `packRunAsExecutionReport` 补成「尚未开始」并计入 `skippedCount`
+     * （`PackReportBridge.kt` 末尾那段循环）—— 不显示这一档，
+     * 报告就会漏掉「还剩几卷没跑」。
+     */
+    @Test
+    fun `pack summary shows skipped and failed in the same layout as organize`() {
+        val service = startedService()
+        fun entry(id: String, outcome: ExecOutcome) = ExecEntry(
+            id = id,
+            label = "$id.cbz",
+            outcome = outcome,
+            createdPath = if (outcome == ExecOutcome.Succeeded) "/out/$id.cbz" else null,
+        )
+        val report = ExecutionReport(
+            entries = listOf(
+                entry("a", ExecOutcome.Succeeded),
+                entry("b", ExecOutcome.Succeeded),
+                entry("c", ExecOutcome.Skipped),
+                entry("d", ExecOutcome.Skipped),
+                entry("e", ExecOutcome.Skipped),
+                entry("f", ExecOutcome.Failed),
+                entry("g", ExecOutcome.Failed),
+                entry("h", ExecOutcome.Failed),
+                entry("i", ExecOutcome.Failed),
+            ),
+            kind = ExecKind.Package,
+        )
+        val request = PackTaskRequest(
+            treeUri = "content://test/tree/root",
+            rootDisplayName = "root",
+            plans = emptyList(),
+            workspaceName = "Stress",
+        )
+
+        val text = service.summaryText(report, request)
+
+        assertEquals(
+            "打包完成的正文必须与整理完成共用同一个摘要键（含「跳过」一档）",
+            context.getString(R.string.task_done_summary, "Stress", 2, 3, 4),
+            text,
+        )
+        assertNotEquals(
+            "跳过与失败两档不能互换 —— 那是用户直接读到的假读数",
+            context.getString(R.string.task_done_summary, "Stress", 2, 4, 3),
+            text,
+        )
     }
 
     /** 通知 id 常量必须是稳定的正数：0 与负数在部分 ROM 上有特殊语义。 */

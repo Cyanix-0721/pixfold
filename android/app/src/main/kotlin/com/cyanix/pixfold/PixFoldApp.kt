@@ -20,6 +20,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.Modifier
 import androidx.core.net.toUri
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalResources
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
@@ -46,6 +47,7 @@ import com.cyanix.pixfold.data.saf.AndroidSafSource
 import com.cyanix.pixfold.data.saf.AndroidThumbnailSource
 import com.cyanix.pixfold.data.saf.SafOutputExistsProbe
 import com.cyanix.pixfold.data.saf.SafPackExecutor
+import com.cyanix.pixfold.data.task.TaskCompletionNotification
 import com.cyanix.pixfold.domain.library.LibraryState
 import com.cyanix.pixfold.domain.library.reconcileLibrary
 import com.cyanix.pixfold.ui.workspace.CachingThumbnailSource
@@ -465,6 +467,13 @@ fun PixFoldApp(store: SettingsStore? = null) {
                 }
 
                 composable<OrganizeRoute> {
+                    // 完成通知的文案在**组合期**取：
+                    // 点击回调里 `context.getString(...)` 会撞 lint
+                    // `LocalContextGetResourceValueCall`（回调捕获的 context 可能带着
+                    // 旧 Configuration，语言切换后拿到过时译文）。
+                    val organizeDoneTitle = stringResource(R.string.organize_notify_done)
+                    val workspaceLabel = workspaceHandle?.displayName.orEmpty()
+                    val resources = LocalResources.current
                     DestinationSurface {
                         OrganizeSteps(
                             collections = collections,
@@ -489,6 +498,31 @@ fun PixFoldApp(store: SettingsStore? = null) {
                             // 故不做成第 4 个页签；选目录入口也长在工作流内部，不进首页。
                             workspaceState = workspaceState,
                             onPickWorkspace = { pickWorkspaceFolder.launch(null) },
+                            // 「整理图片」结束 → 发一条完成通知（用户 m09108）。
+                            //
+                            // 走 `TaskCompletionNotification.post`：那条渠道**不静音**，
+                            // 声音与震动由系统设置决定。进度通知用的 `pack_task_live`
+                            // 是强制静音的，两者必须分开（同一个渠道无法同时做到
+                            // 「进度不响」和「完成要响」）。
+                            //
+                            // 文案在**组合期**取好（`context.getString` 在点击回调里读
+                            // 资源会撞 lint `LocalContextGetResourceValueCall`：那条回调
+                            // 捕获的是旧 Configuration）。
+                            onTaskCompleted = { finished ->
+                                TaskCompletionNotification.post(
+                                    context = context,
+                                    id = TaskCompletionNotification.ORGANIZE_NOTIFICATION_ID,
+                                    smallIcon = R.drawable.ic_pack_progress,
+                                    title = resources.getString(R.string.organize_notify_done),
+                                    body = resources.getString(
+                                        R.string.task_done_summary,
+                                        workspaceLabel,
+                                        finished.succeededCount,
+                                        finished.skippedCount,
+                                        finished.failedCount,
+                                    ),
+                                )
+                            },
                         )
                     }
                 }

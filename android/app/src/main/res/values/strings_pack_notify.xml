@@ -23,7 +23,4 @@
     <string name="pack_notify_rejected">Cannot start packaging</string>
     <string name="pack_notify_failed">Packaging failed</string>
 
-    <!-- 收尾正文：工作区 + 成功/失败卷数。失败数即使为 0 也显示，
-         因为「跑了但有一卷失败」是最需要看见的情况。 -->
-    <string name="pack_notify_summary">%1$s · succeeded %2$d · failed %3$d</string>
 </resources>

@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  任务「已完成」通知的文案。
+
+  与 strings_pack_notify.xml（打包进行中的前台服务通知）分开成两条渠道：
+  进度通知必须静音（每几百毫秒更新一次，响铃会炸），完成通知必须能响
+  （用户 2026-10-19 裁决「声音和震动跟随系统」）。
+-->
+<resources>
+    <!-- 渠道名。用户在系统设置的通知列表里看到的就是这一条。 -->
+    <string name="task_done_channel">Task finished</string>
+    <string name="task_done_channel_desc">One notification when a task is done. Sound and vibration follow your system settings.</string>
+
+    <!-- 整理图片完成。正文由 organize_notify_summary 拼。 -->
+    <string name="organize_notify_done">Organizing finished</string>
+    <!-- 打包漫画完成（失败时用 pack_notify_failed 那条作标题）。 -->
+
+    <!-- 完成正文：成功/跳过/失败计数。刻意把「跳过」也列出来 ——
+         用户看到「成功 3」会以为全部处理了，实际可能有 2 项被跳过。 -->
+    <string name="task_done_summary">%1$s · succeeded %2$d · skipped %3$d · failed %4$d</string>
+</resources>

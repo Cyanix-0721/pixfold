@@ -15,6 +15,4 @@
     <string name="pack_notify_cancelled">打包已取消</string>
     <string name="pack_notify_rejected">无法开始打包</string>
     <string name="pack_notify_failed">打包失败</string>
-
-    <string name="pack_notify_summary">%1$s · 成功 %2$d · 失败 %3$d</string>
 </resources>

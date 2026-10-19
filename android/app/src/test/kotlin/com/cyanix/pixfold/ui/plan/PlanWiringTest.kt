@@ -2,15 +2,19 @@ package com.cyanix.pixfold.ui.plan
 
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.getBoundsInRoot
+import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollToNode
+import androidx.compose.ui.test.performTextReplacement
 import com.cyanix.pixfold.R
 import com.cyanix.pixfold.TestText
 import com.cyanix.pixfold.domain.mock.MockData
 import com.cyanix.pixfold.domain.mock.MockDataB
+import com.cyanix.pixfold.domain.plan.ExecutionReport
 import com.cyanix.pixfold.domain.plan.OutputConflictPolicy
 import com.cyanix.pixfold.domain.plan.SourcePolicy
 import com.cyanix.pixfold.ui.organize.TAG_A_PLAN_CLEAN_TOGGLE
@@ -23,6 +27,8 @@ import com.cyanix.pixfold.ui.organize.TAG_STEP_SORT
 import com.cyanix.pixfold.ui.organize.TAG_STEP_BACK
 import com.cyanix.pixfold.ui.organize.TAG_TO_PLAN
 import com.cyanix.pixfold.ui.organize.OrganizeSteps
+import com.cyanix.pixfold.ui.organize.TAG_PROPOSAL_LIST
+import com.cyanix.pixfold.ui.organize.proposalFieldTag
 import com.cyanix.pixfold.ui.library.TAG_B_STEP_BACK
 import com.cyanix.pixfold.ui.library.TAG_B_STEP_PACK
 import com.cyanix.pixfold.ui.library.TAG_CLEAN_EMPTY_TOGGLE
@@ -35,6 +41,7 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
+import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
 /**
@@ -53,9 +60,11 @@ class PlanWiringTest {
 
     // ================= 工作流 A =================
 
-    private fun openOrganizePlanStep() {
+    private fun openOrganizePlanStep(onTaskCompleted: ((ExecutionReport) -> Unit)? = null) {
         val collections = MockData.workspaceA.collections
-        rule.setContent { OrganizeSteps(collections = collections) }
+        rule.setContent {
+            OrganizeSteps(collections = collections, onTaskCompleted = onTaskCompleted)
+        }
         rule.onNodeWithTag(TAG_STEP_NAMING).performClick()
         rule.onNodeWithTag(TAG_TO_PLAN).performClick()
     }
@@ -146,6 +155,48 @@ class PlanWiringTest {
         // 撤销入口常驻底部动作栏(报告 56 行),不再需要滚动
         rule.onNodeWithTag(TAG_REPORT_UNDO).assertIsDisplayed()
     }
+
+    /**
+     * 执行结束后必须**调一次**完成回调（用户裁决 m09108：整理完成要发通知）。
+     *
+     * 为什么单独测：`OrganizeSteps` 的执行是纯模拟，报告照样出现 ——
+     * 也就是说「忘了接回调」在界面上**完全看不出来**，只有通知永远不来。
+     * 这正是 P3 踩过的「能力做完、界面没用」同款失效。
+     */
+    @Test
+    fun `workflow A invokes the completion callback once with the real report`() {
+        val captured = mutableListOf<ExecutionReport>()
+        openOrganizePlanStep(onTaskCompleted = { captured += it })
+
+        clickAPlanConfirm()
+        rule.onNodeWithTag(TAG_CONFIRM_OK).performClick()
+        rule.onNodeWithTag(TAG_REPORT_PAGE).assertIsDisplayed()
+
+        assertEquals(1, captured.size, "完成回调必须恰好调一次，实际 ${captured.size} 次")
+        val report = captured.single()
+        assertTrue(
+            report.succeededCount > 0,
+            "回调拿到的必须是真实执行报告（成功项 > 0），实际 ${report.succeededCount}",
+        )
+    }
+
+    // 刻意**不**测「全失败时也回调」：
+    //
+    // 试过三条路，两条都走不通，第三条不值得：
+    //  1. 清空覆盖输入框 -> `performTextReplacement("")` 触发的是领域层的
+    //     「空 = 撤销覆盖」语义（`model/Naming.kt:115` 的
+    //     `finalName = overrideName ?: proposedName`），名称回到建议值，
+    //     结果照样成功（实测 30 项成功）。
+    //  2. 只喂一个集合以免其他集合的成功项混进来 -> 有帮助，但不足以解决 1。
+    //  3. 造 `isSkipped` 的提案 -> 整理流程的跳过判定在 UI 上没有入口。
+    //
+    // 结论：整理流程的**唯一**失败判据（「新名称为空」）在 UI 层不可达 ——
+    // 它只对「外部构造的计划」有意义。硬造一个走领域层直调的场景，测的就不再是
+    // 这条接线了。
+    //
+    // 变异实测（2026-10-19）佐证：把调用点改成
+    // `if (finished.succeededCount > 0) onTaskCompleted?.invoke(finished)`
+    // 后上面的测试**全部存活** ⇒ 那条断言原本就没有杀伤力，删掉是对的。
 
     // ================= 工作流 B =================
 
