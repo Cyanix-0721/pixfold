@@ -84,6 +84,89 @@ object CbzWriter {
     }
 
     /**
+     * 把一卷的内容写成 CBZ 字节,**图片按流读取**,峰值内存与页大小无关。
+     *
+     * ## 为什么需要与 [write] 并存的第二入口
+     *
+     * [write] 收的是 [CbzEntry] —— 也就是**已经在内存里的** `ByteArray`。
+     * 真机上一条 100MB 的页会直接
+     * `OutOfMemoryError: Failed to allocate a 104857616 byte allocation`
+     * (256MB 堆),进程被杀且留下 0 字节 CBZ。
+     *
+     * STORED 要求写入前已知 `size` / `compressedSize` / `crc`,但满足它**不必**把内容
+     * 留在内存里:对每页读两遍 —— 第一遍流式算 CRC 与长度(边读过丢),第二遍边读边写。
+     *
+     * ## 流的所有权
+     *
+     * **本函数负责关闭** [source] 给出的每一页流(成功或失败都关,用 `use`)。
+     * [out] 仍不关 —— 与 [write] 一致,输出流归调用方。
+     *
+     * @param pages 条目名与取流身份的配对,**顺序即最终页序**
+     * @throws IllegalStateException 当某页在第二遍时读不到了(第一遍探测成功后文件被移走等);
+     *         此时已写入的字节不完整,调用方应当丢弃产物
+     */
+    fun writeStreaming(
+        comicInfoXml: String,
+        pages: List<CbzPageEntry>,
+        source: PageByteSource,
+        out: OutputStream,
+        timeMillis: Long,
+    ) {
+        require(timeMillis > 0) { "timeMillis 必须为正：$timeMillis（时间戳需由调用方显式给定以保证可复现）" }
+
+        val zip = ZipOutputStream(out)
+        zip.setLevel(0)
+
+        val xmlBytes = comicInfoXml.toByteArray(Charsets.UTF_8)
+        zip.putNextEntry(stored(COMIC_INFO_ENTRY, xmlBytes, timeMillis))
+        zip.write(xmlBytes)
+        zip.closeEntry()
+
+        pages.forEach { page ->
+            // 第一遍:只算 size 与 CRC,字节读完即丢。
+            val crc = CRC32()
+            var size = 0L
+            val probe = source.openFor(page.itemId)
+                ?: error("页在写入阶段读不到了：${page.itemId}")
+            probe.use { stream ->
+                val buffer = ByteArray(STREAM_BUFFER_BYTES)
+                while (true) {
+                    val n = stream.read(buffer)
+                    if (n < 0) break
+                    crc.update(buffer, 0, n)
+                    size += n
+                }
+            }
+
+            val entry = ZipEntry(page.fileName)
+            entry.method = ZipEntry.STORED
+            entry.size = size
+            entry.compressedSize = size
+            entry.crc = crc.value
+            entry.time = timeMillis
+            zip.putNextEntry(entry)
+
+            // 第二遍:再读一遍并写出去。
+            val body = source.openFor(page.itemId)
+                ?: error("页在写入阶段读不到了：${page.itemId}")
+            body.use { stream ->
+                val buffer = ByteArray(STREAM_BUFFER_BYTES)
+                while (true) {
+                    val n = stream.read(buffer)
+                    if (n < 0) break
+                    zip.write(buffer, 0, n)
+                }
+            }
+            zip.closeEntry()
+        }
+
+        zip.finish()
+    }
+
+    /** 流式写入时的单次读取缓冲区大小。64 KiB 是流式 I/O 的常见折中:再大对吞吐无益,再小系统调用偏多。 */
+    private const val STREAM_BUFFER_BYTES = 64 * 1024
+
+    /**
      * 造一个 STORED 条目。
      *
      * STORED 要求写入前 size / compressedSize / crc 三者都已确定,

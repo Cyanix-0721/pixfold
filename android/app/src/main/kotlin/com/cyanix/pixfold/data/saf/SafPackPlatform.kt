@@ -12,6 +12,7 @@ import com.cyanix.pixfold.domain.comic.PageBytes
 import com.cyanix.pixfold.domain.model.ComicVolume
 import com.cyanix.pixfold.domain.pack.CbzOutputSink
 import com.cyanix.pixfold.domain.plan.VolumePackPlan
+import java.io.InputStream
 import java.io.OutputStream
 
 /**
@@ -290,6 +291,17 @@ class SafOutputExistsProbe(
  * 打包内核要求「先探测所有页能否取到」,取不到就整卷不下手(不留 0 字节 CBZ)。
  * 探测走的就是这个函数,所以它必须**快且不抛**(抛异常路径拿不到字节,和返回
  * null 的效果一样,但会把异常类型暴露给使用者)。
+ *
+ * ## 为什么 `bytesOf` 不再是打包路径
+ *
+ * 本类同时提供 [openStream]，打包内核会优先用它（见 `streamingPageByteSource`）。
+ * `bytesOf` 只在**没有流能力**的调用方（如小图预览、测试夹具）用得上。
+ *
+ * 真机实证：4 卷 × 4 张 100MB 页在 256MB 堆上，`bytesOf` 里那行
+ * `resolver.openInputStream(uri)?.use { it.readBytes() }` 直接抛
+ * `OutOfMemoryError: Failed to allocate a 104857616 byte allocation`，进程被杀，
+ * 且输出目录留下 0 字节 CBZ。`readBytes()` 的语义就是「整块读进一个 ByteArray」，
+ * 页有多大就申请多大，这在手机堆上没有任何余量。
  */
 class SafPageBytes(context: Context) : PageBytes {
 
@@ -299,6 +311,25 @@ class SafPageBytes(context: Context) : PageBytes {
         resolver.openInputStream(documentUri.toUri())?.use { it.readBytes() }
     } catch (e: Exception) {
         Log.w(TAG, "读取页字节失败: $documentUri", e)
+        null
+    } catch (e: OutOfMemoryError) {
+        // OOM 是 Error 不是 Exception，不会被上面的 catch 接住 —— 而它恰恰是这个
+        // 方法最可能撞上的错误（大图）。转成 null 让调用方走「读不到」分支，
+        // 而不是把整个进程拖死。
+        Log.w(TAG, "读取页字节时内存不足: $documentUri", e)
+        null
+    }
+
+    /**
+     * 打开页的输入流，**不预读**。
+     *
+     * 返回的流由调用方负责关闭（打包内核用 `use` 包住）。这里刻意不做任何缓冲：
+     * 调用方会按 64 KiB 分块读两遍（算 CRC / 写出），峰值内存与页大小无关。
+     */
+    fun openStream(documentUri: String): InputStream? = try {
+        resolver.openInputStream(documentUri.toUri())
+    } catch (e: Exception) {
+        Log.w(TAG, "打开页流失败: $documentUri", e)
         null
     }
 

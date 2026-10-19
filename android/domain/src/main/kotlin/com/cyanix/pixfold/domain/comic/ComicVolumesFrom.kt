@@ -5,6 +5,7 @@ import com.cyanix.pixfold.domain.model.ImageCollection
 import com.cyanix.pixfold.domain.model.Suggestion
 import com.cyanix.pixfold.domain.naming.DerivedNames
 import com.cyanix.pixfold.domain.pack.PageByteSource
+import java.io.InputStream
 
 /**
  * 把工作区扫描结果折成工作流 B 的卷列表 —— **真实素材进打包链的唯一入口**。
@@ -190,6 +191,18 @@ private const val NO_SUGGESTION_SOURCE = ""
 fun interface PageBytes {
     /** 取某一页的字节;读不到返回 `null`(业务分支,不抛)。 */
     fun bytesOf(documentUri: String): ByteArray?
+
+    /**
+     * 按**流**打开某一页;打不开返回 `null`。
+     *
+     * 打包内核走流式路径时优先用它(见 `streamingPageByteSource`),因为 [bytesOf]
+     * 会把整页读进 `ByteArray` —— 真机上 100MB 的页在 256MB 堆直接
+     * `OutOfMemoryError`,且留下 0 字节 CBZ。
+     *
+     * 默认实现退化成「取字节再包成流」,所以既有实现不必改;SAF 实现
+     * (`SafPageBytes`)应当覆写它。
+     */
+    fun openFor(documentUri: String): InputStream? = bytesOf(documentUri)?.inputStream()
 }
 
 /**
@@ -205,9 +218,17 @@ fun pageByteSourceOf(
     pages: Map<String, String>,
     bytes: PageBytes,
 ): PageByteSource =
-    PageByteSource { itemId ->
-        val uri = pages[itemId] ?: return@PageByteSource null
-        bytes.bytesOf(uri)
+    object : PageByteSource {
+        override fun bytesOf(itemId: String): ByteArray? {
+            val uri = pages[itemId] ?: return null
+            return bytes.bytesOf(uri)
+        }
+
+        // 流式路径:把 uri 映射后直接开流,不经过 bytesOf 的整块读。
+        override fun openFor(itemId: String): InputStream? {
+            val uri = pages[itemId] ?: return null
+            return bytes.openFor(uri)
+        }
     }
 
 /**

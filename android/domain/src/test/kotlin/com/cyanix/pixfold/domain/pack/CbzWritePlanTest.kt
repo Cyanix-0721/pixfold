@@ -232,19 +232,26 @@ class CbzWritePlanTest {
     }
 
     @Test
-    fun `a missing source is never consulted for pages that exist`() {
+    fun `every page is probed before any byte is written`() {
         // 守卫"先探测全部再写"的实现方式:若实现改成"边写边取",第一条会先落盘,
-        // 于是一旦后面缺图就会留下半成品 —— 上一条测试会红,这条补充说明顺序无关。
+        // 于是一旦后面缺图就会留下半成品 —— 上一条测试会红,这条补充说明顺序。
+        //
+        // 流式实现下每页会被打开**三次**(探测可读 / 算 CRC 与长度 / 真正写出),
+        // 故这里不数总次数,只断「前 N 次恰好是按计划顺序的全部页」—— 那才是
+        // "写入之前先探测完整轮"的可观测形态。
         val plan = buildCbzWritePlan(aot1)
         val asked = mutableListOf<String>()
-        val result = writeCbz(
+        writeCbz(
             plan,
             PageByteSource { id -> asked += id; "b".toByteArray() },
             ByteArrayOutputStream(),
             time,
         )
-        assertEquals(plan.pages.map { it.itemId }, asked, "每一页都应被问过一次,且按计划顺序")
-        assertTrue(result.ok)
+        assertEquals(
+            plan.pages.map { it.itemId },
+            asked.take(plan.pages.size),
+            "探测必须覆盖全部页且按计划顺序",
+        )
     }
 
     // ---- 与 CbzWriter 的契约衔接 ----

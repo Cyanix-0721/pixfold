@@ -175,7 +175,15 @@ private fun writeOne(
     val cbzPlan = buildCbzWritePlan(plan.volume)
 
     // ① 先探测:缺页就到此为止,输出文件根本不会被创建。
-    val missing = cbzPlan.pages.filter { bytes.bytesOf(it.itemId) == null }
+    //
+    // 探测**只问能不能打开**,不读内容 —— 旧实现调 `bytesOf` 会把整页读进内存,
+    // 在 256MB 堆上遇到 100MB 的页直接 OOM(真机实测,且留下 0 字节 CBZ)。
+    // 开完立即关,避免泄漏文件描述符。
+    val missing = cbzPlan.pages.filter { page ->
+        val stream = bytes.openFor(page.itemId) ?: return@filter true
+        runCatching { stream.close() }
+        false
+    }
     if (missing.isNotEmpty()) return PackRunOutcome.MissingPages(missing)
 
     // ② 再开流。

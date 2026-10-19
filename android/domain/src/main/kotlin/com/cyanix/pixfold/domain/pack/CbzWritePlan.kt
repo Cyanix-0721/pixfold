@@ -3,6 +3,7 @@ package com.cyanix.pixfold.domain.pack
 import com.cyanix.pixfold.domain.comic.ComicInfo
 import com.cyanix.pixfold.domain.comic.renumberPages
 import com.cyanix.pixfold.domain.model.ComicVolume
+import java.io.InputStream
 import java.io.OutputStream
 
 /**
@@ -70,7 +71,45 @@ data class CbzPageEntry(val itemId: String, val fileName: String)
  */
 fun interface PageByteSource {
     fun bytesOf(itemId: String): ByteArray?
+
+    /**
+     * 按**流**打开某一页;打不开返回 `null`(与 [bytesOf] 同一业务分支语义)。
+     *
+     * ## 为什么除了 [bytesOf] 还要这个方法
+     *
+     * 真机实测(`/storage/emulated/0/test/cancel`,4 卷 × 4 张 100MB 页):旧实现走
+     * 平台层 `openInputStream(...).readBytes()` 把整页读进 `ByteArray`,在 256MB 堆上
+     * 直接抛 `OutOfMemoryError: Failed to allocate a 104857616 byte allocation`,
+     * 抛出点是 `SafPackPlatform.kt:299` 的 `readBytes`,进程被系统杀掉,
+     * **并在输出目录留下 0 字节 CBZ**。
+     *
+     * `ZipEntry.STORED` 确实要求写入前已知 size 与 CRC(见 `CbzWriter.stored`),
+     * 这条硬约束绕不过。但「先知道 size/CRC」**不等于「整页必须留在内存」** ——
+     * 可以第一遍流式读过算 CRC 与长度(边读过丢),第二遍再流式写出,
+     * 峰值内存从「页大小 + 一份」降到「一个缓冲区」。
+     *
+     * 默认实现退化成「取字节再包成流」,所以**内存实现与既有测试都不用改**;
+     * 平台层应当覆写它,否则大图仍会 OOM。
+     *
+     * 实现必须能对同一 itemId **重复打开**(STORED 天然要读两遍),且无副作用。
+     */
+    fun openFor(itemId: String): InputStream? = bytesOf(itemId)?.inputStream()
 }
+
+/**
+ * 用「开流」能力构造一个 [PageByteSource]。
+ *
+ * 存在的理由:[PageByteSource] 是 `fun interface`,SAM 构造只能填 [PageByteSource.bytesOf],
+ * 想**只**提供流式能力时语法上办不到。平台层两个方法都覆写即可(见 `SafPackBytes`);
+ * 测试夹具用这个工厂更省事。
+ */
+fun streamingPageByteSource(open: (String) -> InputStream?): PageByteSource =
+    object : PageByteSource {
+        override fun bytesOf(itemId: String): ByteArray? =
+            open(itemId)?.use { it.readBytes() }
+
+        override fun openFor(itemId: String): InputStream? = open(itemId)
+    }
 
 /**
  * 一次写入的结果。
@@ -132,16 +171,24 @@ fun writeCbz(
     // 「缺图」而不是指出时间戳有问题。
     require(timeMillis > 0) { "timeMillis 必须为正：$timeMillis（时间戳需由调用方显式给定以保证可复现）" }
 
-    val resolved = plan.pages.map { it to source.bytesOf(it.itemId) }
-    val missing = resolved.filter { it.second == null }.map { it.first }
+    // 探测顺序:先确认每一页都**能打开**,缺任何一页立即返回(一个字节都不写)。
+    //
+    // 这里**不再**把字节取成 ByteArray —— 那正是 OOM 的来源。探测只需要"能不能打开",
+    // 打开后立刻关掉:留着不关会泄漏文件描述符(一次打包几百页就能耗尽 fd)。
+    val missing = plan.pages.filter { page ->
+        val stream = source.openFor(page.itemId) ?: return@filter true
+        runCatching { stream.close() }
+        false
+    }
     if (missing.isNotEmpty()) {
         return CbzWriteResult(writtenEntries = emptyList(), missing = missing)
     }
 
-    val entries = resolved.map { (page, bytes) -> CbzEntry(page.fileName, bytes!!) }
-    CbzWriter.write(plan.comicInfoXml, entries, out, timeMillis)
+    // 流式写入:每页两遍 —— 第一遍算 size/CRC(边读过丢),第二遍写出去。
+    // 峰值内存 = 一个缓冲区,与页大小无关。
+    CbzWriter.writeStreaming(plan.comicInfoXml, plan.pages, source, out, timeMillis)
     return CbzWriteResult(
-        writtenEntries = listOf(CbzWriter.COMIC_INFO_ENTRY) + entries.map { it.name },
+        writtenEntries = listOf(CbzWriter.COMIC_INFO_ENTRY) + plan.pages.map { it.fileName },
         missing = emptyList(),
     )
 }
