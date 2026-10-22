@@ -35,15 +35,16 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.res.vectorResource
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.cyanix.pixfold.R
-import com.cyanix.pixfold.domain.comic.applyWriterCleaning
 import com.cyanix.pixfold.domain.comic.defaultCbzName
 import com.cyanix.pixfold.domain.comic.setMetaValue
 import com.cyanix.pixfold.domain.comic.useSuggestion
@@ -58,10 +59,21 @@ import com.cyanix.pixfold.domain.library.selectVolume
 import com.cyanix.pixfold.domain.library.setVolumeIncluded
 import com.cyanix.pixfold.domain.library.updateVolume
 import com.cyanix.pixfold.ui.components.ChipRowTags
+import com.cyanix.pixfold.ui.components.MetaActionButton
 import com.cyanix.pixfold.ui.components.PageActionBar
 import com.cyanix.pixfold.ui.components.VolumeChipRows
 import com.cyanix.pixfold.ui.text.textOf
 import com.cyanix.pixfold.ui.text.textOfOrNull
+
+/**
+ * 字段编辑器的最大显示行数。
+ *
+ * 取 4 而不是无限:元数据字段是**短文本**(标题/作者/系列名),正常不超过两行;
+ * 留 4 行给超长标题足够,同时挡住「粘贴一整篇文章把整页顶开」。
+ * 超过这个高度后输入框内部纵向滚动 —— 纵向滚动**不影响**拖拽选择(手柄在
+ * 视口内就能拖到视口内任意位置,纵向滚动条本身可拖),与单行的横向滚动不是一回事。
+ */
+private const val META_FIELD_MAX_LINES = 4
 
 const val TAG_METADATA_PAGE = "metadata-page"
 const val TAG_METADATA_LIST = "metadata-list"
@@ -94,7 +106,6 @@ const val TAG_BATCH_RESULT = "metadata-batch-result"
 const val TAG_BATCH_FIELD = "metadata-batch-field"
 const val TAG_BATCH_VALUE = "metadata-batch-value"
 const val TAG_BATCH_FORCE = "metadata-batch-force"
-const val TAG_WRITER_CLEAN = "metadata-writer-clean"
 
 /** 「下一步 打包计划」按钮(常驻底栏)。 */
 const val TAG_METADATA_NEXT = "metadata-next"
@@ -120,9 +131,6 @@ fun metaSuggestionTag(field: MetaField) = "metadata-suggestion-${field.name}"
 
 /** 语言下拉框。 */
 const val TAG_LANGUAGE_FIELD = "metadata-field-Language"
-
-/** "其他 ISO 639-1" 的手输代码框(仅 Other 时出现)。 */
-const val TAG_OTHER_LANG_CODE = "metadata-other-lang-code"
 
 /** 步骤 2 切换到某卷的 chip。 */
 fun volumeChipTag(id: String) = "metadata-volume-chip-$id"
@@ -162,7 +170,15 @@ fun MetadataPage(
     onNext: (() -> Unit)? = null,
     onBack: (() -> Unit)? = null,
 ) {
-    var state by remember { mutableStateOf(libraryState) }
+    // **必须带 key**(2026-10-22 修)。
+    //
+    // 无参 `remember` 只会在首次组合时用 `libraryState` 播种,之后上层把新状态传下来
+    // (例如页签行的「按目录结构获取」改了当前卷的字段)时,本地副本仍是旧的 ⇒
+    // **输入框看起来毫无反应**。这与 D2a 那轮「热切换工作区后白屏」是同一个成因:
+    // 上层给新状态、下层 remember 不重新播种。
+    //
+    // 带 key 不会丢本地编辑:每次编辑都经 `update` 同步回上层,上层始终是最新的。
+    var state by remember(libraryState) { mutableStateOf(libraryState) }
     fun update(next: LibraryState) {
         state = next
         onLibraryChange(next)
@@ -239,14 +255,14 @@ fun MetadataPage(
                 // 系列芯片显示组名 + 卷数;单本芯片显示卷标题(与 2 级行同一文案,
                 // 因为单本只有自己一卷,再标「1 卷」是噪声)。
                 if (group.isSeries) {
-                    Text(stringResource(R.string.meta_series_chip, group.name, group.members.size))
+                    stringResource(R.string.meta_series_chip, group.name, group.members.size)
                 } else {
-                    Text(group.name)
+                    group.name
                 }
             },
             topAllEntryText = { n -> pluralStringResource(R.plurals.volume_group_all, n, n) },
             childChipDescription = { v -> stringResource(R.string.meta_volume_chip_cd, v.id) },
-            childChipLabel = { v -> Text(v.title.ifEmpty { v.id }) },
+            childChipLabel = { v -> v.title.ifEmpty { v.id } },
             childAllEntryText = { n -> pluralStringResource(R.plurals.volume_all, n, n) },
         )
 
@@ -305,23 +321,8 @@ fun MetadataPage(
                             volume.writerSug.value.orEmpty(),
                             volume.writerSug.source,
                         ),
-                        extraAction = {
-                            val cleanCd = stringResource(R.string.meta_writer_clean_cd)
-                            TextButton(
-                                onClick = { update(updateVolume(state, applyWriterCleaning(volume))) },
-                                enabled = volume.writerCleanedSug.hasValue,
-                                modifier = Modifier
-                                    .testTag(TAG_WRITER_CLEAN)
-                                    .semantics { contentDescription = cleanCd },
-                            ) { Text(stringResource(R.string.meta_writer_clean)) }
-                        },
-                        extraHint = volume.writerCleanedSug.value?.let {
-                            stringResource(
-                                R.string.meta_writer_cleaned_hint,
-                                it,
-                                volume.writerCleanedSug.source,
-                            )
-                        },
+                        // 「按目录结构获取」已上移到**页签行**右侧(作用于当前卷全部字段,
+                        // 不只作者) —— 用户 2026-10-22 裁决。本行只留「恢复建议值」。
                         onValue = { update(updateVolume(state, setMetaValue(volume, MetaField.Writer, MetaValue.Text(it)))) },
                         onReset = { update(updateVolume(state, useSuggestion(volume, MetaField.Writer))) },
                     )
@@ -339,19 +340,7 @@ fun MetadataPage(
                                     setMetaValue(
                                         volume,
                                         MetaField.Language,
-                                        MetaValue.Language(choice, volume.otherLangCode),
-                                    ),
-                                ),
-                            )
-                        },
-                        onOtherCode = { code ->
-                            update(
-                                updateVolume(
-                                    state,
-                                    setMetaValue(
-                                        volume,
-                                        MetaField.Language,
-                                        MetaValue.Language(LangChoice.Other, code),
+                                        MetaValue.Language(choice),
                                     ),
                                 ),
                             )
@@ -586,6 +575,12 @@ private fun TextFieldRow(
         // 字段名来自领域枚举的 textKey(不是成品字符串);`testTag` 用 `field.name` 保持语言无关。
         val fieldLabel = textOf(field.textKey)
         val resetCd = stringResource(R.string.meta_reset_cd, fieldLabel)
+        // **空值就在这一格标红**(2026-10-22 用户原话:「我说的不是顶部的待确认,
+        // 而是卷号那样空值的红色警告」)。判据来自 `volume.pendingIssueOf(field)`,
+        // 与页头汇总共用同一份映射 —— 两处各写一份的话迟早出现
+        // 「页头说标题缺失、标题框却不标红」这种用户看得见的分歧。
+        val pending = volume.pendingIssueOf(field)
+        val pendingText = pending?.let { textOf(it) }
         Row(
             modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically,
@@ -593,21 +588,31 @@ private fun TextFieldRow(
         ) {
             OutlinedTextField(
                 value = value,
-                onValueChange = onValue,
+                // **不用 `singleLine = true`**:单行输入框在文本超宽时只能横向滚动,
+                // 而 Compose 的拖拽选择手柄拖动时**不会**驱动这个横向滚动 ——
+                // 用户把光标拖到输入框右边缘就再也拖不动,视口外的那半截文字只能靠
+                // 输入法的左右移动键够到(用户 2026-10-20 报告的就是这个现象)。
+                //
+                // 改成多行软换行后,长文本折行显示、每个字符都落在视口内,
+                // 拖拽手柄自然能拖到任意位置。换行符本身仍然禁止(见 onValueChange),
+                // 因为文件名/元数据里出现换行会破坏 `<Title>` 这类单值标签。
+                onValueChange = { onValue(it.replace("\n", "").replace("\r", "")) },
                 label = { Text(fieldLabel) },
-                singleLine = true,
+                maxLines = META_FIELD_MAX_LINES,
+                isError = pending != null,
+                supportingText = pendingText?.let { text -> { Text(text) } },
                 modifier = Modifier
                     .weight(1f)
                     .testTag(metaFieldTag(field)),
             )
             extraAction?.invoke()
-            TextButton(
+            MetaActionButton(
+                icon = ImageVector.vectorResource(R.drawable.ic_undo),
+                description = resetCd,
                 onClick = onReset,
+                tag = metaResetTag(field),
                 enabled = field in volume.overridden,
-                modifier = Modifier
-                    .testTag(metaResetTag(field))
-                    .semantics { contentDescription = resetCd },
-            ) { Text(stringResource(R.string.meta_reset)) }
+            )
         }
         Text(
             text = stringResource(R.string.meta_suggestion_prefix, suggestionText),
@@ -664,13 +669,13 @@ private fun VolumeNumberRow(
                     .weight(1f)
                     .testTag(metaFieldTag(MetaField.Volume)),
             )
-            TextButton(
+            MetaActionButton(
+                icon = ImageVector.vectorResource(R.drawable.ic_undo),
+                description = resetCd,
                 onClick = onReset,
+                tag = metaResetTag(MetaField.Volume),
                 enabled = MetaField.Volume in volume.overridden,
-                modifier = Modifier
-                    .testTag(metaResetTag(MetaField.Volume))
-                    .semantics { contentDescription = resetCd },
-            ) { Text(stringResource(R.string.meta_reset)) }
+            )
         }
         Text(
             text = stringResource(
@@ -700,13 +705,10 @@ private fun VolumeNumberRow(
 private fun LanguageRow(
     volume: ComicVolume,
     onChoice: (LangChoice) -> Unit,
-    onOtherCode: (String) -> Unit,
     onReset: () -> Unit,
 ) {
     var expanded by remember { mutableStateOf(false) }
-    val unset = volume.language == LangChoice.Unset
     val languageLabel = textOf(MetaField.Language.textKey)
-    val unsetError = stringResource(R.string.meta_lang_unset_error)
     // 「恢复建议值 LanguageISO」里的 LanguageISO 是 ComicInfo.xml 的**标签名**,不翻译,
     // 故这里刻意用 `domain_meta_field_language`(`translatable="false"`)而非界面语言。
     val resetCd = stringResource(R.string.meta_reset_cd, languageLabel)
@@ -729,12 +731,6 @@ private fun LanguageRow(
                     onValueChange = {},
                     readOnly = true,
                     label = { Text(languageLabel) },
-                    isError = unset,
-                    supportingText = if (unset) {
-                        { Text(unsetError) }
-                    } else {
-                        null
-                    },
                     trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
                     modifier = Modifier
                         .menuAnchor(ExposedDropdownMenuAnchorType.PrimaryNotEditable)
@@ -753,24 +749,12 @@ private fun LanguageRow(
                     }
                 }
             }
-            TextButton(
+            MetaActionButton(
+                icon = ImageVector.vectorResource(R.drawable.ic_undo),
+                description = resetCd,
                 onClick = onReset,
+                tag = metaResetTag(MetaField.Language),
                 enabled = MetaField.Language in volume.overridden,
-                modifier = Modifier
-                    .testTag(metaResetTag(MetaField.Language))
-                    .semantics { contentDescription = resetCd },
-            ) { Text(stringResource(R.string.meta_reset)) }
-        }
-
-        if (volume.language == LangChoice.Other) {
-            OutlinedTextField(
-                value = volume.otherLangCode,
-                onValueChange = onOtherCode,
-                label = { Text(stringResource(R.string.meta_lang_code_label)) },
-                singleLine = true,
-                modifier = Modifier
-                    .width(200.dp)
-                    .testTag(TAG_OTHER_LANG_CODE),
             )
         }
 
@@ -860,9 +844,10 @@ private fun BatchSection(
         ) {
             OutlinedTextField(
                 value = text,
-                onValueChange = { text = it },
+                // 与字段编辑器同因:单行横向滚动下拖拽手柄够不到视口外的字符
+                onValueChange = { text = it.replace("\n", "").replace("\r", "") },
                 label = { Text(valueLabel) },
-                singleLine = true,
+                maxLines = META_FIELD_MAX_LINES,
                 modifier = Modifier
                     .weight(1f)
                     .testTag(TAG_BATCH_VALUE),

@@ -14,7 +14,9 @@ import com.cyanix.pixfold.domain.sort.pageOrderOf
 import kotlin.test.Test
 import kotlin.test.assertContains
 import kotlin.test.assertEquals
+import kotlin.test.assertNull
 import kotlin.test.assertFalse
+import kotlin.test.assertNotEquals
 import kotlin.test.assertTrue
 
 /**
@@ -42,7 +44,8 @@ class ComicMetadataTest {
         // aot-2 的建议语言是 ja(低置信) —— 但当前值不得自动采纳。
         assertEquals("ja", aot2.langSug.value, "前提:该卷确实有语言建议")
         assertEquals(LangChoice.Unset, aot2.language, "语言默认必须是「未设置」,不能采纳建议")
-        assertTrue(Msg(TextKey.PendingLanguage) in aot2.pendingIssues, "未设置语言必须进待确认项")
+        // Unset 是合法终态,不再进待确认项(2026-10-20 用户裁决,推翻验收第 12 项)
+        assertFalse(Msg(TextKey.PendingLanguage) in aot2.pendingIssues, "语言不该再进待确认项")
     }
 
     @Test
@@ -54,26 +57,28 @@ class ComicMetadataTest {
         // 建议的来源字符串必须存在且人类可读(建议 ≠ 事实,UI 要显示来源)
         assertTrue(aot2.titleSug.source.isNotEmpty())
         assertTrue(aot2.volumeSug.source.contains("第02卷"))
-        assertEquals("清理规则：去作者前缀 / 括号原作 / 尾部标签", aot2.writerCleanedSug.source)
+        assertEquals("目录名开头的 [作者] 前缀（已去掉方括号）", aot2.dirWriterSug.source)
     }
 
     @Test
     fun `volume without a parsed number keeps a null suggestion and is pending`() {
         assertEquals(null, aot0.volumeSug.value)
         assertEquals(null, aot0.volume)
-        assertEquals(listOf(Msg(TextKey.PendingLanguage), Msg(TextKey.PendingVolume)), aot0.pendingIssues)
+        assertEquals(listOf(Msg(TextKey.PendingVolume)), aot0.pendingIssues)
     }
 
     // ================= L15 pendingIssues 顺序与内容 =================
 
     @Test
-    fun `pendingIssues uses the fixed order language then volume`() {
-        assertEquals(listOf(Msg(TextKey.PendingLanguage), Msg(TextKey.PendingVolume)), aot0.pendingIssues)
+    fun `pendingIssues only carries the missing volume`() {
+        // 语言项已于 2026-10-20 移除(Unset 即终态);只剩卷号缺失
+        assertEquals(listOf(Msg(TextKey.PendingVolume)), aot0.pendingIssues)
 
-        val noLangOnly = op101 // 语言建议为 null -> 仍待确认;卷号有值
-        assertEquals(listOf(Msg(TextKey.PendingLanguage)), noLangOnly.pendingIssues)
+        // 卷号有值时,即使语言是 Unset 也不算待确认
+        val noLangOnly = op101
+        assertEquals(emptyList(), noLangOnly.pendingIssues)
+        assertFalse(noLangOnly.needsConfirmation, "语言 Unset 不再构成待确认")
 
-        // 两项都确认后清空
         val confirmed = op102.copy(language = LangChoice.Zh)
         assertEquals(emptyList(), confirmed.pendingIssues)
         assertFalse(confirmed.needsConfirmation)
@@ -83,13 +88,58 @@ class ComicMetadataTest {
 
     @Test
     fun `L11 language not written renders a self-closing empty tag`() {
-        // Skip = 不写入标签 -> 空标签(不是"省略该标签")
-        val xml = ComicInfo.build(op102.copy(language = LangChoice.Skip))
+        // Unset = 不写入标签 -> 空标签(不是"省略该标签")
+        val xml = ComicInfo.build(op102.copy(language = LangChoice.Unset))
         assertContains(xml, "<LanguageISO />")
         assertFalse(xml.contains("<LanguageISO>"), "不写入时不应有带值标签")
 
         // Unset 同样不写入(与归档一致)
         assertContains(ComicInfo.build(op102), "<LanguageISO />")
+    }
+
+    @Test
+    fun `every blank optional field raises its own pending hint`() {
+        // 2026-10-22 用户裁决:「其他几个可选项缺失的警告补上」。
+        // 判据是「有没有值」而不是「有没有被覆盖」—— 目录名解析不出就是空。
+        val blank = aot2.copy(title = "", series = "", writer = "", volume = null)
+        val keys = blank.pendingIssues.map { it.key }
+        assertEquals(
+            listOf(
+                TextKey.PendingTitle,
+                TextKey.PendingSeries,
+                TextKey.PendingVolume,
+                TextKey.PendingWriter,
+            ),
+            keys,
+            "标题 / 系列 / 卷号 / 作者四项为空时各给一条,且顺序固定",
+        )
+    }
+
+    @Test
+    fun `a cleared title raises its own pending hint`() {
+        // 标题这条我漏过一轮,理由是「标题几乎总能从目录名得到」—— 站不住:
+        // titleSug 只是**建议值**,输入框可以被用户清空,清空后 XML 就是 <Title />。
+        // 这条专门钉住「清空标题必须提醒」,与「通常能解析出来」无关。
+        val cleared = aot2.copy(title = "")
+        assertTrue(
+            cleared.pendingIssues.any { it.key == TextKey.PendingTitle },
+            "清空标题后必须出现标题缺失提示",
+        )
+    }
+
+    @Test
+    fun `filled series and writer raise no hint`() {
+        val full = aot2.copy(title = "T", series = "S", writer = "W", volume = 3)
+        assertTrue(full.pendingIssues.isEmpty(), "四项都有值时不该有任何待确认项")
+        assertFalse(full.needsConfirmation)
+    }
+
+    @Test
+    fun `whitespace only values count as missing`() {
+        // 只填空格在界面上看着像「填了」,写进 XML 却是空白 —— 按缺失处理。
+        val spaced = aot2.copy(series = "   ", writer = " ", volume = 3)
+        val keys = spaced.pendingIssues.map { it.key }
+        assertEquals(listOf(TextKey.PendingSeries, TextKey.PendingWriter), keys)
     }
 
     @Test
@@ -100,8 +150,8 @@ class ComicMetadataTest {
 
     @Test
     fun `xml field order is fixed`() {
-        val xml = ComicInfo.build(aot2)
         // 用起始标签前缀匹配:空值字段渲染为自闭合标签(<LanguageISO />),不带 ">"
+        val xml = ComicInfo.build(aot2)
         val order = listOf("<Title", "<Series", "<Number", "<Writer", "<LanguageISO")
             .map { xml.indexOf(it) }
         assertTrue(order.all { it >= 0 }, "五个字段都应出现")
@@ -110,15 +160,53 @@ class ComicMetadataTest {
 
     @Test
     fun `xml uses two space indent and self-closing empty tags for blank values`() {
-        val empty = aot2.copy(title = "", series = "", writer = "", volume = null)
+        val empty = aot2.copy(
+            title = "", series = "", writer = "", volume = null,
+            language = LangChoice.Unset,
+        )
         val xml = ComicInfo.build(empty)
-        assertContains(xml, "  <Title />")
-        assertContains(xml, "  <Series />")
-        assertContains(xml, "  <Number />")
-        assertContains(xml, "  <Writer />")
+        // 2026-10-22 用户裁决:五个字段**全部统一**写自闭合空标签,没有例外
+        // (此前 <Number> 是唯一省略的字段,已改回)。
+        for (tag in listOf("Title", "Series", "Number", "Writer", "LanguageISO")) {
+            assertContains(xml, "  <$tag />")
+        }
         assertTrue(xml.endsWith("</ComicInfo>\n"), "每行以 \\n 结尾")
         assertContains(xml, "<?xml version=\"1.0\" encoding=\"utf-8\"?>")
         assertContains(xml, "xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\"")
+    }
+
+    @Test
+    fun `a volume without a number still writes a self-closing Number tag`() {
+        // 2026-10-22 用户裁决:五个字段一律写自闭合空标签,<Number> 不再是例外。
+        // 原实现省略 <Number>(担心被读成第 0 卷),理由是猜测性的;统一更重要。
+        val noNumber = aot2.copy(volume = null)
+        val xml = ComicInfo.build(noNumber)
+        assertContains(xml, "  <Number />")
+        // 其余字段照旧(空值仍写自闭合标签)
+        assertContains(xml, "<Title>")
+
+        // 有卷号时正常写出,且仍排在 Series 与 Writer 之间
+        val withNumber = aot2.copy(volume = 7)
+        val numbered = ComicInfo.build(withNumber)
+        assertContains(numbered, "<Number>7</Number>")
+        assertTrue(
+            numbered.indexOf("<Series") < numbered.indexOf("<Number") &&
+                numbered.indexOf("<Number") < numbered.indexOf("<Writer"),
+            "Number 仍须位于 Series 与 Writer 之间",
+        )
+    }
+
+    @Test
+    fun `an empty Number tag does not silence the missing volume hint`() {
+        // 用户裁决:空卷号写自闭合标签,但「卷号缺失」的待确认提示必须保留 ——
+        // 那是给用户的提示,不是给阅读器的数据。两者容易一起被误删。
+        val noNumber = aot2.copy(volume = null)
+        assertContains(ComicInfo.build(noNumber), "  <Number />")
+        assertTrue(
+            noNumber.pendingIssues.any { it.key == TextKey.PendingVolume },
+            "卷号为空时 pendingIssues 必须仍含 PendingVolume",
+        )
+        assertTrue(noNumber.needsConfirmation, "卷号为空仍应算「有待确认项」")
     }
 
     @Test
@@ -235,20 +323,9 @@ class ComicMetadataTest {
 
     @Test
     fun `langIso maps every choice`() {
-        assertEquals("zh", langIso(LangChoice.Zh, null))
-        assertEquals("ja", langIso(LangChoice.Ja, null))
-        assertEquals("fr", langIso(LangChoice.Other, "fr"))
-        assertEquals(null, langIso(LangChoice.Other, ""))
-        assertEquals(null, langIso(LangChoice.Other, null))
-        assertEquals(null, langIso(LangChoice.Unset, null))
-        assertEquals(null, langIso(LangChoice.Unknown, null))
-        assertEquals(null, langIso(LangChoice.Skip, null))
-    }
-
-    @Test
-    fun `other language code is written verbatim without validation`() {
-        val v = op102.copy(language = LangChoice.Other, otherLangCode = "zzz-不合法")
-        assertContains(ComicInfo.build(v), "<LanguageISO>zzz-不合法</LanguageISO>")
+        assertEquals("zh", langIso(LangChoice.Zh))
+        assertEquals("ja", langIso(LangChoice.Ja))
+        assertEquals(null, langIso(LangChoice.Unset))
     }
 
     // ================= L14 批量设置不覆盖逐项例外 =================
@@ -389,13 +466,13 @@ class ComicMetadataTest {
     }
 
     @Test
-    fun `useSuggestion for language returns to Unset and clears the manual code`() {
-        val picked = setMetaValue(aot2, MetaField.Language, MetaValue.Language(LangChoice.Other, "fr"))
-        assertEquals("fr", picked.otherLangCode)
+    fun `useSuggestion for language returns to Unset`() {
+        val picked = setMetaValue(aot2, MetaField.Language, MetaValue.Language(LangChoice.Zh))
+        assertEquals("zh", langIso(picked.language))
         val restored = useSuggestion(picked, MetaField.Language)
         assertEquals(LangChoice.Unset, restored.language)
-        assertEquals("", restored.otherLangCode)
-        assertEquals(Msg(TextKey.PendingLanguage), restored.pendingIssues.first())
+        // Unset 是合法终态,不再进待确认项(2026-10-20 裁决)
+        assertFalse(Msg(TextKey.PendingLanguage) in restored.pendingIssues)
     }
 
     @Test
@@ -406,10 +483,47 @@ class ComicMetadataTest {
     }
 
     @Test
-    fun `writer cleaning applies the cleaned suggestion and marks it overridden`() {
-        val cleaned = applyWriterCleaning(aot2)
+    fun `fetch-from-folder refills every editable field from the directory`() {
+        // 用户 2026-10-22 裁决:入口作用于**全部字段**,不是只给作者用。
+        val cleaned = applyDirMetaSuggestions(aot2)
+        assertEquals(aot2.dirTitleSug.value.orEmpty(), cleaned.title)
+        assertEquals(aot2.dirSeriesSug.value.orEmpty(), cleaned.series)
         assertEquals("谏山创", cleaned.writer)
-        assertTrue(MetaField.Writer in cleaned.overridden)
+        assertEquals(aot2.volumeSug.value, cleaned.volume)
+        assertEquals(aot2.outputDirSug, cleaned.outputDir)
+        assertEquals(LangChoice.Unset, cleaned.language, "目录名没有可靠语言信息,不猜")
+        // 七个字段全部记进逐项例外
+        assertEquals(
+            setOf(
+                MetaField.Title,
+                MetaField.Series,
+                MetaField.Writer,
+                MetaField.Volume,
+                MetaField.Language,
+                MetaField.CbzName,
+                MetaField.OutputDir,
+            ),
+            cleaned.overridden,
+        )
+    }
+
+    @Test
+    fun `fetch-from-folder ignores the current suggestions and uses the directory values`() {
+        // 建议值已被 ComicInfo 覆盖(写错的名字)时,「按目录结构获取」是唯一退路 ——
+        // 它必须无视 *Sug,只用 dir*Sug(用户 2026-10-22 裁决)。
+        val overwritten = aot2.copy(
+            titleSug = Suggestion("文件里写错的标题", "已有 ComicInfo.xml"),
+            writerSug = Suggestion("文件里写错的名字", "已有 ComicInfo.xml"),
+            seriesSug = Suggestion("文件里写错的系列", "已有 ComicInfo.xml"),
+            title = "文件里写错的标题",
+            writer = "文件里写错的名字",
+            series = "文件里写错的系列",
+        )
+        val fixed = applyDirMetaSuggestions(overwritten)
+        assertEquals("谏山创", fixed.writer)
+        assertEquals(aot2.dirTitleSug.value.orEmpty(), fixed.title)
+        assertEquals(aot2.dirSeriesSug.value.orEmpty(), fixed.series)
+        assertNotEquals(overwritten.writerSug.value, fixed.writer)
     }
 
     @Test
@@ -507,21 +621,13 @@ class ComicMetadataTest {
     }
 
     @Test
-    fun `writer cleaning ignores an empty cleaned suggestion`() {
-        // 空串 ≠ null:[Suggestion.hasValue] 已把空串视为"没有值",
-        // 清理入口必须同样对待 —— 否则会把作者清成空字符串,还打上"人工已覆盖"标记,
-        // 之后批量设置就再也改不动这一卷了。
-        val blank = aot2.copy(writerCleanedSug = Suggestion("", "空串建议"))
-        val cleaned = applyWriterCleaning(blank)
-        assertEquals(blank, cleaned, "空串建议应原样返回")
-        assertEquals(aot2.writer, cleaned.writer, "不得把作者清空")
-        assertFalse(MetaField.Writer in cleaned.overridden, "空串不该被当成一次清理")
-    }
-
-    @Test
-    fun `writer cleaning is a no-op when there is no cleaned suggestion`() {
-        val noClean = aot2.copy(writerCleanedSug = Suggestion(null, "无"))
-        assertEquals(noClean, applyWriterCleaning(noClean))
+    fun `fetch-from-folder does not blank a writer with no directory value`() {
+        // 目录名里没有 [作者] 前缀时 dirWriterSug 没有值 —— 此时**不得**把作者清空。
+        // (空工作区的可点性由 UI 用 dirMetaAvailable 判,不在领域层做。)
+        val noClean = aot2.copy(dirWriterSug = Suggestion(null, "无"))
+        val refilled = applyDirMetaSuggestions(noClean)
+        assertEquals("", refilled.writer, "无可推导值时作者留空,而不是沿用旧的人工值")
+        assertTrue(MetaField.Writer in refilled.overridden, "这一轮确实覆盖了 Writer 字段")
     }
 
     // ================= 输出目录 / 冲突样例 =================
@@ -534,28 +640,40 @@ class ComicMetadataTest {
     }
 
     @Test
-    fun `series grouping follows the current series value`() {
-        val groups = com.cyanix.pixfold.domain.model.groupVolumesBySeries(library.volumes)
-        assertEquals(listOf("进击的巨人", "海贼王"), groups.map { it.first })
-        assertEquals(3, groups.first().second.size)
-        assertEquals(2, groups.last().second.size)
+    fun `series grouping follows the scanned series directory`() {
+        val groups = com.cyanix.pixfold.domain.comic.groupVolumes(library.volumes).filter { it.isSeries }
+        assertEquals(listOf("进击的巨人", "海贼王"), groups.map { it.name })
+        assertEquals(3, groups.first().volumes.size)
+        assertEquals(2, groups.last().volumes.size)
 
-        // 用户改系列名 -> 分组随之变化(分组键是当前值,不是建议值)
+        // 2026-10-21 改判:分组键是**扫描层** seriesDir,不是可编辑的 series 当前值。
+        // 用户把某一卷的系列名改成「进击的巨人外传」,它仍属于「进击的巨人」这个系列目录
+        // —— 改名只影响显示,不该把一卷从系列里拆出去(条①让单本的 series 当前值恒非空,
+        // 若拿当前值当键,每个单本都会自成一个"系列")。
+        //
+        // 组名取组内**第一本**的 series 当前值(不是每一本各自算),且为空时回退扫描层
+        // 目录名 —— 已有 ComicInfo.xml 却没写 <Series> 时当前值会被清空,不回退就会出现
+        // 无名芯片。这里改的是 aot-0(外传,组内第三本),组名仍取 aot-1 的值。
         val renamed = replaceVolume(library.volumes, aot0.copy(series = "进击的巨人外传"))
-        val after = com.cyanix.pixfold.domain.model.groupVolumesBySeries(renamed)
-        assertEquals(listOf("进击的巨人", "进击的巨人外传", "海贼王"), after.map { it.first })
+        val after = com.cyanix.pixfold.domain.comic.groupVolumes(renamed).filter { it.isSeries }
+        assertEquals(listOf("进击的巨人", "海贼王"), after.map { it.name })
+        assertEquals(3, after.first().volumes.size)
     }
 
     @Test
-    fun `empty series falls into the unnamed group keyed by the empty string`() {
-        // 兜底组的键是**空串**而非「（未命名系列）」:分组键参与 testTag 与相等性判断,
-        // 若把译文当键,切换语言就会把同一批卷"换"成另一个分组。
-        // 译文只在 UI 渲染时补上(见 ui/library/LibraryPage.kt)。
-        val renamed = replaceVolume(library.volumes, aot0.copy(series = ""))
-        val groups = com.cyanix.pixfold.domain.model.groupVolumesBySeries(renamed)
-        assertContains(groups.map { it.first }, "")
-        // 且这个空串键必须真的承载了那一卷,而不只是"有个空组"
-        assertTrue(groups.first { it.first.isEmpty() }.second.any { it.id == aot0.id })
+    fun `a volume without a series directory is a single volume group`() {
+        // 单本的判据是「扫描期没有系列目录」(seriesDir 为空),**不是**「series 当前值为空」
+        // —— 后者会被条①「跟随 Title」填满。
+        //
+        // 2026-10-21 改判:单本**各自成组**(键 = `single:` + id),不再并进一个空串兜底组。
+        // 旧实现在书架页把 3 个互不相干的单本显示成同一个系列的 3 卷。
+        val single = replaceVolume(library.volumes, aot0.copy(series = "某本书", seriesDir = ""))
+        val groups = com.cyanix.pixfold.domain.comic.groupVolumes(single)
+        val singles = groups.filterNot { it.isSeries }
+        assertEquals(1, singles.size, "只有 aot0 是单本")
+        assertFalse(singles.single().isSeries)
+        assertEquals("进击的巨人 外传", singles.single().name, "单本组名取自己的标题")
+        assertTrue(singles.single().volumes.any { it.id == aot0.id })
     }
 
     @Test
@@ -582,5 +700,49 @@ class ComicMetadataTest {
         // 反面也要钉住:勾选状态为 true 的卷一个都不能少(空表也能"通过"上面那条)。
         assertTrue(kept.any { it.id == op101.id }, "仍被勾选的卷不得被丢掉")
         assertEquals(library.volumes.size - 1, kept.size)
+    }
+
+    /**
+     * 字段级红警与页头汇总必须由**同一份**判据产生。
+     *
+     * 界面那边每个输入框的 `isError` 读 [ComicVolume.pendingIssueOf],页头那一行读
+     * [ComicVolume.pendingIssues]。若两者各写一份「什么算缺失」,用户就会看到
+     * 「页头说标题缺失、标题框却不标红」(2026-10-22 正是这个分歧被指出来)。
+     */
+    @Test
+    fun `the per field hint and the header summary come from one rule`() {
+        val volume = aot2.copy(title = "", series = "", writer = "", volume = null)
+
+        val expected = listOf(
+            MetaField.Title to TextKey.PendingTitle,
+            MetaField.Series to TextKey.PendingSeries,
+            MetaField.Volume to TextKey.PendingVolume,
+            MetaField.Writer to TextKey.PendingWriter,
+        )
+        expected.forEach { (field, key) ->
+            assertEquals(key, volume.pendingIssueOf(field)?.key, "$field 的字段级判据给错了键")
+        }
+
+        // 页头汇总 = 逐字段取回非空项,顺序固定
+        assertEquals(
+            expected.mapNotNull { (field, _) -> volume.pendingIssueOf(field)?.key },
+            volume.pendingIssues.map { it.key },
+            "页头汇总的顺序与逐字段判据不一致",
+        )
+    }
+
+    @Test
+    fun `a filled field reports no per field hint`() {
+        val volume = aot2.copy(title = "T", series = "S", writer = "W", volume = 3)
+        listOf(MetaField.Title, MetaField.Series, MetaField.Volume, MetaField.Writer)
+            .forEach { field -> assertNull(volume.pendingIssueOf(field), "$field 有值时不该有红警") }
+    }
+
+    @Test
+    fun `fields outside the rule report no per field hint`() {
+        val volume = aot2.copy(title = "", series = "", writer = "", volume = null)
+        listOf(MetaField.Language, MetaField.CbzName, MetaField.OutputDir).forEach { field ->
+            assertNull(volume.pendingIssueOf(field), "$field 不该有字段级红警")
+        }
     }
 }

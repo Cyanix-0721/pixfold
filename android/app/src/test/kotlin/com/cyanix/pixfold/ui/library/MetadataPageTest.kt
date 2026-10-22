@@ -6,10 +6,13 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.semantics.SemanticsProperties
+import androidx.compose.ui.semantics.getOrNull
+import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.hasTestTag
+import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onAllNodesWithText
@@ -36,6 +39,8 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 import kotlin.test.assertEquals
+import kotlin.test.assertNull
+import kotlin.test.assertTrue
 import kotlin.test.assertTrue
 
 /**
@@ -131,29 +136,38 @@ class MetadataPageTest {
         assertEquals("我的标题", fieldText(MetaField.Title))
     }
 
+    // 刻意**不测**「长标题是否折行 / 光标能否拖到视口外」:
+    //
+    // 缺陷现场(用户 2026-10-20 报告)是 `singleLine = true` 下文本只能横向滚动,
+    // 而 Compose 的拖拽选择手柄拖动时不会驱动横向滚动 ⇒ 光标拖到右边缘就停住,
+    // 视口外那半截文字只能靠输入法的左右移动键够到。
+    //
+    // 曾写过一条「长文本完整保留」的断言,变异回 `singleLine = true` 后**存活** ——
+    // 因为 `performTextReplacement` 在单行模式下同样能塞进完整文本,而 Robolectric
+    // 不做真实文本测量与真实滚动,「是否折行 / 手柄能否拖过去」在这里根本量不出来
+    // (与 §7.4「放得下、是否挤出视口只能真机」同一条边界)。留着只是假保障,故删除。
+    // 真实判据只能真机:超长标题下拖动手柄能拖到最后一个字符。
+
     @Test
-    fun `the writer cleaning suggestion is displayed alongside the raw suggestion`() {
+    fun `a newline pasted into a single value field is stripped`() {
+        // 多行输入框放开后,粘贴可能带换行 —— 元数据是单值标签,换行会破坏 XML
         show()
-        scrollTo(TAG_WRITER_CLEAN)
-        // 建议值与其来源都是 mock 数据(不是文案),故从模型取值代入模板 —— 断言的是**模板**渲染正确。
-        val aot = library.volumes.first { it.id == "aot-0" }
-        rule.onNodeWithText(
-            TestText.of(
-                R.string.meta_writer_cleaned_hint,
-                aot.writerCleanedSug.value.orEmpty(),
-                aot.writerCleanedSug.source,
-            ),
-            substring = true,
-        ).assertIsDisplayed()
-        rule.onNodeWithTag(TAG_WRITER_CLEAN).assertIsDisplayed()
+        scrollTo(metaFieldTag(MetaField.Title))
+        rule.onNodeWithTag(metaFieldTag(MetaField.Title)).performTextReplacement("第一行\n第二行")
+        assertEquals("第一行第二行", fieldText(MetaField.Title), "换行必须被剥掉")
     }
 
     @Test
-    fun `tapping writer cleaning replaces the value`() {
+    fun `the writer row keeps no per-field fetch-from-folder button`() {
+        // 用户 2026-10-22 裁决:「按目录结构获取」上移到**页签行**,作用于当前卷全部字段。
+        // 本行若还留一个只管作者的按钮,就成了同一功能的第二个入口(用户报告的冗余)。
         show()
-        scrollTo(TAG_WRITER_CLEAN)
-        rule.onNodeWithTag(TAG_WRITER_CLEAN).performClick()
-        assertEquals("谏山创", fieldText(MetaField.Writer))
+        rule.onNodeWithTag("metadata-writer-from-dir").assertDoesNotExist()
+        // 旧的「一键清理」也必须真的消失(清理逻辑已与默认获取一致)。
+        rule.onNodeWithTag("metadata-writer-clean").assertDoesNotExist()
+        // 「恢复建议值」仍在 —— 它和「按目录结构获取」是两件事(建议值可能来自 ComicInfo)。
+        scrollTo(metaResetTag(MetaField.Writer))
+        rule.onNodeWithTag(metaResetTag(MetaField.Writer)).assertIsDisplayed()
     }
 
     @Test
@@ -184,11 +198,25 @@ class MetadataPageTest {
     // ================= 验收第 12 项:语言默认未设置 + 逐卷不同 + 不写入可选 =================
 
     @Test
-    fun `language defaults to unset with an explicit confirmation prompt`() {
+    fun `language defaults to unset without an error state`() {
         show()
         scrollTo(TAG_LANGUAGE_FIELD)
+        // Unset 即「不写入标签」,是合法终态 —— 不再标红、不再显示"需确认"
         rule.onNodeWithText(TestText.of(R.string.domain_lang_unset)).assertIsDisplayed()
-        rule.onNodeWithText(TestText.of(R.string.meta_lang_unset_error)).assertIsDisplayed()
+    }
+
+    @Test
+    fun `the language dropdown offers exactly three options`() {
+        show()
+        scrollTo(TAG_LANGUAGE_FIELD)
+        rule.onNodeWithTag(TAG_LANGUAGE_FIELD).performClick()
+        // Unset / Zh / Ja —— 不再有 Other / Unknown / Skip
+        // 下拉框自身显示的就是 Unset 标签,故用菜单项的 index 断言:菜单里恰有三项
+        val options = rule.onAllNodesWithText(TestText.of(R.string.domain_lang_unset), useUnmergedTree = true)
+            .fetchSemanticsNodes()
+        assertTrue(options.isNotEmpty(), "菜单必须包含 Unset 选项")
+        rule.onNodeWithText(TestText.of(R.string.domain_lang_zh)).assertExists()
+        rule.onNodeWithText(TestText.of(R.string.domain_lang_ja)).assertExists()
     }
 
     @Test
@@ -211,30 +239,38 @@ class MetadataPageTest {
         rule.onNodeWithText(TestText.of(R.string.domain_lang_zh)).performClick()
         rule.waitForIdle()
         rule.onNodeWithText(TestText.of(R.string.domain_lang_zh)).assertIsDisplayed()
+        // 选中后下拉框显示的就是 zh —— 不再有"未确认"这类错误态
         assertTrue(
-            rule.onAllNodesWithText(TestText.of(R.string.meta_lang_unset_error)).fetchSemanticsNodes().isEmpty(),
-            "确认语言后不应再显示未确认提示",
+            rule.onAllNodesWithText(TestText.of(R.string.domain_lang_unset)).fetchSemanticsNodes().isEmpty(),
+            "选中 zh 后不应再显示 Unset 标签",
         )
     }
 
     @Test
-    fun `skip is an independent option`() {
+    fun `choosing not to write the tag keeps the value unset`() {
         show()
         scrollTo(TAG_LANGUAGE_FIELD)
         rule.onNodeWithTag(TAG_LANGUAGE_FIELD).performClick()
-        rule.onNodeWithText(TestText.of(R.string.domain_lang_skip)).performClick()
         rule.waitForIdle()
-        rule.onNodeWithText(TestText.of(R.string.domain_lang_skip)).assertIsDisplayed()
+        // 先选 zh 再选回 Unset,验证 Unset 仍是可选项
+        rule.onNodeWithText(TestText.of(R.string.domain_lang_zh)).performClick()
+        rule.waitForIdle()
+        rule.onNodeWithTag(TAG_LANGUAGE_FIELD).performClick()
+        rule.waitForIdle()
+        // 此刻下拉框显示的是 zh,故 Unset 的匹配只剩菜单项(不硬编码匹配数 ——
+        // 下拉框自身是否也匹配取决于当前值,写死数量会在别的取值下变成假红)
+        val unsetNodes = rule.onAllNodesWithText(TestText.of(R.string.domain_lang_unset))
+        val count = unsetNodes.fetchSemanticsNodes().size
+        assertTrue(count >= 1, "菜单必须提供 Unset 选项")
+        unsetNodes[count - 1].performClick()
+        rule.waitForIdle()
+        rule.onNodeWithTag(TAG_LANGUAGE_FIELD).assert(hasText(TestText.of(R.string.domain_lang_unset)))
     }
 
     @Test
     fun `pending issues of the active volume are visible in the editor`() {
         show()
-        // aot-1 语言未设置 -> 卷头必须显示待确认
-        scrollTo(TAG_PENDING_ISSUES)
-        rule.onNodeWithTag(TAG_PENDING_ISSUES).assertIsDisplayed()
-        rule.onNodeWithText(TestText.of(R.string.domain_pending_language), substring = true).assertIsDisplayed()
-
+        // 语言 Unset 不再构成待确认(aot-1 无待确认项),改断 aot-0 的卷号缺失
         // aot-0 缺卷号 -> 出现"卷号缺失"
         switchToVolume("aot-0")
         scrollTo(TAG_PENDING_ISSUES)
@@ -519,4 +555,103 @@ class MetadataPageTest {
             "点「恢复建议值」得到的名字与提示行承诺的不一致",
         )
     }
+
+/**
+ * 空值字段必须**自己**标红,而不是只在页头汇总一行。
+ *
+ * 2026-10-22 用户原话:「我说的不是顶部的待确认,而是卷号那样空值的红色警告」——
+ * 卷号字段一直有 `isError` + `supportingText` 的红色提示,标题 / 系列 / 作者只有
+ * 页头那一行汇总。汇总行需要用户把视线从输入框挪到页头再对照字段名,而红色标记
+ * 就挂在出错的那一格上,不用对照。
+ *
+ * 判据用 `SemanticsProperties.Error`,那是 Material 给 `isError = true` 设定的
+ * 语义属性(无障碍读屏也靠它),不是「有没有红颜色」那种像素级断言。
+ */
+@RunWith(RobolectricTestRunner::class)
+@Config(sdk = [36], qualifiers = "w400dp-h2000dp")
+class MetadataBlankFieldErrorTest {
+    @get:Rule
+    val rule = createComposeRule()
+
+    private val library = MockDataB.library
+
+    private fun show(volumes: List<ComicVolume>) {
+        rule.setContent {
+            var state by remember { mutableStateOf(libraryStateOf(library.rootPath, volumes)) }
+            MetadataPage(
+                libraryState = state,
+                onLibraryChange = { state = it },
+                contentInsets = WindowInsets(0, 0, 0, 0),
+            )
+        }
+    }
+
+    /** 读某个字段节点的 `Error` 语义值;没有该属性即视为「未标红」。 */
+    private fun errorTextOf(field: MetaField): String? =
+        rule.onNodeWithTag(metaFieldTag(field)).fetchSemanticsNode()
+            .config.getOrNull(SemanticsProperties.Error)
+
+    private fun onlyVolume(): ComicVolume = library.volumes.first { it.id == "aot-1" }
+
+    @Test
+    fun `a blank title marks the title field itself as an error`() {
+        show(listOf(onlyVolume().copy(title = "")))
+        assertTrue(
+            errorTextOf(MetaField.Title) != null,
+            "标题为空时 Title 输入框必须自己标红(而非只在页头汇总一行)",
+        )
+    }
+
+    @Test
+    fun `a blank series marks the series field itself as an error`() {
+        show(listOf(onlyVolume().copy(series = "")))
+        assertTrue(
+            errorTextOf(MetaField.Series) != null,
+            "系列为空时 Series 输入框必须自己标红",
+        )
+    }
+
+    @Test
+    fun `a blank writer marks the writer field itself as an error`() {
+        show(listOf(onlyVolume().copy(writer = "")))
+        assertTrue(
+            errorTextOf(MetaField.Writer) != null,
+            "作者为空时 Writer 输入框必须自己标红",
+        )
+    }
+
+    @Test
+    fun `the error text names the missing field so the hint is not just a red border`() {
+        // 红边本身不说明缺什么。`SemanticsProperties.Error` 被 M3 的 `isError` 恒定填成
+        // "Invalid input"(与具体缺什么无关),所以真正的说明文案要作为 supportingText
+        // 在**同一个字段容器内**出现 —— 用 `hasAnyAncestor(hasTestTag(...))` 限定范围,
+        // 避免命中页头汇总那一行(那里也印「标题缺失」)。
+        show(listOf(onlyVolume().copy(title = "")))
+        // `OutlinedTextField` 的 supportingText 因 `mergeDescendants` 并进了**同一个**
+        // 字段节点(实测 `Text : [Title, Title missing]`),所以直接读该字段节点的 Text 列表。
+        // 不能断言 `SemanticsProperties.Error`:M3 把 `isError` 恒定填成 "Invalid input",
+        // 与具体缺什么无关 —— 那只是"有错"的机器标记,不是给人看的说明。
+        val texts = rule.onNodeWithTag(metaFieldTag(MetaField.Title)).fetchSemanticsNode()
+            .config[SemanticsProperties.Text].map { it.text }
+        assertTrue(
+            TestText.of(R.string.domain_pending_title) in texts,
+            "标题字段的节点里必须有「标题缺失」这句说明文字,实际是 $texts",
+        )
+    }
+
+    @Test
+    fun `a filled field is not marked as an error`() {
+        // 反向对照:四个字段都有值时必须一个红的都没有 —— 否则用户会对红色习以为常。
+        val full = onlyVolume().copy(title = "T", series = "S", writer = "W", volume = 3)
+        show(listOf(full))
+        listOf(MetaField.Title, MetaField.Series, MetaField.Writer, MetaField.Volume)
+            .forEach { field ->
+                assertNull(
+                    errorTextOf(field),
+                    "$field 有值时不该标红(用户会对红边习以为常)",
+                )
+            }
+    }
+}
+
 }

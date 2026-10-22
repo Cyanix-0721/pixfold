@@ -7,6 +7,12 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.hasTestTag
+import androidx.compose.ui.test.assertCountEquals
+import com.cyanix.pixfold.domain.pack.PackBlocker
+import com.cyanix.pixfold.domain.pack.PackPreflightResult
+import com.cyanix.pixfold.domain.pack.PackWarning
+import com.cyanix.pixfold.domain.pack.Zip64Reason
+import com.cyanix.pixfold.domain.storage.SpaceCheckResult
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onAllNodesWithText
@@ -250,11 +256,15 @@ class PackPreviewPageTest {
 
     @Test
     fun `pending issues are visible on the preview page`() {
-        show()
+        // 语言项已移除(Unset 即终态);现在唯一待确认项是卷号缺失 —— 用缺卷号的 aot-0
+        val volumes = library.volumes.map { v -> if (v.id == "aot-0") v.copy(included = true) else v }
+        show(volumes)
+        rule.onNodeWithTag(packVolumeChipTag("aot-0")).performClick()
+        rule.waitForIdle()
         scrollTo(TAG_PACK_PENDING)
         rule.onNodeWithTag(TAG_PACK_PENDING).assertIsDisplayed()
         assertTrue(
-            rule.onAllNodesWithText(TestText.of(R.string.domain_pending_language), substring = true).fetchSemanticsNodes().isNotEmpty(),
+            rule.onAllNodesWithText(TestText.of(R.string.domain_pending_volume), substring = true).fetchSemanticsNodes().isNotEmpty(),
             "待确认项必须可见",
         )
     }
@@ -289,17 +299,18 @@ class PackPreviewPageTest {
     }
 
     @Test
-    fun `other language with a code is written verbatim`() {
+    fun `unset language writes no LanguageISO value`() {
         val volumes = library.volumes.map { v ->
             if (v.id == "aot-1") {
-                setMetaValue(v, MetaField.Language, MetaValue.Language(LangChoice.Other, "fr"))
+                setMetaValue(v, MetaField.Language, MetaValue.Language(LangChoice.Unset))
             } else {
                 v
             }
         }
         show(volumes)
         scrollTo(TAG_XML_PREVIEW)
-        assertTrue(xmlOnScreen().contains("<LanguageISO>fr</LanguageISO>"))
+        // Unset = 不写入标签,写成自闭合空元素
+        assertTrue(xmlOnScreen().contains("<LanguageISO />"))
     }
 
     // ================= 未勾选的卷不得"看起来会被打包" =================
@@ -352,7 +363,7 @@ class PackPreviewPageTest {
         val volumes = library.volumes.map { if (it.id == "aot-1") it.copy(included = false) else it }
         show(volumes)
         assertTrue(
-            rule.onAllNodesWithText(TestText.of(R.string.pack_volume_excluded, ""), substring = true).fetchSemanticsNodes().isNotEmpty(),
+            rule.onAllNodesWithText(TestText.of(R.string.pack_volume_suffix_excluded), substring = true).fetchSemanticsNodes().isNotEmpty(),
             "卷切换 chip 上要能看出哪些卷未勾选",
         )
     }
@@ -402,5 +413,139 @@ class PackPreviewPageTest {
             rule.onAllNodesWithTag(TAG_WARN_ICON).fetchSemanticsNodes().isNotEmpty(),
             "选中删除源目录后,警示行应显示矢量图标",
         )
+    }
+}
+
+/**
+ * 计划页预检（D4b）：**按下执行之前**就要看到的结论。
+ *
+ * 背景：预检原先只在 `PackExecutor.execute()` 内部、真正写盘前那一刻跑，
+ * `PackWarning` 的三类告知项（空间临界 / 估算只是下界 / 需要 Zip64）在界面上
+ * **一个出口都没有**。用户站在计划页时看到的只有页码预览。
+ *
+ * 这些用例钉的是「**告知的时机**」，不是「算得对不对」（后者是
+ * `PackPreflightTest` 的职责）。
+ */
+@RunWith(RobolectricTestRunner::class)
+@Config(sdk = [36], qualifiers = "w400dp-h2000dp")
+class PackPreflightPanelTest {
+
+    @get:Rule
+    val rule = createComposeRule()
+
+    private val library = MockDataB.library
+
+    private fun show(preflight: PackUiPreflight?) {
+        rule.setContent {
+            var state by remember { mutableStateOf(libraryStateOf(library.rootPath, library.volumes)) }
+            PackPreviewPage(
+                libraryState = state,
+                onLibraryChange = { state = it },
+                contentInsets = WindowInsets(0, 0, 0, 0),
+                showPlanSection = true,
+                pagePreflight = preflight,
+            )
+        }
+    }
+
+    private fun ready(
+        blockers: List<PackBlocker> = emptyList(),
+        warnings: List<PackWarning> = emptyList(),
+        availableBytes: Long? = 10L * 1024 * 1024 * 1024,
+    ) = PackUiPreflight.Ready(
+        result = PackPreflightResult(
+            volumes = emptyList(),
+            blockers = blockers,
+            warnings = warnings,
+            estimatedBytes = 0L,
+            availableBytes = availableBytes ?: Long.MAX_VALUE,
+        ),
+        availableBytes = availableBytes,
+    )
+
+    @Test
+    fun `nothing is shown before the preflight runs`() {
+        show(preflight = null)
+        rule.onAllNodesWithTag(TAG_PACK_PREFLIGHT).assertCountEquals(0)
+    }
+
+    @Test
+    fun `a clean preflight shows no panel at all`() {
+        // 一切正常时不该在底栏上方多出一块空白区域 —— 那会让底栏看起来「飘」起来。
+        show(ready())
+        rule.onAllNodesWithTag(TAG_PACK_PREFLIGHT).assertCountEquals(0)
+    }
+
+    @Test
+    fun `space shortfall is shown as a blocker`() {
+        val shortfall = 500L * 1024 * 1024
+        show(
+            ready(
+                blockers = listOf(
+                    PackBlocker.SpaceInsufficient(
+                        SpaceCheckResult.Insufficient(
+                            availableBytes = 1024L,
+                            estimatedBytes = 1024L + shortfall,
+                            shortfallBytes = shortfall,
+                        ),
+                    ),
+                ),
+            ),
+        )
+        rule.onAllNodesWithTag(TAG_PACK_PREFLIGHT_BLOCKER).assertCountEquals(1)
+        // 用子串匹配：`WarnLine` 把图标与文本放在同一个 Row 里，语义树上文本节点
+        // 可能带 contentDescription 合并，整串精确匹配会落空。
+        rule.onNodeWithText(humanBytes(shortfall), substring = true).assertIsDisplayed()
+    }
+
+    @Test
+    fun `zip64 requirement is shown as a warning not a blocker`() {
+        // 承重：Zip64 是**标准扩展**，写完照样能读。把它渲染成阻断会让
+        // 4 GiB 以上的卷完全无法打包 —— 这正是 `PackPreflight` KDoc 反复强调的一条。
+        show(
+            ready(
+                warnings = listOf(
+                    PackWarning.Zip64Required("Vol 01.cbz", Zip64Reason.CentralDirOffsetTooLarge),
+                ),
+            ),
+        )
+        rule.onAllNodesWithTag(TAG_PACK_PREFLIGHT_WARNING).assertCountEquals(1)
+        rule.onAllNodesWithTag(TAG_PACK_PREFLIGHT_BLOCKER).assertCountEquals(0)
+    }
+
+    @Test
+    fun `zip64 reason is spelled out instead of showing a raw enum`() {
+        show(
+            ready(
+                warnings = listOf(
+                    PackWarning.Zip64Required("Vol 01.cbz", Zip64Reason.CentralDirOffsetTooLarge),
+                ),
+            ),
+        )
+        // 用户看不懂 CentralDirOffsetTooLarge。屏幕上必须是「整个包达到 4 GB 以上」。
+        rule.onNodeWithText(
+            TestText.of(R.string.pack_warn_zip64_reason_offset),
+            substring = true,
+        ).assertIsDisplayed()
+    }
+
+    @Test
+    fun `estimate lower bound is shown as a warning`() {
+        show(ready(warnings = listOf(PackWarning.EstimateIsLowerBound(3))))
+        rule.onNodeWithText(TestText.of(R.string.pack_warn_estimate_lower_bound, 3)).assertIsDisplayed()
+    }
+
+    @Test
+    fun `unknown available space is stated instead of being silently treated as fine`() {
+        // 承重：领域层对「问不到空间」按充足放行（问不到不等于不足，这是刻意的）。
+        // 但界面**不能说充足** —— 那是假的承诺。必须单独说「无法判断」。
+        show(ready(availableBytes = null))
+        rule.onNodeWithText(TestText.of(R.string.pack_warn_space_unknown)).assertIsDisplayed()
+    }
+
+    @Test
+    fun `a failed preflight is stated rather than showing nothing`() {
+        show(PackUiPreflight.Unavailable("StatFs failed"))
+        rule.onAllNodesWithTag(TAG_PACK_PREFLIGHT).assertCountEquals(1)
     }
 }

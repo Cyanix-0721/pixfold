@@ -110,23 +110,19 @@ fun CollectionChipRows(
             }
         },
         topChipLabel = { group ->
-            Text(
-                stringResource(
-                    R.string.a_collection_chip,
-                    group.name,
-                    group.members.sumOf { it.images.size },
-                ),
+            stringResource(
+                R.string.a_collection_chip,
+                group.name,
+                group.members.sumOf { it.images.size },
             )
         },
         topAllEntryText = { n -> pluralsAllEntry(n) },
         childChipDescription = { collection -> stringResource(R.string.a_collection_cd, collection.name) },
         childChipLabel = { collection ->
-            Text(
-                stringResource(
-                    R.string.a_collection_chip,
-                    collection.name,
-                    collection.images.size,
-                ),
+            stringResource(
+                R.string.a_collection_chip,
+                collection.name,
+                collection.images.size,
             )
         },
         childAllEntryText = { n -> pluralsAllEntry(n) },

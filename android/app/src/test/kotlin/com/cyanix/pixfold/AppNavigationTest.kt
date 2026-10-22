@@ -8,6 +8,7 @@ import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithTag
+import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
@@ -45,7 +46,7 @@ import kotlin.test.assertEquals
  * "回调触发但界面没换"的缺陷。
  */
 @RunWith(RobolectricTestRunner::class)
-@Config(sdk = [36])
+@Config(sdk = [36], qualifiers = "w400dp-h1000dp")
 class AppNavigationTest {
 
     @get:Rule
@@ -197,5 +198,75 @@ class AppNavigationTest {
         val after = rule.onNodeWithTag(proposalFieldTag(id))
             .fetchSemanticsNode().config[SemanticsProperties.EditableText].text
         assertEquals("命名页改的名.jpg", after, "步骤容器重建后命名页应仍看到改过的名字")
+    }
+
+    // ============ 点通知进来必须落到打包页（2026-10-20 真机缺陷）============
+    //
+    // 缺陷现场：打包进度通知被点开，回到的是**首页**。用户刚在看的进度条
+    // 与最后的结果页全都不见了 —— 那条通知存在的唯一理由就是「回到这件事上」。
+    //
+    // 修法分两段：`PackTaskService.openAppIntent()` 带 extra（`PackTaskServiceTest`
+    // 钉住），`MainActivity` 读出来交给 `PixFoldApp(openPackOnStart)` 并导航进
+    // 工作流 B，再由 `LibrarySteps(startAtPackStep)` 落到步骤 3。这里钉的是
+    // **最后那两段的串联** —— 前面两段各自绿着、中间断开，是这类缺陷最常见的形态。
+
+    @Test
+    fun `starting from a notification opens the pack step directly`() {
+        rule.setContent { PixFoldApp(openPackOnStart = true) }
+        rule.waitForIdle()
+
+        // 首页的入口卡片必须已经不在：否则说明压根没导航。
+        rule.onAllNodesWithText(TestText.of(R.string.home_workflow_b)).assertCountEquals(0)
+        // 落到的是**步骤 3**，不是工作流 B 的步骤 1。
+        rule.onNodeWithText(TestText.of(R.string.pack_confirm)).assertExists()
+    }
+
+    @Test
+    fun `a normal launch still starts on the home screen`() {
+        // 反向断言：没有那个 extra 时绝不能自己跳进工作流。
+        rule.setContent { PixFoldApp() }
+        rule.waitForIdle()
+
+        rule.onAllNodesWithText(TestText.of(R.string.home_workflow_b)).assertCountEquals(1)
+        rule.onAllNodesWithText(TestText.of(R.string.pack_confirm)).assertCountEquals(0)
+    }
+
+    /**
+     * 消费后必须把请求交还上层（`onPackRouteHandled`）。
+     *
+     * **这是热启动路径的第二半**（2026-10-20 真机第二轮缺陷）：`MainActivity`
+     * 在 `onNewIntent` 里把 `openPackOnStart` 置 true 后，本组件导航一次，
+     * 若不清零，下次再点通知时 key 没变 ⇒ `LaunchedEffect` 不再跑 ⇒
+     * **第二次点通知静默失效**。真机上表现为「第一次能跳，之后怎么点都没反应」。
+     *
+     * 只断「回调发生」，不断次数 —— 重组次数是实现细节。
+     */
+    @Test
+    fun `consuming the pack request reports back to the host`() {
+        var handled = false
+        rule.setContent {
+            PixFoldApp(openPackOnStart = true, onPackRouteHandled = { handled = true })
+        }
+        rule.waitForIdle()
+
+        rule.onNodeWithText(TestText.of(R.string.pack_confirm)).assertExists()
+        assertEquals(true, handled, "导航完成后必须回清请求，否则第二次点通知会静默失效")
+    }
+
+    /**
+     * 正常启动时不该触发回清。
+     *
+     * 反向断言的价值：如果 `LaunchedEffect` 里漏了 `if (!openPackOnStart) return`，
+     * 那么每次普通启动都会调一次 `onPackRouteHandled` —— 在 `MainActivity` 里
+     * 那是把状态从 false 写成 false（无害），但**会掩盖「通知没被收到」**这类
+     * 问题（看起来一切正常，实际请求从未被处理过）。
+     */
+    @Test
+    fun `a normal launch does not report a pack request`() {
+        var handled = false
+        rule.setContent { PixFoldApp(onPackRouteHandled = { handled = true }) }
+        rule.waitForIdle()
+
+        assertEquals(false, handled, "没有通知请求时不该回清")
     }
 }

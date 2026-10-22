@@ -14,6 +14,8 @@ import com.cyanix.pixfold.domain.mock.MockDataB
 import com.cyanix.pixfold.domain.model.ComicVolume
 import com.cyanix.pixfold.domain.library.LibraryState
 import com.cyanix.pixfold.domain.library.libraryStateOf
+import com.cyanix.pixfold.domain.text.Msg
+import com.cyanix.pixfold.domain.text.TextKey
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -92,14 +94,14 @@ class LibraryPageTest {
                 state.pendingCount,
             ),
         ).assertIsDisplayed()
-        assertEquals(5, state.pendingCount, "五卷的语言全部未确认")
+        assertEquals(1, state.pendingCount, "只有解析不出卷号的 aot-0 待确认")
     }
 
     @Test
     fun `series header aggregates the pending count`() {
         show()
-        // 进击的巨人 3 卷:语言全部未确认 + aot-0 缺卷号 -> 3 卷待确认
-        rule.onNodeWithText(TestText.of(R.string.lib_series_pending, 3)).assertIsDisplayed()
+        // 进击的巨人 3 卷里只有 aot-0 缺卷号 -> 1 卷待确认
+        rule.onNodeWithText(TestText.of(R.string.lib_series_pending, 1)).assertIsDisplayed()
     }
 
     @Test
@@ -196,7 +198,50 @@ class LibraryPageTest {
                 contentInsets = WindowInsets(0, 0, 0, 0),
             )
         }
-        rule.onNodeWithText(TestText.plural(R.plurals.lib_summary, 2, 2, 5, 4, 5)).assertIsDisplayed()
-        rule.onNodeWithText(TestText.of(R.string.lib_series_pending, 3)).assertIsDisplayed()
+        rule.onNodeWithText(TestText.plural(R.plurals.lib_summary, 2, 2, 5, 4, 1)).assertIsDisplayed()
+        rule.onNodeWithText(TestText.of(R.string.lib_series_pending, 1)).assertIsDisplayed()
+    }
+
+    // ---- 结构警告条(2026-10-20 裁决「Series 三条语义」③:系列下嵌套目录要警告) ----
+
+    @Test
+    fun `nested dir warnings render as error-colored rows`() {
+        rule.setContent {
+            LibraryPage(
+                state = libraryStateOf(library.rootPath, library.volumes),
+                onStateChange = {},
+                contentInsets = WindowInsets(0, 0, 0, 0),
+                workspaceWarnings = listOf(
+                    Msg(TextKey.NestedSeriesDir, listOf("系列A", "中间层")),
+                ),
+            )
+        }
+        rule.onNodeWithTag(structureWarningTag(0)).assertIsDisplayed()
+        rule.onNodeWithText(
+            TestText.of(R.string.domain_nested_series_dir, "系列A", "中间层"),
+        ).assertIsDisplayed()
+    }
+
+    @Test
+    fun `multiple warnings render in order with per-index tags`() {
+        rule.setContent {
+            LibraryPage(
+                state = libraryStateOf(library.rootPath, library.volumes),
+                onStateChange = {},
+                contentInsets = WindowInsets(0, 0, 0, 0),
+                workspaceWarnings = listOf(
+                    Msg(TextKey.NestedSeriesDir, listOf("系列A", "乙")),
+                    Msg(TextKey.NestedSeriesDir, listOf("系列A", "甲")),
+                ),
+            )
+        }
+        rule.onNodeWithTag(structureWarningTag(0)).assertIsDisplayed()
+        rule.onNodeWithTag(structureWarningTag(1)).assertIsDisplayed()
+    }
+
+    @Test
+    fun `no warnings means no warning nodes`() {
+        show()
+        rule.onNodeWithTag(structureWarningTag(0)).assertDoesNotExist()
     }
 }

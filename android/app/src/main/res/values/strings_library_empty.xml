@@ -61,4 +61,28 @@
 
     <!-- 上次打包被中断（D2b 第 2 项）。三项读数：处理了几卷 / 共几卷 / 几个目标文件。 -->
     <string name="b_interrupted_notice">Last packing run did not finish (%1$d / %2$d). Incomplete output files: up to %3$d.</string>
+    <!-- ===== 计划页预检（D4b）=====
+         这三条都是「让用户决定还打不打」的告知，必须在**按下执行之前**出现在计划页。
+         预检原先只在执行前一刻跑，用户看不到任何结论。 -->
+
+    <!-- 空间临界：够，但腾不出余量。与 pack_error_space（不足，阻断）语义相反。 -->
+    <string name="pack_warn_space_marginal">Free space is tight: %1$s left, about %2$s needed.</string>
+
+    <!-- 估算只是下界：provider 没给某些文件的大小（COLUMN_SIZE 为 null），
+         实际可能更大 —— 不能把预估当成承诺。 -->
+    <!-- 措辞刻意不写成「%d files」：lint `PluralsCandidate` 会把「%d + 名词」判成该用 plurals。
+         而这里其实不是计数语义（是「有若干项没有尺寸」的告知），硬套 plurals 会让译文更难读。 -->
+    <string name="pack_warn_estimate_lower_bound">The estimate is a lower bound (files without a size: %1$d).</string>
+
+    <!-- 需要 Zip64：单卷超过 2^32 或条目数超过 65535，ZIP 标准扩展仍可正常写出。
+         刻意说「仍可写出」—— 它是告知不是阻断（PackPreflight 的 KDoc 写死了这条）。 -->
+    <string name="pack_warn_zip64">This volume needs ZIP64: %1$s. It will still be written normally.</string>
+
+    <string name="pack_warn_zip64_reason_entries">more than 65535 entries</string>
+    <string name="pack_warn_zip64_reason_entry_size">a single file is 4 GB or larger</string>
+    <string name="pack_warn_zip64_reason_offset">the archive is 4 GB or larger</string>
+
+    <!-- 空间无法判定（非 external-storage 树 / StatFs 失败）。
+         刻意不显示「空间充足」：那是假的承诺。 -->
+    <string name="pack_warn_space_unknown">Free space could not be determined on this folder.</string>
 </resources>

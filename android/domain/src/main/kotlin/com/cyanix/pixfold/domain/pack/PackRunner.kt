@@ -130,6 +130,7 @@ fun runPackPlans(
     token: CancellationToken,
     timeMillis: Long,
     onProgress: (TaskProgress, Int) -> Unit = { _, _ -> },
+    onPageWritten: (volumeIndex: Int, pageDone: Int, pageTotal: Int) -> Unit = { _, _, _ -> },
 ): PackRunReport {
     require(timeMillis > 0) { "timeMillis 必须为正：$timeMillis（时间戳需由调用方显式给定以保证可复现）" }
 
@@ -146,7 +147,9 @@ fun runPackPlans(
 
         val outcome = when {
             plan.skipped -> PackRunOutcome.Skipped
-            else -> writeOne(plan, bytes, sink, timeMillis)
+            else -> writeOne(plan, bytes, sink, timeMillis) { done, total ->
+                onPageWritten(index, done, total)
+            }
         }
         entries += PackRunEntry(plan, outcome)
 
@@ -171,6 +174,7 @@ private fun writeOne(
     bytes: PageByteSource,
     sink: CbzOutputSink,
     timeMillis: Long,
+    onPageWritten: (Int, Int) -> Unit = { _, _ -> },
 ): PackRunOutcome {
     val cbzPlan = buildCbzWritePlan(plan.volume)
 
@@ -191,7 +195,7 @@ private fun writeOne(
 
     // ③ 写入。失败时必须请求清理 —— 否则半成品留在目标目录。
     return try {
-        val result = out.use { writeCbz(cbzPlan, bytes, it, timeMillis) }
+        val result = out.use { writeCbz(cbzPlan, bytes, it, timeMillis, onPageWritten) }
         if (result.ok) {
             PackRunOutcome.Written(pageCount = cbzPlan.pageCount)
         } else {

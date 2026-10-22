@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+
+    <!-- 打包进度弹窗。文案刻意不带数量单位名词：%d 后面紧跟英文单词会触发
+         lint PluralsCandidate（warningsAsErrors = true 下直接判死）。 -->
+    <string name="pack_progress_title">Packing</string>
+    <string name="pack_progress_cancelling">Cancelling…</string>
+    <string name="pack_progress_volumes">%1$d / %2$d</string>
+    <string name="pack_progress_pages">pages %1$d / %2$d</string>
+    <string name="pack_progress_failed">failed: %1$d</string>
+    <string name="pack_progress_cancel">Cancel</string>
+    <string name="pack_progress_cancel_confirm_title">Cancel packing?</string>
+    <string name="pack_progress_cancel_confirm_body">The volume being written will be left incomplete and must be packed again.</string>
+    <string name="pack_progress_cancel_confirm_ok">Cancel packing</string>
+    <string name="pack_progress_cancel_confirm_dismiss">Keep packing</string>
+</resources>

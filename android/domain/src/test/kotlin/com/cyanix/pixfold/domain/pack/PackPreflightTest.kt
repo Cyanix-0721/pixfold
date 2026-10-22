@@ -268,6 +268,55 @@ class PackPreflightTest {
         assertEquals(4, result.volumes.single().entryCount, "3 页 + ComicInfo.xml = 4")
     }
 
+    /**
+     * ⭐ 整卷超过 4 GiB 时必须告出 Zip64。
+     *
+     * 前两条判据（条目数、单页大小）在真实漫画里几乎碰不到：一张 4 GiB 的图不存在，
+     * 65536 页的单卷也不存在。**真正会撞上的是第三条** —— 整卷输出超过 4 GiB，
+     * 此时 ZIP32 的中央目录偏移字段装不下。
+     *
+     * 这条判据曾经**整条路径都是死的**：`assessZip64Need` 的 `centralDirOffset`
+     * 在集成层从未被传过，一直吃默认值 `0L`（KDoc 明写「0 表示尚未知 / 不判定」），
+     * 于是 4.9 GiB 的素材也永远不会被告知需要 Zip64。
+     *
+     * 夹具刻意让**单页远小于 4 GiB**（3 GiB × 2 页），这样只有中央目录那条会命中，
+     * 原因断言才有鉴别力。
+     */
+    @Test
+    fun `整卷超过 4GB 时按中央目录偏移给出 Zip64 原因`() {
+        val threeGiB = 3L * 1024 * 1024 * 1024
+        val result = preflightPackPlans(
+            listOf(plan("v1", pages = 2, pageBytes = threeGiB)),
+            hugeAvailable,
+            percent10,
+            safetyMargin = 0L,
+        )
+        assertTrue(result.canProceed, "Zip64 是合法扩展 —— 超过 4 GiB 也不该被拒绝")
+        val warn = assertIs<PackWarning.Zip64Required>(result.warnings.single())
+        assertEquals(
+            Zip64Reason.CentralDirOffsetTooLarge,
+            warn.reason,
+            "单页只有 3 GiB、条目只有 3 个 ⇒ 只可能是整卷超 4 GiB 这条",
+        )
+    }
+
+    /** 刚好 4 GiB 的卷不触发（边界必须是「大于」，不是「大于等于」）。 */
+    @Test
+    fun `整卷恰好 4GB 时不告 Zip64`() {
+        // 一页 4 GiB − 1 减去 ComicInfo 的 512 字节开销 ⇒ 预估恰好等于上限。
+        val justUnder = Zip32Limits.MAX_CENTRAL_DIR_OFFSET - 512L
+        val result = preflightPackPlans(
+            listOf(plan("v1", pages = 1, pageBytes = justUnder)),
+            hugeAvailable,
+            percent10,
+            safetyMargin = 0L,
+        )
+        assertTrue(
+            result.warnings.none { it is PackWarning.Zip64Required },
+            "恰好等于上限时 ZIP32 仍然装得下 —— 边界写成大于等于会误报",
+        )
+    }
+
     // ==================== 组合与顺序 ====================
 
     @Test

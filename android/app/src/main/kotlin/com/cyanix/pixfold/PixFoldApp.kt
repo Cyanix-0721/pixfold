@@ -29,7 +29,9 @@ import androidx.navigation.compose.rememberNavController
 import androidx.navigation.toRoute
 import com.cyanix.pixfold.domain.mock.MockData
 import com.cyanix.pixfold.domain.mock.MockDataB
+import com.cyanix.pixfold.domain.comic.applyExistingComicInfo
 import com.cyanix.pixfold.domain.comic.comicVolumesFrom
+import com.cyanix.pixfold.domain.source.nestedDirWarnings
 import com.cyanix.pixfold.domain.model.ComicVolume
 import com.cyanix.pixfold.domain.model.ImageCollection
 import com.cyanix.pixfold.domain.model.NamingScheme
@@ -45,11 +47,14 @@ import com.cyanix.pixfold.domain.organize.organizeStateOf
 import com.cyanix.pixfold.data.SharedPrefsSettingsStore
 import com.cyanix.pixfold.data.saf.AndroidSafSource
 import com.cyanix.pixfold.data.saf.AndroidThumbnailSource
+import com.cyanix.pixfold.data.saf.SafExistingComicInfoProbe
 import com.cyanix.pixfold.data.saf.SafOutputExistsProbe
 import com.cyanix.pixfold.data.saf.SafPackExecutor
 import com.cyanix.pixfold.data.saf.SafRenameActions
 import com.cyanix.pixfold.data.saf.SafUndoActions
 import com.cyanix.pixfold.data.task.TaskCompletionNotification
+import com.cyanix.pixfold.ui.components.DialogBlurController
+import com.cyanix.pixfold.ui.components.DialogBlurHost
 import com.cyanix.pixfold.domain.library.LibraryState
 import com.cyanix.pixfold.domain.library.reconcileLibrary
 import com.cyanix.pixfold.ui.workspace.CachingThumbnailSource
@@ -91,7 +96,27 @@ import java.util.concurrent.atomic.AtomicBoolean
  *   从而无需 Android 持久化环境即可断言"设置真的驱动了主题"。
  */
 @Composable
-fun PixFoldApp(store: SettingsStore? = null) {
+fun PixFoldApp(
+    store: SettingsStore? = null,
+    /**
+     * 启动后是否直接落到「打包漫画 · 步骤 3」。
+     *
+     * 由 `MainActivity` 从通知的 intent extra 读出（2026-10-20 真机缺陷：
+     * 点进度通知回到首页，而用户想看的是进度/结果）。默认 false ⇒ 既有测试
+     * 与正常启动路径零改动。
+     */
+    openPackOnStart: Boolean = false,
+    /**
+     * 上层（`MainActivity`）在「打包页请求」被消费后调用的回调。
+     *
+     * **为什么需要它**（2026-10-20 真机第二轮）：热启动时 `onNewIntent` 把
+     * `openPackOnStart` 置 true，导航一次之后必须能**再置回 false** ——
+     * 否则用户下次点通知（或下次进打包页）会拿到一个已经为 true 的值，
+     * 而 `LaunchedEffect(openPackOnStart)` 的 key 没变 ⇒ 不再导航。
+     * 默认空实现让既有测试与普通启动路径零改动。
+     */
+    onPackRouteHandled: () -> Unit = {},
+) {
     val context = LocalContext.current
     val settingsStore = store ?: remember { SharedPrefsSettingsStore(context) }
     // 设置在**应用根**持有:主题、语言、各页面都要读它,提上层是唯一合理位置。
@@ -262,6 +287,27 @@ fun PixFoldApp(store: SettingsStore? = null) {
             CompositionLocalProvider(LocalThumbnailSource provides thumbnailSource) {
             val navController = rememberNavController()
 
+            // 点通知启动 ⇒ 直接进「打包漫画」。
+            //
+            // **两条入口都要覆盖**（2026-10-20 真机缺陷）：
+            //  · 冷启动（应用被杀）⇒ `openPackOnStart` 首次就是 true；
+            //  · 热启动（应用在后台）⇒ `onNewIntent` 把它改成 true。此时本函数
+            //    重新组合，但 `remember` **不会重播种**（无 key）—— 第一版就死在
+            //    这里：真机「从首页按 HOME 再点通知」纹丝不动。改用
+            //    `LaunchedEffect(openPackOnStart)` 补上，key 变化即重跑。
+            //
+            // **消费后必须清零**（`onPackRouteHandled` + `startAtPack = false`）：
+            // 否则用户从打包页返回首页、再点「打包漫画」，又会直接落到步骤 3。
+            // 清零的时机在下层（`LibrarySteps` 真的跳完之后），不能在这里同步清 ——
+            // 那样下层组合时读到的已经是 false。
+            var startAtPack by remember { mutableStateOf(openPackOnStart) }
+            LaunchedEffect(openPackOnStart) {
+                if (!openPackOnStart) return@LaunchedEffect
+                startAtPack = true
+                navController.navigate(LibraryRoute) { launchSingleTop = true }
+                onPackRouteHandled()
+            }
+
             // 工作流 A 的数据源（D2a）：**有真实工作区就用扫描结果，否则回退 mock**。
             //
             // 回退规则写在 `collectionsOr` 里并单独单测过，三条约束：
@@ -307,10 +353,20 @@ fun PixFoldApp(store: SettingsStore? = null) {
                         treeUri = packTreeUri,
                         dirOfVolume = outputDirOf,
                     )
-                    comicVolumesFrom(
-                        collections = collections,
-                        rootDisplayName = workspaceHandle?.displayName.orEmpty(),
-                        outputExists = probe,
+                    // 已有 CBZ 里的 ComicInfo.xml 作为**当前值**,建议值原样保留
+                    // (用户 2026-10-20 裁决:内容以文件为准,恢复建议仍取文件夹)。
+                    // 顺序不能反 —— 先有建议值才有 `cbzFileName`,才知道去哪个文件名里找。
+                    applyExistingComicInfo(
+                        volumes = comicVolumesFrom(
+                            collections = collections,
+                            rootDisplayName = workspaceHandle?.displayName.orEmpty(),
+                            outputExists = probe,
+                        ),
+                        probe = SafExistingComicInfoProbe(
+                            context = context,
+                            treeUri = packTreeUri,
+                            dirOfVolume = outputDirOf,
+                        ),
                     )
                 }
             }
@@ -415,6 +471,11 @@ fun PixFoldApp(store: SettingsStore? = null) {
             // NavHost 不再注册 handler,交回系统退出应用 —— 与迁移前 `rootBack = null` 同义。
             //
             // 注意:返回栈是**唯一**事实来源,不再有 `screen` 这样的第二份状态。
+            // 全站弹窗背景模糊：弹窗是独立 window，拿不到宿主内容，
+            // 只能由宿主在「有弹窗打开时」给页面加 `Modifier.blur`。
+            // 放在 NavHost 外层 ⇒ 一处覆盖所有页面。
+            val dialogBlur = remember { DialogBlurController() }
+            DialogBlurHost(controller = dialogBlur) {
             PixFoldNavHost(
                 navController = navController,
                 startDestination = HomeRoute,
@@ -606,12 +667,20 @@ fun PixFoldApp(store: SettingsStore? = null) {
                             // 真实写入器。null 只在「没有工作区」时出现 —— 但那时
                             // `scannedVolumes` 已回退到 mock,模拟执行反而更诚实
                             // (不该往真实磁盘写一批来自 mock 路径的 CBZ)。
-                            packExecutor = packTreeUri?.let { uri ->
-                                SafPackExecutor(
-                                    context = context,
-                                    treeUri = uri,
-                                    rootDisplayName = workspaceHandle?.displayName.orEmpty(),
-                                )
+                            // **必须 `remember`**（2026-10-20 真实缺陷）：不 remember 时
+                            // 每次组合都新建一个 `SafPackExecutor`，而下层
+                            // `LaunchedEffect(..., packExecutor)` 会把「换了个新对象」当成
+                            // 「条件变了」⇒ 预检无限重启，每次都先把结论清空再被取消，
+                            // 界面上永远看不到结果（真机表现为「4.7 G 的单本本该提示
+                            // Zip64，计划页却干干净净」）。
+                            packExecutor = remember(packTreeUri, workspaceHandle?.displayName) {
+                                packTreeUri?.let { uri ->
+                                    SafPackExecutor(
+                                        context = context,
+                                        treeUri = uri,
+                                        rootDisplayName = workspaceHandle?.displayName.orEmpty(),
+                                    )
+                                }
                             },
                             // ---- 前台服务（D2b 第 2 项「切后台恢复」）----
                             // 只在有工作区时开启：没有工作区时 `volumes` 是 mock，
@@ -620,9 +689,23 @@ fun PixFoldApp(store: SettingsStore? = null) {
                             backgroundPacking = packTreeUri != null,
                             interruptedNotice = interruptedNotice,
                             onDismissInterruptedNotice = { interruptedSnapshot = null },
+                            // 点通知进来 ⇒ 直接落到步骤 3（2026-10-20 真机缺陷）。
+                            // 只在「本次是从通知启动」时为 true；正常从首页进入不受影响。
+                            // 用 `startAtPack` 而非 `openPackOnStart`：后者已被上层
+                            // 消费清零（见顶部 `LaunchedEffect`），下层要靠这个留在 true。
+                            startAtPackStep = startAtPack,
+                            onStartAtPackStepHandled = { startAtPack = false },
+                            // 结构警告（2026-10-20 裁决第 ③ 条）：系列下出现嵌套目录。
+                            // 从**扫描结果**现算 —— 刷新后嵌套层被用户改掉,警告随之消失,
+                            // 不缓存。无工作区时 collections 是 mock ⇒ 不会误报
+                            // (mock 结构没有嵌套;且没有工作区时用户本来也看不到库)。
+                            workspaceWarnings = remember(collections) {
+                                nestedDirWarnings(collections)
+                            },
                         )
                     }
                 }
+            }
             }
             }
         }

@@ -201,9 +201,6 @@ internal fun TextKey.resId(): Int = when (this) {
     TextKey.LangUnset -> R.string.domain_lang_unset
     TextKey.LangZh -> R.string.domain_lang_zh
     TextKey.LangJa -> R.string.domain_lang_ja
-    TextKey.LangOther -> R.string.domain_lang_other
-    TextKey.LangUnknown -> R.string.domain_lang_unknown
-    TextKey.LangSkip -> R.string.domain_lang_skip
 
     // 元数据字段
     TextKey.MetaFieldTitle -> R.string.domain_meta_field_title
@@ -258,7 +255,10 @@ internal fun TextKey.resId(): Int = when (this) {
 
     // 待确认标记 / 未命名系列
     TextKey.PendingLanguage -> R.string.domain_pending_language
+    TextKey.PendingTitle -> R.string.domain_pending_title
     TextKey.PendingVolume -> R.string.domain_pending_volume
+    TextKey.PendingSeries -> R.string.domain_pending_series
+    TextKey.PendingWriter -> R.string.domain_pending_writer
     TextKey.UnnamedSeries -> R.string.domain_unnamed_series
 
     // 影响范围摘要
@@ -323,4 +323,7 @@ internal fun TextKey.resId(): Int = when (this) {
     TextKey.PageIssueCountMismatch -> R.string.domain_page_issue_count_mismatch
     TextKey.PageIssueMissingFromOrder -> R.string.domain_page_issue_missing_from_order
     TextKey.PageIssueWrongIndex -> R.string.domain_page_issue_wrong_index
+
+    // 工作区结构警告
+    TextKey.NestedSeriesDir -> R.string.domain_nested_series_dir
 }

@@ -67,6 +67,7 @@ fun runPackPlansChecked(
     token: CancellationToken,
     timeMillis: Long,
     onProgress: (TaskProgress, Int) -> Unit = { _, _ -> },
+    onPageWritten: (volumeIndex: Int, pageDone: Int, pageTotal: Int) -> Unit = { _, _, _ -> },
 ): PackCheckedOutcome {
     val preflight = preflightPackPlans(
         plans = plans,
@@ -86,6 +87,7 @@ fun runPackPlansChecked(
             token = token,
             timeMillis = timeMillis,
             onProgress = onProgress,
+            onPageWritten = onPageWritten,
         ),
     )
 }

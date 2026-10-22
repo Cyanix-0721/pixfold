@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+
+    <string name="pack_progress_title">正在打包</string>
+    <string name="pack_progress_cancelling">正在取消…</string>
+    <string name="pack_progress_volumes">%1$d / %2$d</string>
+    <string name="pack_progress_pages">页 %1$d / %2$d</string>
+    <string name="pack_progress_failed">失败：%1$d</string>
+    <string name="pack_progress_cancel">取消</string>
+    <string name="pack_progress_cancel_confirm_title">要取消打包吗？</string>
+    <string name="pack_progress_cancel_confirm_body">正在写的这一卷会留下不完整文件，需要重新打包。</string>
+    <string name="pack_progress_cancel_confirm_ok">取消打包</string>
+    <string name="pack_progress_cancel_confirm_dismiss">继续打包</string>
+</resources>

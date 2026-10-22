@@ -61,9 +61,6 @@ class TextKeyMappingTest {
                 TextKey.LangUnset,
                 TextKey.LangZh,
                 TextKey.LangJa,
-                TextKey.LangOther,
-                TextKey.LangUnknown,
-                TextKey.LangSkip,
             ),
             LangChoice.entries.map { it.textKey },
         )

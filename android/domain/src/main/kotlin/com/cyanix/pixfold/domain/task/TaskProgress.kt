@@ -53,6 +53,45 @@ data class TaskProgress(
     val percent: Int get() = (fraction * 100).toInt().coerceIn(0, 100)
 
     /**
+     * 把**当前卷内的页级进度**也算进来的百分比，`0..100`。
+     *
+     * ## 为什么需要它（用户 `User said (m17028)` 原话）
+     *
+     * 「内圈的百分比根据双层共同计算取值吧，不如外圈没转完进度一直 0」
+     *
+     * [percent] 只按卷算，而卷进度**只在整卷写完时**才 +1。打包实际是
+     * 「一批里有几卷、一卷里有几千页」的两级结构：
+     *
+     *  · 4 卷的一批、每卷 1600 页 ⇒ 前 1599 页里 [percent] 一直是 0%，
+     *    用户看到的是「进度条不动」，然后整卷写完直接跳到 25%；
+     *  · 页级进度本来就在外环上画着 —— 环在涨、数字不动，两处读数互相矛盾。
+     *
+     * 故这里把两级合成一个读数：**（已处理卷数 + 当前卷页比例）/ 总卷数**。
+     *
+     * ## 夹取规则
+     *
+     *  · `pageTotal` 缺失或 `<= 0` ⇒ 退化成 [percent]（不知道页数就别编）；
+     *  · 页比例本身夹到 `0f..1f` —— 平台层重复回调会产生 `pageDone > pageTotal` 的脏值；
+     *  · 全部卷处理完时自然满 100：`base = t` ⇒ `base/t = 1f`，再叠加任何页比例都由
+     *    末尾的 `coerceIn(0, 100)` 夹住。**这里刻意不再写「满了就提前 return」
+     *    的分支** —— 变异验证实测为等价变异（删掉后没有任何测试变红 = 纯冗余判据），
+     *    留一条杀不死的判据只会给假保障。
+     *
+     * @param pageDone 当前卷已写页数；`null` = 还不知道
+     * @param pageTotal 当前卷总页数；`null` 或 `<= 0` = 不知道
+     */
+    fun percentWithPage(pageDone: Int?, pageTotal: Int?): Int {
+        val t = total.coerceAtLeast(0)
+        if (t == 0) return 100
+        val base = processed.coerceIn(0, t)
+        if (pageDone == null || pageTotal == null || pageTotal <= 0) {
+            return (base.toFloat() / t * 100f).toInt().coerceIn(0, 100)
+        }
+        val pageFraction = (pageDone.toFloat() / pageTotal).coerceIn(0f, 1f)
+        return ((base + pageFraction) / t * 100f).toInt().coerceIn(0, 100)
+    }
+
+    /**
      * 是否已全部处理完（成功与失败都算处理完）。
      *
      * **空任务（`total == 0`）自然为真**：`processed` 已保证非负，故 `processed >= 0`

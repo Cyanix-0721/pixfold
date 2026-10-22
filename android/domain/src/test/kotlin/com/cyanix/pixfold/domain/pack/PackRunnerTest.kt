@@ -297,9 +297,14 @@ class PackRunnerTest {
         val seen = mutableListOf<TaskProgress>()
         val plans = listOf(plan("a"), plan("bad", skipped = false), plan("c"))
         val sink = RecordingSink(failOnOpen = setOf("bad.cbz"))
-        runPackPlans(plans, bytesSource(), sink, CancellationToken(), now) { progress, _ ->
-            seen += progress
-        }
+        runPackPlans(
+            plans = plans,
+            bytes = bytesSource(),
+            sink = sink,
+            token = CancellationToken(),
+            timeMillis = now,
+            onProgress = { progress, _ -> seen += progress },
+        )
 
         assertEquals(3, seen.size)
         assertEquals(listOf(1, 2, 3), seen.map { it.processed }, "失败的卷也要推进进度,否则进度条卡住")
@@ -311,9 +316,14 @@ class PackRunnerTest {
     @Test
     fun `跳过的卷也算处理完不阻塞进度`() {
         val seen = mutableListOf<TaskProgress>()
-        runPackPlans(listOf(plan("skipped", skipped = true)), bytesSource(), RecordingSink(), CancellationToken(), now) { p, _ ->
-            seen += p
-        }
+        runPackPlans(
+            plans = listOf(plan("skipped", skipped = true)),
+            bytes = bytesSource(),
+            sink = RecordingSink(),
+            token = CancellationToken(),
+            timeMillis = now,
+            onProgress = { p, _ -> seen += p },
+        )
         assertEquals(100, seen.single().percent, "跳过的卷是「已处理」,不该让进度条停在 0%")
     }
 
@@ -322,7 +332,14 @@ class PackRunnerTest {
         val token = CancellationToken()
         token.cancel()
         val seen = mutableListOf<TaskProgress>()
-        runPackPlans(listOf(plan("a")), bytesSource(), RecordingSink(), token, now) { p, _ -> seen += p }
+        runPackPlans(
+            plans = listOf(plan("a")),
+            bytes = bytesSource(),
+            sink = RecordingSink(),
+            token = token,
+            timeMillis = now,
+            onProgress = { p, _ -> seen += p },
+        )
         assertTrue(seen.isEmpty(), "一卷都没处理就中断,不该有进度事件")
     }
 

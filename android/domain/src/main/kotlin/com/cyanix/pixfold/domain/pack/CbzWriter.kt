@@ -111,6 +111,7 @@ object CbzWriter {
         source: PageByteSource,
         out: OutputStream,
         timeMillis: Long,
+        onPageWritten: (Int, Int) -> Unit = { _, _ -> },
     ) {
         require(timeMillis > 0) { "timeMillis 必须为正：$timeMillis（时间戳需由调用方显式给定以保证可复现）" }
 
@@ -122,7 +123,7 @@ object CbzWriter {
         zip.write(xmlBytes)
         zip.closeEntry()
 
-        pages.forEach { page ->
+        pages.forEachIndexed { index, page ->
             // 第一遍:只算 size 与 CRC,字节读完即丢。
             val crc = CRC32()
             var size = 0L
@@ -158,6 +159,10 @@ object CbzWriter {
                 }
             }
             zip.closeEntry()
+            // 逐页回调:调用方据此画出「当前这一卷写到了第几页」。
+            // 放在 `closeEntry()` 之后 —— 页真的完整落进流里了才报，
+            // 提前报会让进度条跑到实际写入前面。
+            onPageWritten(index + 1, pages.size)
         }
 
         zip.finish()

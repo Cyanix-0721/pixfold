@@ -77,13 +77,14 @@ fun executePackPlans(
     token: CancellationToken,
     timeMillis: Long,
     onProgress: (TaskProgress, Int) -> Unit = { _, _ -> },
+    onPageWritten: (volumeIndex: Int, pageDone: Int, pageTotal: Int) -> Unit = { _, _, _ -> },
 ): PackExecutionOutcome {
     if (availableBytes == null) {
         // 无法判定空间 ⇒ 不做空间阻断。仍走 runPackPlans,故「先探测后开流」
         // 「中断只在卷间」「写失败清理半成品」这些保证一个不少。
         return PackExecutionOutcome.Ran(
             preflight = null,
-            report = runPackPlans(plans, bytes, sink, token, timeMillis, onProgress),
+            report = runPackPlans(plans, bytes, sink, token, timeMillis, onProgress, onPageWritten),
         )
     }
     return when (
@@ -97,6 +98,7 @@ fun executePackPlans(
             token = token,
             timeMillis = timeMillis,
             onProgress = onProgress,
+            onPageWritten = onPageWritten,
         )
     ) {
         is PackCheckedOutcome.Rejected ->

@@ -48,7 +48,8 @@ fun VolumeChipRow(
     sheetChipTag: (String) -> String,
     chipDescription: @Composable (String) -> String,
     modifier: Modifier = Modifier,
-    chipLabel: @Composable (ComicVolume) -> Unit,
+    chipLabel: @Composable (ComicVolume) -> String,
+    chipSuffix: @Composable (ComicVolume) -> String = { "" },
 ) {
     SingleSelectChipRow(
         items = volumes,
@@ -67,6 +68,7 @@ fun VolumeChipRow(
         modifier = modifier,
         allEntryText = { n -> pluralStringResource(R.plurals.volume_all, n, n) },
         chipLabel = chipLabel,
+        chipSuffix = chipSuffix,
     )
 }
 

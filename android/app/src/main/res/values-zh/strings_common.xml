@@ -47,6 +47,19 @@
     <string name="common_reset_all_body">将清除排序规则、人工调整、命名覆盖与元数据编辑。</string>
     <string name="common_reset_all_confirm">重置</string>
 
+    <!--
+      ============ 按目录结构获取（DirMetaButton） ============
+      用户 2026-10-22：「右上角重置旁边加个根据目录结构自动获取填写到输入框的按钮」。
+      它把当前卷**全部**元数据字段重填成「仅由文件夹结构推导」的值，绕开 ComicInfo.xml
+      （后者的值平时优先级更高）。长按浮出 `common_dir_meta_hint`；轻点先确认，
+      因为它一次覆盖 7 个字段并打逐项例外标记。
+    -->
+    <string name="common_dir_meta_cd">按目录结构获取</string>
+    <string name="common_dir_meta_hint">按目录结构自动获取元数据</string>
+    <string name="common_dir_meta_title">按目录结构重新获取？</string>
+    <string name="common_dir_meta_body">本卷的 Title、Series、Writer、卷号与 CBZ 文件名将按文件夹名重新填写，当前值会被替换。</string>
+    <string name="common_dir_meta_confirm">重新获取</string>
+
     <!-- ============ 回到顶部(ScrollToTopButton) ============ -->
     <string name="common_scroll_to_top">回到顶部</string>
 

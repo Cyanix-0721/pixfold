@@ -3,6 +3,7 @@ package com.cyanix.pixfold.domain.comic
 import com.cyanix.pixfold.domain.model.ImageCollection
 import com.cyanix.pixfold.domain.model.LangChoice
 import com.cyanix.pixfold.domain.model.SourceItem
+import com.cyanix.pixfold.domain.text.TextKey
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -92,11 +93,59 @@ class ComicVolumesFromTest {
     }
 
     @Test
-    fun `没有系列时标题取卷目录名且系列无建议`() {
+    fun `没有系列时系列跟随标题`() {
+        // 2026-10-20 用户裁决(Series 三条语义之一):无系列层时 Series 跟随 Title ——
+        // 恢复建议点下去后两者一致;不再给「无建议」,那会让 Series 字段永远空着。
         val result = convert(listOf(collection("单本")))
         assertEquals("单本", result.single().titleSug.value)
-        assertNull(result.single().seriesSug.value)
-        assertFalse(result.single().seriesSug.hasValue)
+        assertEquals("单本", result.single().seriesSug.value)
+        assertTrue(result.single().seriesSug.hasValue)
+    }
+
+    @Test
+    fun `没有系列且作者前缀与工作区名一致时系列取工作区名`() {
+        // 2026-10-20 用户裁决(Series 三条语义之二):工作区选在系列文件夹上时,
+        // 卷目录名仍带系列名前缀(如 `[作者X] 标题B 第1卷`),其 [作者X] 与工作区
+        // 文件夹名 `[作者X] 标题B` 的作者前缀一致 ⇒ Series 取工作区文件夹名(清洗后)。
+        val result = convert(
+            listOf(collection("[作者X] 标题B 第1卷")),
+            root = "[作者X] 标题B",
+        )
+        assertEquals("标题B 第1卷", result.single().titleSug.value)
+        assertEquals("标题B", result.single().seriesSug.value)
+        assertTrue(result.single().seriesSug.hasValue)
+    }
+
+    @Test
+    fun `作者前缀与工作区名不一致时仍跟随标题`() {
+        // 「仅当一致才取」的反面:工作区只是普通容器时不得把容器名当系列。
+        val result = convert(
+            listOf(collection("[作者X] 标题B 第1卷")),
+            root = "[作者Y] 完全不同的",
+        )
+        assertEquals("标题B 第1卷", result.single().titleSug.value)
+        assertEquals("标题B 第1卷", result.single().seriesSug.value)
+    }
+
+    @Test
+    fun `卷目录无作者前缀时不匹配工作区名`() {
+        // 无前缀 = 没有一致的证据,回落到跟随 Title(如 4.7G 素材 `2&3` 这种卷名)。
+        val result = convert(
+            listOf(collection("2&3")),
+            root = "[作者X] 标题B",
+        )
+        assertEquals("2&3", result.single().seriesSug.value)
+    }
+
+    @Test
+    fun `跟随标题与工作区名匹配的来源都如实`() {
+        val follow = convert(listOf(collection("单本"))).single()
+        assertEquals("无系列层，跟随 Title", follow.seriesSug.source)
+        val matched = convert(
+            listOf(collection("[作者X] 标题B 第1卷")),
+            root = "[作者X] 标题B",
+        ).single()
+        assertEquals("工作区文件夹名（卷目录 [作者] 前缀与其一致）", matched.seriesSug.source)
     }
 
     @Test
@@ -157,9 +206,10 @@ class ComicVolumesFromTest {
     fun `解析出卷号时不再要求确认卷号`() {
         val result = convert(listOf(collection("第03卷", pages = 2)))
         assertEquals(3, result.single().volume)
-        // 语言仍是 Unset ⇒ 仍需确认,但不该再报卷号
-        assertTrue(result.single().needsConfirmation)
-        assertTrue(result.single().pendingIssues.none { it.toString().contains("Volume") })
+        // 卷号解析出来后**不再有待确认的卷号项**(2026-10-20 裁决)。
+        // 注意不能断言「没有任何待确认项」:2026-10-22 起 series / writer 为空
+        // 也各算一条 —— 这条用例的夹具目录名不带 [作者] 前缀,writer 本就是空的。
+        assertFalse(result.single().pendingIssues.any { it.key == TextKey.PendingVolume })
     }
 
     @Test
@@ -177,14 +227,16 @@ class ComicVolumesFromTest {
         val result = convert(listOf(collection("第01卷")))
         assertNull(result.single().writerSug.value)
         assertNull(result.single().langSug.value)
-        assertNull(result.single().writerCleanedSug.value)
+        assertNull(result.single().dirWriterSug.value)
     }
 
     @Test
-    fun `语言保持 Unset 等待人工确认`() {
+    fun `语言保持 Unset 且不再构成待确认`() {
         val result = convert(listOf(collection("第01卷")))
         assertEquals(LangChoice.Unset, result.single().language)
-        assertTrue(result.single().needsConfirmation)
+        // Unset 即「不写入标签」,是合法终态(2026-10-20 用户裁决)⇒ 不进待确认项。
+        // 不断言「完全没有待确认项」:writer / series 为空各有自己的提示,与语言无关。
+        assertFalse(result.single().pendingIssues.any { it.key == TextKey.PendingLanguage })
     }
 
     @Test
@@ -294,11 +346,14 @@ class ComicVolumesFromTest {
         // 2026-10-19 名字清洗生效:系列名开头的 [作者] 前缀被剥掉,作者另行建议。
         assertEquals("彼女がボクの知らないところで", volumes[0].seriesSug.value)
         assertEquals("彼女がボクの知らないところで", volumes[1].seriesSug.value)
-        // 作者取自外层(系列目录名)的 [作者] 前缀,原始形态保留方括号。
-        assertEquals("[Cior (Ken-1)]", volumes[0].writerSug.value)
-        assertEquals("[Cior (Ken-1)]", volumes[1].writerSug.value)
+        // 2026-10-21 用户裁决:「如果没有 ComicInfo 让你获取 writer,就默认获取去除 [] 的」
+        // ⇒ writerSug 直接给清理后形态(不再是带方括号的原始形态)。
+        assertEquals("Cior (Ken-1)", volumes[0].writerSug.value)
+        assertEquals("Cior (Ken-1)", volumes[1].writerSug.value)
         // 清理只去方括号,内部的 `(Ken-1)` 是署名的一部分(旧脚本 parse_name 同样保留)。
-        assertEquals("Cior (Ken-1)", volumes[0].writerCleanedSug.value)
+        assertEquals("Cior (Ken-1)", volumes[0].dirWriterSug.value)
+        // 两者同值 ⇒ 一键清理在本路径上是幂等的(按钮仍保留:ComicInfo.xml 里的作者可能带方括号)。
+        assertEquals(volumes[0].writerSug.value, volumes[0].dirWriterSug.value)
         // 真实素材目录名里没有「第NN卷」⇒ 卷号解析不出、待用户确认(建议≠事实)
         assertNull(volumes[0].volume)
         assertNull(volumes[1].volume)

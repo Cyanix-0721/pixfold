@@ -18,6 +18,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import com.cyanix.pixfold.ui.components.PixFoldAlertDialog
 import com.cyanix.pixfold.R
 import com.cyanix.pixfold.domain.model.SourceItem
 
@@ -86,7 +87,7 @@ internal fun PreviewRenameDialog(
     val save = stringResource(R.string.preview_rename_save)
     val cancel = stringResource(R.string.common_cancel)
 
-    AlertDialog(
+    PixFoldAlertDialog(
         onDismissRequest = onDismiss,
         title = { Text(title) },
         text = {

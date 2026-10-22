@@ -7,6 +7,7 @@ import com.cyanix.pixfold.domain.comic.packableVolumes
 import com.cyanix.pixfold.domain.pack.PackExecutionOutcome
 import com.cyanix.pixfold.domain.pack.PackPreflightResult
 import com.cyanix.pixfold.domain.pack.executePackPlans
+import com.cyanix.pixfold.domain.pack.preflightPackPlans
 import com.cyanix.pixfold.domain.pack.packRunAsExecutionReport
 import com.cyanix.pixfold.domain.plan.VolumePackPlan
 import com.cyanix.pixfold.domain.storage.SpaceThreshold
@@ -14,6 +15,7 @@ import com.cyanix.pixfold.domain.task.CancellationToken
 import com.cyanix.pixfold.domain.task.TaskProgress
 import com.cyanix.pixfold.ui.library.PackExecutorPort
 import com.cyanix.pixfold.ui.library.PackUiOutcome
+import com.cyanix.pixfold.ui.library.PackUiPreflight
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
@@ -46,44 +48,80 @@ import kotlinx.coroutines.withContext
  *   解析规则见 `comicVolumesFrom` 的 `outputDirSug`，以及本文件调用点的说明。
  * @param rootDisplayName 工作区根的**显示名**（`ComicVolume.outputDir` 的默认值就是
  *   它），用于把 `outputDir` 反解成相对路径。见 [outputDirRelOf]。
+ * @param spaceSource 可用空间查询，默认 [FilesystemSpaceSource]。
+ * @param threshold 空间余量阈值。**预检与执行共用这一个字段** —— 两处各肉一份
+ *   数值是「准备页说能打、执行时被拒绝」的标准成因。
+ *
+ *   **数值依据**：CBZ 的输出大小 ≈ 原图总和（图片已压缩，ZIP 再压收益 < 2%），
+ *   故估算基本准；留 10% 是为了兜住 ZIP 目录区、ComicInfo.xml 与 provider 的块对齐。
+ *   选百分比是因为它随卷大小自然伸缩，而绝对阈值在小卷上过于宽松、在大卷上过于严苛。
+ * @param safetyMargin 临界安全余量，默认 32 MB。为什么不是 0：空间「刚好够」时，
+ *   ZIP 写入本身需要的临时缓冲、以及 provider 的元数据更新都可能失败，且失败发生在
+ *   写到一半 —— 那正是 `discardFor` 要清理的半成品。留一点余量比事后清理便宜。
  */
 class SafPackExecutor(
     context: Context,
     private val treeUri: android.net.Uri,
     private val rootDisplayName: String,
+    /**
+     * 可用空间查询。默认走 [FilesystemSpaceSource]；**声明为构造参数只为了可测**
+     * —— Robolectric 下 `StatFs` 报的是宿主机的真实值，造不出固定场景，
+     * 也就无法断言「预检与执行用的是同一组判据」。
+     */
+    private val spaceSource: (android.net.Uri) -> Long? = { uri ->
+        FilesystemSpaceSource(context).availableBytesOf(uri)
+    },
+    /** 空间余量阈值，默认 10%。见类 KDoc 的 `@param threshold`。 */
+    private val threshold: SpaceThreshold = SpaceThreshold.Percentage(marginPercent = 10),
+    /** 临界安全余量，默认 32 MB。见类 KDoc 的 `@param safetyMargin`。 */
+    private val safetyMargin: Long = 32L * 1024 * 1024,
 ) : PackExecutorPort {
 
     private val appContext = context.applicationContext
 
-    /**
-     * 空间余量阈值。
-     *
-     * **数值依据**：CBZ 的输出大小 ≈ 原图总和（图片已压缩，ZIP 再压收益 < 2%），
-     * 故估算基本准；留 10% 是为了兜住 ZIP 目录区、ComicInfo.xml 与 provider 的块对齐。
-     * HANGOFF §11 第 12 条（百分比 or 绝对值）直到 2026-10-19 仍未由真机定档 ——
-     * 这里选百分比是因为它随卷大小自然伸缩，而绝对阈值在小卷上过于宽松、在大卷上过于严苛。
-     * 定档后改这一个常量即可。
-     */
-    private val threshold: SpaceThreshold = SpaceThreshold.Percentage(marginPercent = 10)
 
     /**
-     * 临界安全余量：32 MB。
+     * 计划页预检（D4b）。**与 [execute] 用同一组阈值常量** —— 两处各肉一份
+     * 数值是「准备页说能打、执行时被拒绝」的标准成因。
      *
-     * 为什么不是 0：空间「刚好够」时，ZIP 写入过程本身需要的临时缓冲、
-     * 以及 provider 的元数据更新都可能失败，且失败发生在写到一半 —— 那正是
-     * `discardFor` 要清理的半成品。留一点余量比事后清理便宜。
+     * 与 [execute] 唯一差别：这里**只问空间、只算领域预检**，不构造 sink、不读页字节。
+     * 代价（一次 `StatFs` + 一次纯计算）远低于让用户在没有任何结论的情况下按「执行」。
      */
-    private val safetyMargin: Long = 32L * 1024 * 1024
+    override suspend fun preflight(plans: List<VolumePackPlan>): PackUiPreflight =
+        withContext(Dispatchers.IO) {
+            val availableBytes = runCatching {
+                spaceSource(treeUri)
+            }.getOrElse { e ->
+                // 查空间本身失败不是「空间不足」—— 必须让界面知道结论不可用。
+                return@withContext PackUiPreflight.Unavailable(
+                    e.message ?: e::class.simpleName ?: "无法查询可用空间",
+                )
+            }
+            PackUiPreflight.Ready(
+                result = preflightPackPlans(
+                    plans = plans,
+                    // `null`（＝无法判定）时喂一个不可能触发的上限，让空间类判定退化成「充足」。
+                    // 这是**刻意的**：`PackPreflightResult` 要求一个 Long，而
+                    // 「问不到「不等于「不足」—— 拿 0 会把用户挡在门外，
+                    // 拿 Long.MAX_VALUE 只是让空间提示消失，Zip64 等告知项照常输出。
+                    // 界面侧靠 `availableBytes == null` 如实显示「无法判断空间」。
+                    availableBytes = availableBytes ?: Long.MAX_VALUE,
+                    threshold = threshold,
+                    safetyMargin = safetyMargin,
+                ),
+                availableBytes = availableBytes,
+            )
+        }
 
     override suspend fun execute(
         plans: List<VolumePackPlan>,
         token: CancellationToken,
         onProgress: (TaskProgress) -> Unit,
+        onPageWritten: (volumeIndex: Int, pageDone: Int, pageTotal: Int) -> Unit,
     ): PackUiOutcome = withContext(Dispatchers.IO) {
         // ---- 1. 组装平台三件套 ----
         val sink = SafCbzOutputSink(appContext, treeUri) { plan -> outputDirRelOf(plan) }
         val pageBytes = SafPageBytes(appContext)
-        val space = FilesystemSpaceSource(appContext)
 
         // itemId → documentUri 的映射。真实扫描下 `SourceItem.id` 就是 documentUri，
         // 但**不假设**这一点：映射由计划里的页列表现算，将来若 id 改成内部 id，
@@ -98,7 +136,7 @@ class SafPackExecutor(
         val bytes = pageByteSourceOf(uriByItemId, pageBytes)
 
         // ---- 2. 空间：问不到就是 null（＝无法判定，不是 0）----
-        val availableBytes = space.availableBytesOf(treeUri)
+        val availableBytes = runCatching { spaceSource(treeUri) }.getOrNull()
 
         // ---- 3. 执行 ----
         val outcome = try {
@@ -112,6 +150,7 @@ class SafPackExecutor(
                 token = token,
                 timeMillis = System.currentTimeMillis(),
                 onProgress = { progress, _ -> onProgress(progress) },
+                onPageWritten = onPageWritten,
             )
         } catch (e: Exception) {
             // 领域层内部不该抛（它把 per-volume 失败都收进了报告），但「不该抛」不等于

@@ -56,12 +56,9 @@
     <string name="domain_warn_type_overridden">人工覆盖</string>
 
     <!-- ============ 语言选择(LangChoice) ============ -->
-    <string name="domain_lang_unset">未设置（需确认）</string>
+    <string name="domain_lang_unset">不写入标签</string>
     <string name="domain_lang_zh">zh · 中文</string>
     <string name="domain_lang_ja">ja · 日文</string>
-    <string name="domain_lang_other" tools:ignore="TypographyDashes">其他 ISO 639-1</string>
-    <string name="domain_lang_unknown">未知</string>
-    <string name="domain_lang_skip">不写入标签</string>
 
     <!-- ============ 元数据字段(MetaField) ============ -->
     <!-- 前五个是 ComicInfo.xml 的标签名,标了 translatable="false",只在默认文件里 -->
@@ -109,7 +106,10 @@
 
     <!-- ============ 待确认标记 / 未命名系列 ============ -->
     <string name="domain_pending_language">语言未确认</string>
+    <string name="domain_pending_title">标题缺失</string>
     <string name="domain_pending_volume">卷号缺失</string>
+    <string name="domain_pending_series">系列缺失</string>
+    <string name="domain_pending_writer">作者缺失</string>
     <string name="domain_unnamed_series">（未命名系列）</string>
 
     <!-- ============ 影响范围摘要(generalSummaryLines) ============ -->
@@ -217,4 +217,7 @@
     <string name="domain_page_issue_missing_from_order" tools:ignore="PluralsCandidate">有 %1$d 页（共 %2$d 页）不在页序里</string>
     <string name="domain_page_issue_wrong_index" tools:ignore="PluralsCandidate">第 %1$d 项页码应为 %2$s，实际 %3$s</string>
 
+    <!-- ============ 工作区结构警告(nestedDirWarnings,显示在书架页) ============ -->
+    <!-- 占位符顺序与英文版逐位相同(TranslationCoverageTest 契约):先嵌套层 %1$s,再系列名 %2$s。 -->
+    <string name="domain_nested_series_dir">系列 %1$s 下出现嵌套目录 %2$s —— 系列内应只放单本文件夹或压缩包</string>
 </resources>

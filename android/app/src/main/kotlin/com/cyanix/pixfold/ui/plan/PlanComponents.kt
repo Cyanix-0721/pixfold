@@ -19,6 +19,7 @@ import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
+import com.cyanix.pixfold.ui.components.PixFoldAlertDialog
 import com.cyanix.pixfold.R
 import com.cyanix.pixfold.domain.plan.ConfirmStep
 import com.cyanix.pixfold.domain.plan.DangerAction
@@ -188,7 +189,7 @@ fun ConfirmDialog(
             // 是普通 lambda,不是 `@Composable`,里面调 `stringResource` 编译失败。
             val ok = stringResource(R.string.domain_general_confirm_ok)
             val cancel = stringResource(R.string.common_cancel)
-            AlertDialog(
+            PixFoldAlertDialog(
                 onDismissRequest = onCancel,
                 title = { Text(stringResource(R.string.domain_general_confirm_title)) },
                 text = {
@@ -235,7 +236,7 @@ fun ConfirmDialog(
             val body = textOf(step.action.bodyKey)
             val confirm = textOf(step.action.buttonKey)
             val cancel = stringResource(R.string.common_cancel)
-            AlertDialog(
+            PixFoldAlertDialog(
                 onDismissRequest = onCancel,
                 title = {
                     // `domain_danger_dialog_title` 去 emoji 后由矢量图标承担警示;图标放在

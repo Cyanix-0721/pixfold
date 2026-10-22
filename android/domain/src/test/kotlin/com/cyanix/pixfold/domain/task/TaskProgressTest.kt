@@ -224,4 +224,49 @@ class TaskProgressTest {
             ),
         )
     }
+
+    // ---- 细粒度进度：卷内页级进度要能推进总进度 -------------------------
+    //
+    // 用户 `User said (m17028)`：「内圈的百分比根据双层共同计算取值吧，不如外圈
+    // 没转完进度一直 0」。
+    //
+    // 动因：卷级进度只在**整卷写完**时才 +1。一卷 1599 页时，中间 1598 页里
+    // 中心读数一直是 0%，看起来像卡死；等整卷写完又直接跳到 100%。页级进度
+    // 本来就在外环上画着，但**数字**不跟它走，两处读数互相矛盾。
+
+    @Test
+    fun `卷内页进度把总进度推到卷与卷之间`() {
+        // 4 卷的一批，第 1 卷才写了 50 页（共 100 页）⇒ (0 + 0.5) / 4 = 12.5%
+        // 只按卷算的话这里是 0%，正是用户说的「一直 0」。
+        val p = TaskProgress(total = 4, done = 0)
+        assertEquals(12, p.percentWithPage(pageDone = 50, pageTotal = 100))
+    }
+
+    @Test
+    fun `没有页级进度时退化成按卷计算`() {
+        val p = TaskProgress(total = 4, done = 1)
+        assertEquals(25, p.percentWithPage(pageDone = null, pageTotal = null))
+        assertEquals(25, p.percentWithPage(pageDone = 10, pageTotal = 0))
+    }
+
+    @Test
+    fun `页级进度不会把读数推到已完成卷之上`() {
+        // 已处理 1 卷 + 当前卷第 99/100 页 ⇒ 1.99/4 = 49.75%，压到 49
+        // 而不是 50 —— 第 2 卷还没写完，界面不能先说「一半了」。
+        val p = TaskProgress(total = 4, done = 1)
+        assertEquals(49, p.percentWithPage(pageDone = 99, pageTotal = 100))
+    }
+
+    @Test
+    fun `空任务带页进度仍是完成`() {
+        val p = TaskProgress(total = 0)
+        assertEquals(100, p.percentWithPage(pageDone = 3, pageTotal = 100))
+    }
+
+    @Test
+    fun `页进度超过总页数按整卷算`() {
+        // 平台层重复回调会给出脏值；夹住而不是崩掉。
+        val p = TaskProgress(total = 4, done = 2)
+        assertEquals(75, p.percentWithPage(pageDone = 150, pageTotal = 100))
+    }
 }

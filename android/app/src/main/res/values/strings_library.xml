@@ -24,9 +24,6 @@
     <string name="meta_suggestion_with_source">%1$s (%2$s)</string>
     <string name="meta_suggestion_prefix">Suggested: %1$s</string>
     <string name="meta_no_value">none</string>
-    <string name="meta_writer_clean">Clean up</string>
-    <string name="meta_writer_clean_cd">Clean up writer automatically</string>
-    <string name="meta_writer_cleaned_hint">Cleaned suggestion: %1$s (%2$s)</string>
     <string name="meta_cbz_name_hint">Will be: %1$s</string>
     <string name="meta_output_dir_hint">Suggested output folder (%1$s)</string>
     <plurals name="meta_batch_applied">
@@ -48,10 +45,7 @@
     </plurals>
     <string name="meta_output_conflict">Output conflict: a CBZ of the same name already exists in the output folder (%1$s)</string>
     <string name="meta_pending_prefix">To confirm:\u0020</string>
-    <string name="meta_reset">Use suggestion</string>
     <string name="meta_reset_cd">Use suggested value for %1$s</string>
-    <string name="meta_lang_unset_error">Language is unset and must be confirmed</string>
-    <string name="meta_lang_code_label" tools:ignore="TypographyDashes">ISO 639-1 code</string>
     <string name="meta_batch_title">Batch set (skips manually edited fields)</string>
     <string name="meta_batch_field_cd">Batch field %1$s</string>
     <string name="meta_batch_value_label">Batch value</string>
@@ -89,7 +83,7 @@
 
     <!-- ============ Step 3 · package preview (PackPreviewPage) ============ -->
     <string name="pack_volume_chip_cd">Preview volume %1$s</string>
-    <string name="pack_volume_excluded">%1$s (excluded)</string>
+    <string name="pack_volume_suffix_excluded">(excluded)</string>
     <string name="pack_xml_title">ComicInfo.xml preview</string>
     <plurals name="pack_page_header">
         <item quantity="one">Page preview (renumbered in the current order, %1$d item)</item>
@@ -116,9 +110,6 @@
         <item quantity="other">%1$d of %2$d volumes will be packaged</item>
     </plurals>
     <string name="pack_included_count_hint">\u0020(excluded volumes are not packaged)</string>
-    <string name="pack_lang_other_empty">(no code entered, not written)</string>
-    <string name="pack_lang_unset">Not written (language not confirmed)</string>
-    <string name="pack_lang_unknown">Not written (unknown)</string>
-    <string name="pack_lang_skip">Not written</string>
+    <string name="pack_lang_unset">Not written</string>
 
 </resources>

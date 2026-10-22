@@ -165,6 +165,7 @@ fun writeCbz(
     source: PageByteSource,
     out: OutputStream,
     timeMillis: Long,
+    onPageWritten: (Int, Int) -> Unit = { _, _ -> },
 ): CbzWriteResult {
     // 参数校验前置:失败原因不该取决于"恰好缺不缺图"。CbzWriter.write 里也有同一断言,
     // 但缺图路径不会走到那里 —— 若只靠下游校验,`timeMillis = 0` + 缺图会静默返回
@@ -186,7 +187,14 @@ fun writeCbz(
 
     // 流式写入:每页两遍 —— 第一遍算 size/CRC(边读过丢),第二遍写出去。
     // 峰值内存 = 一个缓冲区,与页大小无关。
-    CbzWriter.writeStreaming(plan.comicInfoXml, plan.pages, source, out, timeMillis)
+    CbzWriter.writeStreaming(
+        comicInfoXml = plan.comicInfoXml,
+        pages = plan.pages,
+        source = source,
+        out = out,
+        timeMillis = timeMillis,
+        onPageWritten = onPageWritten,
+    )
     return CbzWriteResult(
         writtenEntries = listOf(CbzWriter.COMIC_INFO_ENTRY) + plan.pages.map { it.fileName },
         missing = emptyList(),

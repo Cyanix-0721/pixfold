@@ -7,7 +7,8 @@ import com.cyanix.pixfold.domain.comic.setIncluded
 import com.cyanix.pixfold.domain.model.ComicVolume
 import com.cyanix.pixfold.domain.model.MetaField
 import com.cyanix.pixfold.domain.model.MetaValue
-import com.cyanix.pixfold.domain.model.groupVolumesBySeries
+import com.cyanix.pixfold.domain.comic.VolumeGroup
+import com.cyanix.pixfold.domain.comic.groupVolumes
 
 /**
  * 工作流 B(漫画库 → CBZ)的批次状态(规格 §4.5 / §10.1)。
@@ -59,8 +60,25 @@ data class LibraryState(
     /** 待确认卷数(语言未确认 / 卷号缺失);卷列表按系列聚合展示用。 */
     val pendingCount: Int get() = volumes.count { it.needsConfirmation }
 
-    /** 按系列分组(顺序 = 首次出现顺序,不用排序打乱用户的目录顺序)。 */
-    val seriesGroups: List<Pair<String, List<ComicVolume>>> get() = groupVolumesBySeries(volumes)
+    /**
+     * 按系列分组(顺序 = 首次出现顺序,不用排序打乱用户的目录顺序)。
+     *
+     * **单本各自成组,不与别的单本合并。** 2026-10-21 真机缺陷:这里原先走
+     * `groupVolumesBySeries`(键 = `seriesKey`),把所有单本的**空 seriesKey** 并成
+     * 一个「(未命名系列)」组 ⇒ 3 个互不相干的单本被显示成同一个系列的 3 卷,
+     * 摘要也报错(该显示 2 个系列,实显 3 个)。
+     *
+     * 分组规则现在**只有一份**:`domain/comic/VolumeGroups.kt` 的 [groupVolumes] ——
+     * 与元数据页卷芯片、集合芯片同一套。两套并存时书架页与芯片行的分组会不一致,
+     * 而这种漂移只表现为「有时分对了、有时混在一起」。
+     */
+    val seriesGroups: List<VolumeGroup> get() = groupVolumes(volumes)
+
+    /** 真正的系列数(单本不计入)—— 摘要里「识别到 N 个系列」用的是它。 */
+    val seriesCount: Int get() = seriesGroups.count { it.isSeries }
+
+    /** 不属于任何系列的单本数。 */
+    val singleCount: Int get() = seriesGroups.count { !it.isSeries }
 }
 
 fun libraryStateOf(

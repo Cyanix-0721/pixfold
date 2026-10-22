@@ -32,16 +32,24 @@ data class Suggestion<T>(val value: T?, val source: String) {
 /**
  * 语言选项(声明顺序即 UI 下拉顺序)。
  *
- * **[Unset] 是硬语义**:即使 [Suggestion] 给出了语言建议(如 `ja`),构造出的当前值
- * 仍是 [Unset] —— 语言不是可以放心自动推断的字段,必须人工确认(HANGOFF §4 工作流 B)。
+ * **只有三档:`Unset` / `Zh` / `Ja`**(用户 2026-10-20 裁决)。
+ * 原先还有 `Other`(自由 ISO 639-1)、`Unknown`、`Skip` 三档,已删除:
+ *  - `Other` 没有需求(用户原话「LanguageISO 多出了其他 ISO,这个没需求」);
+ *  - `Unknown` 与 `Skip` 都是「不写入标签」,而 [Unset] 已经是这个意思
+ *    (用户原话「不写入就使用 Unset 吧,和之前的未设置感觉是一个意思」)——
+ *    三个词表达同一件事,用户在下拉里得先猜它们的区别。
+ *
+ * **[Unset] 是终态,不再要求人工确认**(用户 2026-10-20 裁决,推翻 D1 验收第 12 项
+ * 「语言必须人工确认」的语义)。因此 [ComicVolume.pendingIssues] **不再包含语言项** ——
+ * 「不写入」是一个合法的最终选择,不是一个待办。
+ *
+ * 语言仍然**不会**被自动采纳建议值:真实素材的 `langSug` 恒为 null(目录名里没有
+ * 可靠的语言信息),将来若从已有 ComicInfo.xml 读到语言,那是「已有值」而非「建议」。
  */
 enum class LangChoice(val textKey: TextKey) {
     Unset(TextKey.LangUnset),
     Zh(TextKey.LangZh),
     Ja(TextKey.LangJa),
-    Other(TextKey.LangOther),
-    Unknown(TextKey.LangUnknown),
-    Skip(TextKey.LangSkip),
 }
 
 /** 可人工覆盖的元数据字段全集(批量设置与"逐项例外"都以它为键)。 */
@@ -59,7 +67,7 @@ enum class MetaField(val textKey: TextKey) {
 sealed interface MetaValue {
     data class Text(val value: String) : MetaValue
     data class Number(val value: Int?) : MetaValue
-    data class Language(val choice: LangChoice, val otherCode: String = "") : MetaValue
+    data class Language(val choice: LangChoice) : MetaValue
 }
 
 /** 单卷的 ComicInfo 元数据:不可变建议 + 可改当前值 + 逐项例外标记。 */
@@ -71,8 +79,6 @@ data class ComicVolume(
     val titleSug: Suggestion<String>,
     val seriesSug: Suggestion<String>,
     val writerSug: Suggestion<String>,
-    /** 清理后的作者(去作者前缀 / 括号原作 / 尾部标签);一键清理用。 */
-    val writerCleanedSug: Suggestion<String>,
     val volumeSug: Suggestion<Int?>,
     val langSug: Suggestion<String>,
     val outputDirSug: String,
@@ -84,9 +90,40 @@ data class ComicVolume(
     val writer: String,
     val volume: Int?,
     val language: LangChoice = LangChoice.Unset,
-    val otherLangCode: String = "",
     val cbzFileName: String,
     val outputDir: String,
+    /**
+     * **扫描层**的系列目录名;单本卷为空串。
+     *
+     * 必须与 [seriesKey](当前值)分开。2026-10-21 的 Series 条①「无系列层时 Series
+     * 跟随 Title」让单本的 `series` 当前值也等于标题,于是「series 非空 ⇒ 是系列」
+     * 这条判据把每个单本都当成一个系列 —— 真机读数:5 个单本显示成「识别到 5 个系列」,
+     * 元数据页 1 级芯片全部折叠成 1 行(出现「全部 5 项」)。
+     *
+     * **是否属于某个系列是扫描期的事实,不能由用户可改的当前值反推**;当前值只决定
+     * 同一系列内怎么归组(用户改了系列名,该系列内各卷仍在一起)。
+     */
+    val seriesDir: String = "",
+    /**
+     * 仅由**目录结构**推导出的作者建议(去方括号/去前缀后的形态),不随 ComicInfo 改变。
+     *
+     * 与 [writerSug] 分开的理由:建议值优先级是「ComicInfo 最高,其次目录层级」
+     * (用户 2026-10-21 裁决),于是有 `ComicInfo.xml` 时 [writerSug] 会被文件里的作者
+     * 顶掉、目录层级的推导结果就丢了。而界面需要一个「按目录结构获取」的入口 ——
+     * 用户在文件里的作者写错时,唯一的退路就是按目录名重新取。
+     *
+     * 空串表示「目录名里没有 `[作者]` 前缀」,此时界面不给这个入口。
+     */
+    val dirWriterSug: Suggestion<String> = Suggestion(null, ""),
+    /**
+     * 仅由**目录结构**推导出的 Title 建议,不随 ComicInfo 改变(理由同 [dirWriterSug])。
+     *
+     * 与 [titleSug] 分开:`ComicInfo.xml` 里写了 `<Title>` 时 [titleSug] 会被文件值
+     * 顶掉,而界面的「按目录结构获取」入口要能回到目录名推导的结果。
+     */
+    val dirTitleSug: Suggestion<String> = Suggestion(null, ""),
+    /** 仅由**目录结构**推导出的 Series 建议,不随 ComicInfo 改变(理由同 [dirTitleSug])。 */
+    val dirSeriesSug: Suggestion<String> = Suggestion(null, ""),
     /**
      * CBZ 文件名的**基名建议**(不含卷号后缀与扩展名)。
      *
@@ -102,23 +139,64 @@ data class ComicVolume(
     val pageOrder: PageOrderState = pageOrderOf(pages),
     val included: Boolean = true,
 ) {
-    /** 分组键 = 当前 series 值(用户改了系列名,分组随之变化)。 */
-    val seriesKey: String get() = series
+    /**
+     * **扫描层**分组键 —— 与 [seriesDir] 同源。
+     *
+     * 曾经是 `get() = series`(当前值),2026-10-21 因真机回归改判:当前值会被条①的
+     * 「跟随 Title」填满,分组键随之失义。改名后同一系列内仍归一组,因为各卷的
+     * [seriesDir] 相同 —— 用户改的是显示名,不是它属于哪个系列目录。
+     */
+    val seriesKey: String get() = seriesDir
 
     /** 页面张数以**页序**为准(与页码预览、XML 的 PageCount 同源)。 */
     val pageCount: Int get() = pageOrder.order.size
 
     /**
-     * 待确认项(固定顺序,验收第 12 项):语言未确认 / 卷号缺失。
-     * 归档语义:UI 需在卷列表、卷头、计划卡三处一致展示(规格 §4.7)。
+     * 该字段自己的待确认项;没有则 `null`。
      *
+     * **字段 ↔ 待确认项的对应关系只在这里定义一次。** 页头汇总([pendingIssues])与
+     * 字段级红色警告(界面上每个输入框的 `isError` + supportingText)都从这里取 ——
+     * 若两处各写一份判据,迟早出现「页头说标题缺失、标题输入框却不标红」这类
+     * 用户看得见的分歧(2026-10-22 正是这样:先只做了页头汇总,用户指出
+     * 「我说的不是顶部的待确认,而是卷号那样空值的红色警告」)。
+     *
+     * 语言 / CBZ 名 / 输出目录刻意返回 `null`:语言「不写入」是合法终态,
+     * CBZ 名与输出目录有各自的默认值链路,缺了也不会静默丢信息。
+     */
+    fun pendingIssueOf(field: MetaField): Msg? = when (field) {
+        MetaField.Title -> Msg(TextKey.PendingTitle).takeIf { title.isBlank() }
+        MetaField.Series -> Msg(TextKey.PendingSeries).takeIf { series.isBlank() }
+        MetaField.Volume -> Msg(TextKey.PendingVolume).takeIf { volume == null }
+        MetaField.Writer -> Msg(TextKey.PendingWriter).takeIf { writer.isBlank() }
+        MetaField.Language, MetaField.CbzName, MetaField.OutputDir -> null
+    }
+
+    /**
+     * 待确认项:**标题 / 卷号 / 系列 / 作者**四项为空时各给一条,顺序固定为
+     * 工程内 `ComicInfo.build` 的标签顺序(Title → Series → Number → Writer 里
+     * 的字段序,`Number` 与 `Writer` 互换以保持「标量在前」的既有阅读习惯)。
+     *
+     * 语言项已于 2026-10-20 移除 —— [LangChoice.Unset] 即「不写入标签」,
+     * 是合法终态而非待办(用户裁决「Unset 即终态,不再要求确认」)。
+     *
+     * 这四项与语言的区别:它们的空值在 `ComicInfo.xml` 里写的是**自闭合空标签**
+     * (`<Title />` / `<Series />` / `<Number />` / `<Writer />`),阅读器里这本书
+     * 就没有标题、不属于任何系列、没有卷号、没有作者 —— 通常意味着**目录名没解析
+     * 出来**,值得提醒核对。语言不在此列是因为「不写入」本身就是一个正常选择
+     * (用户 2026-10-22 裁决:「所有标签为空时都应该不写入」是写入规则,
+     * 不代表空值都必须提醒)。
+     *
+     * ⚠️ **标题这一项我漏过一轮**:2026-10-22 首次补警告时只补了系列 / 作者,
+     * 理由是「标题几乎总能从目录名得到」—— 这条理由**站不住**,因为
+     * [titleSug] 给的只是**建议值**,用户完全可以把输入框清空(那是块可编辑的
+     * 输入框,不是只读展示),清空后 XML 里就是 `<Title />`。判据必须是
+     * 「当前值是否为空」,不能拿「通常能从目录名得到」当豁免。
+     *
+     * 归档语义:UI 需在卷列表、卷头、计划卡三处一致展示(规格 §4.7)。
      * 返回 [Msg] 而非成品字符串 —— 见 `text/Msg.kt`。
      */
     val pendingIssues: List<Msg>
-        get() = buildList {
-            if (language == LangChoice.Unset) add(Msg(TextKey.PendingLanguage))
-            if (volume == null) add(Msg(TextKey.PendingVolume))
-        }
+        get() = PENDING_FIELD_ORDER.mapNotNull { pendingIssueOf(it) }
 
     /** 是否有待确认项。 */
     val needsConfirmation: Boolean get() = pendingIssues.isNotEmpty()
@@ -127,17 +205,15 @@ data class ComicVolume(
 }
 
 /**
- * 系列分组(保持首次出现顺序;空系列名归入**空串键**的兜底组)。
+ * 页头汇总里待确认项的**展示顺序**:与 `ComicInfo.build` 的标签序一致
+ * (Title → Series → Number → Writer,`Number` 与 `Writer` 互换以保持「标量在前」)。
  *
- * ⚠️ 兜底组的键是**空字符串**,不是「（未命名系列）」这类文案 —— 分组键参与
- * `testTag` 与相等性判断,若把译文当键,切换语言就会把分组"换"成另一个键。
- * UI 渲染时把空串映射成 [TextKey.UnnamedSeries](见 `ui/library/LibraryPage.kt`)。
+ * 只影响汇总行的排列;字段级红警由 [ComicVolume.pendingIssueOf] 各自决定。
  */
-fun groupVolumesBySeries(volumes: List<ComicVolume>): List<Pair<String, List<ComicVolume>>> {
-    val map = LinkedHashMap<String, MutableList<ComicVolume>>()
-    volumes.forEach { v ->
-        val key = v.seriesKey
-        map.getOrPut(key) { mutableListOf() }.add(v)
-    }
-    return map.map { (k, v) -> k to v.toList() }
-}
+private val PENDING_FIELD_ORDER: List<MetaField> = listOf(
+    MetaField.Title,
+    MetaField.Series,
+    MetaField.Volume,
+    MetaField.Writer,
+)
+

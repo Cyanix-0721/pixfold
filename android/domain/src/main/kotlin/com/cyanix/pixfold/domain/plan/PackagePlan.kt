@@ -88,7 +88,7 @@ fun VolumePackPlan.describe(): List<Msg> {
     // 这样「未设置」这类占位词不会以中文字面量被冻进计划里。
     val number: Any = v.volume?.toString() ?: Msg(TextKey.PackValueUnset)
     val writer: Any = if (v.writer.isEmpty()) Msg(TextKey.PackValueEmpty) else v.writer
-    val lang: Any = langIso(v.language, v.otherLangCode) ?: Msg(TextKey.PackValueNotWritten)
+    val lang: Any = langIso(v.language) ?: Msg(TextKey.PackValueNotWritten)
     return buildList {
         add(Msg(TextKey.PackCreateCbz, listOf(outputDisplay)))
         add(Msg(TextKey.PackWriteComicInfo, listOf(v.title, v.series, number, writer, lang)))

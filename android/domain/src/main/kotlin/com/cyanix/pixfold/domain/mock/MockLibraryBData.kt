@@ -78,11 +78,16 @@ object MockDataB {
         titleSug = Suggestion(title, TITLE_SOURCE),
         seriesSug = Suggestion(series, "目录层级 L2"),
         writerSug = Suggestion(writerRaw, "目录层级 L2 段命名"),
-        writerCleanedSug = Suggestion(writerClean, "清理规则：去作者前缀 / 括号原作 / 尾部标签"),
+        // 「按目录结构获取」的退路值:mock 里刻意与 writerSug 不同(带方括号 vs 去括号),
+        // 这样界面上的按钮点下去有可见变化,与真实「ComicInfo 覆盖了 writerSug」的场景同构。
+        dirWriterSug = Suggestion(writerClean, "目录名开头的 [作者] 前缀（已去掉方括号）"),
         volumeSug = Suggestion(volume, volumeSource),
         langSug = Suggestion(lang, langSource),
         outputDirSug = OUTPUT_DIR,
         outputExists = outputExists,
+        // mock 里 series 是「扫描层已给出的系列名」,所以两处同值;空 series 的卷
+        // (演示单本)系列目录也为空。
+        seriesDir = series,
     )
 
     val library: MockLibraryB = MockLibraryB(

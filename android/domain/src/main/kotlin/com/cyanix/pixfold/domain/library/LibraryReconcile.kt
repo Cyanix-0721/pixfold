@@ -99,7 +99,7 @@ private fun mergeVolume(old: ComicVolume, fresh: ComicVolume): ComicVolume {
     // ---- 语言 ----
     // 语言没有建议通道（真实素材的 `langSug` 恒为 null），故"不是 Unset"即用户选的。
     if (old.language != LangChoice.Unset) {
-        merged = merged.copy(language = old.language, otherLangCode = old.otherLangCode)
+        merged = merged.copy(language = old.language)
     }
 
     // ---- 文件名 / 输出目录 ----

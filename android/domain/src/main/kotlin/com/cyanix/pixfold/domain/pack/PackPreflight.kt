@@ -141,14 +141,20 @@ fun preflightPackPlans(
     val volumes = runnable.map { plan ->
         val order = plan.volume.pageOrder.order
         val unknown = order.any { it.sizeBytes <= 0 }
+        val estimated = estimateCbzSize(order.map { it.sizeBytes.coerceAtLeast(0) })
         PackVolumeCheck(
             plan = plan,
             entryCount = order.size + 1, // + ComicInfo.xml
-            estimatedBytes = estimateCbzSize(order.map { it.sizeBytes.coerceAtLeast(0) }),
+            estimatedBytes = estimated,
             hasUnknownSize = unknown,
             zip64 = assessZip64Need(
                 entryCount = order.size + 1,
                 maxEntrySize = order.maxOfOrNull { it.sizeBytes.coerceAtLeast(0) } ?: 0L,
+                // 中央目录偏移的判据必须真传,否则「整卷超过 4 GiB」这条永远不触发。
+                // 对 STORED 包(本工程全部条目都不压缩)来说,除 ComicInfo.xml 之外
+                // 所有字节都是条目数据 ⇒ 预估总大小就是中央目录偏移的量级。
+                // `estimateCbzSize` 已经含了 ComicInfo.xml 的开销,不会再额外多算一次。
+                centralDirOffset = estimated,
             ),
         )
     }

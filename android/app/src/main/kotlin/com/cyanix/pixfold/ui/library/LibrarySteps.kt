@@ -20,6 +20,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.rememberCoroutineScope
@@ -58,8 +59,10 @@ import com.cyanix.pixfold.domain.plan.undoRecordOf
 import com.cyanix.pixfold.domain.task.CancellationToken
 import com.cyanix.pixfold.domain.task.TaskProgress
 import com.cyanix.pixfold.domain.text.Msg
+import com.cyanix.pixfold.domain.comic.applyDirMetaSuggestions
 import com.cyanix.pixfold.domain.library.LibraryState
 import com.cyanix.pixfold.domain.library.libraryStateOf
+import com.cyanix.pixfold.domain.library.updateVolume
 import com.cyanix.pixfold.nav.DestinationSurface
 import com.cyanix.pixfold.nav.NavTransitionStyle
 import com.cyanix.pixfold.nav.PixFoldNavHost
@@ -69,6 +72,7 @@ import com.cyanix.pixfold.nav.LibraryPackRoute
 import com.cyanix.pixfold.nav.goToLibraryStep
 import com.cyanix.pixfold.nav.popWorkflowStep
 import com.cyanix.pixfold.nav.libraryStepIndex
+import com.cyanix.pixfold.ui.components.DirMetaButton
 import com.cyanix.pixfold.ui.components.ResetAllButton
 import com.cyanix.pixfold.ui.text.WarnLine
 import com.cyanix.pixfold.ui.workspace.WorkspaceState
@@ -206,6 +210,29 @@ fun LibrarySteps(
     interruptedNotice: String? = null,
     /** 用户确认/关闭了恢复提示。 */
     onDismissInterruptedNotice: () -> Unit = {},
+    /**
+     * 打开后是否直接落到「步骤 3 · 打包计划」。
+     *
+     * 用于「点打包通知回到进度/结果」（2026-10-20 真机缺陷：点通知落在首页）。
+     * 只把人送到能看见进度的那一页，**不另存状态** —— 进度本身来自
+     * [PackTaskBus]，Activity 重建也拿得到。默认 false ⇒ 既有测试零改动。
+     */
+    startAtPackStep: Boolean = false,
+    /**
+     * 「已把人送到步骤 3」之后回调上层清零。
+     *
+     * **为什么必须回清**（2026-10-20 真机第二轮）：热启动点通知时 `onNewIntent`
+     * 把标志置 true；若不清零，用户从打包页按返回回书架、再点「打包漫画」，
+     * 又会立刻被弹回步骤 3。默认空实现 ⇒ 既有测试零改动。
+     */
+    onStartAtPackStepHandled: () -> Unit = {},
+    /**
+     * 工作区结构警告（2026-10-20 裁决「Series 三条语义」第 ③ 条：系列下出现
+     * 嵌套目录要警告）。由 `PixFoldApp` 从扫描结果算出（`nestedDirWarnings`），
+     * 传给书架页显示。警告说「工作区目录层级有问题」，与用户在库里的操作无关。
+     * 默认空 ⇒ 既有测试零改动。
+     */
+    workspaceWarnings: List<Msg> = emptyList(),
 ) {
     // 跨步骤共享的唯一状态源。这些状态**必须留在嵌套 NavHost 之外** ——
     // 它们要跨步骤存活,而 NavHost 里每个 destination 都是独立作用域。
@@ -259,6 +286,10 @@ fun LibrarySteps(
     // 取消已发出、任务正在收尾。必须在**执行结束时**复位 —— 否则下一次执行
     // 一进来「取消」按钮就是禁用态,用户再也停不下来。
     var cancelling by remember { mutableStateOf(false) }
+    // 计划页预检(D4b)。进入步骤 3 时算,**不写盘**。
+    // 之前预检只在「按下执行」之后那一刻跑 ⇒ 用户在计划页看不到任何结论,
+    // 空间临界 / 估算下界 / 需要 Zip64 三类告知项全都没有出口。
+    var pagePreflight by remember { mutableStateOf<PackUiPreflight?>(null) }
     val scope = rememberCoroutineScope()
     // 拒绝文案与结果故障要在非 composable 的回调里取 `Context` 解析文案
     val context = androidx.compose.ui.platform.LocalContext.current
@@ -282,9 +313,36 @@ fun LibrarySteps(
     // 三个派生值，**不写回**上面那组 mutable 状态：
     // 组合期写 `mutableStateOf` 会把「读取」变成「读取+写入」，在同一帧里触发
     // 额外的重组，且让「服务态」与「进程内态」两份真相互相覆盖。
-    val effectiveExecuting = if (backgroundPacking) backgroundRunning != null else executing
-    val effectiveCancelling = if (backgroundPacking) backgroundRunning?.cancelling ?: false else cancelling
-    val effectiveProgress = if (backgroundPacking) backgroundRunning?.progress else progress
+    //
+    // ⚠️ **判据是「总线在跑」，不是 `backgroundPacking`**（2026-10-20 真机缺陷）：
+    // 从通知进来时，工作区恢复（`restore()` 读 SharedPreferences + 扫目录）比
+    // 组合慢一拍 ⇒ 那几十毫秒里 `packTreeUri == null` ⇒ `backgroundPacking` 是
+    // false。第一版据此判定「没在执行」，于是先渲染出**未开始的打包页**、
+    // 等恢复完成才切成进度条 —— 用户看到的正是「先闪一下未开始的卡片」。
+    //
+    // `backgroundPacking` 表达的是「能不能走服务」（需要 tree URI），
+    // 「现在是否正在执行」是另一个问题，答案只该看总线。
+    val effectiveExecuting =
+        backgroundRunning != null || (!backgroundPacking && executing)
+    val effectiveCancelling =
+        backgroundRunning?.cancelling ?: (!backgroundPacking && cancelling)
+    val effectiveProgress =
+        backgroundRunning?.progress ?: if (backgroundPacking) null else progress
+    // 当前卷的页级进度（双层圆环**外环**）。只有服务路径能给出它 —— 进程内
+    // 路径与模拟路径都没有页回调来源，此时外环画不确定态而不是假的 0%。
+    val effectivePageDone = backgroundRunning?.pageDone
+    val effectivePageTotal = backgroundRunning?.pageTotal
+    // 正在写的卷名（弹窗底部一行）。取 `processed` 指向的那一卷：
+    // 卷是顺序处理的，`processed` 就是「已完成卷数」，正好是当前卷的下标。
+    //
+    // ⚠️ 用 `dirPath`（目录相对路径）而不是 `title`（用户 `User said (m15457)`
+    // 「当前打包的名称要完整显示作者和标题」）。`title` 是**清洗后**的元数据值，
+    // 开头 `[作者]` 前缀被剥掉了 —— 同系列多本只剩后半截，弹窗里几乎一样，
+    // 分不清卡在哪一本。`dirPath` 与卷列表里显示的名字同源，用户能对上号。
+    val effectiveVolumeLabel = remember(backgroundRunning, state.volumes) {
+        val running = backgroundRunning ?: return@remember null
+        state.volumes.getOrNull(running.progress.processed)?.dirPath?.takeIf { it.isNotEmpty() }
+    }
 
     // 收尾结果只在副作用里消费一次。展示完把总线拨回 Idle，否则下次进打包页
     // 还会看到上一次的报告，用户会以为刚才那次又跑了一遍。
@@ -300,10 +358,54 @@ fun LibrarySteps(
         PackTaskBus.consumeResult()
     }
 
+
     val navController = rememberNavController()
     // 当前步骤**从导航栈派生**(理由同 OrganizeSteps):手势进行中 entry 不变,序号稳定。
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val currentIndex = navBackStackEntry?.destination.libraryStepIndex()
+
+    // 点通知进来 ⇒ 直接落到步骤 3。
+    //
+    // **只跳一次**（`LaunchedEffect(startAtPackStep)` + `once` 容器）：这个参数在
+    // Activity 重建后仍是 true，若每次都跳，用户从步骤 3 按返回回步骤 1 会立刻被
+    // 弹回去 —— 表现成「退不出打包页」。
+    val jumpToPackOnce = remember { mutableStateOf(startAtPackStep) }
+    LaunchedEffect(startAtPackStep) {
+        if (!jumpToPackOnce.value) return@LaunchedEffect
+        jumpToPackOnce.value = false
+        // 复用 `goToLibraryStep`：它保证返回栈是**线性链**（往回 pop、往前 push），
+        // 直接 `navigate(LibraryPackRoute)` 会让返回栈变成 [Shelf, Pack] ——
+        // 少掉元数据这一步，按返回会从打包页直接回书架。
+        navController.goToLibraryStep(current = currentIndex ?: 0, target = LibraryStep.Pack.ordinal)
+        // 跳完立刻回清上层标志：这个参数在 Activity 重建后仍是 true，若留着，
+        // 用户从步骤 3 按返回回书架后会立刻被弹回来（真机第二轮实测）。
+        onStartAtPackStepHandled()
+    }
+    // 执行器的**最新值**，但不作为 `LaunchedEffect` 的 key。
+    //
+    // 为什么不直接把它当 key（2026-10-20 真机缺陷）：调用方一旦没 `remember`
+    // （`PixFoldApp` 当时就是这样），每次重组都会新建一个 `SafPackExecutor`，
+    // 对象身份变了 ⇒ 预检无限重启，每次先把结论清空再被取消 ⇒ 界面上永远看不到。
+    // 把「对象是否稳定」这个要求推给每个调用方是脆弱契约，改由本层吸收。
+    val currentExecutor by rememberUpdatedState(packExecutor)
+
+    // 计划页预检（D4b）：进入步骤 3（或计划本身变化）就算一次,但**不写盘**。
+    //
+    // 依赖里刻意含 `conflictPolicy` / `sourcePolicy`：它们改变 `buildPackagePlans`
+    // 的输出（跳过哪些卷、写到哪个路径），而阻断项之一的「输出名撞车」直接吃
+    // `outputPath` —— 用户切一下策略就可能从「撞车」变成「不撞」,界面必须跟着变。
+    //
+    // `packExecutor == null`（测试/模拟路径）时不跑：那时压根没有平台去问空间,
+    // 算出来的结论会是一条假的「空间无法判定」。
+    LaunchedEffect(currentIndex, state.volumes, conflictPolicy, sourcePolicy) {
+        if (currentIndex != LibraryStep.Pack.ordinal) return@LaunchedEffect
+        val executor = currentExecutor ?: return@LaunchedEffect
+        pagePreflight = null
+        val plans = buildPackagePlans(state.volumes, conflictPolicy, sourcePolicy)
+        pagePreflight = runCatching { executor.preflight(plans) }.getOrElse { e ->
+            PackUiPreflight.Unavailable(e.message ?: e::class.simpleName ?: "预检失败")
+        }
+    }
 
     /**
      * 重置**整个工作流**的调整(用户 2026-10-14 裁决,B 侧与 A 侧同构)。
@@ -312,6 +414,28 @@ fun LibrarySteps(
      * 策略回到默认(重命名 / 保留)、危险动作开关复位、确认流程与报告复位,
      * 并**回到步骤 1**。
      */
+    /**
+     * 「按目录结构获取」是否可用:目录推导出的值里**至少有一个非空**。
+     *
+     * 不逐个字段判:`Title` / `Series` / `Writer` 三个目录来源任一有值就够 ——
+     * 全都推不出来时这个按钮点下去什么都不会变,不该让人点。
+     */
+    fun dirMetaAvailable(volume: ComicVolume): Boolean =
+        volume.dirTitleSug.hasValue ||
+            volume.dirSeriesSug.hasValue ||
+            volume.dirWriterSug.hasValue
+
+    /**
+     * 把当前卷全部元数据按目录结构重填(用户 2026-10-22 裁决)。
+     *
+     * 空工作区时 `activeVolumeOrNull` 为 null ⇒ **什么都不做**(不读 `activeVolume`,
+     * 那个属性在空列表上会抛异常)。
+     */
+    fun applyDirMetaToActiveVolume() {
+        val volume = state.activeVolumeOrNull ?: return
+        state = updateVolume(state, applyDirMetaSuggestions(volume))
+    }
+
     fun resetAll() {
         // 重置时若有任务在跑,先叫停 —— 否则重置完界面归零,后台还在往磁盘写,
         // 用户看到的是「我明明重置了,文件却还在变多」。
@@ -319,11 +443,11 @@ fun LibrarySteps(
         // 前台服务路径下「叫停」走总线：`requestCancel` 会让执行方在**卷间**停下。
         // 注意**不要**在这里 `consumeResult` 清状态 —— 那会把正在跑的任务从界面上
         // 抹掉而磁盘上它还在写，比不重置更糟。
-        if (backgroundPacking) {
-            if (backgroundRunning != null) PackTaskBus.requestCancel()
-        } else {
-            cancelToken?.cancel()
-        }
+        //
+        // 判据同 `effectiveExecuting`：看总线有没有在跑，而不是 `backgroundPacking`
+        // （工作区还没恢复完时后者是 false，会把在跑的服务任务漏掉、只取消进程内令牌）。
+        if (backgroundRunning != null) PackTaskBus.requestCancel()
+        if (!backgroundPacking) cancelToken?.cancel()
         cancelToken = null
         executing = false
         cancelling = false
@@ -385,6 +509,12 @@ fun LibrarySteps(
                 }
             }
 
+            // 「按目录结构获取」紧邻重置:两者都是「我想重来一遍」类动作,
+            // 放在同一槽位,用户找它们时不必跨页面。作用于**当前卷**(用户 2026-10-22 裁决)。
+            DirMetaButton(
+                onApply = { applyDirMetaToActiveVolume() },
+                enabled = state.activeVolumeOrNull?.let { dirMetaAvailable(it) } == true,
+            )
             ResetAllButton(onReset = { resetAll() })
         }
 
@@ -414,6 +544,8 @@ fun LibrarySteps(
                             // 工作区条只在注入状态时出现(D2b);默认 null ⇒ 既有测试布局不变
                             workspaceState = workspaceState,
                             onPickWorkspace = onPickWorkspace,
+                            // 结构警告来自扫描结果,不是库状态 —— 由 PixFoldApp 现算注入
+                            workspaceWarnings = workspaceWarnings,
                             modifier = Modifier.weight(1f),
                         )
                     }
@@ -567,6 +699,9 @@ fun LibrarySteps(
                                 // 执行态:底栏换「取消」+ 上方进度条(见 PackPreviewPage)
                                 executing = effectiveExecuting,
                                 progress = effectiveProgress,
+                                pageDone = effectivePageDone,
+                                pageTotal = effectivePageTotal,
+                                volumeLabel = effectiveVolumeLabel,
                                 onCancelExecution = {
                                     if (backgroundPacking) {
                                         // 服务侧取消：令牌在总线里，`requestCancel` 会置
@@ -581,6 +716,7 @@ fun LibrarySteps(
                                 },
                                 cancelling = effectiveCancelling,
                                 executionError = executionError,
+                                pagePreflight = pagePreflight,
                                 onBack = { navController.popWorkflowStep() },
                                 modifier = Modifier.weight(1f),
                             )

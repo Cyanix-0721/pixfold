@@ -23,6 +23,7 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import com.cyanix.pixfold.ui.components.PixFoldConfirmDialog
 import com.cyanix.pixfold.R
 
 const val TAG_RESET_ALL = "reset-all"
@@ -91,26 +92,20 @@ fun ResetAllButton(
     }
 
     if (showDialog) {
-        AlertDialog(
+        // 统一弹窗抽象（2026-10-20 用户要求「所有弹窗都是这个效果」）：
+        // 背景高斯模糊由 PixFoldDialog 通知宿主，外观与按钮区也由它统一。
+        PixFoldConfirmDialog(
             onDismissRequest = { showDialog = false },
-            title = { Text(title) },
-            text = { Text(body) },
-            confirmButton = {
-                TextButton(
-                    onClick = {
-                        showDialog = false
-                        onReset()
-                    },
-                    modifier = Modifier.testTag(TAG_RESET_ALL_CONFIRM),
-                ) {
-                    Text(confirm)
-                }
+            title = title,
+            body = body,
+            confirmText = confirm,
+            onConfirm = {
+                showDialog = false
+                onReset()
             },
-            dismissButton = {
-                TextButton(onClick = { showDialog = false }) {
-                    Text(stringResource(R.string.common_cancel))
-                }
-            },
+            dismissText = stringResource(R.string.common_cancel),
+            isDangerous = true,
+            confirmTag = TAG_RESET_ALL_CONFIRM,
             modifier = Modifier.testTag(TAG_RESET_ALL_DIALOG),
         )
     }

@@ -93,8 +93,32 @@ object PackTaskBus {
     }
 
     /** 进度推进（由 Service 节流后调用）。 */
-    fun publish(progress: TaskProgress, cancelling: Boolean) {
-        mutableState.value = PackTaskState.Running(progress = progress, cancelling = cancelling)
+    fun publish(
+        progress: TaskProgress,
+        cancelling: Boolean,
+        pageDone: Int? = null,
+        pageTotal: Int? = null,
+    ) {
+        mutableState.value = PackTaskState.Running(
+            progress = progress,
+            cancelling = cancelling,
+            pageDone = pageDone,
+            pageTotal = pageTotal,
+        )
+    }
+
+    /**
+     * 只更新**当前卷的页进度**，不动卷进度。
+     *
+     * 单独开一个方法而不是让调用方攒着一起发：页进度每写一页就来一次，
+     * 而 `TaskProgress` 是卷级快照 —— 攒着发就得在服务里再维护一份卷级计数，
+     * 两份计数一旦不同步，界面会出现「卷进度倒退」。
+     *
+     * 非 Running 状态下直接忽略（收尾后再来的页回调没有意义）。
+     */
+    fun publishPage(pageDone: Int, pageTotal: Int) {
+        val running = mutableState.value as? PackTaskState.Running ?: return
+        mutableState.value = running.copy(pageDone = pageDone, pageTotal = pageTotal)
     }
 
     /** 用户点了取消。[CancellationToken] 在卷间生效，故界面先显示「正在取消」。 */
@@ -150,8 +174,17 @@ sealed interface PackTaskState {
      *
      * @param cancelling 用户已点取消，但当前卷还没做完（中断只在**卷间**生效）。
      *   界面据此禁用按钮并显示「正在取消…」，而不是让按钮看起来还有效。
+     * @param pageDone 当前这一卷已写的页数；`null` = 还不知道（刚切到这一卷、
+     *   或当前卷被跳过/缺页）。双层圆环的内环靠它，`null` 时内环画不确定态
+     *   而不是假的 0%。
+     * @param pageTotal 当前卷总页数；与 [pageDone] 同为 `null` 时内环不画。
      */
-    data class Running(val progress: TaskProgress, val cancelling: Boolean) : PackTaskState
+    data class Running(
+        val progress: TaskProgress,
+        val cancelling: Boolean,
+        val pageDone: Int? = null,
+        val pageTotal: Int? = null,
+    ) : PackTaskState
 
     /** 已收尾。结果要被界面取走（并在展示后 [PackTaskBus.consumeResult]）。 */
     data class Settled(val outcome: PackTaskSettled) : PackTaskState

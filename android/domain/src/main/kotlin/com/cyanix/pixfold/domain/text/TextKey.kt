@@ -73,9 +73,6 @@ enum class TextKey {
     LangUnset,
     LangZh,
     LangJa,
-    LangOther,
-    LangUnknown,
-    LangSkip,
 
     // ---------------- 元数据字段(MetaField) ----------------
     MetaFieldTitle,
@@ -127,7 +124,10 @@ enum class TextKey {
 
     // ---------------- 待确认标记 / 未命名系列 ----------------
     PendingLanguage,
+    PendingTitle,
     PendingVolume,
+    PendingSeries,
+    PendingWriter,
     UnnamedSeries,
 
     // ---------------- 影响范围摘要(generalSummaryLines) ----------------
@@ -271,4 +271,8 @@ enum class TextKey {
     PageIssueCountMismatch,
     PageIssueMissingFromOrder,
     PageIssueWrongIndex,
+
+    // ---------------- 工作区结构警告(nestedDirWarnings,显示在书架页) ----------------
+    /** 「系列 %1$s 下出现嵌套目录 %2$s —— 应只放单本文件夹或压缩包」;args = [系列名, 嵌套层相对路径]。 */
+    NestedSeriesDir,
 }

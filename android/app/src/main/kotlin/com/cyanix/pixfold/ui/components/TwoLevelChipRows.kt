@@ -91,12 +91,13 @@ fun <T> TwoLevelChipRows(
     childTags: ChipRowTags,
     singleTopChipTag: (String) -> String,
     topChipDescription: @Composable (TwoLevelGroup<T>) -> String,
-    topChipLabel: @Composable (TwoLevelGroup<T>) -> Unit,
+    topChipLabel: @Composable (TwoLevelGroup<T>) -> String,
     topAllEntryText: @Composable (Int) -> String,
     childChipDescription: @Composable (T) -> String,
-    childChipLabel: @Composable (T) -> Unit,
+    childChipLabel: @Composable (T) -> String,
     childAllEntryText: @Composable (Int) -> String,
     modifier: Modifier = Modifier,
+    childChipSuffix: @Composable (T) -> String = { "" },
 ) {
     // 只有一个单本条目 ⇒ 没有可切的东西,整块不渲染(与 D1 的 `if (collections.size > 1)`
     // 等价,但把「1 个系列含 N 本」也算进需要渲染 —— 那种结构下平铺展示会让各本混在一起)。
@@ -143,10 +144,14 @@ fun <T> TwoLevelChipRows(
             sheetListTag = topTags.sheetListTag,
             sheetChipTag = topTags.sheetChipTag,
             chipDescription = topChipDescription,
-            // 选中系列后 1 级行收缩到一行,把高度让给 2 级行(用户裁决)。
-            // 单本没有 2 级行,不压缩 —— 压了只会把别的单本挤出屏幕。
-            maxLines = if (activeGroup.isSeries) 1 else Int.MAX_VALUE,
+            // **一级行恒定最多 [TOP_CHIP_MAX_LINES] 行**(用户 2026-10-21 裁决,经真机
+            // 反问澄清为「芯片行」而不是「芯片内文字」):原规则是「选中系列后收缩到
+            // 1 行」,用户明确否掉了 —— 「点击 series 后也是 2 行 + 下拉,而不是 1 行 + 下拉」。
+            // 恒定还有一个好处:下方 2 级行不会随选中状态上下窜。
+            maxLines = TOP_CHIP_MAX_LINES,
             allEntryText = topAllEntryText,
+            // 1 级行垫底色,与 2 级行区分(2026-10-21 用户裁决「加个遮罩」)。
+            emphasized = true,
             chipLabel = topChipLabel,
         )
 
@@ -170,6 +175,7 @@ fun <T> TwoLevelChipRows(
                 chipDescription = childChipDescription,
                 allEntryText = childAllEntryText,
                 chipLabel = childChipLabel,
+                chipSuffix = childChipSuffix,
             )
         }
     }

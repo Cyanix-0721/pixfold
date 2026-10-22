@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Material Symbols "恢复建议值 restore" — undo
+  Source : https://fonts.gstatic.com/s/i/short-term/release/materialsymbolsoutlined/undo/default/24px.svg
+  License: Apache License 2.0
+
+  ⚠️ 几何数据由 `.mutwork/svg2vd.py` 机器变换,不是手抄。
+  官方 viewBox 是 `0 -960 960 960`(原点在 y=-960),而 VectorDrawable
+  没有 viewBox 偏移语义 —— 直接照抄会把图形画到画布外(本仓库已两次踩坑)。
+  变换:x'=x*0.025,y'=(y+960)*0.025;绝对命令平移+缩放,相对命令只缩放。
+-->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <path
+        android:fillColor="@android:color/white"
+        android:pathData="M 7,19 v -2 h 7.1 q 1.575,0,2.7375,-1 T 18,13.5 q 0,-1.5,-1.1625,-2.5 T 14.1,10 H 7.8 l 2.6,2.6 -1.4,1.4 -5,-5 5,-5 1.4,1.4 -2.6,2.6 h 6.3 q 2.425,0,4.1625,1.575 T 20,13.5 q 0,2.35,-1.7375,3.925 T 14.1,19 H 7 Z" />
+</vector>

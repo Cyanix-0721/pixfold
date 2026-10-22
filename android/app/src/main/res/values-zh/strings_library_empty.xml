@@ -46,4 +46,21 @@
 
     <!-- 上次打包被中断（D2b 第 2 项）。三项读数：处理了几卷 / 共几卷 / 几个目标文件。 -->
     <string name="b_interrupted_notice">上次打包未完成（%1$d / %2$d）。可能没写完的输出文件：最多 %3$d 个。</string>
+    <!-- ===== 计划页预检（D4b）===== -->
+
+    <!-- 空间临界：够，但腾不出余量。与 pack_error_space（不足，阻断）语义相反。 -->
+    <string name="pack_warn_space_marginal">可用空间紧张：只剩 %1$s，预计需要约 %2$s。</string>
+
+    <!-- 估算只是下界：provider 没给某些文件的大小，实际可能更大。 -->
+    <string name="pack_warn_estimate_lower_bound">估算只是下界（没有大小的项：%1$d）。</string>
+
+    <!-- 需要 Zip64：仍能正常写出，是告知不是阻断。 -->
+    <string name="pack_warn_zip64">这一卷需要 ZIP64：%1$s。仍会正常写出。</string>
+
+    <string name="pack_warn_zip64_reason_entries">条目超过 65535 个</string>
+    <string name="pack_warn_zip64_reason_entry_size">单个文件达到 4 GB 以上</string>
+    <string name="pack_warn_zip64_reason_offset">整个包达到 4 GB 以上</string>
+
+    <!-- 空间无法判定。刻意不说「充足」，那是假的承诺。 -->
+    <string name="pack_warn_space_unknown">无法判断这个文件夹的可用空间。</string>
 </resources>

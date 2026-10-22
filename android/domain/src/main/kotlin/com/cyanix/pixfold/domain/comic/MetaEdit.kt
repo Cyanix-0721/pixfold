@@ -63,16 +63,16 @@ fun defaultCbzName(
 fun defaultCbzName(volume: ComicVolume): String =
     defaultCbzName(volume.id, volume.titleSug, volume.volumeSug, volume.cbzBaseSug)
 
+
 /**
  * 语言选项 → ComicInfo.xml 的 `LanguageISO` 值(规格 §8.4)。
  *
- * `null` 表示**不写入标签**;`Other` 不校验 ISO 639-1 合法性(归档语义:交给用户)。
+ * `null` 表示**不写入标签** —— 即 [LangChoice.Unset],这是合法终态而非「待填」。
  */
-fun langIso(choice: LangChoice, otherCode: String?): String? = when (choice) {
+fun langIso(choice: LangChoice): String? = when (choice) {
     LangChoice.Zh -> "zh"
     LangChoice.Ja -> "ja"
-    LangChoice.Other -> otherCode?.takeIf { it.isNotEmpty() }
-    LangChoice.Unset, LangChoice.Unknown, LangChoice.Skip -> null
+    LangChoice.Unset -> null
 }
 
 /**
@@ -90,12 +90,30 @@ fun comicVolumeOf(
     titleSug: Suggestion<String>,
     seriesSug: Suggestion<String>,
     writerSug: Suggestion<String>,
-    writerCleanedSug: Suggestion<String>,
     volumeSug: Suggestion<Int?>,
     langSug: Suggestion<String>,
     outputDirSug: String,
     outputExists: Boolean = false,
+    /** 仅由目录结构推导的作者建议(不受 ComicInfo 影响),见 [ComicVolume.dirWriterSug]。 */
+    dirWriterSug: Suggestion<String> = Suggestion(null, ""),
+    /**
+     * 仅由目录结构推导的 Title / Series 建议(不受 ComicInfo 影响),
+     * 见 [ComicVolume.dirTitleSug] / [ComicVolume.dirSeriesSug]。
+     *
+     * 默认取传进来的 `titleSug` / `seriesSug`:无 ComicInfo 时目录结构就是唯一建议源,
+     * 两者本就同值,不必让每个调用点重复传一遍。有 ComicInfo 的路径
+     * (`applyExistingComicInfo`)会各自写入被覆盖前的目录值。
+     */
+    dirTitleSug: Suggestion<String> = titleSug,
+    dirSeriesSug: Suggestion<String> = seriesSug,
     cbzBaseSug: Suggestion<String> = Suggestion(null, ""),
+    /**
+     * 扫描层的系列目录名;单本卷留空。
+     *
+     * **与 [seriesSug] 是两件事**:建议值可能被条①「跟随 Title」填上标题,而这个
+     * 字段只回答「它扫进来时是否在某个系列目录下」—— 分组与 `isSeries` 都只看它。
+     */
+    seriesDir: String = "",
 ): ComicVolume = ComicVolume(
     id = id,
     dirPath = dirPath,
@@ -103,18 +121,20 @@ fun comicVolumeOf(
     titleSug = titleSug,
     seriesSug = seriesSug,
     writerSug = writerSug,
-    writerCleanedSug = writerCleanedSug,
     volumeSug = volumeSug,
     langSug = langSug,
     outputDirSug = outputDirSug,
     outputExists = outputExists,
+    dirWriterSug = dirWriterSug,
+    dirTitleSug = dirTitleSug,
+    dirSeriesSug = dirSeriesSug,
     title = titleSug.value ?: "",
     series = seriesSug.value ?: "",
     writer = writerSug.value ?: "",
     volume = volumeSug.value,
     language = LangChoice.Unset,
-    otherLangCode = "",
     cbzBaseSug = cbzBaseSug,
+    seriesDir = seriesDir,
     cbzFileName = defaultCbzName(id, titleSug, volumeSug, cbzBaseSug),
     outputDir = outputDirSug,
     pageOrder = pageOrderOf(pages),
@@ -133,7 +153,7 @@ fun setMetaValue(volume: ComicVolume, field: MetaField, value: MetaValue): Comic
         MetaField.Writer -> (value as? MetaValue.Text)?.let { volume.copy(writer = it.value) }
         MetaField.Volume -> (value as? MetaValue.Number)?.let { volume.copy(volume = it.value) }
         MetaField.Language -> (value as? MetaValue.Language)?.let {
-            volume.copy(language = it.choice, otherLangCode = it.otherCode)
+            volume.copy(language = it.choice)
         }
         MetaField.CbzName -> (value as? MetaValue.Text)?.let { volume.copy(cbzFileName = it.value) }
         MetaField.OutputDir -> (value as? MetaValue.Text)?.let { volume.copy(outputDir = it.value) }
@@ -154,7 +174,7 @@ fun useSuggestion(volume: ComicVolume, field: MetaField): ComicVolume {
         MetaField.Writer -> volume.copy(writer = volume.writerSug.value ?: "")
         MetaField.Volume -> volume.copy(volume = volume.volumeSug.value)
         // 语言的建议值就是"未设置":回 Unset 并清空手输代码
-        MetaField.Language -> volume.copy(language = LangChoice.Unset, otherLangCode = "")
+        MetaField.Language -> volume.copy(language = LangChoice.Unset)
         // 与界面提示行调**同一个**入口 —— 两处各拼一次必然分叉（2026-10-19 真实缺陷）。
         MetaField.CbzName -> volume.copy(cbzFileName = defaultCbzName(volume))
         MetaField.OutputDir -> volume.copy(outputDir = volume.outputDirSug)
@@ -163,14 +183,64 @@ fun useSuggestion(volume: ComicVolume, field: MetaField): ComicVolume {
 }
 
 /**
- * 一键清理作者:用 [ComicVolume.writerCleanedSug](去作者前缀 / 括号原作 / 尾部标签)。
- * 无清理建议时可点性由 UI 控制;此处无建议即原样返回,避免把作者清空。
+ * **按目录结构自动获取**:把 `dir*` 快照(纯目录推导,不受 `ComicInfo.xml` 影响)一次性
+ * 写进**当前卷全部字段**。
+ *
+ * ## 为什么与「恢复建议值」并列存在
+ *
+ * 建议值的优先级是「ComicInfo 最高,其次目录层级」(用户 2026-10-21 裁决)。所以当
+ * `ComicInfo.xml` 写了作者/标题/系列时,`writerSug` / `titleSug` / `seriesSug` 会被
+ * **文件值**顶掉 —— 此时「恢复建议值」回到的是文件值,不是目录名。
+ * 用户在文件里写错、或者想按文件夹重新来一遍时,就需要这条**绕开 ComicInfo 的退路**。
+ *
+ * 只保留目录快照而不复用 `*Sug`,正是为了让这两件事在类型上就分得开:
+ * `*Sug` = 建议值(可能来自文件),`dir*Sug` = 目录推导(永远来自文件夹)。
+ *
+ * ## 覆盖哪些字段
+ *
+ * [MetaField.Title] / [MetaField.Series] / [MetaField.Writer] 取 `dir*Sug`;
+ * [MetaField.Volume] 取 [ComicVolume.volumeSug](卷号本来就只可能来自目录名);
+ * [MetaField.CbzName] / [MetaField.OutputDir] 取各自的推导值;
+ * [MetaField.Language] 回 [LangChoice.Unset] —— 目录名里没有可靠的语言信息,
+ * 这里**不猜**,保持"未设置"这个合法终态。
+ *
+ * ## 为什么打逐项例外标记
+ *
+ * 用户的意图是「就要目录里这一套」,重扫时不该被 `ComicInfo.xml` 又改回去。
+ * 走 [setMetaValue] 逐字段写入即可同时拿到标记(与人工编辑同一语义)。
  */
-fun applyWriterCleaning(volume: ComicVolume): ComicVolume {
-    val cleaned = volume.writerCleanedSug.value
-    if (cleaned.isNullOrEmpty()) return volume
-    return setMetaValue(volume, MetaField.Writer, MetaValue.Text(cleaned))
+fun applyDirMetaSuggestions(volume: ComicVolume): ComicVolume {
+    var next = volume
+    for (field in DIR_META_FIELDS) {
+        next = when (field) {
+            MetaField.Title -> next.copy(title = next.dirTitleSug.value.orEmpty())
+            MetaField.Series -> next.copy(series = next.dirSeriesSug.value.orEmpty())
+            MetaField.Writer -> next.copy(writer = next.dirWriterSug.value.orEmpty())
+            MetaField.Volume -> next.copy(volume = next.volumeSug.value)
+            MetaField.Language -> next.copy(language = LangChoice.Unset)
+            MetaField.CbzName -> next.copy(cbzFileName = defaultCbzName(next))
+            MetaField.OutputDir -> next.copy(outputDir = next.outputDirSug)
+        }.let { it.copy(overridden = it.overridden + field) }
+    }
+    return next
 }
+
+/**
+ * [applyDirMetaSuggestions] 覆盖的字段集合。
+ *
+ * 抽成常量而不是在循环里直接写 `MetaField.entries`:将来新增字段时,
+ * **必须显式决定它是否属于「按目录结构获取」**,而不是被 `entries` 悄悄带进来
+ * (新增字段未必有目录推导的来源)。
+ */
+private val DIR_META_FIELDS: List<MetaField> = listOf(
+    MetaField.Title,
+    MetaField.Series,
+    MetaField.Writer,
+    MetaField.Volume,
+    MetaField.Language,
+    MetaField.CbzName,
+    MetaField.OutputDir,
+)
 
 /** [batchApply] 的结果:**实际生效**与**被逐项例外跳过**的卷数,以及更新后的整库。 */
 data class BatchApplyResult(

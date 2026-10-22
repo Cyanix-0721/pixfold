@@ -1,5 +1,7 @@
 package com.cyanix.pixfold.domain.source
 
+import com.cyanix.pixfold.domain.text.Msg
+import com.cyanix.pixfold.domain.text.TextKey
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
@@ -303,5 +305,61 @@ class SourceGroupsTest {
         val result = collectionsFrom("", listOf(img("a.jpg")))
         assertEquals(1, result.size)
         assertEquals("", result[0].name)
+    }
+
+    // ---- 嵌套目录警告（2026-10-20 用户裁决：系列下只应有单本文件夹，再嵌套要警告） ----
+
+    @Test
+    fun `系列下出现嵌套目录时产生警告`() {
+        // `系列A/中间层/卷/001.jpg`:集合的 seriesKey = "系列A/中间层"(两段)⇒ 中间层是嵌套。
+        val collections = collectionsFrom("工作区", listOf(img("系列A/中间层/卷/001.jpg")))
+        val warnings = nestedDirWarnings(collections)
+        assertEquals(1, warnings.size)
+        assertEquals(TextKey.NestedSeriesDir, warnings.single().key)
+        // args = [系列名, 嵌套层](顺序跟模板 %1$s/%2$s 一致,见 TextKey KDoc)。
+        assertEquals(listOf("系列A", "中间层"), warnings.single().args)
+    }
+
+    @Test
+    fun `正常两级结构不产生警告`() {
+        val collections = collectionsFrom("工作区", listOf(img("系列A/第01卷/001.jpg")))
+        assertEquals(emptyList<Msg>(), nestedDirWarnings(collections))
+    }
+
+    @Test
+    fun `单本与根集合不产生警告`() {
+        val collections = collectionsFrom("工作区", listOf(img("单本/001.jpg"), img("散图.jpg")))
+        assertEquals(emptyList<Msg>(), nestedDirWarnings(collections))
+    }
+
+    @Test
+    fun `同一嵌套层下多本书只警告一次`() {
+        val collections = collectionsFrom(
+            "工作区",
+            listOf(img("系列A/中间层/卷1/001.jpg"), img("系列A/中间层/卷2/002.jpg")),
+        )
+        assertEquals(1, nestedDirWarnings(collections).size)
+    }
+
+    @Test
+    fun `不同嵌套分别警告且按路径排序`() {
+        // 甲 = U+7532,乙 = U+4E59 ⇒ 码点序里「乙」在「甲」前;断言按**自然序**
+        // (码点)排,夹具特意用这两个字 —— 若实现换成纯字典序 `sorted()`,
+        // 排序碰巧相同时测试才有判别力(此前用「甲/乙」字面顺序就是无判别力的反例)。
+        val collections = collectionsFrom(
+            "工作区",
+            listOf(img("系列A/甲/卷/001.jpg"), img("系列A/乙/卷/001.jpg")),
+        )
+        assertEquals(
+            listOf("乙", "甲"),
+            nestedDirWarnings(collections).map { it.args[1] },
+        )
+    }
+
+    @Test
+    fun `更深的嵌套报告完整中间层`() {
+        // `系列A/A/B/卷`:seriesKey = "系列A/A/B" ⇒ 嵌套层 = "A/B"。
+        val collections = collectionsFrom("工作区", listOf(img("系列A/A/B/卷/001.jpg")))
+        assertEquals(listOf("系列A", "A/B"), nestedDirWarnings(collections).single().args)
     }
 }

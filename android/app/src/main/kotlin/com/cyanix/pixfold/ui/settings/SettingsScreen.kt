@@ -41,6 +41,8 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
+import com.cyanix.pixfold.ui.components.PixFoldAlertDialog
+import com.cyanix.pixfold.ui.components.PixFoldConfirmDialog
 import com.cyanix.pixfold.BuildConfig
 import com.cyanix.pixfold.R
 import com.cyanix.pixfold.domain.settings.AccentChoice
@@ -352,25 +354,19 @@ fun SettingsScreen(
             Spacer(Modifier.size(24.dp))
 
             if (showResetDialog) {
-                AlertDialog(
+                PixFoldConfirmDialog(
                     onDismissRequest = { showResetDialog = false },
-                    title = { Text(stringResource(R.string.settings_reset_title)) },
-                    text = { Text(stringResource(R.string.settings_reset_body)) },
-                    confirmButton = {
-                        TextButton(
-                            onClick = {
-                                showResetDialog = false
-                                // 全部重置(含语言与文件访问方式)—— 用户裁决(2026-09-20)。
-                                onChange(PixFoldSettings())
-                            },
-                            modifier = Modifier.testTag(TAG_SETTINGS_RESET_CONFIRM),
-                        ) { Text(stringResource(R.string.settings_reset_confirm)) }
+                    title = stringResource(R.string.settings_reset_title),
+                    body = stringResource(R.string.settings_reset_body),
+                    confirmText = stringResource(R.string.settings_reset_confirm),
+                    onConfirm = {
+                        showResetDialog = false
+                        // 全部重置(含语言与文件访问方式)—— 用户裁决(2026-09-20)。
+                        onChange(PixFoldSettings())
                     },
-                    dismissButton = {
-                        TextButton(onClick = { showResetDialog = false }) {
-                            Text(stringResource(R.string.settings_reset_cancel))
-                        }
-                    },
+                    dismissText = stringResource(R.string.settings_reset_cancel),
+                    isDangerous = true,
+                    confirmTag = TAG_SETTINGS_RESET_CONFIRM,
                     modifier = Modifier.testTag(TAG_SETTINGS_RESET_DIALOG),
                 )
             }
@@ -529,8 +525,11 @@ private fun <T> ChoiceRow(
     }
 
     if (open && enabled) {
-        AlertDialog(
+        PixFoldAlertDialog(
             onDismissRequest = { open = false },
+            // 选项列表自己带 `verticalScroll`，Shell 不能再套一层 ——
+            // 嵌套滚动会抛 `measured with an infinity maximum height constraints`。
+            textScrollable = false,
             title = { Text(label) },
             text = {
                 Column(modifier = Modifier.verticalScroll(rememberScrollState())) {

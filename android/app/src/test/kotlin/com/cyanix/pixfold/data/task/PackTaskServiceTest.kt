@@ -2,6 +2,7 @@ package com.cyanix.pixfold.data.task
 
 import android.app.NotificationManager
 import androidx.test.core.app.ApplicationProvider
+import com.cyanix.pixfold.MainActivity
 import com.cyanix.pixfold.R
 import com.cyanix.pixfold.domain.plan.ExecEntry
 import com.cyanix.pixfold.domain.plan.ExecKind
@@ -397,5 +398,45 @@ class PackTaskServiceTest {
         service.onTimeout(7, 1)
         // 走到这里没抛异常即达标：重载分歧会让某些系统版本上的超时变成崩溃。
         assertTrue(true)
+    }
+
+    /**
+     * 点通知必须落到「打包漫画 · 步骤 3」，而不是首页。
+     *
+     * ## 为什么这条在纯 JVM 里可断
+     *
+     * 缺陷的形状是「intent 里**没有**目标信息」—— 这是一个可以被直接读出来的
+     * 事实，不需要真的把 Activity 拉起来。真机 2026-10-20 暴露的是同一个事实
+     * 的下游表现（点通知回首页），而在单测里钉住上游，能防住任何一次「顺手
+     * 简化掉那个 extra」的改动。
+     *
+     * ## 为什么两条通知都要查
+     *
+     * 进度通知与完成通知各调一次 `openAppIntent()`。只查其中一条的话，另一条
+     * 被改回裸 intent 依然全绿 —— 而用户点的正是「还在跑」的那一条。
+     */
+    @Test
+    fun `both notifications carry the pack step target`() {
+        val service = startedService()
+
+        // 进度通知只在 startForeground / updateNotification 时才发出，
+        // 而 `notifyFinal` 末尾会把它撤掉 ⇒ **必须先取进度那条**。
+        service.updateNotificationForTest(0.5f, "1 / 2")
+        val progressIntent = shadowOf(
+            shadowOf(manager).getNotification(PackTaskService.NOTIFICATION_ID).contentIntent,
+        ).savedIntent
+        assertTrue(
+            "进度通知必须带那个 extra —— 用户点的就是「还在跑」的这条",
+            progressIntent.getBooleanExtra(MainActivity.EXTRA_OPEN_LIBRARY_PACK, false),
+        )
+
+        service.notifyFinal(android.R.string.ok, "done")
+        val finalIntent = shadowOf(
+            shadowOf(manager).getNotification(PackTaskService.FINAL_NOTIFICATION_ID).contentIntent,
+        ).savedIntent
+        assertTrue(
+            "完成通知必须带「直接进打包页」的 extra，否则点它回的是首页",
+            finalIntent.getBooleanExtra(MainActivity.EXTRA_OPEN_LIBRARY_PACK, false),
+        )
     }
 }

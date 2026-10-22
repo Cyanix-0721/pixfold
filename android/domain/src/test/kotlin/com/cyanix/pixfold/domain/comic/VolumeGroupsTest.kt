@@ -29,6 +29,9 @@ class VolumeGroupsTest {
         series: String = "",
         title: String = id,
         pages: Int = 1,
+        // 默认与 series 当前值一致(既有用例的意图),单本用例显式传 "" —— 两者在生产里
+        // 是**两个独立事实**,夹具必须能分别控制。
+        seriesDir: String = series,
     ): ComicVolume = comicVolumeOf(
         id = id,
         dirPath = id,
@@ -36,10 +39,11 @@ class VolumeGroupsTest {
         titleSug = Suggestion(title, "测试夹具"),
         seriesSug = Suggestion(series, "测试夹具"),
         writerSug = Suggestion("作者", "测试夹具"),
-        writerCleanedSug = Suggestion("作者", "测试夹具"),
+        dirWriterSug = Suggestion("作者", "测试夹具"),
         volumeSug = Suggestion(null, "测试夹具"),
         langSug = Suggestion(null, "测试夹具"),
         outputDirSug = "/out",
+        seriesDir = seriesDir,
     )
 
     private fun item(id: String) = SourceItem(
@@ -124,6 +128,67 @@ class VolumeGroupsTest {
         assertEquals(listOf("A", "B", "C"), groups.map { it.name })
         groups.forEach { assertTrue(it.isSeries) }
         assertEquals(listOf(1, 1, 1), groups.map { it.volumeCount })
+    }
+
+    @Test
+    fun `单本的 series 当前值等于标题时仍是单本,不被并成一个系列`() {
+        // 2026-10-21 真机回归:Series 条①「无系列层时 Series 跟随 Title」让每个单本的
+        // `series` 当前值都等于它的标题。若 `isSeries` 用「series 非空」判断,5 个单本
+        // 就显示成「识别到 5 个系列」、元数据页 1 级芯片全折叠。
+        // 是否属于某系列是**扫描期事实**(seriesDir),不能由用户可改的当前值反推。
+        val groups = groupVolumes(
+            listOf(
+                volume("a", series = "书A", title = "书A", seriesDir = ""),
+                volume("b", series = "书B", title = "书B", seriesDir = ""),
+                volume("c", series = "书A", title = "书A", seriesDir = ""),
+            ),
+        )
+        assertEquals(3, groups.size, "三个单本必须各自成组,不能因为 series 值撞了就合并")
+        groups.forEach { assertFalse(it.isSeries, "seriesDir 为空的卷永远是单本") }
+        assertEquals(listOf("书A", "书B", "书A"), groups.map { it.name })
+    }
+
+    /**
+     * 系列组名不能取「当前值」—— 两者可能不一致。
+     *
+     * 2026-10-21 真机缺陷:已有 `ComicInfo.xml` 但没写 `<Series>` 标签时,
+     * `applyExistingComicInfo` 会把 `series` 当前值清空;而 `isSeries` 看的是扫描层的
+     * `seriesDir`(非空)⇒ 组判为系列、组名却是空串 ⇒ 元数据页 1 级芯片渲染成「（1）」,
+     * 系列名整个消失(两个系列芯片都如此,单本芯片因为走另一分支而正常)。
+     */
+    @Test
+    fun `a series whose current series value is empty falls back to the scanned dir name`() {
+        val groups = groupVolumes(
+            listOf(
+                volume("a/第01卷", series = "", title = "第01卷", seriesDir = "进击的巨人"),
+                volume("a/第02卷", series = "", title = "第02卷", seriesDir = "进击的巨人"),
+            ),
+        )
+
+        assertEquals(1, groups.size)
+        assertTrue(groups.single().isSeries, "扫描层有系列目录 ⇒ 是系列")
+        assertEquals("进击的巨人", groups.single().name, "当前值为空时必须回退到扫描层目录名")
+    }
+
+    @Test
+    fun `seriesDir 非空的卷即使 series 当前值被清空仍算系列`() {
+        // 反向:用户把系列名清空了,但它确实在系列目录下 —— 仍应是一 (可能多卷的) 系列,
+        // 而不是退回单本。判据只看扫描层的 seriesDir。
+        val v = comicVolumeOf(
+            id = "s/1",
+            dirPath = "s/1",
+            pages = listOf(item("s-x")),
+            titleSug = Suggestion("卷1", "测试夹具"),
+            seriesSug = Suggestion(null, ""),
+            writerSug = Suggestion(null, ""),
+            dirWriterSug = Suggestion(null, ""),
+            volumeSug = Suggestion(null, ""),
+            langSug = Suggestion(null, ""),
+            outputDirSug = "/out",
+            seriesDir = "s",
+        )
+        val group = groupVolumes(listOf(v)).single()
+        assertTrue(group.isSeries)
     }
 
     @Test

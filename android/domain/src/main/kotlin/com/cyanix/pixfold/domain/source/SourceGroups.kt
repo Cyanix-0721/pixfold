@@ -3,6 +3,8 @@ package com.cyanix.pixfold.domain.source
 import com.cyanix.pixfold.domain.model.ImageCollection
 import com.cyanix.pixfold.domain.model.SourceItem
 import com.cyanix.pixfold.domain.sort.naturalCompare
+import com.cyanix.pixfold.domain.text.Msg
+import com.cyanix.pixfold.domain.text.TextKey
 
 /**
  * 把工作区扫描结果 [docs] 收敛成图片集合列表。
@@ -58,6 +60,49 @@ fun collectionsFrom(rootDisplayName: String, docs: List<SourceDoc>): List<ImageC
 
 /** 工作区根下图片那个集合的 id = 空串（且任何子目录集合的 id 都非空，故不撞）。 */
 const val ROOT_COLLECTION_ID: String = ""
+
+// ---- 嵌套目录警告 ----
+
+/**
+ * 系列下出现**嵌套目录**的警告（2026-10-20 用户裁决：「series 下只应有单本文件夹或压缩包，
+ * 再嵌套要发警告通知」）。
+ *
+ * ## 判定
+ *
+ * 正常结构是「系列 / 单本 / 页」两段;集合的 `seriesKey` 是集合目录的父路径。当某个
+ * `seriesKey` 本身还含 `/`(即集合目录的父路径不止一段)时,说明系列与单本之间夹了
+ * 嵌套层 —— 那层目录既不是系列也不是单本,是结构问题。
+ *
+ * ## 为什么是领域层纯函数
+ *
+ * 警告的判定只依赖 `ImageCollection.seriesKey`(扫描层已算好),不碰文件系统;
+ * 把它放领域层,「什么样的结构算嵌套」就只有一个权威实现,UI 只负责显示。
+ *
+ * 去重:同一嵌套层下多本书只警告一次(按 `seriesKey` 分组);排序:按嵌套层路径
+ * **自然序**(`naturalCompare`,与集合排序同一口径 —— 纯字典序会把 `卷2` 排在
+ * `卷10` 前面),保证真机核对读数稳定。
+ */
+fun nestedDirWarnings(collections: List<ImageCollection>): List<Msg> =
+    collections
+        .asSequence()
+        .map { it.seriesKey }
+        .filter { it.count { c -> c == '/' } >= 1 }
+        .distinct()
+        .sortedWith { a, b -> naturalCompare(a, b) }
+        .map { seriesKey ->
+            Msg(
+                key = TextKey.NestedSeriesDir,
+                // args = [系列名, 嵌套层],与中英模板 %1$s/%2$s 一致
+                // (TranslationCoverageTest 钉死「中英占位符逐位相同」)。
+                args = listOf(
+                    // 系列名 = seriesKey 首段。
+                    seriesKey.substringBefore('/'),
+                    // 嵌套层 = 去掉首段后的剩余路径(可能是多级,原样带出)。
+                    seriesKey.substringAfter('/'),
+                ),
+            )
+        }
+        .toList()
 
 /** `a/b/c.jpg` → `a/b`；`c.jpg` → `""`。 */
 private fun parentDirOf(relPath: String): String = relPath.substringBeforeLast('/', "")

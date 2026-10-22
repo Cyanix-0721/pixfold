@@ -42,6 +42,9 @@ interface PackExecutorPort {
      * @param token 取消令牌。中断只在**卷间**生效（见 `runPackPlans` 的 KDoc）。
      * @param onProgress 进度回调。**在 IO 线程上被调用**，实现方负责切回主线程；
      *   平台实现应据此节流（领域层给了 `shouldEmitProgress`），否则每页一次重组。
+     * @param onPageWritten **当前卷的页级进度**：`(volumeIndex, pageDone, pageTotal)`。
+     *   双层圆环的内环靠它 —— 只有卷进度时，一卷 1600 页的内圈会从 0 直接跳到 100%，
+     *   看起来像卡死。同样在 IO 线程回调。
      *
      * @return 拒绝执行 / 已执行的报告 / 执行器自身故障（如拿不到输出目录）。
      */
@@ -49,7 +52,52 @@ interface PackExecutorPort {
         plans: List<VolumePackPlan>,
         token: CancellationToken,
         onProgress: (TaskProgress) -> Unit,
+        onPageWritten: (volumeIndex: Int, pageDone: Int, pageTotal: Int) -> Unit = { _, _, _ -> },
     ): PackUiOutcome
+
+    /**
+     * **只读预检**：算出「能不能打」和「打之前该知道什么」，**一个字节都不写、一个流都不开**。
+     *
+     * 为什么需要它：预检原先只在 [execute] 内部、真正写盘前那一刻跑 ⇒ 用户站在
+     * 「打包计划」页时看不到任何结论，`PackWarning` 的三类告知项（空间临界 /
+     * 估算只是下界 / 需要 Zip64）**全都没有出口**。告知发生在用户按下「执行」之后，
+     * 那时再想改方案已经来不及 —— 大卷用户会一直以为一切正常。
+     *
+     * 它与 [execute] 内部的预检**不是两套判据**：实现方必须复用它自己的阈值常量，
+     * 否则「准备页说能打、执行时被拒绝」会出现（反之亦然）。[execute] 仍保留内部预检 ——
+     * 计划可能在预检与执行之间被改动，而且执行方不能信任调用方「我已经预检过了」。
+     *
+     * @return 预检结果；**空间无法判定时 `availableBytes` 为 `null`** —— 见
+     *   [com.cyanix.pixfold.domain.pack.PackPreflightResult] 的说明：那时不做空间阻断，
+     *   但仍会给出 Zip64 等与空间无关的告知项。
+     */
+    suspend fun preflight(plans: List<VolumePackPlan>): PackUiPreflight
+}
+
+/**
+ * 计划页预检的两种结局。
+ *
+ * 与领域层 [PackPreflightResult] 的区别：**多一个 [Unavailable]**。
+ * 「空间未知」不是领域层能表达的状态（它要求一个 `availableBytes: Long`），
+ * 但界面必须能区分「问不到空间」与「空间充足」—— 前者不该显示「空间充足」这种
+ * 会被用户当承诺的结论，也不该显示「空间不足」（那是假的）。
+ */
+sealed interface PackUiPreflight {
+
+    /**
+     * 拿到了预检结论。
+     *
+     * `availableBytes == null` ⇒ 空间无法判定（非 external-storage 树 / StatFs 失败）。
+     * 此时 `result` 里**不会有**空间类阻断与提示，但 Zip64、估算下界等与空间无关的
+     * 告知项仍然有效 —— 它们不依赖可用空间。
+     */
+    data class Ready(
+        val result: PackPreflightResult,
+        val availableBytes: Long?,
+    ) : PackUiPreflight
+
+    /** 预检本身失败（授权失效 / 无法查询空间等）。界面据此保守处理：不显示「可以打包」。 */
+    data class Unavailable(val message: String) : PackUiPreflight
 }
 
 /**

@@ -191,6 +191,11 @@ class PackTaskService : Service() {
                             updateNotification(progress.fraction, countsText(progress))
                         }
                     },
+                    // 页级进度：每写一页回调一次，**不节流**。
+                    // 内环要跟手，节流到 250ms 会看到「一顿一顿」。代价是每页
+                    // 一次 StateFlow 写入 —— 但每页本身就是一次 provider 读取 +
+                    // 一次 ZIP 写入，一次状态更新的开销可以忽略。
+                    onPageWritten = { _, done, total -> PackTaskBus.publishPage(done, total) },
                 )
                 // 取消标记从总线的令牌读，而不是猜「报告条数少了」——
                 // `packRunAsExecutionReport` 会把未处理的卷补成「尚未开始」，
@@ -398,9 +403,21 @@ class PackTaskService : Service() {
         notifications.cancel(NOTIFICATION_ID)
     }
 
+    /**
+     * 点通知要落到「打包漫画 · 步骤 3」，而不是首页。
+     *
+     * **为什么必须带 extra**（2026-10-20 真机缺陷）：原先只指向 `MainActivity`，
+     * 于是用户在通知上点一下，回到的是首页 —— 而他刚看的是进度条或完成报告。
+     * 那条通知的全部意义就是「回到这件事上」，落在首页等于把它做废。
+     *
+     * `FLAG_ACTIVITY_CLEAR_TOP` 意味着 Activity **可能已经存在**（应用在后台时），
+     * 此时走的是 `onNewIntent` 而非 `onCreate` —— 两个入口都要读这个 extra，
+     * 否则「后台点通知」这条最常见的路径依然是坏的。
+     */
     private fun openAppIntent(): PendingIntent {
         val intent = Intent(this, MainActivity::class.java).apply {
             flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
+            putExtra(MainActivity.EXTRA_OPEN_LIBRARY_PACK, true)
         }
         return PendingIntent.getActivity(
             this,

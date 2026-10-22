@@ -69,8 +69,19 @@ fun groupVolumes(volumes: List<ComicVolume>): List<VolumeGroup> {
             key = key,
             // 系列名取 series 而不是 title:同系列各卷的 title 可以不同(如「进击的巨人 外传」),
             // 拿第一本的标题当组名会让系列看上去缺了后半截。
+            //
+            // ⚠️ **series 为空时必须回退 seriesDir,不能直接用。** `isSeries` 看的是扫描层的
+            // `seriesDir`,而 `series` 是**当前值** —— 两者可以不一致:已有 `ComicInfo.xml`
+            // 但没写 `<Series>` 时 `applyExistingComicInfo` 会把当前值清空(用户裁决「文件里
+            // 没写就是空的」)。若这里不回退,组被判为系列而组名为空 ⇒ 芯片渲染成「（1）」,
+            // 系列名整个消失(2026-10-21 真机缺陷)。
+            //
             // 单本没有系列可依,退回标题;标题为空(用户清空了它)时用 id,免得出现无名芯片。
-            name = if (isSeries) first.series else first.title.ifEmpty { first.id },
+            name = if (isSeries) {
+                first.series.ifEmpty { first.seriesDir }.ifEmpty { first.title }.ifEmpty { first.id }
+            } else {
+                first.title.ifEmpty { first.id }
+            },
             volumes = members,
             isSeries = isSeries,
         )

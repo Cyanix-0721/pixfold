@@ -156,6 +156,80 @@ class CbzStreamingTest {
         assertEquals(0, bytesOfCalls, "有流式能力时不许回退到整块读 —— 那正是 OOM 的成因")
         assertContentEquals("streamed".toByteArray(), readBack(out.toByteArray())[1].second)
     }
+    /**
+     * 页级进度必须**逐页**上报，且分母是这一卷的页数。
+     *
+     * 界面要画「外层 = 卷进度、内层 = 当前卷的页进度」的双层圆环，内层没有页级
+     * 回调就只能按卷跳 —— 一卷 1600 页时内圈会从 0 直接到 100%，用户看到的是
+     * 「卡住不动然后突然完成」。
+     *
+     * 断言三条：①回调次数 == 页数；②`done` 从 1 递增到 total；③`total` 恒等于页数。
+     */
+    @Test
+    fun `page progress is reported once per page`() {
+        val volume = volumeWith(4)
+        val bytes = streamingPageByteSource { ByteArray(64) { 3 }.inputStream() }
+        val sink = CbzOutputSink { ByteArrayOutputStream() }
+        val seen = mutableListOf<Pair<Int, Int>>()
+
+        runPackPlans(
+            plans = buildPackagePlans(listOf(volume)),
+            bytes = bytes,
+            sink = sink,
+            token = CancellationToken(),
+            timeMillis = time,
+            onPageWritten = { _, done, total -> seen += done to total },
+        )
+
+        assertEquals(listOf(1 to 4, 2 to 4, 3 to 4, 4 to 4), seen, "每写完一页就该报一次，且分母是卷内页数")
+    }
+
+    /** 卷索引必须跟着走：多卷时界面要知道「现在是第几卷」。 */
+    @Test
+    fun `page progress carries the volume index`() {
+        val v1 = volumeWith(2)
+        val v2 = volumeWith(3).copy(id = "v2")
+        val bytes = streamingPageByteSource { ByteArray(64) { 3 }.inputStream() }
+        val sink = CbzOutputSink { ByteArrayOutputStream() }
+        val volumes = mutableListOf<Int>()
+
+        runPackPlans(
+            plans = buildPackagePlans(listOf(v1, v2)),
+            bytes = bytes,
+            sink = sink,
+            token = CancellationToken(),
+            timeMillis = time,
+            onPageWritten = { volumeIndex, _, _ -> volumes += volumeIndex },
+        )
+
+        assertEquals(listOf(0, 0, 1, 1, 1), volumes, "前两页属第 0 卷，后三页属第 1 卷")
+    }
+
+    /**
+     * 缺页的卷**一页进度都不该报**。
+     *
+     * 这是「不留 0 字节 CBZ」那条规则的延伸：探测失败时连输出流都没开，
+     * 若仍按计划页数报进度，界面会显示「第 5 页写完了」而磁盘上什么都没有。
+     */
+    @Test
+    fun `a volume with missing pages reports no page progress`() {
+        val volume = volumeWith(3)
+        val bytes = streamingPageByteSource { id -> if (id == "p2") null else ByteArray(16).inputStream() }
+        val sink = CbzOutputSink { ByteArrayOutputStream() }
+        val seen = mutableListOf<Int>()
+
+        runPackPlans(
+            plans = buildPackagePlans(listOf(volume)),
+            bytes = bytes,
+            sink = sink,
+            token = CancellationToken(),
+            timeMillis = time,
+            onPageWritten = { _, done, _ -> seen += done },
+        )
+
+        assertTrue(seen.isEmpty(), "缺页卷不该报页进度，实际报了 $seen")
+    }
+
 }
 
 /**

@@ -41,6 +41,7 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import com.cyanix.pixfold.ui.components.PixFoldAlertDialog
 import com.cyanix.pixfold.R
 import com.cyanix.pixfold.ui.text.textOf
 import com.cyanix.pixfold.domain.model.CasePolicy
@@ -418,7 +419,7 @@ private fun SanitizeInfoButton(
     }
 
     if (showInfo) {
-        AlertDialog(
+        PixFoldAlertDialog(
             onDismissRequest = { showInfo = false },
             title = { Text(title) },
             text = {

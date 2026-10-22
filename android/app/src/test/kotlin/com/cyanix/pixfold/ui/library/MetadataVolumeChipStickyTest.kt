@@ -174,10 +174,12 @@ class MetadataVolumeChipStickyTest {
     }
 
     @Test
-    fun `series row cramped to one line keeps an all entry`() {
-        // 1 级行在选中系列时收缩到 1 行（用户 2026-10-19 裁决）。收缩后看不见的系列芯片
-        // 不能再靠换行够到 ⇒ 必须给「全部 N 项」入口。真机长系列名 1 行可能只放得下 1 个，
-        // 而 Robolectric 量不出宽度 ⇒ 规则取「宁可多给入口」。
+    fun `series row cramped to two lines keeps an all entry`() {
+        // 1 级行限到 2 行（用户 2026-10-21 裁决「第一层chip最多显示2行」）。限行后看不见的
+        // 系列芯片不能再靠换行够到 ⇒ 必须给「全部 N 项」入口。
+        // 为什么 2 行也要给：芯片宽度跟随内容，10 字芯片约 170dp，361dp 屏一行只放得下 2 个
+        // ⇒ 2 行只装 4 个，**小于常驻上限 5**；5 个长名系列时第 5 个会被 FlowRow 裁掉而
+        // total > 5 不成立。Robolectric 又量不出宽度 ⇒ 规则取「限行即给入口」。
         show()
         rule.onNodeWithTag(TAG_VOLUME_GROUP_ALL).assertIsDisplayed()
     }

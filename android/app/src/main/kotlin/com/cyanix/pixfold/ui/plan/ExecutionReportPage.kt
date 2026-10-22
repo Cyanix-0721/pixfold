@@ -15,7 +15,6 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -31,13 +30,13 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.window.Dialog
 import com.cyanix.pixfold.R
 import com.cyanix.pixfold.domain.plan.ExecEntry
 import com.cyanix.pixfold.domain.plan.ExecOutcome
 import com.cyanix.pixfold.domain.plan.ExecutionReport
 import com.cyanix.pixfold.domain.plan.UndoScope
 import com.cyanix.pixfold.domain.text.Msg
+import com.cyanix.pixfold.ui.components.PixFoldDialogShell
 import com.cyanix.pixfold.ui.components.IssueFilterRow
 import com.cyanix.pixfold.ui.components.PageActionBar
 import com.cyanix.pixfold.ui.text.WarnLine
@@ -299,8 +298,10 @@ fun ExecutionReportPage(
  *
  * ⚠️ 两个 Button 用的是 `AlertDialog` 的 `confirmButton` / `dismissButton` 槽位吗?
  * **不是**。Material3 的 `AlertDialog` 只有这两个槽位,摆不下三个同级按钮,
- * 且槽位位置会随平台排版改变"取消在最后"这条明说的要求。故这里用
- * `Dialog` + 自绘 `Surface`/`Column`,顺序由我们的布局决定。
+ * 且槽位位置会随平台排版改变"取消在最后"这条明说的要求。
+ *
+ * 外观与模糊仍由 [PixFoldDialogShell] 提供(全站唯一来源),这里只把按钮区
+ * 换成竖排 —— 这正是该 Shell 把 `buttons` 设计成任意槽的原因。
  */
 @Composable
 private fun UndoScopeDialog(
@@ -320,55 +321,54 @@ private fun UndoScopeDialog(
     val everything = stringResource(R.string.report_undo_everything)
     val cancel = stringResource(R.string.common_cancel)
 
-    Dialog(onDismissRequest = onCancel) {
-        Surface(
-            shape = MaterialTheme.shapes.extraLarge,
-            color = MaterialTheme.colorScheme.surfaceContainerHigh,
-            modifier = Modifier.testTag(TAG_UNDO_SCOPE_DIALOG),
-        ) {
-            Column(
-                modifier = Modifier.padding(24.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp),
-            ) {
-                // 警示由矢量图标承担(2026-10-05 用户要求,资源里已无 ⚠️ 前缀)。
-                // 标题是 `headlineSmall`,故图标放大到 24dp 与之齐平;`Text` 节点本身
-                // 仍只含标题文本,`UndoScopeDialogTest` 的 `onNodeWithText` 不受影响。
-                WarnLine(
-                    icon = warnIcon(R.string.report_undo_warning_title) ?: R.drawable.ic_warning_triangle,
-                    text = title,
-                    style = MaterialTheme.typography.headlineSmall,
-                    color = MaterialTheme.colorScheme.error,
-                    iconSize = 24.dp,
-                )
-                Text(text = body, style = MaterialTheme.typography.bodyMedium)
-                // 顺序即语义:安全 → 危险 → 取消(用户明说"取消放到最后边")。
-                // 安全档只删**本次产物**,故用描边(透明底)而非填充 —— 与危险档分级(O1)。
-                OutlinedButton(
-                    onClick = { onChoose(UndoScope.ThisRun) },
-                    colors = dangerOutlineButtonColors(),
-                    border = dangerOutlineBorder(),
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .testTag(TAG_UNDO_SCOPE_THIS_RUN)
-                        .semantics { contentDescription = thisRun },
-                ) { Text(thisRun) }
-                Button(
-                    onClick = { onChoose(UndoScope.Everything) },
-                    colors = dangerActionButtonColors(),
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .testTag(TAG_UNDO_SCOPE_EVERYTHING)
-                        .semantics { contentDescription = everything },
-                ) { Text(everything) }
-                TextButton(
-                    onClick = onCancel,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .testTag(TAG_UNDO_SCOPE_CANCEL)
-                        .semantics { contentDescription = cancel },
-                ) { Text(cancel) }
-            }
-        }
+    // 统一弹窗效果（2026-10-20 用户要求「所有弹窗都是这个效果」）。
+    // 外观 / 模糊 / 内边距 / 标题间距全由 `PixFoldDialogShell` 提供 ——
+    // 本处只决定**按钮怎么摆**：三颗全宽竖排，顺序即语义。
+    PixFoldDialogShell(
+        onDismissRequest = onCancel,
+        tag = TAG_UNDO_SCOPE_DIALOG,
+        title = {
+            // 警示由矢量图标承担(2026-10-05 用户要求,资源里已无 ⚠️ 前缀)。
+            // 标题是 `headlineSmall`,故图标放大到 24dp 与之齐平;`Text` 节点本身
+            // 仍只含标题文本,`UndoScopeDialogTest` 的 `onNodeWithText` 不受影响。
+            WarnLine(
+                icon = warnIcon(R.string.report_undo_warning_title) ?: R.drawable.ic_warning_triangle,
+                text = title,
+                style = MaterialTheme.typography.headlineSmall,
+                color = MaterialTheme.colorScheme.error,
+                iconSize = 24.dp,
+            )
+        },
+        buttons = {
+            // 顺序即语义:安全 → 危险 → 取消(用户明说"取消放到最后边")。
+            // 安全档只删**本次产物**,故用描边(透明底)而非填充 —— 与危险档分级(O1)。
+            OutlinedButton(
+                onClick = { onChoose(UndoScope.ThisRun) },
+                colors = dangerOutlineButtonColors(),
+                border = dangerOutlineBorder(),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .testTag(TAG_UNDO_SCOPE_THIS_RUN)
+                    .semantics { contentDescription = thisRun },
+            ) { Text(thisRun) }
+            Button(
+                onClick = { onChoose(UndoScope.Everything) },
+                colors = dangerActionButtonColors(),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .testTag(TAG_UNDO_SCOPE_EVERYTHING)
+                    .semantics { contentDescription = everything },
+            ) { Text(everything) }
+            TextButton(
+                onClick = onCancel,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .testTag(TAG_UNDO_SCOPE_CANCEL)
+                    .semantics { contentDescription = cancel },
+            ) { Text(cancel) }
+        },
+    ) {
+        Text(text = body, style = MaterialTheme.typography.bodyMedium)
     }
 }
 

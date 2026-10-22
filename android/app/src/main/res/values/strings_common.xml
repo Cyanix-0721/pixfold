@@ -60,6 +60,20 @@
     <string name="common_reset_all_body">Sort rules, manual adjustments, naming overrides and metadata edits will be cleared.</string>
     <string name="common_reset_all_confirm">Reset</string>
 
+    <!--
+      ============ Fetch from folder structure (DirMetaButton) ============
+      User 2026-10-22: an icon button next to "Reset all adjustments" that refills
+      **every** metadata field of the current volume from the folder structure only,
+      bypassing ComicInfo.xml (whose values normally outrank folder-derived advice).
+      Long press reveals `common_dir_meta_hint`; tapping asks for confirmation because
+      it overwrites 7 fields at once and marks each as a per-volume exception.
+    -->
+    <string name="common_dir_meta_cd">Fetch metadata from folder structure</string>
+    <string name="common_dir_meta_hint">Fetch metadata from folder structure</string>
+    <string name="common_dir_meta_title">Fetch metadata from folder structure?</string>
+    <string name="common_dir_meta_body">Title, series, writer, volume number and CBZ file name of this volume will be refilled from the folder names, replacing the current values.</string>
+    <string name="common_dir_meta_confirm">Refill</string>
+
     <!-- ============ Scroll to top (ScrollToTopButton) ============ -->
     <string name="common_scroll_to_top">Back to top</string>
 

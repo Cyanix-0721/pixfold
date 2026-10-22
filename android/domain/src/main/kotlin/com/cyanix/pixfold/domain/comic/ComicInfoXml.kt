@@ -12,11 +12,21 @@ import com.cyanix.pixfold.domain.text.TextKey
  * 是 `scripts/batch_pack_cbz.py` 的字段子集的子集;若日后要扩展字段,
  * 须回头对齐脚本(规格 §8.5 注)。
  *
- * 与脚本的**两处已知差异**(有意,原型只做预览):
- *  - 脚本用 4 空格缩进 + `<Volume>` + `PageCount` + `Pages`,本实现用规格 §8.5 的 2 空格
- *    + `<Number>`(归档原型契约);
- *  - 脚本在值为空时**省略**标签,本实现按规格输出**自闭合空标签**(`<Title />`)——
- *    "不写入"必须是一种明确表示,而不是"标签不见了"。
+ * 与脚本的**一处已知差异**(有意,原型只做预览):脚本用 4 空格缩进 + `<Volume>` +
+ * `PageCount` + `Pages`,本实现用规格 §8.5 的 2 空格 + `<Number>`(归档原型契约)。
+ *
+ * **空值一律写自闭合空标签**(`<Title />`),**五个字段全部统一,没有例外**
+ * (用户 2026-10-22 裁决:「还是空值写自闭合标签吧,几个标签全部都改」)。
+ *
+ * 三态回顾:D1 起 `<Number>` 曾是唯一例外(空卷号时整个标签省略,理由是"`<Number />`
+ * 会被部分阅读器读成第 0 卷")。2026-10-22 用户先要求「所有标签为空都不写入」,
+ * 随后改回本条 —— **统一比"某字段特例"更可预测**:字段序固定、每份 XML 都是五个
+ * 位置齐全,读者(人或工具)不必先记住"哪个字段可能消失"。
+ * 若日后确有阅读器把 `<Number />` 误读成第 0 卷,再单独处理那一个字段,
+ * 届时须在文件头记下具体机型/版本,不要凭猜测改。
+ *
+ * ⚠️ **字段为空时「缺失」的待确认提示仍然保留**(`ComicVolume.pendingIssues`),
+ * 与本处的空标签互不影响 —— 那是给用户的提示,不是给阅读器的数据。
  */
 object ComicInfo {
 
@@ -27,7 +37,7 @@ object ComicInfo {
         .replace(">", "&gt;")
         .replace("\"", "&quot;")
 
-    /** 空值/不写入 → 自闭合空标签。判定 = null 或空串。 */
+    /** 空值 → 自闭合空标签。判定 = null 或空串(见文件头 KDoc:五个字段一律如此)。 */
     private fun field(tag: String, value: String?): String =
         if (value.isNullOrEmpty()) "  <$tag />" else "  <$tag>${escape(value)}</$tag>"
 
@@ -40,11 +50,12 @@ object ComicInfo {
             "<ComicInfo xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\" " +
                 "xmlns:xsd=\"http://www.w3.org/2001/XMLSchema\">\n",
         )
+        // 字段顺序固定,空值写自闭合空标签(见文件头 KDoc)。
         append(field("Title", volume.title)).append('\n')
         append(field("Series", volume.series)).append('\n')
         append(field("Number", volume.volume?.toString())).append('\n')
         append(field("Writer", volume.writer)).append('\n')
-        append(field("LanguageISO", langIso(volume.language, volume.otherLangCode))).append('\n')
+        append(field("LanguageISO", langIso(volume.language))).append('\n')
         append("</ComicInfo>\n")
     }
 }

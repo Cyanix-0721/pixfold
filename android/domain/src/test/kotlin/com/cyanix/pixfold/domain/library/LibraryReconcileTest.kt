@@ -282,7 +282,10 @@ class LibraryReconcileTest {
             rescan("单本"),
         )
         assertEquals("单本", after.volumes.single().title)
-        assertEquals(null, after.volumes.single().seriesSug.value)
+        // 2026-10-20 裁决「Series 三条语义」①:无系列层时 Series 跟随 Title
+        // (不再给「无建议」)—— 单行本把 <Series> 写成自己的标题是阅读器常态。
+        assertEquals("单本", after.volumes.single().seriesSug.value)
+        assertEquals("无系列层，跟随 Title", after.volumes.single().seriesSug.source)
     }
 
     @Test
@@ -329,7 +332,6 @@ class LibraryReconcileTest {
         val after = reconcileLibrary(before, rescan("系列A/第01卷"))
 
         assertEquals(LangChoice.Unset, after.volumes.single().language)
-        assertEquals("", after.volumes.single().otherLangCode)
     }
 
     @Test

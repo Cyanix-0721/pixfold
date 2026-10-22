@@ -78,13 +78,15 @@ class LibraryStateTest {
     }
 
     @Test
-    fun `pending count counts unconfirmed volumes not included ones`() {
-        assertEquals(5, state.pendingCount, "mock 五卷的语言全都未确认")
-        assertEquals(5, state.includedCount, "此时两个计数恰好相等,所以要再走一步才能分辨")
+    fun `pending count counts volumes missing a volume number`() {
+        // 语言项已于 2026-10-20 移除(Unset 即终态);mock 五卷里只有 aot-0(「外传」)
+        // 解析不出卷号 ⇒ 待确认数 = 1,而勾选数 = 5 —— 两个计数必须能分辨。
+        assertEquals(1, state.pendingCount, "只有解析不出卷号的那一卷算待确认")
+        assertEquals(5, state.includedCount, "待确认数不是已勾选数")
 
-        val confirmed = updateVolume(state, vol(state, "op-102").copy(language = LangChoice.Zh))
-        assertEquals(4, confirmed.pendingCount, "确认一卷语言后待确认少一卷")
-        assertEquals(5, confirmed.includedCount, "勾选数不变 —— 待确认数不是已勾选数")
+        val withNumber = updateVolume(state, vol(state, "aot-0").copy(volume = 99))
+        assertEquals(0, withNumber.pendingCount, "补上卷号后不再有待确认项")
+        assertEquals(5, withNumber.includedCount, "勾选数不受卷号影响")
     }
 
     @Test
@@ -97,8 +99,29 @@ class LibraryStateTest {
 
     @Test
     fun `series groups keep first appearance order`() {
-        assertEquals(listOf("进击的巨人", "海贼王"), state.seriesGroups.map { it.first })
-        assertEquals(listOf(3, 2), state.seriesGroups.map { it.second.size })
+        assertEquals(listOf("进击的巨人", "海贼王"), state.seriesGroups.map { it.name })
+        assertEquals(listOf(3, 2), state.seriesGroups.map { it.volumes.size })
+    }
+
+    /**
+     * 单本各自成组,不能被并成一个「未命名系列」。
+     *
+     * 2026-10-21 真机缺陷:书架页原先走 `groupVolumesBySeries`(键 = seriesKey),3 个互不
+     * 相干的单本因为 seriesKey 都是空串而被并成同一个系列的 3 卷,摘要也报错(显示 3 个
+     * 系列,实际只有 2 个)。分组规则现在只有 `groupVolumes` 一份。
+     */
+    @Test
+    fun `single volumes stay separate instead of merging into one series`() {
+        val singles = MockDataB.library.volumes.take(1).map { it.copy(series = "某本书", seriesDir = "") } +
+            MockDataB.library.volumes.take(1).map {
+                it.copy(id = "其他单本", dirPath = "其他单本", series = "另一本书", seriesDir = "")
+            }
+        val next = state.copy(volumes = singles)
+
+        assertEquals(2, next.seriesGroups.size, "两个单本必须各自成组")
+        assertTrue(next.seriesGroups.none { it.isSeries }, "单本组不是系列")
+        assertEquals(0, next.seriesCount, "系列数不含单本")
+        assertEquals(2, next.singleCount)
     }
 
     @Test

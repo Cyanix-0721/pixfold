@@ -7,7 +7,9 @@ import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.windowInsetsPadding
@@ -51,6 +53,7 @@ import com.cyanix.pixfold.domain.model.LangChoice
 import com.cyanix.pixfold.domain.library.LibraryState
 import com.cyanix.pixfold.domain.library.selectVolume
 import com.cyanix.pixfold.ui.components.PageActionBar
+import com.cyanix.pixfold.ui.components.PackProgressDialog
 import com.cyanix.pixfold.ui.components.TaskProgressBar
 import com.cyanix.pixfold.ui.components.VolumeChipRow
 import com.cyanix.pixfold.ui.text.WarnLine
@@ -144,6 +147,17 @@ fun PackPreviewPage(
      * 领域层单测里钉住了，UI 侧不该再算一遍。
      */
     progress: TaskProgress? = null,
+    /**
+     * 当前卷已写页数（双层圆环**外环**）。`null` = 还不知道 —— 外环画不确定态。
+     *
+     * 为什么需要它：一卷 1600 页时，只有卷进度会让内圈从 0 直接跳到 100%，
+     * 看起来像卡死。页级进度只在**当前卷**内有意义，故与 [progress] 分开传。
+     */
+    pageDone: Int? = null,
+    /** 当前卷总页数；与 [pageDone] 同时为 `null` 时外环不画百分比。 */
+    pageTotal: Int? = null,
+    /** 弹窗底部显示的卷名（正在写哪一卷）。`null` = 不显示。 */
+    volumeLabel: String? = null,
     /** 用户要求中止执行。仅在 [executing] 为 true 时有意义。 */
     onCancelExecution: () -> Unit = {},
     /**
@@ -162,6 +176,17 @@ fun PackPreviewPage(
      * 会让用户以为部分卷已经写出来了。
      */
     executionError: String? = null,
+    /**
+     * 计划页预检结论（D4b）。`null` = 还没算出来（进入步骤 3 的那一刻起算）。
+     *
+     * 为什么必须在**计划页**显示而不是等「执行」时才说：这三类告知项
+     * （空间临界 / 估算只是下界 / 需要 Zip64）都是「让用户决定还打不打」的信息。
+     * 等按下执行再说，用户要么已经删了源文件、要么已经等了半小时。
+     *
+     * 与 [executionError] 的区别：那个是「已经按了执行、结果没跑起来」，
+     * 这个是「还没按，先告诉你风险」。两者可以同时为 null。
+     */
+    pagePreflight: PackUiPreflight? = null,
 ) {
     // 空工作区必须**先于**任何 `activeVolume` 读取判定（2026-10-19）。
     // 真实 SAF 扫描可能一卷都不产生（目录里没有图片，或图片全散在根目录 ——
@@ -203,15 +228,10 @@ fun PackPreviewPage(
             sheetListTag = TAG_PACK_VOLUME_SHEET_LIST,
             sheetChipTag = ::packVolumeSheetChipTag,
             chipDescription = { id -> stringResource(R.string.pack_volume_chip_cd, id) },
-            chipLabel = { v ->
-                val title = v.title.ifEmpty { v.id }
-                Text(
-                    if (v.included) {
-                        title
-                    } else {
-                        stringResource(R.string.pack_volume_excluded, title)
-                    },
-                )
+            chipLabel = { v -> v.title.ifEmpty { v.id } },
+            chipSuffix = { v ->
+                // 「未勾选」是固定短标记,单独走后缀:它不该被名称的长度上限截掉。
+                if (v.included) "" else stringResource(R.string.pack_volume_suffix_excluded)
             },
         )
 
@@ -427,6 +447,12 @@ fun PackPreviewPage(
             }
         }
 
+        // 计划页预检（D4b）:**按下执行之前**就该看到的结论。
+        // 放在 executionError 之前 —— 预检是「还不知道会怎样」，故障是「已经怎样了」。
+        if (pagePreflight != null) {
+            PackPreflightPanel(pagePreflight)
+        }
+
         // 执行故障横条:必须是**错误色**而不是普通的提示色 —— 它是「这次什么都没写成」,
         // 不是「有个小提醒」。放在底栏正上方,因为用户的视线在按钮附近。
         if (executionError != null) {
@@ -450,18 +476,14 @@ fun PackPreviewPage(
         // 再启一次任务。此时唯一有意义的动作是**取消**,故右侧换成取消按钮,
         // 左侧的返回也一并撤掉 —— 返回会离开这个目的地,而任务还在后台跑。
         if (showPlanSection && executing) {
-            // 进度与取消由 `TaskProgressBar` 一体承担（进度条 + 行内取消,见其 KDoc
-            // 「为什么取消按钮在进度条行内」）。**不在这里自作主张再写一套** ——
-            // 同一屏出现两个挂 TAG_TASK_PROGRESS 的进度条时,`onNodeWithTag` 会直接
-            // 撞到多个节点而失败,而且两条进度条的读数还可能不同源。
-            //
-            // 底栏在执行期整条撤掉:左侧「返回」会离开这个目的地(任务却还在后台跑),
+            // 执行期底栏整条撤掉（留一条占位高度，避免计划区在弹窗出现时跳动）:
+            // 左侧「返回」会离开这个目的地（任务却还在后台跑），
             // 右侧「确认打包」再按一次就是并发写同一批文件。
-            TaskProgressBar(
-                progress = progress ?: TaskProgress(total = 0),
-                onCancel = onCancelExecution,
-                cancelling = cancelling,
-            )
+            //
+            // 进度改由**模态弹窗**承载（双层圆环 + 背景模糊，见 PackProgressDialog）。
+            // 底栏不再挂进度条 —— 弹窗里已有唯一一份读数，两处同挂
+            // `TAG_TASK_PROGRESS` 会让 `onNodeWithTag` 撞到多个节点。
+            Spacer(Modifier.height(72.dp))
         } else if (showPlanSection) {
             val back = onBack
             val backCd = stringResource(R.string.b_step_back_cd)
@@ -487,6 +509,19 @@ fun PackPreviewPage(
                 },
             )
         }
+    }
+
+    // 打包进度弹窗（D2b / 2026-10-20 用户裁决「弹窗双层圆圈 + 背景高斯模糊」）。
+    // 与确认框同层：独立窗口，放进滚动容器会被裁切。
+    if (showPlanSection && executing) {
+        PackProgressDialog(
+            progress = progress ?: TaskProgress(total = 0),
+            pageDone = pageDone,
+            pageTotal = pageTotal,
+            onCancel = onCancelExecution,
+            cancelling = cancelling,
+            volumeLabel = volumeLabel,
+        )
     }
 
     // 确认对话框:严格按领域层给出的序列推进(通用 → 危险)。
@@ -638,8 +673,143 @@ private fun PackEmptyState(
 private fun langLabel(volume: ComicVolume): String = when (volume.language) {
     LangChoice.Zh -> "zh"
     LangChoice.Ja -> "ja"
-    LangChoice.Other -> volume.otherLangCode.ifEmpty { stringResource(R.string.pack_lang_other_empty) }
+    // Unset = 不写入标签,是合法终态(用户 2026-10-20 裁决),文案不再说「未确认」。
     LangChoice.Unset -> stringResource(R.string.pack_lang_unset)
-    LangChoice.Unknown -> stringResource(R.string.pack_lang_unknown)
-    LangChoice.Skip -> stringResource(R.string.pack_lang_skip)
+}
+
+/** 计划页预检提示区（D4b）。阻断项用错误色，告知项用普通提示色。 */
+const val TAG_PACK_PREFLIGHT = "pack-preflight"
+
+/** 预检「阻断」行：这次不能打。 */
+const val TAG_PACK_PREFLIGHT_BLOCKER = "pack-preflight-blocker"
+
+/** 预检「告知」行：能打，但该知道。 */
+const val TAG_PACK_PREFLIGHT_WARNING = "pack-preflight-warning"
+
+/**
+ * 把预检结论渲染成底栏正上方的一块提示区（D4b）。
+ *
+ * ### 为什么阻断与告知用两种颜色
+ * 空间不足 / 输出名撞车是「你现在点执行也不会开始」，红色；空间临界 / 估算下界 /
+ * 需要 Zip64 是「照打，但你可能想知道」，普通提示色。同一堆信息用同一种颜色，
+ * 用户就得分不清「点下去会怎样」。
+ *
+ * ### 为什么空间「无法判定」单独一条
+ * `PackUiPreflight.Ready.availableBytes == null` 意味着 provider 报不出可用空间
+ * （非 external-storage 树、或 StatFs 失败）。此时领域层按「充足」放行 ——
+ * 这是**刻意的**（问不到不等于不足），但界面**不能**因此一声不吭：
+ * 用户会以为应用确认过空间。所以单独说「无法判断」。
+ *
+ * 与 `executionError` 的区别：那个是「按了执行、结果没跑起来」，
+ * 这个是「还没按，先告诉你」。
+ */
+@Composable
+private fun PackPreflightPanel(preflight: PackUiPreflight) {
+    val rows = preflightRows(preflight)
+    if (rows.isEmpty()) return
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 12.dp, vertical = 6.dp)
+            .testTag(TAG_PACK_PREFLIGHT),
+        verticalArrangement = Arrangement.spacedBy(4.dp),
+    ) {
+        rows.forEach { row ->
+            WarnLine(
+                icon = warnIcon(row.iconKey) ?: R.drawable.ic_warning_triangle,
+                text = row.text,
+                style = MaterialTheme.typography.labelMedium,
+                color = if (row.blocking) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.testTag(
+                    if (row.blocking) TAG_PACK_PREFLIGHT_BLOCKER else TAG_PACK_PREFLIGHT_WARNING,
+                ),
+            )
+        }
+    }
+}
+
+/** 预检面板的一行：文案 + 用哪个图标键 + 是否阻断。 */
+private data class PreflightRow(val text: String, val iconKey: Int, val blocking: Boolean)
+
+/**
+ * 预检结论 → 可渲染的行。
+ *
+ * 抽成普通函数（而不是在 `@Composable` 里内联 `when`）是因为**每一行都要取
+ * `stringResource`**，而 `when` 里分散取会让「阻断项在前、告知项在后」这个顺序
+ * 约束看不出来。顺序必须稳定：用户要能一眼看出「红色 = 现在打不了」。
+ */
+@Composable
+private fun preflightRows(preflight: PackUiPreflight): List<PreflightRow> = when (preflight) {
+    is PackUiPreflight.Unavailable -> listOf(
+        PreflightRow(
+            text = stringResource(R.string.pack_warn_space_unknown) + " " + preflight.message,
+            iconKey = R.string.pack_error_space,
+            blocking = false,
+        ),
+    )
+
+    is PackUiPreflight.Ready -> {
+        val result = preflight.result
+        val rows = mutableListOf<PreflightRow>()
+
+        // ---- 阻断项（红）：现在打不了 ----
+        for (blocker in result.blockers) {
+            val text = when (blocker) {
+                is com.cyanix.pixfold.domain.pack.PackBlocker.SpaceInsufficient ->
+                    stringResource(
+                        R.string.pack_error_space,
+                        humanBytes(blocker.shortfallBytes),
+                        humanBytes(result.availableBytes),
+                    )
+
+                is com.cyanix.pixfold.domain.pack.PackBlocker.OutputNameCollision ->
+                    pluralStringResource(
+                        R.plurals.pack_error_collision,
+                        blocker.collidingCount,
+                        blocker.collidingCount,
+                        blocker.outputPath,
+                    ) + "\n" + stringResource(R.string.pack_error_collision_hint)
+            }
+            rows += PreflightRow(text, R.string.pack_error_space, blocking = true)
+        }
+
+        // ---- 告知项（普通色）：能打，但该知道 ----
+        for (warning in result.warnings) {
+            val text = when (warning) {
+                is com.cyanix.pixfold.domain.pack.PackWarning.SpaceMarginal ->
+                    stringResource(
+                        R.string.pack_warn_space_marginal,
+                        humanBytes(warning.space.availableBytes),
+                        humanBytes(warning.space.estimatedBytes),
+                    )
+
+                is com.cyanix.pixfold.domain.pack.PackWarning.EstimateIsLowerBound ->
+                    stringResource(R.string.pack_warn_estimate_lower_bound, warning.volumeCount)
+
+                is com.cyanix.pixfold.domain.pack.PackWarning.Zip64Required ->
+                    stringResource(
+                        R.string.pack_warn_zip64,
+                        stringResource(zip64ReasonRes(warning.reason)),
+                    )
+            }
+            rows += PreflightRow(text, R.string.pack_error_space, blocking = false)
+        }
+
+        // ---- 空间无法判定：单独一条，且**不能**说「充足」 ----
+        if (preflight.availableBytes == null && result.blockers.isEmpty()) {
+            rows += PreflightRow(
+                text = stringResource(R.string.pack_warn_space_unknown),
+                iconKey = R.string.pack_error_space,
+                blocking = false,
+            )
+        }
+        rows
+    }
+}
+
+/** Zip64 触发原因 → 文案键。三条与 `Zip64Reason` 声明序一一对应。 */
+private fun zip64ReasonRes(reason: com.cyanix.pixfold.domain.pack.Zip64Reason): Int = when (reason) {
+    com.cyanix.pixfold.domain.pack.Zip64Reason.TooManyEntries -> R.string.pack_warn_zip64_reason_entries
+    com.cyanix.pixfold.domain.pack.Zip64Reason.EntryTooLarge -> R.string.pack_warn_zip64_reason_entry_size
+    com.cyanix.pixfold.domain.pack.Zip64Reason.CentralDirOffsetTooLarge -> R.string.pack_warn_zip64_reason_offset
 }

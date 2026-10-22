@@ -30,7 +30,9 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.cyanix.pixfold.R
+import com.cyanix.pixfold.domain.comic.VolumeGroup
 import com.cyanix.pixfold.domain.model.ComicVolume
+import com.cyanix.pixfold.domain.text.Msg
 import com.cyanix.pixfold.domain.text.TextKey
 import com.cyanix.pixfold.domain.library.LibraryState
 import com.cyanix.pixfold.domain.library.selectVolume
@@ -51,6 +53,9 @@ const val TAG_LIBRARY_PAGE = "library-page"
 const val TAG_LIBRARY_EMPTY = "library-page-empty"
 const val TAG_LIBRARY_LIST = "library-list"
 const val TAG_LIBRARY_SUMMARY = "library-summary"
+
+/** 工作区结构警告条(嵌套目录;每条警告一个节点,tag 带索引便于逐条断言)。 */
+fun structureWarningTag(index: Int) = "library-structure-warning-$index"
 
 /** 「下一步 编辑元数据」按钮。 */
 const val TAG_LIBRARY_NEXT = "library-next"
@@ -102,6 +107,14 @@ fun LibraryPage(
     workspaceState: WorkspaceState? = null,
     /** 用户要求选择/更换工作区目录。仅 [workspaceState] 非 null 时会被调用。 */
     onPickWorkspace: () -> Unit = {},
+    /**
+     * 工作区结构警告(2026-10-20 裁决:系列下出现嵌套目录要警告)。
+     *
+     * 由上层(PixFoldApp)从**扫描结果**算出(`nestedDirWarnings(collections)`),
+     * 这里只负责显示 —— 警告是「工作区长什么样」的属性,不是库状态的属性,
+     * 用户在库里的任何操作都不该让它出现/消失。默认空 ⇒ 既有测试零改动。
+     */
+    workspaceWarnings: List<Msg> = emptyList(),
 ) {
     // 要进 semantics{},故先在组合上下文里解析
     val nextCd = stringResource(R.string.lib_next_cd)
@@ -125,8 +138,8 @@ fun LibraryPage(
         Text(
             text = pluralStringResource(
                 R.plurals.lib_summary,
-                state.seriesGroups.size,
-                state.seriesGroups.size,
+                state.seriesCount,
+                state.seriesCount,
                 state.volumeCount,
                 state.includedCount,
                 state.pendingCount,
@@ -137,6 +150,20 @@ fun LibraryPage(
                 .padding(horizontal = 12.dp)
                 .testTag(TAG_LIBRARY_SUMMARY),
         )
+
+        // 结构警告条:常驻在摘要与列表之间 —— 它说的是「这个工作区的目录层级有问题」,
+        // 卷列表再长也不能把警告滚没(与工作区条同一理由,见 HANGOFF §4「从属层」)。
+        workspaceWarnings.forEachIndexed { index, warning ->
+            Text(
+                text = textOf(warning),
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.error,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 12.dp, vertical = 2.dp)
+                    .testTag(structureWarningTag(index)),
+            )
+        }
 
         LazyColumn(
             modifier = Modifier
@@ -161,13 +188,14 @@ fun LibraryPage(
                     )
                 }
             }
-            state.seriesGroups.forEach { (series, volumes) ->
-                // 分组键保持语言无关(空串 = 未命名系列,见 groupVolumesBySeries 的 KDoc);
-                // 只有**显示**时才翻译,故 testTag 用原始键、标题用解析结果。
-                item(key = "series-$series") {
-                    SeriesHeader(series = series, volumes = volumes)
+            state.seriesGroups.forEach { group ->
+                // **单本不挂系列头**(2026-10-21 真机缺陷的收尾):单本各自成组,但它自己
+                // 就是那一本 —— 给每个单本配一个「系列头 + 1 卷」读起来像在说"这些单本
+                // 各自是一个系列"。系列头只在 group.isSeries 时出现。
+                if (group.isSeries) {
+                    item(key = "series-${group.key}") { SeriesHeader(group = group) }
                 }
-                items(volumes, key = { it.id }) { volume ->
+                items(group.volumes, key = { it.id }) { volume ->
                     VolumeRow(
                         volume = volume,
                         selected = volume.id == state.activeVolumeOrNull?.id,
@@ -197,18 +225,21 @@ fun LibraryPage(
     }
 }
 
-/** 系列分组头(含"待确认"聚合,对齐归档 `_seriesHeader`)。 */
+/**
+ * 系列分组头(含"待确认"聚合,对齐归档 `_seriesHeader`)。
+ *
+ * 只渲染**真系列**。单本不进来 —— 见调用点注释。
+ */
 @Composable
-private fun SeriesHeader(series: String, volumes: List<ComicVolume>) {
+private fun SeriesHeader(group: VolumeGroup) {
+    val volumes = group.volumes
     val pending = volumes.count { it.needsConfirmation }
-    // 分组键是语言无关的稳定字符串(空串 = 未命名系列)—— 翻译只发生在**显示**这一层。
-    // 若把 `TextKey.UnnamedSeries` 存进键,切语言时同一批卷会被分到两个组里。
-    val seriesTitle = if (series.isEmpty()) textOf(TextKey.UnnamedSeries) else series
+    val seriesTitle = group.name
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .padding(horizontal = 12.dp, vertical = 4.dp)
-            .testTag(seriesHeaderTag(series)),
+            .testTag(seriesHeaderTag(group.name)),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(6.dp),
     ) {

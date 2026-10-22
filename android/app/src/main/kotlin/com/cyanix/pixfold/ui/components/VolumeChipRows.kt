@@ -47,12 +47,13 @@ fun VolumeChipRows(
     childTags: ChipRowTags,
     singleTopChipTag: (String) -> String,
     topChipDescription: @Composable (TwoLevelGroup<ComicVolume>) -> String,
-    topChipLabel: @Composable (TwoLevelGroup<ComicVolume>) -> Unit,
+    topChipLabel: @Composable (TwoLevelGroup<ComicVolume>) -> String,
     topAllEntryText: @Composable (Int) -> String,
     childChipDescription: @Composable (ComicVolume) -> String,
-    childChipLabel: @Composable (ComicVolume) -> Unit,
+    childChipLabel: @Composable (ComicVolume) -> String,
     childAllEntryText: @Composable (Int) -> String,
     modifier: Modifier = Modifier,
+    childChipSuffix: @Composable (ComicVolume) -> String = { "" },
 ) {
     val groups = remember(volumes) {
         groupVolumes(volumes).map { group ->
@@ -78,6 +79,7 @@ fun VolumeChipRows(
         topAllEntryText = topAllEntryText,
         childChipDescription = childChipDescription,
         childChipLabel = childChipLabel,
+        childChipSuffix = childChipSuffix,
         childAllEntryText = childAllEntryText,
         modifier = modifier,
     )

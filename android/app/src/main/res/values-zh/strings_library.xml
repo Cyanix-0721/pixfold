@@ -24,9 +24,6 @@
     <string name="meta_suggestion_with_source">%1$s（%2$s）</string>
     <string name="meta_suggestion_prefix">建议：%1$s</string>
     <string name="meta_no_value">无</string>
-    <string name="meta_writer_clean">一键清理</string>
-    <string name="meta_writer_clean_cd">一键清理作者</string>
-    <string name="meta_writer_cleaned_hint">清理建议：%1$s（%2$s）</string>
     <string name="meta_cbz_name_hint">它将命名为：%1$s</string>
     <string name="meta_output_dir_hint">建议输出目录（%1$s）</string>
     <plurals name="meta_batch_applied">
@@ -45,10 +42,7 @@
     </plurals>
     <string name="meta_output_conflict">输出冲突：输出目录已存在同名 CBZ（%1$s）</string>
     <string name="meta_pending_prefix">待确认：</string>
-    <string name="meta_reset">恢复建议</string>
     <string name="meta_reset_cd">恢复建议值 %1$s</string>
-    <string name="meta_lang_unset_error">语言默认未设置，需人工确认</string>
-    <string name="meta_lang_code_label" tools:ignore="TypographyDashes">ISO 639-1 代码</string>
     <string name="meta_batch_title">批量设置（跳过已人工修改的字段）</string>
     <string name="meta_batch_field_cd">批量设置字段 %1$s</string>
     <string name="meta_batch_value_label">批量值</string>
@@ -83,7 +77,7 @@
 
     <!-- ============ 步骤 3 · 打包预览(PackPreviewPage) ============ -->
     <string name="pack_volume_chip_cd">预览卷 %1$s</string>
-    <string name="pack_volume_excluded">%1$s（未勾选）</string>
+    <string name="pack_volume_suffix_excluded">（未勾选）</string>
     <string name="pack_xml_title">ComicInfo.xml 预览</string>
     <plurals name="pack_page_header">
         <item quantity="other">页码预览（按当前页序重编号，共 %1$d 项）</item>
@@ -108,9 +102,6 @@
         <item quantity="other">本次将打包 %1$d / %2$d 卷</item>
     </plurals>
     <string name="pack_included_count_hint">（未勾选的卷不会打包）</string>
-    <string name="pack_lang_other_empty">（未填代码，不写入）</string>
-    <string name="pack_lang_unset">不写入（语言未确认）</string>
-    <string name="pack_lang_unknown">不写入（未知）</string>
-    <string name="pack_lang_skip">不写入</string>
+    <string name="pack_lang_unset">不写入</string>
 
 </resources>

@@ -7,13 +7,18 @@ import android.os.StatFs
 import android.provider.DocumentsContract
 import android.util.Log
 import androidx.core.net.toUri
+import com.cyanix.pixfold.domain.comic.ComicInfoData
+import com.cyanix.pixfold.domain.comic.ExistingComicInfoProbe
 import com.cyanix.pixfold.domain.comic.OutputExistsProbe
 import com.cyanix.pixfold.domain.comic.PageBytes
 import com.cyanix.pixfold.domain.model.ComicVolume
+import com.cyanix.pixfold.domain.comic.parseComicInfo
 import com.cyanix.pixfold.domain.pack.CbzOutputSink
 import com.cyanix.pixfold.domain.plan.VolumePackPlan
+import java.io.BufferedInputStream
 import java.io.InputStream
 import java.io.OutputStream
+import java.util.zip.ZipInputStream
 
 /**
  * 打包输出的 SAF 实现 —— **这是让「打包」真正写盘的那一层**。
@@ -387,5 +392,127 @@ class FilesystemSpaceSource(context: Context) {
         const val TAG = "FilesystemSpaceSource"
         const val EXTERNAL_STORAGE_AUTHORITY = "com.android.externalstorage.documents"
         const val PRIMARY_PREFIX = "primary:"
+    }
+}
+
+/**
+ * 读「该卷已有 CBZ 里的 `ComicInfo.xml`」—— [ExistingComicInfoProbe] 的 SAF 实现。
+ *
+ * 存在的意义:用户可能已经打包过一次、手工改过元数据,再次打包时界面应当以**文件里的
+ * 值**为当前值(用户 2026-10-20 裁决),而不是每次都从目录名重推。
+ *
+ * ## 契约
+ *
+ * - 没有同名 CBZ ⇒ `null`(调用方保持建议值);
+ * - CBZ 在但里面没有 `ComicInfo.xml` ⇒ `ComicInfoData()` 空对象(调用方清空当前值);
+ * - 包坏了 / 读不出来 ⇒ `null`(与「没有」同样处理 —— 扫描路径不得因坏包中断)。
+ *
+ * ## 为什么只读 `ComicInfo.xml` 一个条目
+ *
+ * 一个 2 GB 的 CBZ 有几百个条目,完整遍历会把主线程拖死。`ZipInputStream` 是顺序读的,
+ * 但我们**自己写出的**包把 ComicInfo 放在物理首位,所以正常情况下第一个条目就是它;
+ * 万一不是(第三方工具重排过),最多扫到第一个图片条目为止 —— 见 [MAX_ENTRIES_SCANNED]。
+ */
+class SafExistingComicInfoProbe(
+    context: Context,
+    private val treeUri: Uri,
+    private val dirOfVolume: (ComicVolume) -> String,
+) : ExistingComicInfoProbe {
+
+    private val resolver: ContentResolver = context.applicationContext.contentResolver
+
+    override fun read(volume: ComicVolume): ComicInfoData? {
+        val parentUri = parentDocumentUri(dirOfVolume(volume)) ?: return null
+        val parentDocId = runCatching { DocumentsContract.getDocumentId(parentUri) }.getOrNull()
+            ?: return null
+        val childrenUri = DocumentsContract.buildChildDocumentsUriUsingTree(treeUri, parentDocId)
+        val projection = arrayOf(
+            DocumentsContract.Document.COLUMN_DOCUMENT_ID,
+            DocumentsContract.Document.COLUMN_DISPLAY_NAME,
+            DocumentsContract.Document.COLUMN_MIME_TYPE,
+        )
+        val cbzUri = try {
+            resolver.query(childrenUri, projection, null, null, null)?.use { cursor ->
+                var found: Uri? = null
+                while (cursor.moveToNext() && found == null) {
+                    val docId = cursor.getString(0)
+                    val name = cursor.getString(1)
+                    val mime = cursor.getString(2) ?: ""
+                    if (name == volume.cbzFileName && mime != DocumentsContract.Document.MIME_TYPE_DIR) {
+                        found = DocumentsContract.buildDocumentUriUsingTree(treeUri, docId)
+                    }
+                }
+                found
+            }
+        } catch (e: Exception) {
+            Log.w(TAG, "查询已有 CBZ 失败: ${volume.cbzFileName}", e)
+            null
+        }
+        return cbzUri?.let { readComicInfoFrom(it) }
+    }
+
+    private fun readComicInfoFrom(cbzUri: Uri): ComicInfoData? = try {
+        resolver.openInputStream(cbzUri)?.use { raw ->
+            ZipInputStream(BufferedInputStream(raw)).use { zip ->
+                var scanned = 0
+                var xml: String? = null
+                while (scanned < MAX_ENTRIES_SCANNED) {
+                    val entry = zip.nextEntry ?: break
+                    scanned++
+                    val name = entry.name.substringAfterLast('/')
+                    if (name.equals(COMIC_INFO_ENTRY, ignoreCase = true)) {
+                        xml = zip.readBytes().toString(Charsets.UTF_8)
+                        break
+                    }
+                }
+                // 包在但没有 ComicInfo.xml ⇒ 空对象(调用方清空当前值),不是 null。
+                xml?.let { parseComicInfo(it) } ?: ComicInfoData()
+            }
+        }
+    } catch (e: Exception) {
+        Log.w(TAG, "读取已有 CBZ 失败,按没有处理: $cbzUri", e)
+        null
+    }
+
+    private fun parentDocumentUri(dirRel: String): Uri? {
+        val rootDocId = runCatching { DocumentsContract.getTreeDocumentId(treeUri) }.getOrNull()
+            ?: return null
+        if (dirRel.isEmpty()) return DocumentsContract.buildDocumentUriUsingTree(treeUri, rootDocId)
+        var currentDocId = rootDocId
+        for (segment in dirRel.split('/')) {
+            if (segment.isEmpty()) continue
+            val childrenUri = DocumentsContract.buildChildDocumentsUriUsingTree(treeUri, currentDocId)
+            currentDocId = queryDirId(childrenUri, segment) ?: return null
+        }
+        return DocumentsContract.buildDocumentUriUsingTree(treeUri, currentDocId)
+    }
+
+    private fun queryDirId(childrenUri: Uri, displayName: String): String? {
+        val projection = arrayOf(
+            DocumentsContract.Document.COLUMN_DOCUMENT_ID,
+            DocumentsContract.Document.COLUMN_DISPLAY_NAME,
+            DocumentsContract.Document.COLUMN_MIME_TYPE,
+        )
+        return try {
+            resolver.query(childrenUri, projection, null, null, null)?.use { cursor ->
+                while (cursor.moveToNext()) {
+                    val name = cursor.getString(1)
+                    val mime = cursor.getString(2) ?: ""
+                    if (name == displayName && mime == DocumentsContract.Document.MIME_TYPE_DIR) {
+                        return cursor.getString(0)
+                    }
+                }
+                null
+            }
+        } catch (e: Exception) {
+            null
+        }
+    }
+
+    private companion object {
+        const val TAG = "SafExistingComicInfo"
+        const val COMIC_INFO_ENTRY = "ComicInfo.xml"
+        /** 最多扫这么多个条目找 ComicInfo —— 防第三方包把它埋在最末。 */
+        const val MAX_ENTRIES_SCANNED = 16
     }
 }

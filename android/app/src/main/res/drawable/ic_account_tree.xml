@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Material Symbols "按目录结构获取" — account_tree
+  Source : https://fonts.gstatic.com/s/i/short-term/release/materialsymbolsoutlined/account_tree/default/24px.svg
+  License: Apache License 2.0
+
+  ⚠️ 几何数据由 `.mutwork/svg2vd.py` 机器变换,不是手抄。
+  官方 viewBox 是 `0 -960 960 960`(原点在 y=-960),而 VectorDrawable
+  没有 viewBox 偏移语义 —— 直接照抄会把图形画到画布外(本仓库已两次踩坑)。
+  变换:x'=x*0.025,y'=(y+960)*0.025;绝对命令平移+缩放,相对命令只缩放。
+-->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <path
+        android:fillColor="@android:color/white"
+        android:pathData="M 15,21 v -3 H 11 v -10 h -2 v 3 H 2 v -8 h 7 v 3 h 6 v -3 h 7 v 8 H 15 v -3 h -2 v 8 h 2 v -3 h 7 v 8 H 15 Z M 4,5 v 4 -4 Z m 13,10 v 4 -4 Z m 0,-10 v 4 -4 Z m 0,4 h 3 v -4 H 17 v 4 Z m 0,10 h 3 v -4 H 17 v 4 Z M 4,9 h 3 v -4 H 4 v 4 Z" />
+</vector>

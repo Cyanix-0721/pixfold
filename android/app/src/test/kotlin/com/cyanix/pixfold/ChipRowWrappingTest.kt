@@ -3,6 +3,7 @@ package com.cyanix.pixfold
 import org.junit.Test
 import java.io.File
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 /**
@@ -140,15 +141,95 @@ class ChipRowWrappingTest {
             calls,
             "两级芯片必须恰好两个 SingleSelectChipRow(1 级 = series/单本,2 级 = 选中 series 下的单本)",
         )
-        // 1 级行在选中系列时收缩到一行(maxLines = 1),否则不压缩。
+        // 1 级行**恒定**最多 2 行(用户 2026-10-21 反订了旧的「选中系列时收缩到 1 行」:
+        // 「点击 series 后也是 2 行 + 下拉,而不是 1 行 + 下拉」)。
         assertTrue(
-            src.contains("maxLines = if (activeGroup.isSeries) 1 else Int.MAX_VALUE"),
-            "1 级芯片行必须在选中系列时收缩到一行(用户 2026-10-19 裁决)",
+            src.contains("maxLines = TOP_CHIP_MAX_LINES"),
+            "1 级芯片行必须恒定限行(TOP_CHIP_MAX_LINES = 2,用户 2026-10-21 裁决)",
+        )
+        assertFalse(
+            src.contains("if (activeGroup.isSeries) 1 else"),
+            "不该再按选中状态分档收缩 —— 恒定 2 行才能让下方 2 级行不上下窜",
         )
         // 2 级行只在选中系列时出现 —— 单本没有 2 级。
         assertTrue(
             src.contains("if (activeGroup.isSeries) {"),
             "2 级芯片行必须只在选中 series 时渲染",
+        )
+    }
+
+    /**
+     * 芯片行必须**每行居中**,「全部 N 项」入口也要居中(2026-10-21 真机反馈)。
+     *
+     * ## 为什么只能用源码结构守卫
+     *
+     * 用户原话:「1级芯片没有居中显示,全部5项打开的同样不居中且太靠左贴边了」。
+     * 「居中」的判据是**芯片块相对可用宽度的水平位置**,而 Robolectric 把芯片标签宽度
+     * 全部算成 ~0 ⇒ 左对齐与居中算出来的 bounds 几乎重合,**布局断言没有杀伤力**
+     * (本文件顶部记录的 2026-09-25 教训:按 bounds 比屏宽那条断言在变异下存活)。
+     *
+     * 所以退而守住**结构事实**:容器必须把 `Alignment.CenterHorizontally` 交给
+     * `Arrangement.spacedBy`,入口必须包在居中的 `Box` 里。这证明不了「看起来居中」,
+     * 但能拦住「有人把它改回默认的左对齐」——那是本轮反馈的原形态。
+     *
+     * ⚠️ 全局对齐口径只能有**一处**:`SingleSelectChipRow` 是所有芯片行(卷芯片、
+     * 集合芯片、两级芯片的两行)的唯一容器。若将来有人在调用点各写一套对齐,
+     * 这条守卫守不住 —— 那属于换实现,须连同本文件一起改判。
+     */
+    @Test
+    fun chip_rows_align_left_and_center_the_text_inside() {
+        val src = mainSource("ui/components/SingleSelectChipRow.kt")
+        val code = src.lines().filterNot { it.trimStart().startsWith("//") || it.trimStart().startsWith("*") }
+
+        // **芯片在行内左对齐**(用户 2026-10-21:「不是 chip 本身居中」)。
+        // 曾按「1 级芯片没有居中显示」改成逐行居中 —— 那句话指的是芯片内的**文字**。
+        // 瀑布流从左上起排、各行左端对齐;居中会让每行起点随该行总宽左右漂。
+        assertTrue(
+            code.any { it.contains("Arrangement.spacedBy(6.dp)") },
+            "芯片行必须左对齐(Arrangement.spacedBy(6.dp))",
+        )
+        assertFalse(
+            code.any { it.contains("Alignment.CenterHorizontally") },
+            "芯片不该整行居中 —— 用户要的是 chip 内部文字居中",
+        )
+        // **文字在 chip 内部居中**。chip 宽度跟随内容,文字是它唯一的填充物。
+        assertTrue(
+            code.any { it.contains("textAlign = TextAlign.Center") },
+            "chip 内部文字必须居中(textAlign = TextAlign.Center)",
+        )
+        assertTrue(
+            code.any { it.contains("contentAlignment = Alignment.Center") },
+            "「全部 N 项」入口必须居中(contentAlignment = Alignment.Center)",
+        )
+        // **下箭头**是用户 2026-10-21 明确要的形态(「多的加个屏框的下箭头长按钮」):
+        // 它是「还有更多、往下展开」的固定语义。首版没有断言,变异(删掉 Icon)存活。
+        assertTrue(
+            code.any { it.contains("ic_arrow_drop_down") },
+            "溢出入口必须带下箭头图标(ic_arrow_drop_down)",
+        )
+    }
+
+    /**
+     * 「全部 N 项」底部弹层的内容不能贴屏幕左沿(2026-10-21 真机反馈「太靠左贴边了」)。
+     *
+     * 标题自带 `horizontal = 16.dp`,芯片列表若没有同样的内边距,两者左沿不齐 ——
+     * 视觉上像两栏错位。这条只看列表的 `padding(horizontal = 16.dp)` 是否存在,
+     * 同样属于结构守卫(真实左沿只有真机能量)。
+     */
+    @Test
+    fun all_items_sheet_pads_chips_horizontally() {
+        val src = mainSource("ui/components/SingleSelectChipRow.kt")
+        val sheetStart = src.indexOf("private fun <T> AllItemsSheet")
+        assertTrue(sheetStart > 0, "找不到 AllItemsSheet;若已改名,本守卫须随之改判")
+        val sheet = src.substring(sheetStart)
+        val code = sheet.lines().filterNot { it.trimStart().startsWith("//") || it.trimStart().startsWith("*") }
+        val listStart = code.indexOfFirst { it.contains("LazyColumn(") }
+        assertTrue(listStart >= 0, "AllItemsSheet 里找不到 LazyColumn")
+        // 取 LazyColumn 到首个 "{" 之间的修饰符链,确认内边距在列表上。
+        val chain = code.drop(listStart).takeWhile { !it.trimEnd().endsWith("{") }.joinToString("\n")
+        assertTrue(
+            chain.contains("padding(horizontal = 16.dp)"),
+            "弹层里的芯片列表必须有 padding(horizontal = 16.dp) 与标题左沿对齐,否则芯片贴屏幕左沿",
         )
     }
 }

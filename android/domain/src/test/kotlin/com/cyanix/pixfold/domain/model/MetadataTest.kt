@@ -45,7 +45,7 @@ class MetadataTest {
     @Test
     fun `library suggestions follow the same rule`() {
         assertTrue(aot1.titleSug.hasValue)
-        assertTrue(aot1.writerCleanedSug.hasValue)
+        assertTrue(aot1.dirWriterSug.hasValue)
         assertEquals("ja", aot1.langSug.value)
         assertFalse(library.volumes.first { it.id == "op-101" }.langSug.hasValue, "op-101 无语言线索")
     }
@@ -53,18 +53,19 @@ class MetadataTest {
     // ---- ComicVolume.needsConfirmation ----
 
     @Test
-    fun `a single pending issue is enough to need confirmation`() {
-        // op-101 只缺语言(卷号已解析出 101)—— 一项也算待确认。
-        // 若写成"多于一项才算",这一卷就会被 UI 当成已确认,漏掉语言必答题。
-        assertEquals(listOf(Msg(TextKey.PendingLanguage)), op101.pendingIssues)
-        assertTrue(op101.needsConfirmation, "只缺语言也必须待确认")
+    fun `a missing volume number alone needs confirmation`() {
+        // 语言项已于 2026-10-20 移除(Unset 即终态);唯一待确认项是卷号缺失。
+        val aot0 = library.volumes.first { it.id == "aot-0" }
+        assertEquals(listOf(Msg(TextKey.PendingVolume)), aot0.pendingIssues)
+        assertTrue(aot0.needsConfirmation, "只缺卷号也必须待确认")
     }
 
     @Test
-    fun `both issues pending still needs confirmation`() {
-        val aot0 = library.volumes.first { it.id == "aot-0" }
-        assertEquals(2, aot0.pendingIssues.size, "语言与卷号都缺")
-        assertTrue(aot0.needsConfirmation)
+    fun `an unset language does not need confirmation`() {
+        // op-101 卷号已解析出 101,语言是 Unset —— 按新语义不该再算待确认
+        assertEquals(LangChoice.Unset, op101.language)
+        assertEquals(emptyList(), op101.pendingIssues)
+        assertFalse(op101.needsConfirmation, "语言 Unset 是合法终态")
     }
 
     @Test

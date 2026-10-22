@@ -4,6 +4,7 @@ import com.cyanix.pixfold.domain.model.ComicVolume
 import com.cyanix.pixfold.domain.model.ImageCollection
 import com.cyanix.pixfold.domain.model.Suggestion
 import com.cyanix.pixfold.domain.naming.DerivedNames
+import com.cyanix.pixfold.domain.naming.derivedNamesOf
 import com.cyanix.pixfold.domain.pack.PageByteSource
 import java.io.InputStream
 
@@ -82,14 +83,11 @@ fun comicVolumesFrom(
     // 作者取自**外层**(有系列时 = 系列目录名),与旧脚本 derive_metadata 一致:
     // 两层结构里作者写在系列文件夹上,内层只是本卷标题。
     val writerSource = if (hasSeries) seriesOf else own
-    val writerRaw = writerSource.writerRaw
 
     // 系列名同样要清洗(`[Cior (Ken-1)]` 这类前缀不该出现在 Series 元数据里)。
-    val seriesSug: Suggestion<String> = if (hasSeries) {
-        Suggestion(seriesOf.title, SERIES_SOURCE_DIR)
-    } else {
-        Suggestion(null, NO_SUGGESTION_SOURCE)
-    }
+    // 2026-10-20 用户裁决(Series 三条语义):无系列层时**跟随 Title**、作者前缀与
+    // 工作区文件夹名一致时**取工作区名** —— 判定树见 [seriesSuggestionOf]。
+    val seriesSug: Suggestion<String> = seriesSuggestionOf(collection, rootDisplayName)
     val volumeSug: Suggestion<Int?> = if (parsedVolume == null) {
         Suggestion(null, NO_SUGGESTION_SOURCE)
     } else {
@@ -104,19 +102,24 @@ fun comicVolumesFrom(
         seriesSug = seriesSug,
         // 作者只从 `[作者]` 前缀取,**取不到就不给建议**(不硬猜);
         // 语言在目录名里没有任何可靠信息 ⇒ 永远不给建议。
-        writerSug = if (writerRaw.isEmpty()) {
-            Suggestion<String>(null, NO_SUGGESTION_SOURCE)
-        } else {
-            Suggestion(writerRaw, WRITER_SOURCE_DIR)
-        },
-        writerCleanedSug = writerSource.writerCleaned.takeIf { it.isNotEmpty() }?.let {
-            Suggestion<String>(it, WRITER_CLEAN_SOURCE)
+        // 2026-10-21 用户裁决:「如果没有 ComicInfo 让你获取 writer,就默认获取去除 [] 的」。
+        // 于是 writerSug 直接给**清理后**形态。原先的「一键清理」按钮在同一路径上
+        // 因此恒等而变冗余,已于 2026-10-22 删除 —— 改为「按目录结构获取」([dirWriterSug]),
+        // 它绕开 ComicInfo 建议值,是文件里作者写错时的退路。
+        writerSug = writerSource.writerCleaned.takeIf { it.isNotEmpty() }?.let {
+            Suggestion<String>(it, WRITER_SOURCE_CLEANED)
+        } ?: Suggestion<String>(null, NO_SUGGESTION_SOURCE),
+        // 「按目录结构获取」的退路值:上面的 writerSug 会被 ComicInfo 顶掉,这份不会。
+        dirWriterSug = writerSource.writerCleaned.takeIf { it.isNotEmpty() }?.let {
+            Suggestion<String>(it, WRITER_SOURCE_CLEANED)
         } ?: Suggestion<String>(null, NO_SUGGESTION_SOURCE),
         volumeSug = volumeSug,
         langSug = Suggestion<String>(null, NO_SUGGESTION_SOURCE),
         outputDirSug = parentDirOf(collection.id, rootDisplayName),
         outputExists = false,
         cbzBaseSug = cbzBaseSug,
+        // 扫描层的系列目录名:分组与 `isSeries` 只认它(见 ComicVolume.seriesDir)。
+        seriesDir = collection.seriesName,
     )
     // outputExists 需要拿到「输出名」才知道问谁，故在两段之后补。
     volume.copy(outputExists = outputExists.exists(volume))
@@ -130,6 +133,35 @@ fun comicVolumesFrom(
 private fun parentDirOf(collectionId: String, rootDisplayName: String): String {
     val parent = collectionId.substringBeforeLast('/', "")
     return parent.ifEmpty { rootDisplayName }
+}
+
+// ---- Series 建议判定树(2026-10-20 用户裁决「Series 三条语义」) ----
+
+/**
+ * Series 建议的取值判定,按序判定、取先命中者:
+ *
+ * 1. **有系列层** → 清洗后的系列目录名(原行为,来源「目录层级 L2」);
+ * 2. **卷目录作者前缀与工作区文件夹名一致** → 清洗后的工作区文件夹名
+ *    (工作区选在系列文件夹上、卷目录名仍带系列名前缀的形态,来源如实写「工作区文件夹名」);
+ * 3. **其余(单本/不一致/无前缀)** → 跟随 Title —— 恢复建议点下去后 Series 与 Title 一致,
+ *    不再给「无建议」;单行本把 `<Series>` 写成自己的标题是阅读器的常见常态。
+ *
+ * 「作者前缀一致」的判据:两边都取 `[...]` 原始前缀比对(不比清洗值 —— 清洗会剥掉
+ * 内部括号,`[社团 (画师)]` 这种署名会被误判成不一致)。
+ */
+private fun seriesSuggestionOf(
+    collection: ImageCollection,
+    rootDisplayName: String,
+): Suggestion<String> {
+    if (collection.seriesName.isNotEmpty()) {
+        return Suggestion(collection.seriesDerived.title, SERIES_SOURCE_DIR)
+    }
+    val ownWriterRaw = collection.derived.writerRaw
+    val rootWriterRaw = derivedNamesOf(rootDisplayName).writerRaw
+    if (ownWriterRaw.isNotEmpty() && ownWriterRaw == rootWriterRaw) {
+        return Suggestion(derivedNamesOf(rootDisplayName).title, SERIES_FROM_WORKSPACE_SOURCE)
+    }
+    return Suggestion(collection.derived.title, SERIES_FOLLOWS_TITLE_SOURCE)
 }
 
 // ---- 卷号解析 ----
@@ -171,9 +203,10 @@ const val MAX_VOLUME_NUMBER: Int = 9999
 
 private const val TITLE_SOURCE_DIR = "目录层级（系列层或卷目录名）"
 private const val SERIES_SOURCE_DIR = "目录层级 L2（系列层）"
+private const val SERIES_FOLLOWS_TITLE_SOURCE = "无系列层，跟随 Title"
+private const val SERIES_FROM_WORKSPACE_SOURCE = "工作区文件夹名（卷目录 [作者] 前缀与其一致）"
 private const val CBZ_SOURCE_DIR = "目录名清洗（保留 [作者] 前缀，去括号原作与末尾标注）"
-private const val WRITER_SOURCE_DIR = "目录名开头的 [作者] 前缀"
-private const val WRITER_CLEAN_SOURCE = "清理规则：去作者前缀 / 括号原作 / 尾部标签"
+private const val WRITER_SOURCE_CLEANED = "目录名开头的 [作者] 前缀（已去掉方括号）"
 private const val VOLUME_SOURCE_DIR = "目录名「第NN卷」解析"
 private const val NO_SUGGESTION_SOURCE = ""
 
