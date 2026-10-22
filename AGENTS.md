@@ -22,7 +22,7 @@
 >
 > **本轮(2026-10-20 白天)**:①**4.73 GiB 归档真机实测通过** —— D2b 第 5 项最后一块。用 `test/[青水庵 (にやすけ 青水庵)] 子産み島/…2&3`(4.7 GB / 1599 页)打出 **5,078,971,778 B** CBZ;Zip64 取证:普通 EOCD `cd_offset=0xFFFFFFFF`、Zip64 EOCD Record `version_needed=45`、`cd_offset=5,078,882,575`;Kuro Reader 打开 `1/1599`→`1599/1599`。②**通知跳转缺陷已修** —— `MainActivity` 读 `EXTRA_OPEN_LIBRARY_PACK`(`onCreate` + `onNewIntent` 两个入口)、`PixFoldApp(openPackOnStart)`+`onPackRouteHandled` 回清、`LibrarySteps(startAtPackStep)` 走 `goToLibraryStep`。**真机第二轮撞出真缺陷**:`var startAtPack by remember { mutableStateOf(...) }` **无 key** ⇒ 第二次点通知静默失效 ⇒ 加回清后修复。③**打包进度改双层圆环弹窗 + 背景高斯模糊**(用户裁决:模态/只模糊背景/取消二次确认):领域层补**页级进度透传**(`CbzWriter`→`PackRunner`→`PackExecutor`,内环用);新建全站弹窗抽象 `ui/components/PixFoldDialog.kt` —— `DialogBlurController` **用计数不用布尔**(嵌套弹窗)且 `release` 钳到 0(否则背景永久模糊)。**真缺陷**:首版 `DialogBlurHost` 按 `hasOpenDialog` 切换 `content()` 调用层级 ⇒ Compose 视为不同子树而重建 ⇒ **弹窗一打开就自己消失**(两条既有测试抓出)⇒ 改为「Box 恒定,只让修饰符变」。变异 M1–M4 KILLED;M5(模态语义)存活 ⇒ 删断言并写明「只能真机验」(Robolectric 无「点 Dialog 外部/返回键」路径)。四道闸门 **app 693 / domain 910 / lint 零告警 / APK 34,323,186 B**。
 > **Series 三条语义已实现(2026-10-21 凌晨,详见 HANGOFF §9「Series 三条语义」)**:①无系列层时 Series 跟随 Title;②仅当卷目录 `[作者]` 前缀与工作区文件夹名一致时取工作区名(`seriesSuggestionOf` 判定树);③series 下嵌套目录 ⇒ 书架页警告条(`nestedDirWarnings`)。app 704 / domain 920,变异 M1–M7 全 KILLED;**真机核对待补**(设备凌晨自动锁 PIN)。
-> **⚠️ 换机续接点(2026-09-27 订正)**:当前工作分支 = **`dev`**;**已推送的远端基线是 `origin/dev`**,本地 `dev` 领先若干提交且**均未推送**(确切数目查 `git rev-list --count origin/dev..dev`,**本处不硬编码以免每次提交后失效**)。曾经的阶段分支 `d1/settings-impl` 已合回 `dev`(merge `7a6f678`)并删除本地分支。分支拓扑 `ready` → **`dev`** → 阶段分支 `d1/pN`(完成即合回 `dev` 并回写文档);**D1 全绿后 `dev` → `main` 发 release** —— 详见 §6 与 HANGOFF §9.1。**push 由用户处理,agent 只提交不推送。**
+> **⚠️ 换机续接点(2026-09-27 订正)**:当前工作分支 = **`dev`**;**已推送的远端基线是 `origin/dev`**,本地 `dev` 领先若干提交且**均未推送**(确切数目查 `git rev-list --count origin/dev..dev`,**本处不硬编码以免每次提交后失效**)。曾经的阶段分支 `d1/settings-impl` 已合回 `dev`(merge `7a6f678`)并删除本地分支。分支拓扑 `ready` → **`dev`** → 阶段分支 `d1/pN`(完成即合回 `dev` 并回写文档);**D1 全绿后 `dev` → `main` 发 release** —— 详见 §6 与 HANGOFF §9.2。**push 由用户处理,agent 只提交不推送。**
 >
 > **本文件头部只做「当前阶段 + 历轮索引」,不再逐轮写详版记录**(原因:详版曾使本文件达 66.8 KB,**超出 65536 字节工作区指令预算 ⇒ 每次加载都被系统截断**,§7.3 已知坑列表尾与 §7.4 表格因此不可见)。**每轮的唯一权威记录在各处文档里**,索引见下。
 >
@@ -74,7 +74,7 @@
 >
 > ⚠️ **写头部时的两条纪律**(踩过):①**详版会超预算被截断** —— 只留「阶段/续接点/索引」,细节一律落到上表指向的文档;②**不硬编码提交数**(每次提交后即失效)。
 >
-> 本文件优先级低于用户当回合指令,高于全局 AGENTS.md;技术栈/流程/环境类全局约定见全局文件。
+> 本文件优先级低于用户当回合指令,高于全局 AGENTS.md 的**项目事实类**约定(技术栈/环境/工具链/构建命令)。**但全局 `~/.dsh/AGENTS.md` §0 的「任何用户任务先按 Superpowers 协议匹配 skill」是下限,项目级不得覆盖** —— 见 §7.0。
 
 ## 1. 文档层级(谁在哪记录什么)
 
@@ -84,9 +84,11 @@
 | `README.md`   | 项目概览与门面,内容须与 HANGOFF 一致;含开发环境部署节(⚠️ 暂定,只含项目相关步骤)                                                                                                                                     |
 | `.mise.toml`  | 项目工具版本声明(**纯配置无注释**,说明见 HANGOFF §12.2);变更后需 `mise install`                                                                                                                                     |
 | `scripts/`    | 两个 Python 脚本:现有行为参考、回归样例、命令行备用;**不是最终规范**——GUI 需补全交互并避免静默危险操作                                                                                                              |
+| `docs/INDEX.md` | **文档地图**(非产品权威):四层结构 = 产品权威 / 阶段详版 `docs/phases/` / 调研笔记 `docs/notes/` / 规格与计划 `docs/superpowers/`;另含当前状态速览、旧编号 `§9.1「…」` 映射表、维护规则。**新增文档须在此登记一行** |
+| `docs/phases/` | **各阶段实现留痕**(`d1-interaction-prototype` / `branch-topology` / `settings-and-theme` / `d2-platform` / `d3-domain-core` / `d4-mvp`)。2026-10-23 自 `HANGOFF.md` §9 原文逐字迁出,**产品决策仍以 HANGOFF 为唯一权威**,此处只是其详版,性质为「只查不常读」 |
 | `docs/notes/` | 调研与实证笔记(非产品权威):`d1-archive-domain-semantics.md`(归档原型领域语义+16 项测试意图)、`scripts-behavior-matrix.md`(脚本行为矩阵+13 条危险默认值)、`d1-toolchain-evidence.md`(新栈构建链实证)、`d1-ui-friction-inventory.md`(**操作流程与 UI 摩擦点清单**,用户 2026-09-19 提出"先调基础 UI"后的改动依据;每条标注来源=真机实测/代码核实/走查观察)。每条结论附来源/命令 |
-| `docs/superpowers/` | D1 流程产物:`specs/`(设计规格)、`plans/`(分阶段实施计划)。**产品决策仍以 HANGOFF 为唯一权威**,此处只承载实现级规格与计划。现有规格:`2026-09-16-d1-interaction-prototype-design.md`(D1 交互原型)、`2026-09-20-d1-settings-theme-design.md`(**设置与主题体系 · 阶段 1**) |
-| `android/` | **Android 工程**(2026-10-18 由 `pixfold-d1/` 改名;包名 `com.cyanix.pixfold`)。**在阶段分支/dev 上**,不进 `ready`/`main`;`domain/` 纯 Kotlin JVM + `app/` Compose。拓扑见 HANGOFF §9.1 |
+| `docs/superpowers/` | D1 流程产物:`specs/`(设计规格)、`plans/`(分阶段实施计划)。**产品决策仍以 HANGOFF 为唯一权威**,此处只承载实现级规格与计划。现有规格:`2026-09-16-d1-interaction-prototype-design.md`(D1 交互原型)、`2026-09-20-d1-settings-theme-design.md`(**设置与主题体系 · 阶段 1**)。⚠️ **`plans/2026-10-04-d3-p1-packing-core.md` 仍是活跃台账**(同时是实施计划与夜间台账,每轮开工读 §0、收工更新 §3),不是历史文档 |
+| `android/` | **Android 工程**(2026-10-18 由 `pixfold-d1/` 改名;包名 `com.cyanix.pixfold`)。**在阶段分支/dev 上**,不进 `ready`/`main`;`domain/` 纯 Kotlin JVM + `app/` Compose。拓扑见 HANGOFF §9.2 |
 | 归档分支      | `archive-flutter-verify`(**已推远程**;本地无同名分支):已删除的 `pixfold-d1` / `pixfold-saf-spike` 整树快照;新栈可参考其中 Kotlin SAF 实现。详见 HANGOFF §12.7                                                       |
 
 **变更路由(维护规则)**:领域术语、决策、约束变更 → **先回写 `HANGOFF.md` 对应章节(唯一权威)**,不在别处另起炉灶;凡改变“当前阶段/状态”,随后同步本文件头部快照与 `README.md` 状态/路线,保持三处一致、不得只改一处。环境/工具类变动回写 `HANGOFF.md` §12。原 `s_handoff.md` 已于 2026-09-07 并入 §12 后删除,勿再新建同类文件。
@@ -123,7 +125,7 @@
 
 - **不另起新的"正式工程"(2026-09-21 重述)**:D1 退出条件已达成,且用户确认
   **`android/` 的 UI 即 D4 MVP 的基座**(见 HANGOFF §9 D1「复用关系」)——
-  MVP 能力**就地演进**,不再新建工程、也不推倒重写。发版仍按 §9.1 拓扑(`dev` → `main`);
+  MVP 能力**就地演进**,不再新建工程、也不推倒重写。发版仍按 §9.2 拓扑(`dev` → `main`);
 - 不把 `scripts/` 现有行为当作最终规范照搬;
 - 不用 `mise use -g` 改全局工具声明(绕过 chezmoi 造成漂移);
 - 不改 D1 验收清单的判据以"迁就现状"(清单是 D1 的唯一出口,条目变更须用户确认)。
@@ -137,14 +139,30 @@
 
 - 语言:与用户用中文交流;仓库文档双语(README)或中文(HANGOFF),新增/修改匹配所在文件的语言风格。
 - Git:本仓库独立于 chezmoi dotfiles 仓库;忽略项现状为 **`.agents/`**（用户 2026-09-19 移除 `.kilo/`、`.workbuddy*/` —— 两者已不再使用）。
-- **分支模型(2026-09-16 起)**:`ready`(设计文档线,原型代码永不进)→ **`dev`(开发主线)** → 阶段分支 `d1/pN`。阶段分支从 `dev` 开、**完成即合回 `dev` 并回写文档**、随即删除;D1 全绿后 `dev` → `main` 发 release,此后开发继续在 `dev`。**push 由用户自行处理**,agent 只提交不推送。详见 HANGOFF §9.1。
+- **分支模型(2026-09-16 起)**:`ready`(设计文档线,原型代码永不进)→ **`dev`(开发主线)** → 阶段分支 `d1/pN`。阶段分支从 `dev` 开、**完成即合回 `dev` 并回写文档**、随即删除;D1 全绿后 `dev` → `main` 发 release,此后开发继续在 `dev`。**push 由用户自行处理**,agent 只提交不推送。详见 HANGOFF §9.2。
 - 验收:任何改动对照 `HANGOFF.md` §10(功能 / 数据正确性 / 平台)自检。
 
 ## 7. 每轮任务的固定步骤与真机核对规约
 
 > 本节把已反复踩过的坑固化为步骤。**用户可当回合覆盖本节**;未覆盖时按此执行,不得跳步。
 
+### 7.0 skill 匹配(本节唯一不可被项目级覆盖的部分)
+
+**动手前的第一个动作是 `skill` 调用,不是 `bash`/`read`/`todo_write`。**
+
+> 「不可被项目级覆盖」只针对**自动加载的项目指令**;用户当回合说「跳过 skill」仍然有效(用户 > 项目 > 全局),只是那种覆盖必须来自用户本人,不能来自本文件的其它章节。
+
+条文本身在全局 `~/.dsh/AGENTS.md` §0,此处不复述(避免两处漂移)。项目侧只补三条本条特有的事实:
+
+1. **技能名无前缀**。实际名是 `brainstorming`/`writing-plans`/`executing-plans`/`test-driven-development`/`systematic-debugging`/`verification-before-completion`/`requesting-code-review`/`finishing-a-development-branch`/`dispatching-parallel-agents`/`using-git-worktrees`/`using-superpowers` 等 15 个,**没有 `superpower-` 前缀**;叫错名 = 调不到。
+2. **本项目最常见的漏掉场景**:请求里出现「加一个/改一下/支持 X」但没明说「设计」时,`brainstorming` 仍然适用;请求是「检查/收尾/验收」时,`verification-before-completion` 与 `finishing-a-development-branch` 适用。
+3. **§7.1 的七步不是 skill 的替代**。七步管「怎么落地」,skill 管「用哪套方法落地」——§7.1 第 2 步(红→绿)对应 `test-driven-development`,第 3 步(变异)与第 7 步(提交)分别对应 `verification-before-completion` 与 `finishing-a-development-branch`。**跳过 skill 直接进七步 = 只剩流程没有方法。**
+
+⚠️ 依据(实测,非推断):本工作区 7 个历史会话 337 个人工轮、23,780 次工具调用中 `skill` 只出现在 **8 轮(2.4%)**;而技能目录在每个会话第 1 轮就已完整注入(38 个技能,含上述 15 个)。**问题是看见了不调,不是看不见。**
+
 ### 7.1 固定步骤(顺序不可调换)
+
+> **进入下面七步之前,先过 §7.0** —— skill 匹配是第一步的前置,不是第零个可选步骤。
 
 1. **对齐依据**:读 `HANGOFF.md` 对应条目(产品决策唯一权威)+ `docs/notes/d1-ui-friction-inventory.md` + 用户当回合指令;**有歧义先请用户裁决**,把裁决项写下来再动手。
 2. **红 → 绿**:先写会失败的断言,再改码;跑四道闸门(见 7.2)。
