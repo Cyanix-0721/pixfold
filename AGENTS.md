@@ -31,7 +31,39 @@
 >
 > ⚠️ **写头部时的纪律**(踩过):**不硬编码提交数**(每次提交后即失效);阶段状态以 `HANGOFF.md` §9.1 为准。
 >
-> 本文件优先级低于用户当回合指令,高于全局 AGENTS.md 的**项目事实类**约定(技术栈/环境/工具链/构建命令)。**但全局 `~/.dsh/AGENTS.md` §0 的「任何用户任务先按 Superpowers 协议匹配 skill」是下限,项目级不得覆盖** —— 见 §7.0。
+> 本文件优先级低于用户当回合指令,高于全局 AGENTS.md 的**项目事实类**约定(技术栈/环境/工具链/构建命令)。**但全局 `~/.dsh/AGENTS.md` §0 的「任何用户任务先按 Superpowers 协议匹配 skill」是下限,项目级不得覆盖** —— 见 §0。
+
+## 0. skill 匹配(先于一切,本节唯一不可被项目级覆盖)
+
+**动手前的第一个动作是 `skill` 调用,不是 `bash`/`read`/`todo_write`。**
+
+> 「不可被项目级覆盖」只针对**自动加载的项目指令**;用户当回合说「跳过 skill」仍然有效(用户 > 项目 > 全局),只是那种覆盖必须来自用户本人,不能来自本文件的其它章节。
+
+条文本身在全局 `~/.dsh/AGENTS.md` §0,此处不复述(避免两处漂移)。项目侧只补三条本条特有的事实:
+
+1. **技能名无前缀**。实际名是 `brainstorming`/`writing-plans`/`executing-plans`/`test-driven-development`/`systematic-debugging`/`verification-before-completion`/`requesting-code-review`/`finishing-a-development-branch`/`dispatching-parallel-agents`/`using-git-worktrees`/`using-superpowers` 等 15 个,**没有 `superpower-` 前缀**;叫错名 = 调不到。
+2. **本项目最常见的漏掉场景**:请求里出现「加一个/改一下/支持 X」但没明说「设计」时,`brainstorming` 仍然适用;请求是「检查/收尾/验收」时,`verification-before-completion` 与 `finishing-a-development-branch` 适用。
+3. **§7.1 的七步不是 skill 的替代**。七步管「怎么落地」,skill 管「用哪套方法落地」——§7.1 第 2 步(红→绿)对应 `test-driven-development`,第 3 步(变异)与第 7 步(提交)分别对应 `verification-before-completion` 与 `finishing-a-development-branch`。**跳过 skill 直接进七步 = 只剩流程没有方法。**
+
+⚠️ 依据(实测,非推断):本工作区 7 个历史会话 337 个人工轮、23,780 次工具调用中 `skill` 只出现在 **8 轮(2.4%)**;而技能目录在每个会话第 1 轮就已完整注入(38 个技能,含上述 15 个)。**问题是看见了不调,不是看不见。**
+
+### 0.1 五个可自查的锚点(2026-10-24 加固,均来自实测失效)
+
+只加规则不解决问题 —— 本节原文已经写过一遍,chip 改版那轮照样漏了 `brainstorming`/`writing-plans`/`using-git-worktrees`。故补五个**可被机械检查**的锚点:
+
+1. **`todo_write` 的第 1 项必须写本轮要用的 skill 名**(如「加载 brainstorming 澄清 chip 交互」),之后每完成一步立即标记。理由:任务面板是**压缩后唯一能自证进度的载体** —— 第 1 项写着 skill 名,压缩十次之后仍看得见欠着它;只写在头脑里,压一次就没了。
+2. **下列动作都不算 skill 调用**:读源码、画示意图/HTML 原型、建 `todo_write`、给用户列方案征求意见、用户已给出明确裁决。**尤其:把用户的裁决当成 `brainstorming` 的等价物是自我豁免** —— 裁决只是裁决,不会生成「设计 → 计划 → 执行」的方法链。
+3. **闸门判绿的三条硬判据**(细节在 §7.2,此处只列判据,防止用缓存结果冒充通过):① 只看 `android/build/gate-last.rc` 与日志 `BUILD SUCCESSFUL|BUILD FAILED`,**不看作业状态**;② 相关 task 不是 `UP-TO-DATE`/`FROM-CACHE`,否则必须加 `--rerun-tasks` 重跑;③ lint 判绿看 `rc`,**不是** `grep -c warning`(日志里那两条是 Gradle 自己的 `--warning-mode all` 文案)。
+4. **多文件改动的第一个动作是开分支**(`using-git-worktrees`),不是 `read`/`edit`。判据:`git branch --show-current` 不能是 `dev`;分支从 `dev` 开、完成合回 `dev` 并删除,阶段前缀按 HANGOFF §9.2 拓扑取(现为 `d4/…`)。**为什么必须机械检查**:§6 的分支模型 2026-09-16 就写下了、`using-git-worktrees` 第 1 轮就注入,而 2026-10-24 chip 改版 24 files / +1865−756 全程在 `dev` 上改、直接提交 `a50cbce` —— 规则在、技能在,漏的是调用。
+
+   **不要自己判例外**。「只改文档」「改动很小」「dev 单线开发没有并行需求」都是自我豁免的形式 —— 2026-10-24 我正是用最后一条把这条规则挡掉的,用户反驳:「还是写吧,只是这一次你忘了开分支」。唯一合法的出口是**用户当回合本人**说在 `dev` 上直接改;判断权不在我。
+5. **收工前必须把派出去的子 agent 全部收口**(2026-10-24 用户指出:派出去的子 agent 任务没跑完就收工了)。收工/关机/结束会话前,三个清单必须都是空的:① `list_agents` 里没有 `running`/`provisioning` 的成员;② `job_list` 里没有 `running`/`stopping` 的作业;③ `terminal_list` 里不再需要的会话已 `terminal_close`。派出去但不等的,要么 `job_kill`/`interrupt_agent` 明确终止,要么拿到结果再走 —— **不许让它们挂在那儿自己结束**。
+
+   **自我豁免的形式**:「反正是只读子 agent」「结果不重要」「它自己会跑完的」。2026-10-24 我派了两个只读 code-review 子 agent,其中一个还没回结果就收工了,用户第二天才提出来 —— 性质是**派出即视为已交付的错觉**。只读不等于可以不收,结果没拿到就是**没拿到**,不能默认它成功。
+
+   **这条对 `gate.sh` 的作业要特别小心**:它的 `cmd.exe` 子进程句柄不关,`job_output` 会**永远报 running**(已实测,见第 3 条)。所以对这一类,判据是**落盘文件**(`android/build/gate-last.rc`)+ 日志里的 `BUILD SUCCESSFUL|BUILD FAILED`,确认完成后**主动 `job_kill`** 清掉假 running 的作业,不要让它挂到会话结束。
+
+⚠️ 2026-10-24 实测失效记录(三条都是当轮自查出来的,不是推断):① chip 改版全程未调 `brainstorming`,也没产出 `writing-plans`(事后补 `docs/superpowers/plans/2026-10-24-chip-waterfall-v4.md`);② 首次用 `./gate.sh` 只跑 2s(全 up-to-date)就报了「通过」,改 `--rerun-tasks` 才拿到真结果;③ 变异 `MF` 因 build cache 报假 SURVIVED,差点当成结论。
 
 ## 1. 文档层级(谁在哪记录什么)
 
@@ -96,30 +128,16 @@
 
 - 语言:与用户用中文交流;仓库文档双语(README)或中文(HANGOFF),新增/修改匹配所在文件的语言风格。
 - Git:本仓库独立于 chezmoi dotfiles 仓库;忽略项现状为 **`.agents/`**（用户 2026-09-19 移除 `.kilo/`、`.workbuddy*/` —— 两者已不再使用）。
-- **分支模型(2026-09-16 起)**:`ready`(设计文档线,原型代码永不进)→ **`dev`(开发主线)** → 阶段分支 `d1/pN`。阶段分支从 `dev` 开、**完成即合回 `dev` 并回写文档**、随即删除;D1 全绿后 `dev` → `main` 发 release,此后开发继续在 `dev`。**push 由用户自行处理**,agent 只提交不推送。详见 HANGOFF §9.2。
+- **分支模型(2026-09-16 起)**:`ready`(设计文档线,原型代码永不进)→ **`dev`(开发主线)** → 阶段分支 `d1/pN`(D4 起为 `d4/…`)。阶段分支从 `dev` 开、**完成即合回 `dev` 并回写文档**、随即删除;D1 全绿后 `dev` → `main` 发 release,此后开发继续在 `dev`。**push 由用户自行处理**,agent 只提交不推送。详见 HANGOFF §9.2。**开分支是硬前置,判据与出口见 §0.1 第 4 条。**
 - 验收:任何改动对照 `HANGOFF.md` §10(功能 / 数据正确性 / 平台)自检。
 
 ## 7. 每轮任务的固定步骤与真机核对规约
 
 > 本节把已反复踩过的坑固化为步骤。**用户可当回合覆盖本节**;未覆盖时按此执行,不得跳步。
 
-### 7.0 skill 匹配(本节唯一不可被项目级覆盖的部分)
-
-**动手前的第一个动作是 `skill` 调用,不是 `bash`/`read`/`todo_write`。**
-
-> 「不可被项目级覆盖」只针对**自动加载的项目指令**;用户当回合说「跳过 skill」仍然有效(用户 > 项目 > 全局),只是那种覆盖必须来自用户本人,不能来自本文件的其它章节。
-
-条文本身在全局 `~/.dsh/AGENTS.md` §0,此处不复述(避免两处漂移)。项目侧只补三条本条特有的事实:
-
-1. **技能名无前缀**。实际名是 `brainstorming`/`writing-plans`/`executing-plans`/`test-driven-development`/`systematic-debugging`/`verification-before-completion`/`requesting-code-review`/`finishing-a-development-branch`/`dispatching-parallel-agents`/`using-git-worktrees`/`using-superpowers` 等 15 个,**没有 `superpower-` 前缀**;叫错名 = 调不到。
-2. **本项目最常见的漏掉场景**:请求里出现「加一个/改一下/支持 X」但没明说「设计」时,`brainstorming` 仍然适用;请求是「检查/收尾/验收」时,`verification-before-completion` 与 `finishing-a-development-branch` 适用。
-3. **§7.1 的七步不是 skill 的替代**。七步管「怎么落地」,skill 管「用哪套方法落地」——§7.1 第 2 步(红→绿)对应 `test-driven-development`,第 3 步(变异)与第 7 步(提交)分别对应 `verification-before-completion` 与 `finishing-a-development-branch`。**跳过 skill 直接进七步 = 只剩流程没有方法。**
-
-⚠️ 依据(实测,非推断):本工作区 7 个历史会话 337 个人工轮、23,780 次工具调用中 `skill` 只出现在 **8 轮(2.4%)**;而技能目录在每个会话第 1 轮就已完整注入(38 个技能,含上述 15 个)。**问题是看见了不调,不是看不见。**
-
 ### 7.1 固定步骤(顺序不可调换)
 
-> **进入下面七步之前,先过 §7.0** —— skill 匹配是第一步的前置,不是第零个可选步骤。
+> **进入下面七步之前,先过 §0** —— skill 匹配是第一步的前置,不是第零个可选步骤。条文与五个可自查锚点都在 §0,本节不重复。第 1 步动手前先过 §0.1 第 4 条(开分支);收工前过第 5 条(子 agent 收口)。
 
 1. **对齐依据**:读 `HANGOFF.md` 对应条目(产品决策唯一权威)+ `docs/notes/d1-ui-friction-inventory.md` + 用户当回合指令;**有歧义先请用户裁决**,把裁决项写下来再动手。
 2. **红 → 绿**:先写会失败的断言,再改码;跑四道闸门(见 7.2)。
