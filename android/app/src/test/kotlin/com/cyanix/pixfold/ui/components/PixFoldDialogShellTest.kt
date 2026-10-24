@@ -1,6 +1,5 @@
 package com.cyanix.pixfold.ui.components
 
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -8,7 +7,6 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -41,8 +39,8 @@ import org.robolectric.annotation.Config
  *
  * 现在所有弹窗都委托 `PixFoldDialogShell`。本测试钉两件事：
  *  1. **每一个入口都带上统一容器的 tag** —— tag 在 Shell 里加，谁绕过 Shell 谁就没 tag；
- *  2. **底部弹层与对话框共用同一个模糊计数** —— 它们虽然机制不同（Dialog 是独立
- *     window，ModalBottomSheet 是同 window 浮层），但对「背景要不要糊」必须一致。
+ *  2. **嵌套浮层共用同一个模糊计数** —— 浮层可能叠浮层（对话框里再开对话框），
+ *     计数必须能叠加，否则内层一关外层就被解糊。
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @RunWith(RobolectricTestRunner::class)
@@ -136,54 +134,28 @@ class PixFoldDialogShellTest {
     }
 
     @Test
-    fun `a bottom sheet registers the same blur as a dialog`() {
-        val counter = Counter()
-        rule.setContent {
-            val controller = remember { DialogBlurController() }
-            CompositionLocalProvider(LocalDialogBlur provides controller) {
-                counter.value = controller.openCount
-                Box {
-                    PixFoldBottomSheet(
-                        onDismissRequest = {},
-                        sheetState = rememberModalBottomSheetState(),
-                        tag = "test-sheet",
-                    ) { Text("内容") }
-                }
-            }
-        }
-        rule.waitForIdle()
-
-        // 弹层与对话框共用一个计数：少了这一条，底部弹层就没有背景模糊，
-        // 而全站其它浮层都有 —— 观感不一致。
-        assertEquals(
-            "底部弹层必须注册背景模糊，且与对话框用同一个控制器",
-            1,
-            counter.value,
-        )
-    }
-
-    @Test
-    fun `the chip row sheet goes through the shared bottom sheet`() {
-        // 这条来自一次变异存活：把 `SingleSelectChipRow` 里的 `PixFoldBottomSheet`
-        // 换回裸 `ModalBottomSheet`，700 个测试**一个都没红** —— 「全站弹窗统一」
-        // 这件事在真实调用点上是零覆盖，只有抽象层自己被测过。
-        // 判据用模糊计数：绕开统一基底就没有 `DialogBlurRegistration()`，计数停在 0。
+    fun `the chip row never registers a background blur`() {
+        // 这条的来历：一次变异存活 —— 把 `SingleSelectChipRow` 里的
+        // `PixFoldBottomSheet` 换回裸 `ModalBottomSheet`，700 个测试一个都没红。
+        //
+        // 2026-10-23 之后情况**反过来了**：用户裁决「全部 X 项就不要下面弹出窗口了,
+        // 而是延续瀑布流显示」⇒ 芯片行里不该再有任何弹层，因此**任何时候都不该
+        // 注册背景模糊**。断言从「点开后 == 1」改成「点开后仍是 0」，
+        // 守卫的强度没降：谁把弹层加回来（哪怕换成走统一基底的
+        // `PixFoldBottomSheet`），计数都会变 1，这条立刻红。
         val counter = Counter()
         rule.setContent {
             val controller = remember { DialogBlurController() }
             CompositionLocalProvider(LocalDialogBlur provides controller) {
                 counter.value = controller.openCount
                 SingleSelectChipRow(
-                    items = (1..8).map { "item-$it" },
+                    items = (1..12).map { "item-$it" },
                     activeId = "item-1",
                     idOf = { it },
                     onSelect = {},
                     selectorTag = "sel-row",
                     chipTag = { "chip-$it" },
                     allEntryTag = "all-entry",
-                    sheetTag = "sel-sheet",
-                    sheetListTag = "sel-sheet-list",
-                    sheetChipTag = { "sel-sheet-chip-$it" },
                     chipDescription = { it },
                     allEntryText = { n -> "全部 $n 项" },
                     chipLabel = { it },
@@ -197,30 +169,36 @@ class PixFoldDialogShellTest {
         rule.waitForIdle()
 
         assertEquals(
-            "芯片行的「全部 N 个」弹层必须走 PixFoldBottomSheet 并注册背景模糊",
-            1,
+            "「全部 N 项」已改原地展开,不该再注册背景模糊(弹层已按 2026-10-23 裁决移除)",
+            0,
             counter.value,
         )
     }
 
     @Test
-    fun `a dialog inside a sheet counts two`() {
+    fun `a dialog inside a dialog counts two`() {
+        // 2026-10-23 起底部弹层（`PixFoldBottomSheet`）已随芯片改版删除 ——
+        // 「全部 N 项」改成原地展开后全站再没有它的使用者，留着等于留一份没人调的
+        // 外观来源。原先这条用例守的是「弹层 + 对话框计到 2」的**计数语义**，
+        // 组件没了但语义还得守（`DialogBlurController` 仍用计数而非布尔），
+        // 故改成「对话框里再开对话框」这个同样真实存在的嵌套场景。
         val counter = Counter()
         rule.setContent {
             val controller = remember { DialogBlurController() }
             CompositionLocalProvider(LocalDialogBlur provides controller) {
                 counter.value = controller.openCount
-                PixFoldBottomSheet(
+                // 用 `PixFoldDialog`（带 content 槽的那个入口）而不是
+                // `PixFoldConfirmDialog` —— 后者没有 content 槽，塞不进内层。
+                PixFoldDialog(
                     onDismissRequest = {},
-                    sheetState = rememberModalBottomSheetState(),
+                    confirmButton = { TextButton(onClick = {}) { Text("确定") } },
+                    title = "外层",
                 ) {
-                    PixFoldConfirmDialog(
+                    PixFoldDialog(
                         onDismissRequest = {},
-                        title = "确认",
-                        body = "正文",
-                        confirmText = "确定",
-                        onConfirm = {},
-                    )
+                        confirmButton = { TextButton(onClick = {}) { Text("确定") } },
+                        title = "内层",
+                    ) { Text("正文") }
                 }
             }
         }
@@ -228,7 +206,7 @@ class PixFoldDialogShellTest {
 
         // 计数而不是布尔值 —— 布尔值在内层关闭时会被置回 false，外层还开着
         // 而背景已经清晰了。这两条一起构成「计数行为」的可执行判据。
-        assertEquals("弹层 + 对话框必须计到 2", 2, counter.value)
+        assertEquals("嵌套对话框必须计到 2", 2, counter.value)
     }
 
     @Test

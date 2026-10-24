@@ -95,10 +95,6 @@ fun volumeGroupTag(key: String) = "metadata-volume-group-$key"
 /** 1 级「全部 N 项」入口。 */
 const val TAG_VOLUME_GROUP_ALL = "metadata-volume-group-all"
 
-/** 1 级 sheet 的标题容器 / 列表 / 列表内芯片。 */
-const val TAG_VOLUME_GROUP_SHEET = "metadata-volume-group-sheet"
-const val TAG_VOLUME_GROUP_SHEET_LIST = "metadata-volume-group-sheet-list"
-fun volumeGroupSheetTag(key: String) = "metadata-volume-group-sheet-chip-$key"
 const val TAG_PENDING_ISSUES = "metadata-pending-issues"
 const val TAG_BATCH_ROW = "metadata-batch-row"
 const val TAG_BATCH_APPLY = "metadata-batch-apply"
@@ -135,15 +131,8 @@ const val TAG_LANGUAGE_FIELD = "metadata-field-Language"
 /** 步骤 2 切换到某卷的 chip。 */
 fun volumeChipTag(id: String) = "metadata-volume-chip-$id"
 
-/** 「全部 N 卷」入口(sheet 打开器)。 */
+/** 2 级卷行「全部 N 卷」入口(2026-10-23 起是原地展开,不再是 sheet 打开器)。 */
 const val TAG_VOLUME_ALL = "metadata-volume-all"
-
-/** 「全部 N 卷」sheet 的标题/列表容器。 */
-const val TAG_VOLUME_SHEET = "metadata-volume-sheet"
-const val TAG_VOLUME_SHEET_LIST = "metadata-volume-sheet-list"
-
-/** sheet 内的卷芯片(与页面上常驻的 [volumeChipTag] 区分,避免 tag 冲突)。 */
-fun volumeSheetChipTag(id: String) = "metadata-volume-sheet-chip-$id"
 
 /**
  * 工作流 B · 步骤 2:逐卷元数据(验收第 11、12、13 项)。
@@ -231,17 +220,11 @@ fun MetadataPage(
                 selectorTag = TAG_VOLUME_SERIES_ROW,
                 chipTag = ::volumeGroupTag,
                 allEntryTag = TAG_VOLUME_GROUP_ALL,
-                sheetTag = TAG_VOLUME_GROUP_SHEET,
-                sheetListTag = TAG_VOLUME_GROUP_SHEET_LIST,
-                sheetChipTag = ::volumeGroupSheetTag,
             ),
             childTags = ChipRowTags(
                 selectorTag = TAG_VOLUME_SELECTOR,
                 chipTag = ::volumeChipTag,
                 allEntryTag = TAG_VOLUME_ALL,
-                sheetTag = TAG_VOLUME_SHEET,
-                sheetListTag = TAG_VOLUME_SHEET_LIST,
-                sheetChipTag = ::volumeSheetChipTag,
             ),
             singleTopChipTag = ::volumeChipTag,
             topChipDescription = { group ->

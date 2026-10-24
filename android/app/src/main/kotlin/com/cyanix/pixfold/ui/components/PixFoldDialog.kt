@@ -16,11 +16,7 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.SheetState
-import androidx.compose.material3.ModalBottomSheet
-import androidx.compose.material3.BottomSheetDefaults
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -30,7 +26,6 @@ import androidx.compose.runtime.Stable
 import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
-import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -303,53 +298,6 @@ private val DialogTitleGap: Dp = 16.dp
 
 /** 正文与按钮之间。 */
 private val DialogButtonsGap: Dp = 24.dp
-
-/**
- * 全站底部弹层的**唯一底层**，与 [PixFoldDialogShell] 并列。
- *
- * ## 为什么不能直接复用 [PixFoldDialogShell]
- *
- * `ModalBottomSheet` 不是 `Dialog` 窗口 —— 它是同一个 window 里从底部升起的
- * 浮层，生命周期与布局机制都不同。硬塞进 Dialog 的 shell 会得到一个「从中间
- * 弹出、盖满屏幕」的东西，那不是底部弹层。
- *
- * ## 它与对话框共享什么
- *
- * | 共享项 | 怎么共享的 |
- * | --- | --- |
- * | 背景模糊 | 同一个 [DialogBlurController]，**计数**叠加（弹层上再弹对话框时不会提前解糊） |
- * | 底色 | `surfaceContainerHigh`，与对话框同值 |
- * | 圆角 | `BottomSheetDefaults.ExpandedShape`，与对话框的 28dp 同族 |
- *
- * ## 为什么 `sheetState` 交给调用方
- *
- * 关闭要走「先播收起动画、动画结束再回调」两段，而 `sheetState.hide()` 是
- * suspend 的。藏进本函数就必须自己起协程，于是「谁负责把浮层从组合里移除」
- * 变得含糊 —— 调用方明明握着 `visible` 状态却不知道何时该置 false。
- * 保持现状：**状态归调用方，外观归这里**。
- *
- * @param tag 容器 testTag（打在 `ModalBottomSheet` 上）
- */
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-fun PixFoldBottomSheet(
-    onDismissRequest: () -> Unit,
-    sheetState: SheetState,
-    modifier: Modifier = Modifier,
-    tag: String? = null,
-    content: @Composable ColumnScope.() -> Unit,
-) {
-    // 与对话框共用计数控制器：底部弹层也算「盖住页面的浮层」。
-    DialogBlurRegistration()
-    ModalBottomSheet(
-        onDismissRequest = onDismissRequest,
-        sheetState = sheetState,
-        modifier = if (tag != null) modifier.testTag(tag) else modifier,
-        shape = BottomSheetDefaults.ExpandedShape,
-        containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
-        content = content,
-    )
-}
 
 /**
  * 全站统一弹窗。

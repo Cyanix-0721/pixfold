@@ -32,18 +32,26 @@ import kotlin.test.assertTrue
  *
  * ## 本类守护什么
  *
- * - **1 级 / 2 级的显隐**:没选中系列时只有 1 级行;选中系列后 2 级行出现并列出各单本。
+ * - **1 级 / 2 级的显隐**:没点开系列时只有 1 级行;点开后浮层列出该系列各单本。
  * - **单本沿用既有 tag**:`collectionTag(id)` —— 18 个既有测试按它点芯片,语义没变。
  * - **「1 系列含 2 本」必须能分别选中**:这是用户实测缺陷的回归
  *   (原判据在「一个系列两本书」结构下把两本并成一个集合,步骤 1 无法区分)。
- * - **系列间来回切时记住上次那本**:否则每次切回系列都跳第一本,用户在 2 级行里做的选择白费。
+ * - **系列间来回切时记住上次那本**:否则每次切回系列都跳第一本,用户在浮层里做的选择白费。
+ *
+ * ## 2026-10-23 起的交互变化(用户裁决)
+ *
+ * 原话:「series 的单本不放到下面的一个单独遮罩内,而是上面 series 为顶点,展开叠加一个
+ * 遮罩显示,再次点击 series 或点击其他 series 或 series 外单本时收缩刚才展开的」。
+ *
+ * ⇒ 2 级**不再常驻**:旧实现在「选中项属于某个系列」时会自动在下面长出一行芯片,
+ * 页面内容因此上下窜。现在默认只有 1 级行,2 级在点开 series 时以**浮层**叠上来。
+ * 本类的多个用例因此改成「先点开 series,再断浮层里的芯片」——这就是用户真实路径。
  *
  * ## 本类**不**守护什么
  *
- * 「收缩到一行」(`maxLines = 1`)的**实际视觉效果** —— Robolectric 不做真实文本测量,
- * 芯片宽度一律算成 ~0dp,换行与否离线断不出(项目既有结论,见
- * `docs/notes/d1-ui-friction-inventory.md`)。故那条只做结构守卫
- * (`ChipRowWrappingTest.collection_chips_are_two_level`),视觉留真机核对。
+ * 「收口在 3 行」的**实际视觉效果** —— Robolectric 不做真实文本测量,芯片宽度一律
+ * 算成 ~0dp(除 `widthIn(min = 96.dp)` 这个确定性下限),换行与否离线断不出
+ * (项目既有结论,见 `docs/notes/d1-ui-friction-inventory.md`)。视觉留真机核对。
  */
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [36], qualifiers = "w361dp-h794dp-560dpi")
@@ -77,22 +85,39 @@ class CollectionChipRowsTest {
     }
 
     @Test
-    fun `未选中系列时不渲染 2 级芯片行`() {
+    fun `未点开系列时只有 1 级芯片行`() {
         setContent(
             listOf(collection("trip"), seriesBook("S", "S/第01卷"), seriesBook("S", "S/第02卷")),
             initial = "trip",
         )
 
+        // 即使初始选中项属于某个系列,浮层也**不自动展开** —— 否则页面一进来就被
+        // 一块遮罩盖住,而用户什么都没点。
         assertTrue(
             rule.onAllNodesWithTag(TAG_COLLECTION_BOOK_ROW).fetchSemanticsNodes().isEmpty(),
-            "当前选中项是单本,不该出现 2 级行",
+            "没点开系列时不该出现 2 级浮层",
         )
+    }
+
+    @Test
+    fun `初始选中系列成员时也不自动展开浮层`() {
+        setContent(
+            listOf(seriesBook("S", "S/第01卷"), seriesBook("S", "S/第02卷")),
+            initial = "S/第01卷",
+        )
+
+        assertTrue(
+            rule.onAllNodesWithTag(TAG_COLLECTION_BOOK_ROW).fetchSemanticsNodes().isEmpty(),
+            "浮层只应响应用户点击,不该按当前选中项自动展开",
+        )
+        // 1 级行上仍要能看出「当前在哪一个系列」——否则收起后用户就丢失了位置感。
+        rule.onNodeWithTag(groupTag("${SERIES_PREFIX}S")).assertIsDisplayed()
     }
 
     // ---- 1 系列含 2 本:两本必须能分别选中(用户实测缺陷的回归) ----
 
     @Test
-    fun `一个系列含两本时渲染系列芯片与两级行`() {
+    fun `点开系列后浮层列出该系列的两本`() {
         setContent(
             listOf(seriesBook("S", "S/第01卷"), seriesBook("S", "S/第02卷")),
             initial = "S/第01卷",
@@ -100,7 +125,12 @@ class CollectionChipRowsTest {
 
         rule.onNodeWithTag(TAG_COLLECTION_ROW).assertIsDisplayed()
         rule.onNodeWithTag(groupTag("${SERIES_PREFIX}S")).assertIsDisplayed()
-        // 选中项属于系列 ⇒ 2 级行出现,两本都在、且可按各自 tag 点
+
+        // 2 级不常驻 —— 必须先点开系列(用户真实路径)。
+        rule.onNodeWithTag(groupTag("${SERIES_PREFIX}S")).performClick()
+        rule.waitForIdle()
+
+        // 已在本系列内 ⇒ 浮层只是展开,不该换书(仍停在第 01 卷)。
         rule.onNodeWithTag(TAG_COLLECTION_BOOK_ROW).assertIsDisplayed()
         rule.onNodeWithTag(collectionTag("S/第01卷")).assertIsDisplayed()
         rule.onNodeWithTag(collectionTag("S/第02卷")).assertIsDisplayed()
@@ -120,10 +150,84 @@ class CollectionChipRowsTest {
             .assertTextContainsFragments("S", "7")
     }
 
+    /** 三条收起触发之一:再点同一个 series —— 浮层收起。 */
+    @Test
+    fun `再点同一个系列会收起浮层`() {
+        setContent(
+            listOf(seriesBook("S", "S/第01卷"), seriesBook("S", "S/第02卷")),
+            initial = "S/第01卷",
+        )
+
+        rule.onNodeWithTag(groupTag("${SERIES_PREFIX}S")).performClick()
+        rule.waitForIdle()
+        rule.onNodeWithTag(TAG_COLLECTION_BOOK_ROW).assertIsDisplayed()
+
+        rule.onNodeWithTag(groupTag("${SERIES_PREFIX}S")).performClick()
+        rule.waitForIdle()
+
+        assertTrue(
+            rule.onAllNodesWithTag(TAG_COLLECTION_BOOK_ROW).fetchSemanticsNodes().isEmpty(),
+            "再点同一个系列必须收起浮层(三条收起触发之一)",
+        )
+    }
+
+    /** 三条收起触发之二:点另一个 series —— 旧浮层让位,新浮层展开。 */
+    @Test
+    fun `点另一个系列会把浮层换过去`() {
+        setContent(
+            listOf(
+                seriesBook("A", "A/第01卷"),
+                seriesBook("A", "A/第02卷"),
+                seriesBook("B", "B/第01卷"),
+                seriesBook("B", "B/第02卷"),
+            ),
+            initial = "A/第01卷",
+        )
+
+        rule.onNodeWithTag(groupTag("${SERIES_PREFIX}A")).performClick()
+        rule.waitForIdle()
+        rule.onNodeWithTag(collectionTag("A/第02卷")).assertIsDisplayed()
+
+        rule.onNodeWithTag(groupTag("${SERIES_PREFIX}B")).performClick()
+        rule.waitForIdle()
+
+        // 浮层内容必须整体换掉:属于 A 的两本不在,属于 B 的两本在。
+        assertTrue(
+            rule.onAllNodesWithTag(collectionTag("A/第02卷")).fetchSemanticsNodes().isEmpty(),
+            "换到 B 之后,A 的浮层必须让位",
+        )
+        rule.onNodeWithTag(collectionTag("B/第01卷")).assertIsDisplayed()
+    }
+
+    /** 三条收起触发之三:点 series 外的单本 —— 浮层让位。 */
+    @Test
+    fun `点系列外的单本会收起浮层`() {
+        setContent(
+            listOf(
+                collection("trip"),
+                seriesBook("S", "S/第01卷"),
+                seriesBook("S", "S/第02卷"),
+            ),
+            initial = "S/第01卷",
+        )
+
+        rule.onNodeWithTag(groupTag("${SERIES_PREFIX}S")).performClick()
+        rule.waitForIdle()
+        rule.onNodeWithTag(TAG_COLLECTION_BOOK_ROW).assertIsDisplayed()
+
+        rule.onNodeWithTag(collectionTag("trip")).performClick()
+        rule.waitForIdle()
+
+        assertTrue(
+            rule.onAllNodesWithTag(TAG_COLLECTION_BOOK_ROW).fetchSemanticsNodes().isEmpty(),
+            "点 series 外的单本必须收起浮层(三条收起触发之三)",
+        )
+    }
+
     // ---- 2 级行为 ----
 
     @Test
-    fun `点击 1 级系列芯片会切到该系列的第一本`() {
+    fun `点开系列会切到该系列的第一本并展开浮层`() {
         val collections = listOf(
             collection("trip"),
             seriesBook("S", "S/第01卷"),
@@ -134,22 +238,28 @@ class CollectionChipRowsTest {
         rule.onNodeWithTag(groupTag("${SERIES_PREFIX}S")).performClick()
         rule.waitForIdle()
 
+        // 从单本切进系列 ⇒ 浮层展开,并停在第一本;必须断**选中态**,
+        // 只断 displayed 的话「切了但没选中」也能绿。
         rule.onNodeWithTag(TAG_COLLECTION_BOOK_ROW).assertIsDisplayed()
-        rule.onNodeWithTag(collectionTag("S/第01卷")).assertIsDisplayed()
+        rule.onNodeWithTag(collectionTag("S/第01卷")).assertIsSelected()
     }
 
     @Test
-    fun `点击 2 级芯片切换系列内的书`() {
+    fun `点击浮层里的芯片切换系列内的书`() {
         setContent(
             listOf(seriesBook("S", "S/第01卷"), seriesBook("S", "S/第02卷")),
             initial = "S/第01卷",
         )
 
+        rule.onNodeWithTag(groupTag("${SERIES_PREFIX}S")).performClick()
+        rule.waitForIdle()
+
         rule.onNodeWithTag(collectionTag("S/第02卷")).performClick()
         rule.waitForIdle()
 
-        // 仍在系列里 ⇒ 2 级行还在(不是被 click 弄丢)
+        // 仍在系列里 ⇒ 浮层还在(不是被 click 弄丢),且选中态跟着走。
         rule.onNodeWithTag(TAG_COLLECTION_BOOK_ROW).assertIsDisplayed()
+        rule.onNodeWithTag(collectionTag("S/第02卷")).assertIsSelected()
     }
 
     @Test
@@ -164,6 +274,8 @@ class CollectionChipRowsTest {
         )
 
         // 在 A 里选第二本
+        rule.onNodeWithTag(groupTag("${SERIES_PREFIX}A")).performClick()
+        rule.waitForIdle()
         rule.onNodeWithTag(collectionTag("A/第02卷")).performClick()
         rule.waitForIdle()
 
@@ -174,7 +286,7 @@ class CollectionChipRowsTest {
         rule.waitForIdle()
 
         // 应回到 A 的第二本,而不是永远跳第一本。
-        // **必须断选中态,不能只断 displayed**:切回来后 A 的两本都在 2 级行里,两本都
+        // **必须断选中态,不能只断 displayed**:切回来后 A 的两本都在浮层里,两本都
         // 「可见」—— 只断 displayed 的话,「永远跳第一本」的变异照样能绿(2026-10-19 M16 存活)。
         rule.onNodeWithTag(TAG_COLLECTION_BOOK_ROW).assertIsDisplayed()
         rule.onNodeWithTag(collectionTag("A/第02卷")).assertIsSelected()
@@ -182,7 +294,7 @@ class CollectionChipRowsTest {
     }
 
     @Test
-    fun `重复点击当前系列的芯片不会把用户甩回第一本`() {
+    fun `点开当前系列不会把用户甩回第一本`() {
         setContent(
             listOf(seriesBook("S", "S/第01卷"), seriesBook("S", "S/第02卷")),
             initial = "S/第02卷",
@@ -191,8 +303,9 @@ class CollectionChipRowsTest {
         rule.onNodeWithTag(groupTag("${SERIES_PREFIX}S")).performClick()
         rule.waitForIdle()
 
-        // 已在该系列内:不该换书
-        rule.onNodeWithTag(collectionTag("S/第02卷")).assertIsDisplayed()
+        // 已在该系列内 ⇒ 展开浮层但不换书。旧版这里是「重复点击系列芯片」,语义相同
+        // (当时 2 级常驻),现在浮层默认收起后再点就是展开 —— 仍是同一条承重规则。
+        rule.onNodeWithTag(collectionTag("S/第02卷")).assertIsSelected()
     }
 
     // ---- 不渲染的边界 ----

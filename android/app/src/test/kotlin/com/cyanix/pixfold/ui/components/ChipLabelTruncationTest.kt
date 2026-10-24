@@ -23,6 +23,11 @@ import kotlin.test.assertTrue
  *
  * 上限 2026-10-22 由 10 改到 24(用户:「显示太短了,首尾几个字都要显示」),
  * 前提也跟着变了:芯片内文字此时已允许折行,宽度上限不再需要「够排进一行」。
+ *
+ * 2026-10-23 由 24 改到 30 —— 同一次改版把芯片宽度钉进 [96,156]dp、文字行数放宽到
+ * [CHIP_TEXT_MAX_LINES] = 4,于是「装得下多少字」也跟着变大:156dp 芯片的内容宽
+ * 126dp、每行 9 个全角字、4 行 36 字;实测 33 字 + `(512)` 后缀仍是 4 行、
+ * 34 字跳 5 行 ⇒ 取 30 留余量(后缀长度不固定,不能贴着 33 用)。
  */
 class ChipLabelTruncationTest {
 
@@ -33,15 +38,15 @@ class ChipLabelTruncationTest {
 
     @Test
     fun a_label_at_the_limit_is_left_untouched() {
-        val exactlyAtLimit = "一二三四五六七八九十一二三四五六七八九十一二三四"
+        val exactlyAtLimit = "一二三四五六七八九十".repeat(3)
         assertEquals(CHIP_LABEL_MAX_CHARS, exactlyAtLimit.length, "夹具本身必须正好在限上")
         assertEquals(exactlyAtLimit, truncateChipLabel(exactlyAtLimit))
     }
 
     @Test
     fun a_long_label_keeps_its_head_and_tail() {
-        // 夹具必须**超过 24 字上限**,否则截断根本不该发生(2026-10-22 上限放宽后
-        // 原来那条 18 字的夹具落进了「不截断」区间,断 contains("…") 必然失败)。
+        // 夹具必须**超过 30 字上限**,否则截断根本不该发生(每次放宽上限都会让旧夹具
+        // 落进「不截断」区间,断 contains("…") 就必然失败 —— 2026-10-22 踩过一次)。
         val long = "[青水庵 (にやすけ 青水庵)] 彼女がボクの知らないところで第01巻"
         val cut = truncateChipLabel(long)
 
@@ -58,8 +63,13 @@ class ChipLabelTruncationTest {
     }
 
     @Test
-    fun the_limit_is_twenty_four_characters() {
-        assertEquals(24, CHIP_LABEL_MAX_CHARS, "上限 2026-10-22 由用户改判:10 字显示太短,首尾都要看得见")
+    fun the_limit_is_thirty_characters() {
+        assertEquals(
+            30,
+            CHIP_LABEL_MAX_CHARS,
+            "上限 2026-10-23 改到 30:芯片宽 156dp / 每行 9 全角字 / 4 行 = 36 字," +
+                "实测 33 字 + 后缀仍 4 行、34 字跳 5 行 ⇒ 取 30 留余量",
+        )
     }
 
     @Test

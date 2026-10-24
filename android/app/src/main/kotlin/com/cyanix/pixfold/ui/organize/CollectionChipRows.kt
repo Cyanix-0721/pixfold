@@ -19,25 +19,11 @@ fun groupTag(key: String) = "collection-group-$key"
 /** 1 级芯片「全部 N 项」入口的 testTag。 */
 const val TAG_COLLECTION_GROUP_ALL = "collection-group-all"
 
-/** 1 级芯片 sheet 容器 / 列表的 testTag。 */
-const val TAG_COLLECTION_GROUP_SHEET = "collection-group-sheet"
-const val TAG_COLLECTION_GROUP_SHEET_LIST = "collection-group-sheet-list"
-
-/** sheet 内 1 级芯片的 testTag 生成器(与常驻行区分,避免同 tag 撞车)。 */
-fun groupSheetTag(key: String) = "collection-group-sheet-$key"
-
-/** 2 级芯片(选中 series 下的各单本)整行的 testTag。 */
+/** 2 级芯片(选中 series 下的各单本)整行的 testTag —— 只在浮层打开时存在。 */
 const val TAG_COLLECTION_BOOK_ROW = "collection-book-row"
 
 /** 2 级芯片「全部 N 项」入口的 testTag。 */
 const val TAG_COLLECTION_BOOK_ALL = "collection-book-all"
-
-/** 2 级芯片 sheet 容器 / 列表 / sheet 内芯片的 testTag。 */
-const val TAG_COLLECTION_BOOK_SHEET = "collection-book-sheet"
-const val TAG_COLLECTION_BOOK_SHEET_LIST = "collection-book-sheet-list"
-
-/** 2 级芯片 sheet 内芯片的 testTag 生成器。 */
-fun bookSheetTag(id: String) = "collection-book-sheet-$id"
 
 /**
  * 集合切换芯片行 —— **两级**(用户 2026-10-19 裁决,原话「芯片分2级别,series或单本作为
@@ -89,17 +75,11 @@ fun CollectionChipRows(
             selectorTag = TAG_COLLECTION_ROW,
             chipTag = ::groupTag,
             allEntryTag = TAG_COLLECTION_GROUP_ALL,
-            sheetTag = TAG_COLLECTION_GROUP_SHEET,
-            sheetListTag = TAG_COLLECTION_GROUP_SHEET_LIST,
-            sheetChipTag = ::groupSheetTag,
         ),
         childTags = ChipRowTags(
             selectorTag = TAG_COLLECTION_BOOK_ROW,
             chipTag = ::collectionTag,
             allEntryTag = TAG_COLLECTION_BOOK_ALL,
-            sheetTag = TAG_COLLECTION_BOOK_SHEET,
-            sheetListTag = TAG_COLLECTION_BOOK_SHEET_LIST,
-            sheetChipTag = ::bookSheetTag,
         ),
         singleTopChipTag = ::collectionTag,
         topChipDescription = { group ->

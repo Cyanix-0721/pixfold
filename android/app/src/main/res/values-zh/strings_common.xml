@@ -18,6 +18,9 @@
         <item quantity="other">全部 %1$d 项</item>
     </plurals>
 
+    <!-- 芯片行展开后的「收起」入口(2026-10-23 瀑布流改版新增)。 -->
+    <string name="chip_collapse">收起</string>
+
     <!-- ============ 集合切换(工作流 A 步骤 1 的 CollectionChipRows) ============ -->
     <plurals name="collection_all">
         <item quantity="other">全部 %1$d 项</item>

@@ -24,6 +24,13 @@
         <item quantity="other">All %1$d items</item>
     </plurals>
 
+    <!--
+      芯片行展开后的「收起」入口(2026-10-23 瀑布流改版新增)。
+      与 volume_all / collection_all 同尺寸、同位置:展开后最后一块从「全部 N 项」
+      原地变成「收起」,用户不需要移开手指去找另一个控件。
+    -->
+    <string name="chip_collapse">Show less</string>
+
     <!-- ============ 集合切换(工作流 A 步骤 1 的 CollectionChipRows) ============ -->
     <!--
       量词用「项」而不是「个集合」:1 级芯片里既有系列又有单本,两者都算一项,

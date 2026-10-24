@@ -87,15 +87,8 @@ fun packPageRowTag(index: Int) = "pack-page-row-$index"
 /** 步骤 3 的卷切换 chip。 */
 fun packVolumeChipTag(id: String) = "pack-volume-chip-$id"
 
-/** 「全部 N 卷」入口(sheet 打开器)。 */
+/** 「全部 N 卷」入口(2026-10-23 起是原地展开,不再是 sheet 打开器)。 */
 const val TAG_PACK_VOLUME_ALL = "pack-volume-all"
-
-/** 「全部 N 卷」sheet 的标题/列表容器。 */
-const val TAG_PACK_VOLUME_SHEET = "pack-volume-sheet"
-const val TAG_PACK_VOLUME_SHEET_LIST = "pack-volume-sheet-list"
-
-/** sheet 内的卷芯片(与页面上常驻的 [packVolumeChipTag] 区分,避免 tag 冲突)。 */
-fun packVolumeSheetChipTag(id: String) = "pack-volume-sheet-chip-$id"
 
 /**
  * 工作流 B · 步骤 3:预览(验收第 14 项:**ComicInfo.xml 预览与页码列表预览一致**)。
@@ -215,7 +208,8 @@ fun PackPreviewPage(
         // 2026-09-25 真机实测:原为 `Row + horizontalScroll`,5 卷时第 4、5 卷芯片落在
         // 视口外 ⇒ 改 FlowRow 换行。2026-10-18:该行在 `LazyColumn` 之外且不设个数上限,
         // 卷一多就把下方预览挤到不可达(步骤 2 同源,40 卷实测已证)⇒ 改用全站共用的
-        // `VolumeChipRow`:常驻限 5 个 + 溢出时给「全部 N 卷」入口。
+        // `VolumeChipRow`。2026-10-23 起判据从「常驻 5 个」改为「收起态最多 3 行芯片」
+        // (`CHIP_COLLAPSE_LINES`),溢出时给「全部 N 卷」虚线芯片原地展开。
         // 芯片标签保留本页特有语义:未勾选的卷要标出来,否则用户会误以为它也会被打包。
         VolumeChipRow(
             volumes = libraryState.volumes,
@@ -224,9 +218,6 @@ fun PackPreviewPage(
             selectorTag = TAG_PACK_VOLUME_SELECTOR,
             chipTag = ::packVolumeChipTag,
             allEntryTag = TAG_PACK_VOLUME_ALL,
-            sheetTag = TAG_PACK_VOLUME_SHEET,
-            sheetListTag = TAG_PACK_VOLUME_SHEET_LIST,
-            sheetChipTag = ::packVolumeSheetChipTag,
             chipDescription = { id -> stringResource(R.string.pack_volume_chip_cd, id) },
             chipLabel = { v -> v.title.ifEmpty { v.id } },
             chipSuffix = { v ->

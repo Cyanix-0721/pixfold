@@ -10,10 +10,10 @@ import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performScrollToNode
 import com.cyanix.pixfold.domain.mock.MockDataB
 import com.cyanix.pixfold.domain.source.SERIES_PREFIX
-import com.cyanix.pixfold.ui.components.visibleVolumeChips
 import com.cyanix.pixfold.domain.model.ComicVolume
 import com.cyanix.pixfold.domain.library.LibraryState
 import com.cyanix.pixfold.domain.library.libraryStateOf
@@ -71,6 +71,14 @@ class MetadataVolumeChipStickyTest {
         rule.waitForIdle()
     }
 
+    /** 浮层里点一卷。浮层由 1 级系列芯片为顶点打开(2026-10-23 起 2 级不再常驻)。 */
+    private fun pickVolumeInPopup(seriesName: String, volumeId: String) {
+        rule.onNodeWithTag(volumeGroupTag(SERIES_PREFIX + seriesName)).performClick()
+        rule.waitForIdle()
+        rule.onNodeWithTag(volumeChipTag(volumeId)).performScrollTo().performClick()
+        rule.waitForIdle()
+    }
+
     @Test
     fun `volume chips stay visible after scrolling to the bottom`() {
         show()
@@ -80,7 +88,10 @@ class MetadataVolumeChipStickyTest {
         rule.onNodeWithTag(TAG_BATCH_APPLY).assertIsDisplayed()
 
         // 真机缺陷：此时芯片全部滚出视口 ⇒ 换卷必须回顶。
-        rule.onNodeWithTag(volumeChipTag("aot-1")).assertIsDisplayed()
+        //
+        // 2026-10-23 起常驻的是**1 级系列芯片**,具体的卷在浮层里(点开才有);
+        // 所以「芯片常驻」这条要断 1 级,断 `aot-1` 会变成「断一个页面上本就没有的东西」。
+        rule.onNodeWithTag(volumeGroupTag(SERIES_PREFIX + "进击的巨人")).assertIsDisplayed()
     }
 
     @Test
@@ -88,8 +99,7 @@ class MetadataVolumeChipStickyTest {
         show()
         scrollToBottom()
 
-        rule.onNodeWithTag(volumeChipTag("aot-2")).performClick()
-        rule.waitForIdle()
+        pickVolumeInPopup(seriesName = "进击的巨人", volumeId = "aot-2")
 
         assertEquals("aot-2", latest?.activeVolumeId, "点芯片必须真的切卷")
         // 换卷后不得回顶 —— 否则「换卷 → 回顶 → 再滚回原字段」的来回仍在。
@@ -113,93 +123,60 @@ class MetadataVolumeChipStickyTest {
         )
     }
 
+
     @Test
-    fun `overflowing volumes keep fields reachable and expose the all-volumes entry`() {
+    fun `overflowing volumes keep the page fields reachable`() {
         show(manyVolumes(40))
 
-        // 芯片区必须限高，否则 40 卷时它会吃掉整个视口 —— 真机实测（2026-10-18）
+        // 芯片区必须**高度受控**，否则 40 卷时它会吃掉整个视口 —— 真机实测（2026-10-18）
         // 13 行芯片占 834.9dp（视口 835.3dp），11 次全屏 swipe 后字段仍全部不可见。
-        // 限高后溢出卷必须有一个入口，否则后面的卷切换不了。
-        // 40 卷同属一个系列 ⇒ 1 级行只有 1 个芯片、不溢出;溢出发生在 **2 级卷行**,
-        // 故这里断言的是 2 级「全部 N 卷」入口(`TAG_VOLUME_ALL`)。
-        rule.onNodeWithTag(TAG_VOLUME_ALL).assertIsDisplayed()
-
-        // 常驻行必须**真的只组合 5 个芯片**，第 6 卷起不进常驻行。
-        // 为什么必须直接断言个数：Robolectric 把芯片宽度算成 ~0，40 个芯片也能塞进
-        // 2 行 ⇒「字段可达」那类断言对「不限个数」的变异毫无杀伤力（变异 M1 存活过）。
-        rule.onNodeWithTag(volumeChipTag("scale-6")).assertDoesNotExist()
-        rule.onNodeWithTag(volumeChipTag("scale-40")).assertDoesNotExist()
+        //
+        // 2026-10-23 起控高的方式从「只常驻 5 个 + sheet 兜底」换成「3 行收口 + 原地展开」。
+        // 40 卷同属一个系列 ⇒ 1 级行只有 1 块芯片、根本不收口；溢出的那 40 卷关在**浮层**里
+        // （点开 series 才出现），页面默认根本没有它们。
+        // ⇒ 这里该断的是「页面主体不被芯片区挤走」，而不是「出现了 2 级入口」。
+        rule.onNodeWithTag(TAG_VOLUME_ALL).assertDoesNotExist()
 
         // 字段必须真的可达（滚到底后最后一个可操作控件在视口内）。
+        // 这一条是那轮真机缺陷的正面判据，比任何结构断言都直接。
         scrollToBottom()
         rule.onNodeWithTag(TAG_BATCH_APPLY).assertIsDisplayed()
     }
 
     @Test
-    fun `all-volumes sheet lists every volume and switching works`() {
+    fun `the series popup lists every volume and switching works`() {
         show(manyVolumes(40))
 
-        rule.onNodeWithTag(TAG_VOLUME_ALL).performClick()
+        // 浮层内的卷不在默认页面上 —— 必须先点开 1 级系列芯片（用户真实路径）。
+        rule.onNodeWithTag(volumeGroupTag(SERIES_PREFIX + "进击的巨人")).performClick()
         rule.waitForIdle()
 
-        // 溢出的卷必须在 sheet 里能点到（scale-40 是第 40 卷，常驻行只放 5 个）。
-        // sheet 列出的是**当前系列的全部卷**（两级下 2 级 sheet 的口径，不是全库），
-        // 本夹具全在同一系列 ⇒ 40 卷都在里面。sheet 内可滚动，先滚到最后一卷再点。
-        rule.onNodeWithTag(TAG_VOLUME_SHEET_LIST)
-            .performScrollToNode(hasTestTag(volumeSheetChipTag("scale-40")))
-        rule.waitForIdle()
-        rule.onNodeWithTag(volumeSheetChipTag("scale-40")).performClick()
+        // 40 卷全在同一系列 ⇒ 全部在浮层里。浮层高度上限 318dp、内部竖滚；
+        // 浮层内是 Column + verticalScroll（不是 Lazy），节点都在树上，可直接滚到再点。
+        rule.onNodeWithTag(volumeChipTag("scale-40")).performScrollTo().performClick()
         rule.waitForIdle()
 
-        assertEquals("scale-40", latest?.activeVolumeId, "sheet 里点卷必须真的切卷")
+        assertEquals("scale-40", latest?.activeVolumeId, "浮层里点卷必须真的切卷")
 
-        // 切完之后当前卷必须回到页面常驻行里（否则用户看不出"我在改哪一卷"）。
+        // 切完之后当前卷必须仍然可见（否则用户看不出「我在改哪一卷」）。
         rule.onNodeWithTag(volumeChipTag("scale-40")).assertIsDisplayed()
     }
 
     @Test
-    fun `five volumes show no child all-volumes entry`() {
+    fun `five volumes show no collapse entry`() {
         show()
 
         // mock 5 卷 = 两个系列（进击的巨人 3 卷 / 海贼王 2 卷）。
-        // 2 级行最多 3 卷 ⇒ 不溢出、不出现多余的 2 级入口；当前系列第一本可见。
-        rule.onNodeWithTag(TAG_VOLUME_ALL).assertDoesNotExist()
-        rule.onNodeWithTag(volumeChipTag("aot-1")).assertIsDisplayed()
+        // 1 级行只有 2 块芯片 ⇒ 远不到 3 行，不该收口。
+        // （旧版这里断的是「2 级行不出现『全部 N 卷』入口」—— 2 级已进浮层，
+        //   该语义由 the series popup lists every volume and switching works 覆盖。）
+        rule.onNodeWithTag(TAG_VOLUME_GROUP_ALL).assertDoesNotExist()
+        rule.onNodeWithTag(volumeGroupTag(SERIES_PREFIX + "进击的巨人")).assertIsDisplayed()
 
-        // 另一系列的卷不在当前 2 级行里 —— 必须走用户真实路径：
-        // 先点 1 级系列芯片（自动切到该系列第一本），再到 2 级行点目标卷。
+        // 具体的卷都在浮层里 —— 必须走用户真实路径：点 1 级系列芯片打开浮层，
+        // 再在浮层里找目标卷。
         rule.onNodeWithTag(volumeGroupTag(SERIES_PREFIX + "海贼王")).performClick()
         rule.waitForIdle()
         rule.onNodeWithTag(volumeChipTag("op-102")).assertIsDisplayed()
-    }
-
-    @Test
-    fun `series row cramped to two lines keeps an all entry`() {
-        // 1 级行限到 2 行（用户 2026-10-21 裁决「第一层chip最多显示2行」）。限行后看不见的
-        // 系列芯片不能再靠换行够到 ⇒ 必须给「全部 N 项」入口。
-        // 为什么 2 行也要给：芯片宽度跟随内容，10 字芯片约 170dp，361dp 屏一行只放得下 2 个
-        // ⇒ 2 行只装 4 个，**小于常驻上限 5**；5 个长名系列时第 5 个会被 FlowRow 裁掉而
-        // total > 5 不成立。Robolectric 又量不出宽度 ⇒ 规则取「限行即给入口」。
-        show()
-        rule.onNodeWithTag(TAG_VOLUME_GROUP_ALL).assertIsDisplayed()
-    }
-
-    // ---- visibleVolumeChips：溢出时常驻哪几卷（纯函数，直接断言，不依赖布局测量）----
-
-    @Test
-    fun `visible chips keep the active volume in the row`() {
-        val volumes = manyVolumes(40)
-
-        // 当前卷在尾部（会被截掉的那部分）⇒ 必须顶替最后一个常驻位。
-        val kept = visibleVolumeChips(volumes, "scale-40")
-        assertEquals(5, kept.size, "溢出时常驻 5 个芯片")
-        assertEquals("scale-40", kept.last().id, "当前卷必须在常驻行内，否则看不出在改哪一卷")
-
-        // 当前卷已在前 5 卷里 ⇒ 常驻 5 个不变，顺序不动。
-        val keptHead = visibleVolumeChips(volumes, "scale-2")
-        assertEquals(listOf("scale-1", "scale-2", "scale-3", "scale-4", "scale-5"), keptHead.map { it.id })
-
-        // 当前卷不在列表里（脏状态）⇒ 退化成前 5 卷，不抛异常。
-        assertEquals(5, visibleVolumeChips(volumes, "no-such-id").size)
     }
 }

@@ -425,7 +425,12 @@ class MetadataPageTest {
     fun `volume chips are addressable even when titles repeat`() {
         // 两个 aot 卷的 Title 建议相同(都是系列名)-> chip 文案重复,
         // 但仍必须能按 tag 精确选中,且不会崩。
+        //
+        // 2026-10-23 起具体的卷收在**浮层**里(点开 1 级系列芯片才出现),
+        // 所以先走用户真实路径把它打开,再断 tag 唯一性。
         show()
+        rule.onNodeWithTag(volumeGroupTag(SERIES_PREFIX + "进击的巨人")).performClick()
+        rule.waitForIdle()
         rule.onAllNodesWithTag(volumeChipTag("aot-1")).assertCountEquals(1)
         rule.onAllNodesWithTag(volumeChipTag("aot-2")).assertCountEquals(1)
     }

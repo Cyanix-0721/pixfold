@@ -4,6 +4,7 @@ import org.junit.Test
 import java.io.File
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
+import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
 /**
@@ -81,14 +82,20 @@ class ChipRowWrappingTest {
     }
 
     /**
-     * 四处芯片行必须真的用 `FlowRow` 承载。
+     * 四处芯片行必须真的用会换行的容器承载。
      *
      * 与上一条互补:上一条拦"用回横向滚动",这一条拦"把容器换成不会换行的普通 `Row`"
      * —— 后者同样会让靠后的芯片溢出,而且**连横向滚动都没有**,比原缺陷更糟(彻底够不着)。
      *
-     * ⚠️ 2026-10-19 芯片抽象后,**唯一**的 `FlowRow` 搬到了 `SingleSelectChipRow.kt`;
+     * ⚠️ 2026-10-19 芯片抽象后,**唯一**的芯片行容器搬到了 `SingleSelectChipRow.kt`;
      * 三个调用方(`VolumeChipRow` / `CollectionChipRows` / `SortAndPreviewPage`)自身
      * 的 FlowRow 计数已归零。这张表必须跟着搬,否则会拿旧口径判新结构(直接红)。
+     *
+     * ⚠️ 2026-10-23 那次容器从 `FlowRow` 换成 `ChipFlow`(`SubcomposeLayout` 手写分行):
+     * 原生的收口指示器要么已废弃(`FlowRowOverflow`),要么根本不存在
+     * (`overflowIndicator` 参数在 foundation-layout 1.12.1 里查无此名),
+     * 而 `FlowRow(maxLines)` 会**直接裁掉**放不下的芯片 —— 收口芯片自己先消失。
+     * 故 `SingleSelectChipRow.kt` 的 FlowRow 计数由 1 变 0,`ChipFlow` 成为新容器。
      */
     @Test
     fun chip_rows_use_flow_row() {
@@ -103,8 +110,8 @@ class ChipRowWrappingTest {
             "ui/library/PackPreviewPage.kt" to 2,
             // 2026-10-18:卷切换芯片行(工作流 B 步骤 2/3 共用)现在是薄壳,容器在底层
             "ui/components/VolumeChipRow.kt" to 0,
-            // 2026-10-19:全站唯一的芯片行容器(卷芯片 + 集合芯片共用)
-            "ui/components/SingleSelectChipRow.kt" to 1,
+            // 2026-10-23:容器改为 ChipFlow(SubcomposeLayout 手写分行),不再用 FlowRow
+            "ui/components/SingleSelectChipRow.kt" to 0,
             // 2026-10-19:两级集合芯片行 —— 两个 SingleSelectChipRow 调用,自身无 FlowRow
             "ui/organize/CollectionChipRows.kt" to 0,
             // 2026-10-19:两级状态逻辑的唯一实现(集合芯片与卷芯片共用),自身无 FlowRow
@@ -117,6 +124,18 @@ class ChipRowWrappingTest {
             val actual = src.lines().count { it.trimStart().startsWith("FlowRow(") }
             assertEquals(count, actual, "$rel 的 FlowRow 数量变了;芯片行容器被改动")
         }
+
+        // 新容器的守卫:芯片行必须由 `ChipFlow` 承载,且它真的是自己分行
+        // (SubcomposeLayout)。少任一条,「瀑布流」就退化成一行一块或直接裁掉。
+        val row = mainSource("ui/components/SingleSelectChipRow.kt")
+        assertTrue(
+            row.contains("ChipFlow("),
+            "芯片行必须由 ChipFlow 承载(FlowRow(maxLines) 会把收口芯片自己裁掉)",
+        )
+        assertTrue(
+            row.contains("SubcomposeLayout("),
+            "ChipFlow 必须用 SubcomposeLayout 自己分行 —— 这是「收口芯片落在最后一行」的唯一实现路径",
+        )
     }
 
     /**
@@ -141,20 +160,30 @@ class ChipRowWrappingTest {
             calls,
             "两级芯片必须恰好两个 SingleSelectChipRow(1 级 = series/单本,2 级 = 选中 series 下的单本)",
         )
-        // 1 级行**恒定**最多 2 行(用户 2026-10-21 反订了旧的「选中系列时收缩到 1 行」:
-        // 「点击 series 后也是 2 行 + 下拉,而不是 1 行 + 下拉」)。
-        assertTrue(
-            src.contains("maxLines = TOP_CHIP_MAX_LINES"),
-            "1 级芯片行必须恒定限行(TOP_CHIP_MAX_LINES = 2,用户 2026-10-21 裁决)",
+        // 1 级行**恒定按行数收口**（2026-10-23 起是 CHIP_COLLAPSE_LINES = 3），
+        // 不再按「是否选中系列」分档收缩。
+        //
+        // 2026-10-21 那条裁决（「第一层 chip 最多 2 行」⇒ TOP_CHIP_MAX_LINES = 2）已被
+        // 2026-10-23 的瀑布流改版取代:块高不一致时,「条数」或者固定的「行×块」
+        // 都守不住视觉上那条线,改由 ChipFlow 按真实行数在 3 行处收口。
+        val code = src.lines().filterNot { it.trimStart().startsWith("//") || it.trimStart().startsWith("*") }
+        assertFalse(
+            code.any { it.contains("TOP_CHIP_MAX_LINES") },
+            "TOP_CHIP_MAX_LINES 已作废(2026-10-23 改为按芯片行数收口)",
         )
         assertFalse(
-            src.contains("if (activeGroup.isSeries) 1 else"),
-            "不该再按选中状态分档收缩 —— 恒定 2 行才能让下方 2 级行不上下窜",
+            src.contains("maxLines = if (activeGroup.isSeries)"),
+            "不该再按选中状态切换行数",
         )
-        // 2 级行只在选中系列时出现 —— 单本没有 2 级。
+        // 2 级行（浮层）只在点开 series 时出现 —— 单本没有 2 级。
         assertTrue(
-            src.contains("if (activeGroup.isSeries) {"),
-            "2 级芯片行必须只在选中 series 时渲染",
+            src.contains("openSeriesKey?.let"),
+            "2 级芯片行必须只在点开的 series 上渲染(浮层以 series 为顶点)",
+        )
+        // 单本点了不展开浮层 —— 这是「三条收起触发」里的第 ③ 条的前提。
+        assertTrue(
+            src.contains("if (!group.isSeries)"),
+            "点 series 外的单本必须收起浮层,不得展开",
         )
     }
 
@@ -184,9 +213,25 @@ class ChipRowWrappingTest {
         // **芯片在行内左对齐**(用户 2026-10-21:「不是 chip 本身居中」)。
         // 曾按「1 级芯片没有居中显示」改成逐行居中 —— 那句话指的是芯片内的**文字**。
         // 瀑布流从左上起排、各行左端对齐;居中会让每行起点随该行总宽左右漂。
+        // 2026-10-23 起容器是手写分行的 `ChipFlow`,行内间距由参数给定，
+        // 不再走 `Arrangement.spacedBy`。
         assertTrue(
-            code.any { it.contains("Arrangement.spacedBy(6.dp)") },
-            "芯片行必须左对齐(Arrangement.spacedBy(6.dp))",
+            code.any { it.contains("horizontalGap = 4.dp") },
+            "芯片行内横向间距必须是 4dp 且左对齐(ChipFlow 的 horizontalGap = 4.dp)",
+        )
+        // **纵向间距必须大于横向**(用户 2026-10-24 真机反馈:「chip 内容有换行的情况下,
+        // 左右间隔大了些,上下又几乎没有间隔」)。
+        // 高矮不一的芯片并排时行高由最高那块决定,单行块下方先空一截,再叠加很小的行距
+        // ⇒ 三行芯片在像素上连成一片(实测 x=200 与 x=760 的亮区都只有连续一段
+        //   `1.4..173.1 dp`,行间无暗缝)。所以守「纵 > 横」这个不等式,而不是钉死两个数字
+        // —— 将来再调数值只要还满足它就仍然对。
+        val hGap = Regex("horizontalGap = (\\d+)\\.dp").find(code.joinToString("\n"))?.groupValues?.get(1)?.toInt()
+        val vGap = Regex("verticalGap = (\\d+)\\.dp").find(code.joinToString("\n"))?.groupValues?.get(1)?.toInt()
+        assertNotNull(hGap, "必须能从源码读出 ChipFlow 的 horizontalGap")
+        assertNotNull(vGap, "必须能从源码读出 ChipFlow 的 verticalGap")
+        assertTrue(
+            vGap!! > hGap!!,
+            "纵向行距必须大于横向间距(否则换行时行会粘在一起),实际 横=$hGap 纵=$vGap",
         )
         assertFalse(
             code.any { it.contains("Alignment.CenterHorizontally") },
@@ -198,8 +243,8 @@ class ChipRowWrappingTest {
             "chip 内部文字必须居中(textAlign = TextAlign.Center)",
         )
         assertTrue(
-            code.any { it.contains("contentAlignment = Alignment.Center") },
-            "「全部 N 项」入口必须居中(contentAlignment = Alignment.Center)",
+            code.any { it.contains("Alignment.CenterVertically") },
+            "收口芯片是 文字 + 箭头 的横排,必须垂直居中(原先的居中 Box 已随全宽按钮一起退役)",
         )
         // **下箭头**是用户 2026-10-21 明确要的形态(「多的加个屏框的下箭头长按钮」):
         // 它是「还有更多、往下展开」的固定语义。首版没有断言,变异(删掉 Icon)存活。
@@ -210,26 +255,29 @@ class ChipRowWrappingTest {
     }
 
     /**
-     * 「全部 N 项」底部弹层的内容不能贴屏幕左沿(2026-10-21 真机反馈「太靠左贴边了」)。
+     * 「全部 N 项」**不得再是底部弹层**(2026-10-23 用户裁决)。
      *
-     * 标题自带 `horizontal = 16.dp`,芯片列表若没有同样的内边距,两者左沿不齐 ——
-     * 视觉上像两栏错位。这条只看列表的 `padding(horizontal = 16.dp)` 是否存在,
-     * 同样属于结构守卫(真实左沿只有真机能量)。
+     * 用户原话:「全部 X 项就不要下面弹出窗口了,而是延续瀑布流显示」。
+     *
+     * 旧守卫（`all_items_sheet_pads_chips_horizontally`）盯的是 `AllItemsSheet` 里
+     * `LazyColumn` 的 16dp 内边距 —— 弹层没了,那条断言随之作废。
+     * 但「弹窗别复活」这件事必须继续有人守:否则下次有人为了「省事」把它加回来,
+     * 用户裁决就被悄悄推翻了,而且没有任何用例会红。
      */
     @Test
-    fun all_items_sheet_pads_chips_horizontally() {
-        val src = mainSource("ui/components/SingleSelectChipRow.kt")
-        val sheetStart = src.indexOf("private fun <T> AllItemsSheet")
-        assertTrue(sheetStart > 0, "找不到 AllItemsSheet;若已改名,本守卫须随之改判")
-        val sheet = src.substring(sheetStart)
-        val code = sheet.lines().filterNot { it.trimStart().startsWith("//") || it.trimStart().startsWith("*") }
-        val listStart = code.indexOfFirst { it.contains("LazyColumn(") }
-        assertTrue(listStart >= 0, "AllItemsSheet 里找不到 LazyColumn")
-        // 取 LazyColumn 到首个 "{" 之间的修饰符链,确认内边距在列表上。
-        val chain = code.drop(listStart).takeWhile { !it.trimEnd().endsWith("{") }.joinToString("\n")
+    fun the_all_entry_no_longer_opens_a_sheet() {
+        val row = mainSource("ui/components/SingleSelectChipRow.kt")
+        val code = row.lines().filterNot { it.trimStart().startsWith("//") || it.trimStart().startsWith("*") }
+
+        assertEquals(
+            emptyList(),
+            code.filter { it.contains("AllItemsSheet") || it.contains("PixFoldBottomSheet") },
+            "「全部 N 项」已改为原地展开(2026-10-23 用户裁决),不得再开底部弹层",
+        )
+        // 展开/收起必须靠**同一个**收口芯片切换,而不是两套入口。
         assertTrue(
-            chain.contains("padding(horizontal = 16.dp)"),
-            "弹层里的芯片列表必须有 padding(horizontal = 16.dp) 与标题左沿对齐,否则芯片贴屏幕左沿",
+            code.any { it.contains("R.string.chip_collapse") },
+            "展开后必须有「收起」入口,否则展开就出不来了",
         )
     }
 }
