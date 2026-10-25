@@ -128,6 +128,12 @@ fun WorkspaceListDialog(
     // 开关**不持久化**：它表达「这一次移除顺便撤销授权」的临时意图。
     // 持久化会让下次手滑删掉一条就永久失去授权，而那是不可逆的
     // （用户要重新走一次系统目录选择器）。
+    //
+    // ⚠️ **调用方必须以 `if (show) { WorkspaceListDialog(...) }` 包裹整个组件**。
+    // 「每次重开复位」靠在隐藏时让这个 Composable 整个离开组合，`remember` 随之销毁；
+    // 若把 Dialog 常驻组合（只在 Shell 内部做 if），开关会残留上次的 true ——
+    // 于是下一次「删一条记录」会静默升级成「撤销系统授权」。全仓既有弹窗
+    // （DirMetaButton.kt:69/101、ResetAllButton.kt:68/94）都是 if 包裹的写法。
     var releaseGrant by remember { mutableStateOf(false) }
     val granted = listings.filter { it.granted }
     val stale = listings.filterNot { it.granted }
@@ -154,6 +160,11 @@ fun WorkspaceListDialog(
             }
             if (granted.isNotEmpty()) {
                 SectionLabel(R.string.workspace_section_granted)
+                // 上分区直接透传 f/t，**不加偏移**：这只在「上分区 == 整表头部」时成立，
+                // 而那个前提不是本组件建立的 —— 是 WorkspaceController 把 grantedPart
+                // 拼在 rememberedPart 前面（WorkspaceController.kt:554-561）。
+                // 若将来改成「单一列表 + 渲染期分区」，这里会静默错位：不崩、不报错，
+                // 只是拖了没反应。改动分区顺序或分区来源时，务必回来重看这两处。
                 WorkspaceDragList(granted, onMove = { f, t -> onMove(f, t) }) { entry ->
                     WorkspaceRow(entry, currentTreeUri, releaseGrant, onOpen, onTogglePin, onRemove)
                 }

@@ -26,6 +26,11 @@ import kotlin.math.roundToInt
  * **56dp 不是随便取的**：AGENTS.md §2.7 要求触控目标 ≥48dp，而本列表的整行本身就
  * 是「点一行切换过去」的点击区 —— 行高就是触控高度，不能再靠内层按钮兜底。
  * 留到 56dp 是为了给「目录名 + 使用中」两行文字留出垂直呼吸，同时不小于 48。
+ *
+ * **不能写成 `const val`**：`Dp` 不是编译期常量，`const` 会直接编译失败
+ * （`Const 'val' initializer should be a constant value`）。task-6-brief 的骨架里
+ * 写的是 `const val`，那是不可能编译的写法 —— 这里是**有意的偏差**，
+ * 第 7 轮起若发现别处照抄了带 `const` 的签名，那是复制错误，不是这里的回归。
  */
 val WORKSPACE_ROW_HEIGHT: Dp = 56.dp
 
