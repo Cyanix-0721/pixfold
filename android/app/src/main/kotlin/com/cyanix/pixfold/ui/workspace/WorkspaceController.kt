@@ -190,6 +190,10 @@ class WorkspaceController(
 
         source.forgetWorkspace(treeUri)
         if (alsoRelease) (source as? AndroidGrantReleaser)?.releasePersistentGrant(treeUri)
+        // 评审 Minor-3：「列表满且全钉住」的被拒提示，指的是**上一次** remember 的结论。
+        // 用户照着提示删掉一条之后这个前提已经不成立，提示却会一直挂到下次成功 remember
+        // 为止（可能再也不发生）—— 所以移除动作本身要把它撤掉。
+        listRejected = false
         refreshListings()
 
         // 列表空了也回 None：目录已不再被记住，界面不能再停在一个凭空的「当前工作区」上。
@@ -257,6 +261,11 @@ class WorkspaceController(
      * 薄壳转 [remove]（不带 alsoRelease）—— 删除逻辑只留一处。原先它直接调
      * `currentHandle()?.let { forgetWorkspace(it.treeUri) }`，在 Failed 状态下
      * 一条都删不掉却照样把 state 置 None（评审 M5）。
+     *
+     * ⚠️ **已被 `remove(treeUri, alsoRelease)` 取代，Task 7 接线时删除。**
+     * 现在已经**没有任何生产调用点**（列表 UI 直接按 treeUri 调 [remove]，因为删哪一条
+     * 与「当前是哪条」无关）；留着只是因为 Task 7 之前的调用方还没全部接完，
+     * 现在就删会迫使那一步同时改两件事。
      */
     fun forget() {
         currentHandle()?.treeUri?.let { remove(it, alsoRelease = false) }
@@ -430,6 +439,10 @@ class WorkspaceController(
                     null
                 }
                 if (second is LoadResult.Success) {
+                    // 评审 Important-1：重试成功与「首轮就成功」同语义，都是「真的读到了」。
+                    // 漏这行时存储顺序不更新 ⇒ 下次 restore() 的 `workspaces().firstOrNull()`
+                    // 恢复到**旧**目录，平时完全静默（spec §6 第 2 条）。
+                    rememberIfLoaded(second, handle)
                     state = WorkspaceState.Ready(handle, second.collections)
                     // 重试成功说明授权其实还在：监听必须留着重挂，否则这一轮之后
                     // 「实时刷新」就静默失效了（用户会以为功能坏了）。
@@ -496,6 +509,11 @@ class WorkspaceController(
      */
     private fun rememberIfLoaded(result: LoadResult, handle: WorkspaceHandle) {
         if (result !is LoadResult.Success) return
+        // 真实实现下这一行**恒走 MovedToFront**：能走到这里说明刚扫成功，而 open / restore
+        // 的 handle 必然已经在列表里（open 先从 workspaces() 找出来，restore 直接取第一条）。
+        // 因此 RejectedAllPinned 这条分支在真实路径上不可达，置位只是极端竞态（另一进程
+        // 同时改写了列表文件）的兜底。**不要当 bug 删**：删掉它并不让任何用例变红，
+        // 但那一格竞态里会静默丢掉「加不进列表」这条信号。
         listRejected = source.rememberWorkspace(handle) == RememberResult.RejectedAllPinned
     }
 
@@ -511,10 +529,33 @@ class WorkspaceController(
      *
      * 分区是渲染的第一条规则，图钉只在区内部起作用（「图钉之间仍可互相拖拽互换」
      * 也只在同一区内成立）。
+     *
+     * ## 代价与「为什么不改成 suspend」（评审 Important-2 的裁决）
+     *
+     * 本函数**仍是同步的，调用方全在主线程**（[openList] / [remove] / [togglePin] / [move] 直接调，
+     * [pick] / [load] / [applyRefresh] 经 [load] 的 finally 与 [applyRefresh] 收口），
+     * 一次调用的代价被压到：
+     *
+     * 1. **1 次** prefs 读 —— `workspaces()` 读的是本进程内存映射（SharedPreferences
+     *    加载后就常驻内存），微秒级；
+     * 2. **1 次** JSON 解析（条目上限 8 条）；
+     * 3. **1 次** Binder —— `persistentGrants()` 一次拿全系统授权表
+     *    （旧写法是**每条一次**，8 条 = 8 次跨进程调用，见 [WorkspaceSource.persistentGrants]）。
+     *
+     * 前两项是本进程内的微秒级开销，第三项才是跨进程大头 —— 批量化之后它已经是常数 1。
+     * 若改成 `suspend` + `withContext(ioDispatcher)`，四个公开方法（openList / remove /
+     * `togglePin / move`）会全部被迫变成异步，调用点与 UI 层的状态机都要跟着改，
+     * 收益与风险不成比例。
+     *
+     * ⚠️ **但这笔账只在「1 次 Binder + 8 条」下成立**：将来若放大条目上限、或这里再**加任何**
+     * 跨进程调用（读缩略图、查文档 provider……），必须改成 `suspend` +
+     * `withContext(ioDispatcher)`，不要再往主线程上加常数项。
      */
     private fun refreshListings() {
+        // 一次拿全集再在内存里比：Binder 次数从「每条一次」降到常数 1（评审 Important-2）。
+        val grants = source.persistentGrants()
         val (grantedPart, rememberedPart) = source.workspaces()
-            .map { WorkspaceListing(it, source.isPersistentGrant(it.handle.treeUri)) }
+            .map { WorkspaceListing(it, it.handle.treeUri in grants) }
             .partition { it.granted }
         listings = orderedForDisplay(grantedPart) + orderedForDisplay(rememberedPart)
     }

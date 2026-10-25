@@ -55,6 +55,9 @@ class ReadyWorkspaceSource(
 
     override fun moveWorkspace(from: Int, to: Int) = Unit
 
+    /** 「就绪」= 这条确实持有系统授权（否则界面会把它画进「只记住了路径」下区）。 */
+    override fun persistentGrants(): Set<String> = setOf(handle.treeUri)
+
     override fun loadCollections(handle: WorkspaceHandle): LoadResult =
         LoadResult.Success(collections)
 

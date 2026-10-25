@@ -106,6 +106,10 @@ class WorkspaceControllerTest {
         }
         override fun setPinned(treeUri: String, pinned: Boolean) = Unit
         override fun moveWorkspace(from: Int, to: Int) = Unit
+
+        /** 这些用例关心的是扫描/重试/状态，不关心分区；不表态即「一条都没持有授权」。 */
+        override fun persistentGrants(): Set<String> = emptySet()
+
         override fun loadCollections(handle: WorkspaceHandle): LoadResult {
             loadCalls += handle
             return if (queue.size > 1) queue.removeFirst() else queue.first()
@@ -142,6 +146,7 @@ class WorkspaceControllerTest {
         override fun forgetWorkspace(treeUri: String) = inner.forgetWorkspace(treeUri)
         override fun setPinned(treeUri: String, pinned: Boolean) = Unit
         override fun moveWorkspace(from: Int, to: Int) = Unit
+        override fun persistentGrants(): Set<String> = inner.persistentGrants()
         override fun loadCollections(handle: WorkspaceHandle): LoadResult {
             onLoad?.invoke(handle)
             return inner.loadCollections(handle)
@@ -186,6 +191,10 @@ class WorkspaceControllerTest {
         override fun forgetWorkspace(treeUri: String) = Unit
         override fun setPinned(treeUri: String, pinned: Boolean) = Unit
         override fun moveWorkspace(from: Int, to: Int) = Unit
+
+        /** 同上：这些用例只看「结果串没串工作区」，不对授权表态。 */
+        override fun persistentGrants(): Set<String> = emptySet()
+
         override fun loadCollections(handle: WorkspaceHandle): LoadResult {
             loadCalls += handle
             onLoad?.invoke(handle)

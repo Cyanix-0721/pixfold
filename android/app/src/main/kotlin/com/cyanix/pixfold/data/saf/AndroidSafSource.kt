@@ -96,15 +96,25 @@ class AndroidSafSource(context: Context) : WorkspaceSource, AndroidGrantReleaser
     override fun moveWorkspace(from: Int, to: Int) = treeStore.move(from, to)
 
     /**
-     * 这一条是否还持有系统持久授权（读权限）。
+     * 当前**全部**仍持有系统持久授权的 treeUri（只算读权限）。
+     *
+     * **一次查询拿全集**：
+     * `resolver.persistedUriPermissions` 是跨进程调用（读系统的授权表）。旧的逐条写法
+     * 让列表每次刷新做 N 次 Binder（8 条 = 8 次），而 N 次问的是**同一份**快照。
+     * 这里查一次、在内存里筛，调用方（`WorkspaceController.refreshListings()`）
+     * 改成 `treeUri in grants`，语义不变、跨进程次数降到 1。
      *
      * 查询本身失败时按「没有授权」处理：让用户重选一次，比显示一个假的 ✓ 好。
+     * 整批一起回落也一致 —— 这是同一份快照的查询结果，不存在「部分查到」。
      */
-    override fun isPersistentGrant(treeUri: String): Boolean = try {
-        resolver.persistedUriPermissions.any { it.uri.toString() == treeUri && it.isReadPermission }
+    override fun persistentGrants(): Set<String> = try {
+        resolver.persistedUriPermissions
+            .filter { it.isReadPermission }
+            .map { it.uri.toString() }
+            .toSet()
     } catch (e: Exception) {
         Log.w(TAG, "persistedUriPermissions 查询失败", e)
-        false
+        emptySet()
     }
 
     /**

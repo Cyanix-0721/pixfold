@@ -73,12 +73,33 @@ interface WorkspaceSource {
     fun moveWorkspace(from: Int, to: Int)
 
     /**
-     * 这一条是否还持有系统持久授权。
+     * 当前**全部**仍持有系统持久授权的 treeUri。
      *
      * **只有平台层能回答** —— domain 层不得 `import android.*`（`AdapterBoundaryTest` 每次闸门都跑）。
-     * 默认 `true`：假源与不支持查询的实现按「都在」处理，避免每个测试替身都要实现一遍。
+     *
+     * ## 为什么是「批量」而不是「单条」
+     *
+     * 真实实现在 Android 上要问 `ContentResolver.persistedUriPermissions`，那是**跨进程**
+     * 调用。列表上限 8 条时逐条问就是 8 次 Binder —— 而它们读的是**同一份**系统状态。
+     * 一次拿全集再在内存里比，语义一字不差，代价从 N 次压到 1 次。
+     *
+     * **这里是唯一真相源**：单条版本 [isPersistentGrant] 是默认实现、由它推导，
+     * 实现方只实现本方法。若允许两边各自实现，迟早出现「批量说有、单条说没有」的
+     * 两个真相源（本项目已吃过 `canOrganize` / `canStartWorkflow` 语义并存的亏）。
+     *
+     * **刻意没有默认实现**（旧单条版本默认返 `true`）。默认值无论选哪边都在
+     * 替实现方表态：「都在」会让假源掩盖分区逻辑，「都不在」会让界面把持着授权的目录
+     * 标成「只记住了路径」。每个实现方一律写明自己那份事实 —— 编译器会点名催。
      */
-    fun isPersistentGrant(treeUri: String): Boolean = true
+    fun persistentGrants(): Set<String>
+
+    /**
+     * 这一条是否还持有系统持久授权。
+     *
+     * **默认实现，不要覆盖** —— 真正的来源是 [persistentGrants]（见它的 KDoc）。
+     * 覆盖它就会绕过唯一真相源，两处判断迟早漂移。
+     */
+    fun isPersistentGrant(treeUri: String): Boolean = treeUri in persistentGrants()
 
     /**
      * 扫描工作区，组装成集合列表。

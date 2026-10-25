@@ -35,10 +35,8 @@ import kotlin.test.assertTrue
 @OptIn(ExperimentalCoroutinesApi::class)
 class WorkspaceControllerListTest {
 
-    private fun TestScope.testScope() = CoroutineScope(UnconfinedTestDispatcher(testScheduler))
-
     /** [UnconfinedTestDispatcher] 才能让 load() 返回时状态已经落定（同 [WorkspaceControllerTest]）。 */
-    private fun TestScope.testDispatcher() = UnconfinedTestDispatcher(testScheduler)
+    private fun TestScope.testScope() = CoroutineScope(UnconfinedTestDispatcher(testScheduler))
 
     private fun handle(name: String) = WorkspaceHandle("content://tree/$name", name)
 
@@ -85,9 +83,21 @@ class WorkspaceControllerListTest {
             entries.add(to.coerceIn(0, entries.size), item)
         }
 
-        override fun isPersistentGrant(treeUri: String): Boolean = treeUri in granted
+        override fun persistentGrants(): Set<String> = granted
 
-        override fun loadCollections(handle: WorkspaceHandle): LoadResult = result
+        /**
+         * 按调用顺序依次返回的脚本队列（先例见 [WorkspaceControllerTest] 的 ScriptedSource）。
+         *
+         * 为空时回落到 [result]；非空时依次取，**用完后重复最后一个** ——
+         * 「先失败后成功」这类多轮路径没法用单一 [result] 表达。
+         */
+        val script = ArrayDeque<LoadResult>()
+
+        override fun loadCollections(handle: WorkspaceHandle): LoadResult = when {
+            script.isEmpty() -> result
+            script.size > 1 -> script.removeFirst()
+            else -> script.first()
+        }
 
         override fun readBytes(item: com.cyanix.pixfold.domain.model.SourceItem): ByteArray? = null
 
@@ -226,6 +236,50 @@ class WorkspaceControllerListTest {
         assertEquals(2, source.rememberCalls, "refresh() 走 applyRefresh，漏了它顺序刷新后会变旧")
     }
 
+    @Test
+    fun `刷新时授权失效但自动重试成功，也要 remember`() = runTest {
+        // 评审 Important-1：applyRefresh 的 Denied 分支会**自己再扫一次**（自动重试），
+        // 那一次的 Success 与「首轮就成功」在语义上没有区别 —— 都是「真的读到了」。
+        // 漏掉这支的表现是：冷启动抖一下才读到的那次不更新顺序 ⇒ 下次 restore() 用
+        // `workspaces().firstOrNull()` 恢复到**旧**目录，平时完全静默。spec §6 第 2 条。
+        val a = WorkspaceEntry(handle("a"))
+        val b = WorkspaceEntry(handle("b"))
+        val source = ListSource(
+            mutableListOf(a, b),
+            granted = setOf(a.handle.treeUri, b.handle.treeUri),
+        )
+        source.script.addAll(
+            listOf(
+                LoadResult.Success(collections()), // open() 那次扫描
+                LoadResult.Denied, // refresh() 首轮：先失效
+                LoadResult.Success(collections()), // 自动重试：授权其实还在
+            ),
+        )
+        val controller = controller(source, testScope())
+        controller.open(a.handle.treeUri)
+        assertIs<WorkspaceState.Ready>(controller.state)
+
+        // 让「这条不是列表最前」这个条件成立：另一个入口刚用过 b。
+        // 不制造这个前提的话，下面的 entries.first() 断言恒真（open 已经把它排到最前了）。
+        source.rememberWorkspace(b.handle)
+        assertEquals("b", source.entries.first().handle.displayName)
+
+        source.rememberCalls = 0
+        controller.refresh()
+
+        assertIs<WorkspaceState.Ready>(controller.state)
+        assertEquals(1, source.rememberCalls, "自动重试成功同样是「读到了」，必须 remember")
+        assertEquals(
+            "a",
+            source.entries.first().handle.displayName,
+            "重试成功要把这条重新移到最前，否则 restore() 会恢复到旧目录",
+        )
+        assertEquals(
+            listOf("a", "b"),
+            controller.listings.map { it.entry.handle.displayName },
+        )
+    }
+
     // ---- 上限被拒：listRejected ----
 
     @Test
@@ -242,6 +296,26 @@ class WorkspaceControllerListTest {
         source.rejectRemember = false
         controller.pick("content://tree/new")
         assertFalse(controller.listRejected, "拒绝是「上一次」的结论，不是永久标记")
+    }
+
+    @Test
+    fun `被拒之后删掉一条，提示也要撤掉`() = runTest {
+        // 评审 Minor-3：被拒提示说的是「列表满且全钉住，加不进新的」。用户照它去删掉
+        // 一条之后这个前提已经不成立，提示却还挂着 —— 同一条提示会一直留到下次成功
+        // remember 为止（可能再也不发生）。remove() 必须自己把它复位。
+        // 假源用 [ListSource.rejectRemember] 模拟「已满 8 条且全钉住」的拒绝（同上面那条用例）；
+        // 条目本身也照实铺成 8 条全钉，免得用例名里的前提只存在于注释里。
+        val entries = (0 until 8).map { WorkspaceEntry(handle("w$it"), pinned = true) }
+        val source = ListSource(entries.toMutableList())
+        source.rejectRemember = true
+        val controller = controller(source, testScope())
+
+        controller.pick("content://tree/new")
+        assertTrue(controller.listRejected)
+
+        controller.remove(entries.first().handle.treeUri, alsoRelease = false)
+
+        assertFalse(controller.listRejected, "列表不再满了，提示必须跟着撤掉")
     }
 
     @Test
@@ -427,6 +501,9 @@ class WorkspaceControllerListTest {
         controller.move("content://tree/a", "content://tree/c")
 
         assertEquals(listOf("b", "c", "a"), source.entries.map { it.handle.displayName })
+        // 评审 Important-3：只断 [source].entries 挡不住「move() 末尾漏掉 refreshListings()」——
+        // 删掉那一行时存储顺序照旧正确，而用户看到的 [listings] 还停在旧顺序。变异实测全绿。
+        assertEquals(listOf("b", "c", "a"), controller.listings.map { it.entry.handle.displayName })
     }
 
     @Test
@@ -444,6 +521,8 @@ class WorkspaceControllerListTest {
         controller.move("content://tree/d", "content://tree/b")
 
         assertEquals(listOf("a", "d", "b", "c"), source.entries.map { it.handle.displayName })
+        // 同上：界面顺序必须跟着存储顺序一起变，见 Important-3 那条注释。
+        assertEquals(listOf("a", "d", "b", "c"), controller.listings.map { it.entry.handle.displayName })
     }
 
     @Test
