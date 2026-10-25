@@ -257,6 +257,29 @@ class SafTreeStoreTest {
     }
 
     @Test
+    fun `存储里多一个未知字段时仍能解码出原条目`() {
+        // 场景:用户装了更新的版本(写入了 `lastOpenedAt` 之类的新字段),回滚到旧 APK;
+        // 或者将来加字段后又一次回滚。默认的 kotlinx.serialization 遇到未知字段会
+        // 抛 SerializationException ⇒ runCatching 吞掉 ⇒ loadAll() 返空列表 ⇒
+        // **全部工作区静默消失**,用户只会看到「怎么又要重选目录」。
+        // 故 Json 实例必须 ignoreUnknownKeys = true(见 SafTreeStore 的 KDoc)。
+        prefs().edit()
+            .putString(
+                KEY_LIST,
+                """[{"treeUri":"content://tree/a","displayName":"甲","pinned":true,""" +
+                    """"lastOpenedAt":1730000000000},{"treeUri":"content://tree/b",""" +
+                    """"displayName":"乙","futureEnvelope":{"v":2}}]""",
+            )
+            .apply()
+
+        val all = store.loadAll()
+
+        assertEquals(listOf("甲", "乙"), all.map { it.handle.displayName }, "未知字段不该让整条列表解码失败")
+        assertEquals(listOf("content://tree/a", "content://tree/b"), all.map { it.handle.treeUri })
+        assertEquals(listOf(true, false), all.map { it.pinned }, "已认识的字段必须照常读出")
+    }
+
+    @Test
     fun `损坏的数据不会在写入时被当作有效内容合并`() {
         prefs().edit().putString(KEY_LIST, "不是 JSON").apply()
 

@@ -26,6 +26,13 @@ const val WORKSPACE_LIST_LIMIT: Int = 8
  * 换成一个 `workspaces_v2` 存整个数组,写入是**单次** `apply()` ——
  * 不会出现"名字写进去了、图钉没写"的半截状态。
  *
+ * ## 为什么 Json 要 `ignoreUnknownKeys = true`
+ * 默认的 kotlinx.serialization 遇到**不认识的字段**会抛 `SerializationException`，
+ * 底下那道 `runCatching` 一吞就成了空列表 ⇒ 用户升级后回滚旧 APK（或将来加了新字段再回滚）
+ * 时，**全部工作区静默消失**，界面只会表现成「怎么又要重选目录」。
+ * 多出来的字段对旧版本没有意义，忽略它比整条丢弃正确得多；
+ * 缺字段那一侧本来就由 `StoredEntry.pinned` 的默认值兜住（见其 KDoc）。
+ *
  * ## 为什么反序列化失败当作空列表而不抛
  * 这段代码在**冷启动路径**上:抛异常等于用户一打开应用就崩,且无路可退。
  * 而损坏的数据本来也没有可挽救的信息 —— 空列表让用户重新选一次即可。
@@ -44,7 +51,7 @@ class SafTreeStore(context: Context) {
         val raw = prefs.getString(KEY_LIST, null)
         if (raw.isNullOrEmpty()) return migratedFromLegacy()
         val decoded = runCatching {
-            Json.decodeFromString<List<StoredEntry>>(raw)
+            json.decodeFromString<List<StoredEntry>>(raw)
         }.getOrNull() ?: return emptyList()
         return decoded.map { it.toEntry() }
     }
@@ -109,8 +116,8 @@ class SafTreeStore(context: Context) {
     }
 
     private fun persist(entries: List<WorkspaceEntry>) {
-        val json = Json.encodeToString(entries.map { StoredEntry.of(it) })
-        prefs.edit { putString(KEY_LIST, json) }
+        val text = json.encodeToString(entries.map { StoredEntry.of(it) })
+        prefs.edit { putString(KEY_LIST, text) }
     }
 
     /**
@@ -137,6 +144,9 @@ class SafTreeStore(context: Context) {
     }
 
     private companion object {
+        /** 唯一一处 Json 实例：读写共用，避免「写进去的」与「读出来的」用两套策略。 */
+        val json = Json { ignoreUnknownKeys = true }
+
         const val PREFS_NAME = "pixfold_workspace"
         const val KEY_LIST = "workspaces_v2"
         const val KEY_LEGACY_URI = "tree_uri"

@@ -42,17 +42,43 @@ fun interface WorkspaceChangeWatcher {
  * **异常契约**：授权失效时实现方**不要**抛 `SecurityException` 穿透到 UI，
  * 而应返回 [LoadResult.Denied]（见下）。其余 IO 异常一律转成
  * [LoadResult.Failed]，由 UI 决定怎么提示。
+ *
+ * **为什么没有 `lastWorkspace()`**：列表世界里「上次的」= [workspaces] 的第一条
+ * （remember 会把最近用过的移到最前），调用点写 `workspaces().firstOrNull()?.handle`。
+ * **不留双语义**：本项目已经吃过一次「两套语义并存」的亏 —— `WorkspaceState.canOrganize`
+ * 在 `None`/`Denied`/`Failed` 上都返 `true`，与首页真正要问的问题相反，
+ * 2026-10-24 只能另写一个 `canStartWorkflow` 绕开。凡是能从一个来源推导的，
+ * 就不再提供第二个入口。
  */
 interface WorkspaceSource {
 
-    /** 上次授权过的工作区；`null` = 从未选过，或用户清过数据。 */
-    fun lastWorkspace(): WorkspaceHandle?
+    /** 全部已记住的工作区，顺序即显示顺序（图钉只影响渲染，不影响这里）。 */
+    fun workspaces(): List<WorkspaceEntry>
 
-    /** 记住一个刚授权的工作区，供下次冷启动恢复。 */
-    fun rememberWorkspace(handle: WorkspaceHandle)
+    /**
+     * 记住一个工作区并把它移到最前。
+     *
+     * 已存在（同一 treeUri）⇒ 更新显示名 + 移到最前 + **保留 pinned**。
+     * 已满上限且全部钉住 ⇒ 列表一个字都不改，返回 [RememberResult.RejectedAllPinned]。
+     */
+    fun rememberWorkspace(handle: WorkspaceHandle): RememberResult
 
-    /** 忘掉当前工作区（用户主动「更换目录」/ 授权失效后清理）。 */
-    fun forgetWorkspace()
+    /** 只从列表移除这一条；不动磁盘、不动系统授权。 */
+    fun forgetWorkspace(treeUri: String)
+
+    /** 切换图钉。treeUri 不存在时无事发生。 */
+    fun setPinned(treeUri: String, pinned: Boolean)
+
+    /** 拖拽提交：把 from 这一条移到下标 to。越界时钳到合法范围。 */
+    fun moveWorkspace(from: Int, to: Int)
+
+    /**
+     * 这一条是否还持有系统持久授权。
+     *
+     * **只有平台层能回答** —— domain 层不得 `import android.*`（`AdapterBoundaryTest` 每次闸门都跑）。
+     * 默认 `true`：假源与不支持查询的实现按「都在」处理，避免每个测试替身都要实现一遍。
+     */
+    fun isPersistentGrant(treeUri: String): Boolean = true
 
     /**
      * 扫描工作区，组装成集合列表。

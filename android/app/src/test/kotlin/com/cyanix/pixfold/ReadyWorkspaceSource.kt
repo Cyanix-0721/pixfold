@@ -4,6 +4,8 @@ import com.cyanix.pixfold.domain.mock.MockData
 import com.cyanix.pixfold.domain.model.ImageCollection
 import com.cyanix.pixfold.domain.model.SourceItem
 import com.cyanix.pixfold.domain.source.LoadResult
+import com.cyanix.pixfold.domain.source.RememberResult
+import com.cyanix.pixfold.domain.source.WorkspaceEntry
 import com.cyanix.pixfold.domain.source.WorkspaceHandle
 import com.cyanix.pixfold.domain.source.WorkspaceSource
 
@@ -14,7 +16,7 @@ import com.cyanix.pixfold.domain.source.WorkspaceSource
  *
  * 用户裁决「未选工作区时首页两张大卡禁用」之后，首页入口的可用性取决于
  * `WorkspaceState`；而 Robolectric 的 `ContentResolver` 里没有任何
- * `DocumentsProvider`，真实 `AndroidSafSource.lastWorkspace()` 恒为 `null`
+ * `DocumentsProvider`，真实 `AndroidSafSource.workspaces()` 恒为空列表
  * ⇒ state 恒为 `None` ⇒ 两张大卡恒禁用 ⇒ 所有「在首页点卡片进工作流」的
  * 导航测试一起红。
  *
@@ -40,11 +42,18 @@ class ReadyWorkspaceSource(
     private val collections: List<ImageCollection> = MockData.workspaceA.collections,
 ) : WorkspaceSource {
 
-    override fun lastWorkspace(): WorkspaceHandle = handle
+    /** 就绪状态 = 列表里本来就有这一条，且它排在最前（= 上次用过的）。 */
+    private val entries = mutableListOf(WorkspaceEntry(handle, pinned = false))
 
-    override fun rememberWorkspace(handle: WorkspaceHandle) = Unit
+    override fun workspaces(): List<WorkspaceEntry> = entries.toList()
 
-    override fun forgetWorkspace() = Unit
+    override fun rememberWorkspace(handle: WorkspaceHandle): RememberResult = RememberResult.Added
+
+    override fun forgetWorkspace(treeUri: String) = Unit
+
+    override fun setPinned(treeUri: String, pinned: Boolean) = Unit
+
+    override fun moveWorkspace(from: Int, to: Int) = Unit
 
     override fun loadCollections(handle: WorkspaceHandle): LoadResult =
         LoadResult.Success(collections)

@@ -101,7 +101,8 @@ class WorkspaceController(
      * 显示一份过期列表比重新扫一遍更糟。
      */
     fun restore() {
-        val handle = source.lastWorkspace() ?: return
+        // 「上次用过的」= 列表最前那条：rememberWorkspace 会把用过的移到最前。
+        val handle = source.workspaces().firstOrNull()?.handle ?: return
         load(handle)
     }
 
@@ -115,15 +116,16 @@ class WorkspaceController(
         val handle = WorkspaceHandle(treeUri = treeUri, displayName = name)
         // 先记住授权（takePersistableUriPermission 也在这里做），再扫描。
         // 顺序重要：扫描失败/被取消时，用户下次启动仍应恢复到该目录。
+        // 返回值（是否被「满 8 条且全钉住」拒绝）本任务先不处理，Task 4 接被拒提示。
         source.rememberWorkspace(handle)
         load(handle)
     }
 
-    /** 用户主动「忘记」当前工作区。 */
+    /** 用户主动「忘记」当前工作区：只从列表删这一条，**不改**系统授权。 */
     fun forget() {
         cancelJob()
         closeWatcher()
-        source.forgetWorkspace()
+        currentHandle()?.let { source.forgetWorkspace(it.treeUri) }
         state = WorkspaceState.None
     }
 

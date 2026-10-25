@@ -13,8 +13,10 @@ import android.provider.DocumentsContract
 import android.util.Log
 import com.cyanix.pixfold.domain.model.SourceItem
 import com.cyanix.pixfold.domain.source.LoadResult
+import com.cyanix.pixfold.domain.source.RememberResult
 import com.cyanix.pixfold.domain.source.SourceDoc
 import com.cyanix.pixfold.domain.source.WorkspaceChangeWatcher
+import com.cyanix.pixfold.domain.source.WorkspaceEntry
 import com.cyanix.pixfold.domain.source.WorkspaceHandle
 import com.cyanix.pixfold.domain.source.WorkspaceSource
 import com.cyanix.pixfold.domain.source.collectionsFrom
@@ -46,21 +48,30 @@ class AndroidSafSource(context: Context) : WorkspaceSource {
     private val resolver: ContentResolver = appContext.contentResolver
     private val treeStore = SafTreeStore(appContext)
 
-    // Task 2 把存储层换成列表后,"上次的工作区"= 列表最前那条(remember 会把最近用过的插到最前)。
-    // 列表式接口(读取全部条目、图钉、拖拽)由 Task 3 改 WorkspaceSource 时接出来。
-    override fun lastWorkspace(): WorkspaceHandle? = treeStore.loadAll().firstOrNull()?.handle
+    /**
+     * 全部已记住的工作区，顺序即显示顺序。
+     *
+     * 「上次用过的」不再有独立入口 —— 就是这里的 `firstOrNull()`，
+     * 因为 [rememberWorkspace] 会把用过的移到最前。
+     */
+    override fun workspaces(): List<WorkspaceEntry> = treeStore.loadAll()
 
     /**
-     * 记住授权：先 `takePersistableUriPermission`，再落 SharedPreferences。
+     * 记住授权：先落 SharedPreferences（把这条移到最前），再提升持久授权。
      *
      * **顺序与容错**（继承归档 spike 的实测结论）：即使 `takePersistableUriPermission`
      * 抛 `SecurityException` 也要把 URI 存下来 —— 该异常的含义是「这次没能把授权
      * 提升为持久授权」，**不等于**这个 URI 现在不可用（本次进程内仍可能读得到）。
      * 反过来，先存 URI 再提升授权，能保证「下次启动至少会去试一次」，
      * 真的失效时由 `loadCollections` 返回 [LoadResult.Denied] 走重选流程。
+     *
+     * **被拒时不提升授权**：列表已满且全部钉住时 [SafTreeStore.remember] 一个字都不改，
+     * 此时若还去 take 一个没进列表的授权，等于在系统里留一条谁都不会再引用的
+     * 持久授权（用户再也删不掉它）—— 所以先返回。
      */
-    override fun rememberWorkspace(handle: WorkspaceHandle) {
-        treeStore.remember(handle)
+    override fun rememberWorkspace(handle: WorkspaceHandle): RememberResult {
+        val result = treeStore.remember(handle)
+        if (result == RememberResult.RejectedAllPinned) return result
         try {
             resolver.takePersistableUriPermission(
                 handle.treeUri.toUri(),
@@ -73,12 +84,42 @@ class AndroidSafSource(context: Context) : WorkspaceSource {
         } catch (e: Exception) {
             Log.w(TAG, "takePersistableUriPermission 异常 ${handle.treeUri}", e)
         }
+        return result
     }
 
-    // 旧接口语义是"忘掉当前那个工作区",在只有一个工作区的年代等价于清空。
-    // 列表世界里"忘掉"应是逐条移除 —— 那属于 Task 3 改接口的范围,这里先保持旧行为。
-    override fun forgetWorkspace() {
-        treeStore.loadAll().forEach { treeStore.forget(it.handle.treeUri) }
+    /** 只从列表移除这一条 —— **不动**系统授权（撤销要显式调 [releasePersistentGrant]）。 */
+    override fun forgetWorkspace(treeUri: String) = treeStore.forget(treeUri)
+
+    override fun setPinned(treeUri: String, pinned: Boolean) = treeStore.setPinned(treeUri, pinned)
+
+    override fun moveWorkspace(from: Int, to: Int) = treeStore.move(from, to)
+
+    /**
+     * 这一条是否还持有系统持久授权（读权限）。
+     *
+     * 查询本身失败时按「没有授权」处理：让用户重选一次，比显示一个假的 ✓ 好。
+     */
+    override fun isPersistentGrant(treeUri: String): Boolean = try {
+        resolver.persistedUriPermissions.any { it.uri.toString() == treeUri && it.isReadPermission }
+    } catch (e: Exception) {
+        Log.w(TAG, "persistedUriPermissions 查询失败", e)
+        false
+    }
+
+    /**
+     * 撤销这一条的系统持久授权。**只删列表不做这件事** —— 两者是不同强度的动作。
+     *
+     * 现在还没有调用点（`remove(alsoRelease = true)` 是 Task 4 才加），先备好。
+     */
+    fun releasePersistentGrant(treeUri: String) {
+        try {
+            resolver.releasePersistableUriPermission(
+                treeUri.toUri(),
+                Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION,
+            )
+        } catch (e: Exception) {
+            Log.w(TAG, "releasePersistableUriPermission 失败 $treeUri", e)
+        }
     }
 
     /**

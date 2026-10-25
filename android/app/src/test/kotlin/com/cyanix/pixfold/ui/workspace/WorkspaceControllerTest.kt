@@ -3,8 +3,10 @@ package com.cyanix.pixfold.ui.workspace
 import com.cyanix.pixfold.domain.model.ImageCollection
 import com.cyanix.pixfold.domain.model.SourceItem
 import com.cyanix.pixfold.domain.source.LoadResult
-import com.cyanix.pixfold.domain.source.WorkspaceHandle
+import com.cyanix.pixfold.domain.source.RememberResult
 import com.cyanix.pixfold.domain.source.WorkspaceChangeWatcher
+import com.cyanix.pixfold.domain.source.WorkspaceEntry
+import com.cyanix.pixfold.domain.source.WorkspaceHandle
 import com.cyanix.pixfold.domain.source.WorkspaceSource
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -17,7 +19,6 @@ import org.junit.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertIs
-import kotlin.test.assertNull
 import kotlin.test.assertSame
 import kotlin.test.assertTrue
 
@@ -75,12 +76,23 @@ class WorkspaceControllerTest {
     ) : WorkspaceSource {
         private val queue = ArrayDeque(script.toList())
         val loadCalls = mutableListOf<WorkspaceHandle>()
-        var lastWorkspace: WorkspaceHandle? = last
+
+        /** 列表里**本来就有**的那一条（= 上次用过的），构造时由 `last` 铺进去。 */
+        val entries = mutableListOf<WorkspaceEntry>().apply { last?.let { add(WorkspaceEntry(it)) } }
+
+        /** 最近一次 remember 传进来的 handle，供「先记住授权再扫描」的断言用。 */
         var remembered: WorkspaceHandle? = null
 
-        override fun lastWorkspace(): WorkspaceHandle? = lastWorkspace
-        override fun rememberWorkspace(handle: WorkspaceHandle) { remembered = handle }
-        override fun forgetWorkspace() { lastWorkspace = null }
+        override fun workspaces(): List<WorkspaceEntry> = entries.toList()
+        override fun rememberWorkspace(handle: WorkspaceHandle): RememberResult {
+            remembered = handle
+            return RememberResult.Added
+        }
+        override fun forgetWorkspace(treeUri: String) {
+            entries.removeAll { it.handle.treeUri == treeUri }
+        }
+        override fun setPinned(treeUri: String, pinned: Boolean) = Unit
+        override fun moveWorkspace(from: Int, to: Int) = Unit
         override fun loadCollections(handle: WorkspaceHandle): LoadResult {
             loadCalls += handle
             return if (queue.size > 1) queue.removeFirst() else queue.first()
@@ -111,9 +123,11 @@ class WorkspaceControllerTest {
         /** 每次扫描**开始前**的钩子，用来模拟「扫描进行中又发生了别的事」。 */
         var onLoad: ((WorkspaceHandle) -> Unit)? = null
 
-        override fun lastWorkspace(): WorkspaceHandle? = inner.lastWorkspace()
-        override fun rememberWorkspace(handle: WorkspaceHandle) = inner.rememberWorkspace(handle)
-        override fun forgetWorkspace() = inner.forgetWorkspace()
+        override fun workspaces(): List<WorkspaceEntry> = inner.workspaces()
+        override fun rememberWorkspace(handle: WorkspaceHandle): RememberResult = RememberResult.Added
+        override fun forgetWorkspace(treeUri: String) = inner.forgetWorkspace(treeUri)
+        override fun setPinned(treeUri: String, pinned: Boolean) = Unit
+        override fun moveWorkspace(from: Int, to: Int) = Unit
         override fun loadCollections(handle: WorkspaceHandle): LoadResult {
             onLoad?.invoke(handle)
             return inner.loadCollections(handle)
@@ -152,9 +166,12 @@ class WorkspaceControllerTest {
         /** 每次扫描**开始前**的钩子。 */
         var onLoad: ((WorkspaceHandle) -> Unit)? = null
 
-        override fun lastWorkspace(): WorkspaceHandle? = last
-        override fun rememberWorkspace(handle: WorkspaceHandle) = Unit
-        override fun forgetWorkspace() = Unit
+        override fun workspaces(): List<WorkspaceEntry> =
+            listOfNotNull(last).map { WorkspaceEntry(it) }
+        override fun rememberWorkspace(handle: WorkspaceHandle): RememberResult = RememberResult.Added
+        override fun forgetWorkspace(treeUri: String) = Unit
+        override fun setPinned(treeUri: String, pinned: Boolean) = Unit
+        override fun moveWorkspace(from: Int, to: Int) = Unit
         override fun loadCollections(handle: WorkspaceHandle): LoadResult {
             loadCalls += handle
             onLoad?.invoke(handle)
@@ -239,7 +256,10 @@ class WorkspaceControllerTest {
     }
 
     @Test
-    fun `忘记工作区会清空状态并抹掉持久授权`() = runTest {
+    fun `忘记工作区会清空状态并把它从列表里删掉`() = runTest {
+        // 列表世界里「忘记」= 逐条移除这一条，不再是「抹掉唯一的那个」。
+        // 判据从 lastWorkspace() 换成 workspaces()：列表里还留着的话，
+        // 下次冷启动 restore() 会把它当作最前那条恢复回来。
         val source = ScriptedSource(LoadResult.Success(collections()), last = handle)
         val controller = WorkspaceController(source, testScope(), ioDispatcher = testDispatcher())
         controller.restore()
@@ -248,7 +268,7 @@ class WorkspaceControllerTest {
         controller.forget()
 
         assertEquals(WorkspaceState.None, controller.state)
-        assertNull(source.lastWorkspace(), "持久授权也必须抹掉，否则下次启动又回来")
+        assertTrue(source.workspaces().isEmpty(), "列表里也必须没了，否则下次启动又回来")
     }
 
     @Test
