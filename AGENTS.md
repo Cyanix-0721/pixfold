@@ -2,38 +2,14 @@
 
 > PixFold:图片整理与 CBZ 制作工作台(图形应用),**GUI 只做 Android**(2026-09-10 起;Windows / Linux 端只做 CLI),技术栈 **Kotlin + Jetpack Compose(Android 原生)**(§8.1;换栈触发 = §8.2 证伪条件 ③)。
 >
-> **当前阶段(2026-10-19)**:设计期(设计文档线)与实现并行推进。**D1 交付物全部完成**(交互原型 P1–P7 交付、验收清单 20/20、收尾三轮含拖拽让位动效、D1 退出条件 §9 决策门已达成)。**D2 阶段性完成**:**D2a** = SAF 平台层在 `android/` 里重建(只读闭环:领域端口 + 递归遍历 + 持久授权 + `loadThumbnail` + 工作区条/空态),**真机核对通过**;**D2b 五项** = ①千级缩略图策略 ②后台任务与进度 ③授权失效恢复 ④存储空间预检 ⑤大归档写入,**领域层与平台层全部接线完成**;真机取证 **3/5 完整**(②③④已含失败路径),**①只测到 56 张、⑤只测到 33MB 级**(1GB 级与 Zip64 仍未验)。**D3** = 打包核心与适配层(含可执行边界检查 `AdapterBoundaryTest`)。**D4b** = 真实文件闭环:**已端到端跑通** —— `/storage/emulated/0/test` 真实产出两个独立 CBZ(`38,085,495 B` / `79,764,587 B`)。**D2b 代码层已全部完成(2026-10-19 深夜)**:切后台恢复走 `dataSync` 前台服务 + 快照恢复,进度通知支持 Android 16 Live Update 升格(真机拿到 `PROMOTED_ONGOING` 与状态栏胶囊),完成通知分两条渠道(进度静音 / 完成跟随系统)。**同日补做失败路径真机取证并查出真缺陷**:③授权失效(撤销持久授权后逐字显示「重试后仍无法访问…」+ 重选入口)、④空间不足(「还差 4.3 GB」且零字节写入)均通过;**⑤ 查出 OOM 级缺陷** —— 单页整块 `readBytes()` 在 256MB 堆上撞 `OutOfMemoryError`,进程被杀且留下 0 字节 CBZ;已按用户裁决改成**流式两遍读**(峰值内存 = 64KiB 缓冲区),复验产出 33,555,158 B 完整 CBZ。**仍未做**:千级缩略图实测、1GB 级归档 + Zip64 —— 用户 2026-10-19 裁决**接受「代码写完但未验证」,记录后转走查阶段再补**(依据:真机只有 56 张素材;CBZ 是 STORED 不压缩,1GB 输入需等量输出而设备只剩 3.24–4.6 GB)。**D4b 真实改名/撤销已跑通(2026-10-19 深夜)**:`domain/plan/RenameExecution.kt`(`RenameActions.rename` 返**新 uri** 而非 Boolean,撤销才改得对人)+ `data/saf/SafRenamePlatform.kt`;真机 120 张全部改名成功后全部撤销回原名。**首轮撞出 ANR**:`executeRenamePlanReal` 在主线程逐项调 `DocumentsContract.renameDocument`(每项一次同步 Binder 往返),120 项 > 5 秒被系统杀;`logcat -b crash` **空**(不是崩溃),靠 `dumpsys dropbox --print data_app_anr` 才拿到主线程栈顶。修法三件:领域层加 `CancellationToken` + `onProgress`(中断后剩余项补 `PackFailNotStarted`)、UI 执行与撤销都挪 `Dispatchers.IO`、进度条通用化为 `ui/components/TaskProgressBar.kt`。**修正后的续接点**:D4b 剩余 = CBZ 可被阅读器打开、1GB 级归档(已裁决留走查补)。
-> **2026-10-23/24 chip 瀑布流改版 v4 已落地**:芯片补 `Modifier.widthIn(96.dp, 156.dp)`(`CHIP_MIN_WIDTH`/`CHIP_MAX_WIDTH`;**此前无任何宽度上限,长目录名撑满整行 ⇒ 瀑布流退化成一列**)、`CHIP_TEXT_MAX_LINES` 3→**4**、`CHIP_LABEL_MAX_CHARS` 24→**30**(首 15+…+尾 14);取消「常驻 5 个」改**按芯片行数收口**(`CHIP_COLLAPSE_LINES = 3`)——第 3 行末尾一块**同尺寸虚线芯片**(`CollapseChip`,90 行文字用 `drawBehind + PathEffect.dashPathEffect`),点它原地展开/再点收起;两级结构的**二级从兄弟行改为以 series 为顶点的 `Popup` 浮层**(箭头对准锚点、高 318dp 内滚、三条收起触发 = 再点同系列 / 点另一系列 / 点系列外单本);`PixFoldBottomSheet` 与全部 15 个 sheet testTag、3 个 `sheet*` 参数**随之退役**。分行用 `SubcomposeLayout` 手写两趟(探测趟 `clearAndSetSemantics` 空壳只量宽、显示趟只组合要显示的项)——**顺带修两个真缺陷**:①`items[index]` 越界崩溃(items 由 2 项缩 1 项时残留子组合带旧 index 重进,栈顶 `SingleSelectChipRow.kt:198` 经 `Recomposer.performRecompose`)②被收起芯片仍在语义树(读屏念出看不见的条目)。原生 `FlowRowOverflow` **探针否决**(foundation-layout 1.12.1 已 deprecated 且 `shownItemCount` 组合阶段读取抛 `IllegalStateException`)。四道闸门绿(app **748** / domain 940 / lint 零告警 / APK **35,087,282 B**),变异全 KILLED(MA 去 48dp 触摸目标 / MB 锚点退回单变量 / MC 展开态去掉限高 / MD 收口计数改成已显示数 / MF focusable 退回 true / MG 删 BackHandler)。**真机核对已完成**(2026-10-24,361dp 视口),30 / 96 / 156 三个数全对:芯片宽实测 156.0 / 133.7 / 119.4 / 96.3dp,30 字截断未溢成 5 行(3 个长名均 3 行、末字带省略号)。当场又改判两处 —— ①**行内间距 横 6 / 纵 4 → 横 4 / 纵 10 dp**(用户:「chip内容有换行的情况下,左右间隔大了些,上下又几乎没有间隔」;行高由最高那块决定,单行块下方先空一截再叠 4dp ⇒ 行粘死;横向真机留白实测 4dp、纵向 ≈10dp)②**又一个真缺陷:`Popup(focusable = true)` 让收起触发②「点另一个 series」要点两次** —— focusable 是独立窗口且**持焦点**,落在窗口外的触摸被它消费成「点外部⇒dismiss」且**不透传**给下层 ⇒ 改 `focusable = false` + `dismissOnClickOutside = false` + `dismissOnBackPress = false`,返回键由组件内 `BackHandler(enabled = true)` 兜住(activity-compose 1.13.0 是既有依赖)。三条收起触发 + 返回键 + 浮层内滚真机全部一步生效。**教训(第四次)**:断言曾写 `src.contains("focusable = false")`,而该测试自己的 KDoc 里就有这句 ⇒ 恒真,变异 MF 存活后才暴露;现改为过滤注释行后断 `code.contains("focusable = false,")`。
+> **当前阶段(2026-10-25)**:D1 完成、D2 完成(含五项真机取证 + 千级缩略图 862 张实测)、D3 完成、D4 进行中(MVP 闭环:真实 CBZ 落盘、Zip64 4.73 GiB 归档、CBZ 阅读器兼容、Series 三条语义均已真机取证)。
+> **逐轮细节一律看 [`docs/INDEX.md`](docs/INDEX.md) 的「历轮台账」** —— 每轮的裁决、真实缺陷、闸门读数、变异结果都在那里,各阶段实现留痕在 [`docs/phases/`](docs/phases/)。
 >
-> **2026-10-24 两个遗留缺口全部关闭(真机取证)**:①**D2b 第 1 项「千级缩略图」** —— 862 张真实素材实测:冷启 **3.2s 出画面 / 6.7s 稳定**,TOTAL PSS **136 MB → 峰值 271 MB → 回落 231 MB**(按字节 LRU 真在淘汰;pid 未变、`logcat -b crash` 长度 0),gfxinfo **850 帧 / Janky 1(0.12%)** / 95th 15ms,862 张滚到底全加载无空白 ⇒ **D2b 五项真机 5/5**,2026-10-19「接受代码写完但未验证」的裁决作废。②**Series 三条语义** —— 三组素材实测三条全部与 `seriesSuggestionOf` / `nestedDirWarnings` 判定树一致、**无缺陷**(单本跟随 Title / `[作者]` 前缀一致取工作区名、反例跟随 Title / 嵌套目录出 error 色警告条)。细节见 `docs/phases/d2-platform.md`「① 千级缩略图取证」与 `docs/INDEX.md` 历轮台账。
->
-> **D2 期间的关键改判与新增决策**(细节见 HANGOFF §9 D2a/D2b 节与 §5/§11):
-> ① **集合分级改判** —— 旧「一级子目录 = 一个集合」在真实素材上把同系列多本并成一集,改为「**每个直接含图片的目录 = 一个集合**」,父目录即系列(`ImageCollection` 尾部追加带默认值 `seriesKey`/`seriesName`,26 处既有构造零改动);**不做嵌套结构** —— 集合是唯一被排序/命名/打包消费的单位,系列只是芯片行分组视图;集合 id 用**相对工作区根的路径**(用目录名会在不同系列下撞 id)。
-> ② **工作区实时刷新** —— 回 `ON_RESUME` 重扫 + `ContentObserver`(`notifyForDescendants = true`)+ **增量对账**(保留人工排序/改名,丢弃已删,新增按规则插入;对账**必须在组合期**做,放 `LaunchedEffect` 会因下层不重播种而看不到结果)。刷新期保留旧列表不退回 `Loading`、失败不清屏、变更风暴合并成补一轮;**手动刷新按钮刻意不做**。**已知代价**:绕开 `DocumentsProvider` 直接改文件系统(adb `cp`/`rm`)不触发 `notifyChange`,只能靠回前台重扫兜住。
-> ③ **芯片行统一**(用户裁决只统一「集合芯片」与「卷芯片」,其余 9 处 `FilterChip` 不动) —— 抽出 `SingleSelectChipRow<T>` 底层,集合芯片与工作流 B 卷芯片走**两级**(1 级 = 系列或单本、2 级 = 选中的系列以浮层列出成员);第二层底层 `TwoLevelChipRows<T>`,首版未自带 `Column` ⇒ 非 `Column` 容器下两行 bounds 完全重合、点击命中最上层(已修)。**⚠️ 2026-10-23 起 1 级不再「选中系列时收缩到一行」** —— 改为恒定按 `CHIP_COLLAPSE_LINES = 3` 行收口,二级改为以 series 芯片为顶点的 `Popup` 浮层(见本节末尾 v4 段)。其余 `FilterChip` 是「编辑一个参数」而非「从 N 条选 1 条」,语义不同。
-> ④ **工作流 B 复用工作区**(用户裁决,与 A 同一套)—— 一个集合 = 一本;三层分工 `comicVolumesFrom`(纯函数给建议值)/ `SafOutputExistsProbe`(问 provider 同名 CBZ 是否存在,决定覆盖警告)/ `SafPackExecutor`(读字节写 ZIP)。`outputExists` **必须问一次**:为 true 不告知 ⇒ 静默覆盖;为 false 而实际存在 ⇒ 撤销把「覆盖」记成「新建」、**删掉用户原来的文件**(缺陷 R3)。
-> ⑤ **输出名撞车必须执行前阻断** —— 真机当场暴露的**静默数据丢失**:同系列两本默认名都取系列名 ⇒ 两卷写同一路径、后写覆盖前写,报告说「成功 2」而磁盘只剩 1 个文件。修法 = `titleSug` 改取**卷目录名**(用户指出「默认名不是应该从单本的文件(夹)名解析吗」)+ `PackPreflight` 新增 `PackBlocker.OutputNameCollision`(真机验证:两本都改 `same.cbz` 后界面明确提示且**一个字节都没写**)。
-> ⑥ **空间未知 ≠ 空间充足** —— `availableBytes: Long? = null` 表示「无法判定」而非 0;拿假大数伪装「够用」和直接拒绝都错。**§11 第 12 条空间阈值由此关闭**:`SpaceThreshold.Percentage(10)` + 安全余量 `32 MiB`。
-> ⑦ **零字节 CBZ 的防线 = 先探测后开流** —— 缺页时连输出流都不打开;写盘失败必 `discardFor` 清理半成品;中断只在**卷间**检查(半途硬停留半个 ZIP)。
-> ⑧ **`PackRunReport` 单向转 `ExecutionReport`** —— 真实写盘报告喂给 D3 已有报告页,UI 零改动;只有 `Written` 算成功且带 `createdPath`(自动不进撤销记录),`originalPath` 复用 `overwritesExisting` 这唯一判据。
->
-> **D2 期间真机暴露的真实缺陷**(均已修,详见 HANGOFF §9):① **热切换工作区整片空白** —— 本地 `state` 用**无参 `remember`** 播种,上层换工作区传下新 state 但下层组合未销毁 ⇒ 仍持旧 orders ⇒ 渲染处 `?: return` **静默白屏**,连「重置全部」也救不回;修法 = 播种点加 `collections`/`collection` 作 key + 去掉静默 `return` 改显式空态。**任何状态错配都必须可见,白屏是最坏的失败模式。** ② **重命名后文件名不更新** —— `reconcilePageOrder` 原在 id 集合相同时原样返回旧实例,而 `ExternalStorageProvider` **重命名不换 `documentUri`** ⇒ 永远显示旧名;改为「顺序与人工标记原样保留,但每项换成刷新后的元数据」。③ **集合分级错误**(见上 ①)。
->
-> **D2 收尾四道闸门(第二轮结束时)**:`app 616` / `domain 817` / `lint` 零告警 / APK **34,852,830 B**;变异 M1–M16 全 KILLED(M5 首轮存活 = 排序断言没有判别力 ⇒ 改成逆序后杀掉;M15/M16 为本轮新增的 `effectiveScheme` 与播种入口变异)。**遗留**:① `ContentObserver` 的 `notifyForDescendants` 变异 **M8 刻意保留**(Robolectric 无真实 `DocumentsProvider`,属「只能真机断」类别,不设假保障);② `WorkspaceState.Failed` 不带 handle ⇒ 首次加载失败后 `refresh()` 是 no-op(已知,未修)。
->
-> **下一步 = Series 三条语义(用户 2026-10-20 裁决,详见 `HANGOFF.md` §9.1 历轮索引与 `docs/phases/d4-mvp.md`)。** **本轮(2026-10-20 凌晨)**:①**计划页预检** —— 预检从「点执行才算」提前到「进计划页就算」(`PackExecutorPort.preflight` + `PackUiPreflight{Ready/Unavailable}` + `PackPreviewPage` 预检面板,阻断=error 色/告知=onSurfaceVariant),并修掉 `assessZip64Need` 从不接收 `centralDirOffset` 导致「整卷超过 4 GiB」永不触发;真机 4.7G/1600 页单本验证面板文案出现;顺带修 `PixFoldApp` 的 `packExecutor` 缺 `remember` ⇒ 预检无限重启(改 `rememberUpdatedState`)。②**CBZ 阅读器兼容已取证** —— Kuro Reader Pro 1.6.7 打开真机产出的 38MB/24 页包,首屏正常、末页 `24 / 24`;并补上此前零覆盖的检查(`CbzReaderCompatTest` 9 项全走 `ZipFile`,此前全工程回读一律 `ZipInputStream`)。③**已有 ComicInfo.xml 作为当前值** —— `ComicInfoReader.kt` 的 `parseComicInfo`/`applyExistingComicInfo` + `SafExistingComicInfoProbe`;当前值取文件、**建议值仍取文件夹**(用户裁决),「恢复建议值」因此与无 ComicInfo 时一致;对账仍按「值≠建议」判人工改过。④**卷号为空省略 `<Number>` 标签**(保留卷号缺失提示)、**LanguageISO 缩为 Unset/Zh/Ja**(Unset 即终态,不再进 `pendingIssues`)、**元数据输入框改多行软换行**(修光标拖不到视口外)。四道闸门 **app 677 / domain 907 / lint 零告警 / APK 34,236,654 B**。**执行后可撤销已落地** —— 见上方续接点段的 ANR 修复轮记录。**名字清洗与「目录名 → 展示名」统一抽象**(2026-10-19 晚):`derivedNamesOf` 是全工程唯一入口,芯片显示原始目录名、`<Title>` 用清洗后的 `title`、CBZ 名用保留 `[作者]` 前缀的 `cbzBase`。
->
-> **本轮(2026-10-20 白天)**:①**4.73 GiB 归档真机实测通过** —— D2b 第 5 项最后一块。用 `test/[青水庵 (にやすけ 青水庵)] 子産み島/…2&3`(4.7 GB / 1599 页)打出 **5,078,971,778 B** CBZ;Zip64 取证:普通 EOCD `cd_offset=0xFFFFFFFF`、Zip64 EOCD Record `version_needed=45`、`cd_offset=5,078,882,575`;Kuro Reader 打开 `1/1599`→`1599/1599`。②**通知跳转缺陷已修** —— `MainActivity` 读 `EXTRA_OPEN_LIBRARY_PACK`(`onCreate` + `onNewIntent` 两个入口)、`PixFoldApp(openPackOnStart)`+`onPackRouteHandled` 回清、`LibrarySteps(startAtPackStep)` 走 `goToLibraryStep`。**真机第二轮撞出真缺陷**:`var startAtPack by remember { mutableStateOf(...) }` **无 key** ⇒ 第二次点通知静默失效 ⇒ 加回清后修复。③**打包进度改双层圆环弹窗 + 背景高斯模糊**(用户裁决:模态/只模糊背景/取消二次确认):领域层补**页级进度透传**(`CbzWriter`→`PackRunner`→`PackExecutor`,内环用);新建全站弹窗抽象 `ui/components/PixFoldDialog.kt` —— `DialogBlurController` **用计数不用布尔**(嵌套弹窗)且 `release` 钳到 0(否则背景永久模糊)。**真缺陷**:首版 `DialogBlurHost` 按 `hasOpenDialog` 切换 `content()` 调用层级 ⇒ Compose 视为不同子树而重建 ⇒ **弹窗一打开就自己消失**(两条既有测试抓出)⇒ 改为「Box 恒定,只让修饰符变」。变异 M1–M4 KILLED;M5(模态语义)存活 ⇒ 删断言并写明「只能真机验」(Robolectric 无「点 Dialog 外部/返回键」路径)。四道闸门 **app 693 / domain 910 / lint 零告警 / APK 34,323,186 B**。
-> **Series 三条语义已实现(2026-10-21 凌晨,详见 HANGOFF §9「Series 三条语义」)**:①无系列层时 Series 跟随 Title;②仅当卷目录 `[作者]` 前缀与工作区文件夹名一致时取工作区名(`seriesSuggestionOf` 判定树);③series 下嵌套目录 ⇒ 书架页警告条(`nestedDirWarnings`)。app 704 / domain 920,变异 M1–M7 全 KILLED;**真机核对待补**(设备凌晨自动锁 PIN)。
 > **⚠️ 换机续接点(2026-09-27 订正)**:当前工作分支 = **`dev`**;**已推送的远端基线是 `origin/dev`**,本地 `dev` 领先若干提交且**均未推送**(确切数目查 `git rev-list --count origin/dev..dev`,**本处不硬编码以免每次提交后失效**)。曾经的阶段分支 `d1/settings-impl` 已合回 `dev`(merge `7a6f678`)并删除本地分支。分支拓扑 `ready` → **`dev`** → 阶段分支 `d1/pN`(完成即合回 `dev` 并回写文档);**D1 全绿后 `dev` → `main` 发 release** —— 详见 §6 与 HANGOFF §9.2。**push 由用户处理,agent 只提交不推送。**
 >
-> **本文件头部只做「当前阶段 + 续接点」**,逐轮台账与历轮索引在 [`docs/INDEX.md`](docs/INDEX.md) 的
-> 「历轮台账」一节(原因:历轮表 43 行 / 22 KB 曾使本文件占 65,536 字节工作区指令预算的 88%,
-> 逼近截断;2026-10-23 迁出,**内容逐字未改**)。
+> **写头部时的纪律(踩过三次)**:①只写「当前阶段一句话 / 续接点 / 指针」三类 —— 逐轮台账、历次改判与缺陷清单、闸门读数、变异结果**一律不写在这里**;历轮表曾以 43 行 / 22 KB 占满注入预算的 88%(2026-10-23 迁出),2026-10-25 又在头部重新长出 18,491 字节(**占全文 41.1%**)被迫二次迁出 —— 每轮往头部加一段历史,就是在重犯同一个错。
+> ②**不硬编码提交数**(每次提交后即失效,查 `git rev-list --count origin/dev..dev`);③阶段状态以 `HANGOFF.md` §9.1 为准。
 >
-> ⚠️ **写头部时的纪律**(踩过):**不硬编码提交数**(每次提交后即失效);阶段状态以 `HANGOFF.md` §9.1 为准。
->
-> 本文件优先级低于用户当回合指令,高于全局 AGENTS.md 的**项目事实类**约定(技术栈/环境/工具链/构建命令)。**但全局 `~/.dsh/AGENTS.md` §0 的「任何用户任务先按 Superpowers 协议匹配 skill」是下限,项目级不得覆盖** —— 见 §0。
 
 ## 0. skill 匹配(先于一切,本节唯一不可被项目级覆盖)
 
@@ -83,6 +59,8 @@
 | 归档分支      | `archive-flutter-verify`(**已推远程**;本地无同名分支):已删除的 `pixfold-d1` / `pixfold-saf-spike` 整树快照;新栈可参考其中 Kotlin SAF 实现。详见 HANGOFF §12.7                                                       |
 
 **变更路由(维护规则)**:领域术语、决策、约束变更 → **先回写 `HANGOFF.md` 对应章节(唯一权威)**,不在别处另起炉灶;凡改变“当前阶段/状态”,随后同步本文件头部快照与 `README.md` 状态/路线,保持三处一致、不得只改一处。环境/工具类变动回写 `HANGOFF.md` §12。原 `s_handoff.md` 已于 2026-09-07 并入 §12 后删除,勿再新建同类文件。
+
+**反方向同样成立:历史不进头部。** 每轮收工写文档时,「这一轮做了什么」写进 `docs/INDEX.md` 的历轮台账或 `docs/phases/`,**不写进本文件头部**;头部只允许「当前阶段一句话 / 换机续接点 / 指针」三类。2026-10-23 与 2026-10-25 两次迁出都是同一个病 — 平时一句「顺手记一下」最省事,攒够一年就是 22 KB。
 
 ## 2. 不可违背的产品约束
 
@@ -146,7 +124,7 @@
 3. **变异验证**:证明断言有杀伤力(见 7.4)。
 4. **真机核对**:必须**先获用户授权**(见 7.3)。
 5. **回写文档**:`HANGOFF.md` → 同步本文件头部快照 + `README.md`(变更路由三处一致)。
-6. **展示改动集等批准**:列出文件与行数,**等用户点头**。
+6. **展示改动集 + 主动提醒提交**:列出文件与行数,然后**每次都主动问一句**:「这些改动现在提交,还是继续下一个需求一起提交?」—— 判断权在用户,不在我。**不许自己替他判「改动小/是中间态/后面还要动同一片代码,先攒着吧」**,那是把「等待裁决」偷换成「我已经决定攒着」。依据 `User said (m03873)`:「每次完成任务提醒我提交,我来决定是直接继续新需求写完一起提交还是先提交再继续」。注意这条**不豁免**下方「不得在真机核对前宣布完成」:提醒提交的前提是四道闸门绿 + 该真机的部分已真机核对,前置没做完时该说的是「还差什么」,不是「要不要提交」。
 7. **提交**(只提交不推送)→ **推送前**跑密钥扫描(见 §7.2 末;**必须在提交之后** —— 该扫描读的是 git 对象,提交前跑会漏掉正要提交的内容)→ **合回 `dev`** → 再补一次"提交号 + 合并结果"的文档同步提交。
 
 ⚠️ **任务面板纪律(与上列 7 步并行贯穿全程):开工建全量清单,每步完成立即标记,不得攒批** —— 条文与理由见全局 `~/.dsh/AGENTS.md` §0(含 `todo_write` 的挂载来源、`executing-plans` 依据、以及「面板是压缩后唯一能自证进度的载体」的原因),**此处不复述以免两处漂移**。**留一条本项目实测先例**:第 18 条一轮 7 项**开工时只写了一次、全程未再更新**,直到用户指出(`User said (m16667)`:「你又忘了推进任务进度」)才一次性全勾掉;性质是**执行过失而非规约缺口**。
@@ -154,6 +132,8 @@
 ⚠️ **同一过失反复发生，累计五次(内容相同无需重读)**：② `User said (m21345)`「你又忘了实时跟进人物面板」；③ `User said (m22486)`「你都到变异测试了任务面板却仍然没有实时跟进」；④ `User said (m22601)`「**你已经好几次没有实时更新任务面板了，全局AGENTS.md的约束还不够吗**」；⑤ `User said (m23631)`「菜单宽度这个没有更加优雅的写法吗，另外你好像又又又又又忘了更新任务面板进度」(「又」×5 ⇒ 用户已用字数计数)。⇒ 五次均为**执行过失**。现行硬规则：**任何一步完成后的第一个工具调用必须是 `todo_write`**，然后才允许启动下一步命令（可检查：面板更新时间戳必须早于下一个 bash/read）。
 
 ⚠️ **不得在真机核对前宣布完成、不得先催提交**:用户已明确纠正 —— `User said (m13805)`「你经常嘴上说完成要提交却没有给我真机校验先，而且任务进度会卡着」。**正确顺序是「真机核对 → 回写文档 → 展示改动集 → 提交」**。
+
+⚠️ **但反过来也不行:前置绿了必须主动问提交,不许闷着。** 上面那条禁的是「拿提交当完成宣告、跳过真机」,**不是「别提提交」**。2026-10-25 用户明确要求每轮完成主动提醒(`User said (m03873)`),因为「现在提交还是攒着一起提交」是**他的调度决策** —— 我不问,他就得自己盯回来催。两条合起来的判据:**前置没绿 ⇒ 报「还差什么」;前置全绿 ⇒ 报改动集 + 问「现在提交还是攒着」。**
 
 ### 7.2 四道闸门(Gradle 必须在 Windows 侧跑)
 

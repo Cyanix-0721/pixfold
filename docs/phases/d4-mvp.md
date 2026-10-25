@@ -574,6 +574,25 @@
 > 四道闸门:app **657** / domain **877** / lint 零告警 / APK **34,204,030 B**。变异 **M1–M6 全 KILLED**(M1 执行回主线程、M2 底栏不换进度条、M3 去掉中断检查、M4 尚未开始原因置空、M5 成功不计入进度、M6 跳过不计入进度)。M5 首轮写成重复 `when` 分支导致编译失败 —— **编译失败不算 KILLED,必须重做成语义合法但行为错误的变异**。
 
 
+> **▶ 工作区选取搬到首页 (2026-10-24)** —— 用户原话「把工作区选取改到首页？写功能里感觉意义不大,要么是首页点进去,要么是外部直接分享文件夹或者大量图片进去（这功能D5再做）」。
+>
+> **一、落地的不是新设计,而是 HANGOFF §4 里 2026-10-15 就写成目标形态的那一版** —— 当时原文是「标题行 + 设置齿轮 → 两张工作流大卡(不变) → 其下从属层一行『当前工作区: … [更换]』」,执行时机标为「属 D2b/D4b,本轮(D1 收尾)不碰首页」。本轮把它从「将来」落到现在,**入口仍然不是第三张大卡**(Workspace 是范围、工作流是任务,摆成三张等权卡会误导用户以为「选工作区」也是一件能做完的事)。
+>
+> **二、三条裁决(用户原话「乙甲乙」)** —— ①工作流内那两处 `WorkspaceBar` 怎么办:**乙** = 只在正忙/出问题时显示;②选完工作区停首页还是自动跳:**甲** = 停首页;③未选工作区时两张大卡禁用吗:**乙** = 禁用,首页变成「先选文件夹」引导页。
+>
+> **三、裁决①不能简单「全删」的根因**:`WorkspaceState.collectionsOr` 在非 `Ready` 状态**一律回退 `MockData`** ⇒ 授权失效后界面上照样有一整列**看着正常**的图片,用户会以为在编辑真实文件。所以 `Denied`/`Failed` 必须保留重选入口;`None`(首页已有入口)/`Ready`(无事可做)才可以不画。落成扩展 `val WorkspaceState.showsWorkspaceBar`,而不是在两处调用点各写一个 `when` —— **只改一处不会有任何测试报错**,这正是要抽出扩展的理由。
+>
+> **四、裁决③不能复用现成判据**:`WorkspaceState.canOrganize` 在 `None`/`Denied`/`Failed` 都返 `true`(D1 的 mock 演示语义:没选目录也能拿演示数据玩)。而首页入口要回答的是「点进去操作的是不是**你自己的**文件」—— 两个问题不同,必须另立 `HomeScreen.canStartWorkflow`:`null→true`(宿主没接线时本组件无权假定)、`None/Loading/Denied/Failed→false`、`Ready→collections.isNotEmpty()`。
+>
+> **五、禁用态的写法有讲究**:必须走 `Modifier.clickable(enabled = enabled, onClick = …)`,**不能换成空 lambda** —— 只有 `enabled` 参数会往语义树写 `Disabled`,读屏才知道这个大卡用不了,测试的 `assertIsNotEnabled` 也依赖它。视觉上描边 `outlineVariant.copy(alpha = 0.4f)`、标题 `onSurface.copy(alpha = 0.38f)`。
+>
+> **六、测试侧必须开注入缝**:`PixFoldApp` 原来直接 `remember { AndroidSafSource(context) }`,没有替换点。Robolectric 没有真实 `DocumentsProvider` ⇒ `lastWorkspace()` 恒 null ⇒ state 恒 `None` ⇒ 两张大卡恒禁用 ⇒ **24 处导航测试会一起红,那不是行为回归**。故加 `PixFoldApp(workspaceSource: WorkspaceSource? = null)`(与既有 `store`/`openPackOnStart` 同一套可测性先例),测试侧补 `ReadyWorkspaceSource`。另有一条真实的连锁改判:`AppNavigationTest` 的 `volumeCardTag("aot-1")` 改成 `"trip"` —— 注入就绪工作区后卷 id 直接来自 `collections`(`ComicVolumesFrom.kt` 的 `id = collection.id`),而 `aot-1` 只属于「无工作区 ⇒ 回退 `MockDataB`」那条路径。
+>
+> **七、变异 M5 首轮 SURVIVED 是本轮最有价值的一条**:`LibraryPage` 的 `showsWorkspaceBar` 条件退回 `!= null`,全部测试照绿 —— 说明工作流 B 侧**一条守卫都没有**,只守了 A 侧。补 `LibraryPageTest` 两条(常态不挂条 / 撤权后必须挂条)后转 KILLED。**两处必须同时改的地方,只改一处不会有任何测试报错**,与第三条同一个病因。
+>
+> 四道闸门(`--rerun-tasks` 强制重跑):app **764** / domain **940** / lint 零告警 / APK **34,426,454 B**;变异 M1–M6 全 KILLED。分支 `d4/home-workspace`。**真机核对待做**。
+>
+
 优先交付（**GUI 仅 Android**，2026-09-10 变更）：
 
 - Android：单目录/单系列，图片预览与人工排序，逐卷元数据，CBZ 生成；
