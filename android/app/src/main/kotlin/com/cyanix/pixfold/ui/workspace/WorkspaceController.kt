@@ -3,11 +3,16 @@ package com.cyanix.pixfold.ui.workspace
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import com.cyanix.pixfold.domain.source.AndroidGrantReleaser
 import com.cyanix.pixfold.domain.source.FailureCause
 import com.cyanix.pixfold.domain.source.LoadResult
+import com.cyanix.pixfold.domain.source.RememberResult
 import com.cyanix.pixfold.domain.source.WorkspaceChangeWatcher
 import com.cyanix.pixfold.domain.source.WorkspaceHandle
+import com.cyanix.pixfold.domain.source.WorkspaceListing
 import com.cyanix.pixfold.domain.source.WorkspaceSource
+import com.cyanix.pixfold.domain.source.movedOrder
+import com.cyanix.pixfold.domain.source.orderedForDisplay
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -67,7 +72,41 @@ class WorkspaceController(
     var isRefreshing: Boolean by mutableStateOf(false)
         private set
 
+    /**
+     * 列表快照。**含 granted 运行时判定**，每次 [openList] 与任何增删改后重算。
+     *
+     * 不缓存 `granted`：持久授权可能在应用外被撤销（用户在系统设置里删了），
+     * 我们收不到任何通知。缓存它等于显示一个过期的 ✓。
+     *
+     * **分区先于图钉**：列表分「已持久授权」与「只记住了路径」两段，上段整体在前；
+     * 图钉的稳定排序只在**每段内部**生效（见 [refreshListings]）。把两者混成一条排序键，
+     * 就等于允许一枚图钉把一条没有授权的记录顶到有授权的那一段里 —— 那是伪造授权。
+     */
+    var listings: List<WorkspaceListing> by mutableStateOf(emptyList())
+        private set
+
+    /**
+     * 上一次 [WorkspaceSource.rememberWorkspace] 被「8 条全钉住」拒绝了。
+     *
+     * UI 据此提示「先取消一个图钉再添加」。**必须是可观察状态而不是返回值**：
+     * 拒绝发生在 [pick] 与 [load] 两条路径上，用户看到的却只有一个「没加上」的结果；
+     * 界面拿不到一句能解释这句话的信息时，只会让人以为应用吞了操作。
+     */
+    var listRejected: Boolean by mutableStateOf(false)
+        private set
+
     private var job: Job? = null
+
+    /**
+     * 正在 [load] 的那份授权。
+     *
+     * 为什么需要单独记：`WorkspaceState.Loading` **不带 handle**，而 [remove] 必须回答
+     * 「用户删掉的这条是不是正在加载的那条」。没有它，扫描期间删掉目录会让扫描继续
+     * 跑完并把一个已经不在列表里的目录落成 Ready。
+     *
+     * 只在 [loadingHandleOrNull] 里、且仅当状态是 Loading 时才读 —— 陈旧值因此无害。
+     */
+    private var loadingHandle: WorkspaceHandle? = null
 
     /** 当前挂着的变更监听；换工作区 / 忘记 / 关闭时必须先关掉它。 */
     private var watcher: WorkspaceChangeWatcher? = null
@@ -102,10 +141,100 @@ class WorkspaceController(
      */
     fun restore() {
         // 「上次用过的」= 列表最前那条：rememberWorkspace 会把用过的移到最前。
-        // TODO(Task 4): 列表为空时直接 return，state 保持原值 —— 从 Ready 变成空列表
-        //  仍会显示 Ready。列表页的 remove() 落地时必须同时复位 state。
         val handle = source.workspaces().firstOrNull()?.handle ?: return
         load(handle)
+    }
+
+    /**
+     * 重读列表 + 逐条判定授权。每次打开列表都调 —— 见 [listings] 的 KDoc。
+     */
+    fun openList() {
+        refreshListings()
+    }
+
+    /**
+     * 从列表里选一条切过去。
+     *
+     * **只在读到之后才移到最前**：失败就移到最前会让一条打不开的记录反复霸占第一位。
+     * 「移到最前」的动作落在 [load] 的成功分支里（一个位置覆盖 restore / pick / open
+     * 三个入口，spec §6 第 2 条），这里只负责发起。
+     */
+    fun open(treeUri: String) {
+        val entry = source.workspaces().firstOrNull { it.handle.treeUri == treeUri } ?: return
+        load(entry.handle)
+    }
+
+    /**
+     * 从列表移除一条。
+     *
+     * [alsoRelease] 为 `true` 才撤销系统持久授权 —— 默认 `false`。
+     * 「从列表删掉」与「收回系统授权」是两件事：混成一件会让用户手滑就丢掉授权，
+     * 下次还得重新走系统选择器。
+     *
+     * ## 「是不是当前那条」为什么不能只看 [currentHandle]
+     *
+     * - [WorkspaceState.Failed] **不带 handle**（只有 message）⇒ 那时「当前是哪条」不可知。
+     *   既然无从判断，就按「可能正是它」处理：停在一条可能已被删掉的目录的 Failed 上，
+     *   是对用户说了一句假话。旧 `forget()` 正是在这里返 nil，于是**一条都删不掉**
+     *   （评审 M5），用户点了 ✕ 列表照旧，下次启动又回来。
+     * - [WorkspaceState.Denied] 带 handle ⇒ 能如实判断，故**不能**无条件回 [WorkspaceState.None]：
+     *   那条工作区条是授权失效时唯一的重选入口（见 `WorkspaceState.showsWorkspaceBar`），
+     *   删掉一条无关记录不该把它一起关掉。
+     * - [WorkspaceState.Loading] 取不到 handle，改读 [loadingHandle]。
+     *
+     * 删除动作本身**与「当前是哪条」无关**：入参就是 treeUri。
+     */
+    fun remove(treeUri: String, alsoRelease: Boolean) {
+        val active = currentHandle() ?: loadingHandleOrNull()
+        val wasCurrent = active?.treeUri == treeUri
+
+        source.forgetWorkspace(treeUri)
+        if (alsoRelease) (source as? AndroidGrantReleaser)?.releasePersistentGrant(treeUri)
+        refreshListings()
+
+        // 列表空了也回 None：目录已不再被记住，界面不能再停在一个凭空的「当前工作区」上。
+        // Failed 态无条件复位 —— 那时「当前是哪条」不可知，见上方 KDoc。
+        if (wasCurrent || state is WorkspaceState.Failed || listings.isEmpty()) {
+            cancelJob()
+            closeWatcher()
+            state = WorkspaceState.None
+        }
+    }
+
+    /** 切换图钉。渲染顺序立刻变（钉住的排本区最前），存储位置不动。 */
+    fun togglePin(treeUri: String) {
+        val entry = source.workspaces().firstOrNull { it.handle.treeUri == treeUri } ?: return
+        source.setPinned(treeUri, !entry.pinned)
+        refreshListings()
+    }
+
+    /**
+     * 拖拽提交。入参是 **treeUri**，不是下标 —— 渲染顺序经过 pinned 稳定排序，
+     * 与存储下标没有线性对应关系（换算见 `movedOrder`）。
+     *
+     * **跨分区的拖拽被丢弃**：分区是运行时事实，把一条「只记住了路径」拖进
+     * 「已持久授权」区等于伪造授权。判据用「两端授权状态是否一致」而不是「分区序号是否
+     * 相同」—— 后者要先把整表分区一遍，两行能算清的判断不该付一次全表遍历。
+     *
+     * ## `to` 为什么找 `fromUri` 而不是 `toUri`
+     *
+     * `movedOrder` 的返回值**就是期望的最终序列**；而 `moveWorkspace(from, to)` 的语义是
+     * 「删掉 `from` 之后，把这条插到第 `to` 位」。删完就插、其后元素整体后移一位，
+     * 所以这条落定后的下标恰好等于它的插入位 —— 即它在 `moved` 里的下标。
+     *
+     * 换成「在 `moved` 里找 `toUri` 的下标」就会错一格：`[a,b,c]` 上 a→c 时
+     * `moved` = `[b,c,a]`，c 的下标是 1，插到 1 位得到 `[b,a,c]`，与期望的 `[b,c,a]` 不符。
+     * （brief Step 3 的代码片段与它自己的用例正是这么互相矛盾的，以用例与 spec §4.4 为准。）
+     */
+    fun move(fromUri: String, toUri: String) {
+        val store = source.workspaces()
+        val fromGranted = source.isPersistentGrant(fromUri)
+        if (fromGranted != source.isPersistentGrant(toUri)) return
+        val moved = movedOrder(store, fromUri, toUri) ?: return
+        val from = store.indexOfFirst { it.handle.treeUri == fromUri }
+        val to = moved.indexOfFirst { it.handle.treeUri == fromUri }
+        source.moveWorkspace(from, to)
+        refreshListings()
     }
 
     /**
@@ -118,19 +247,26 @@ class WorkspaceController(
         val handle = WorkspaceHandle(treeUri = treeUri, displayName = name)
         // 先记住授权（takePersistableUriPermission 也在这里做），再扫描。
         // 顺序重要：扫描失败/被取消时，用户下次启动仍应恢复到该目录。
-        // 返回值（是否被「满 8 条且全钉住」拒绝）本任务先不处理，Task 4 接被拒提示。
-        source.rememberWorkspace(handle)
+        listRejected = source.rememberWorkspace(handle) == RememberResult.RejectedAllPinned
         load(handle)
     }
 
-    /** 用户主动「忘记」当前工作区：只从列表删这一条，**不改**系统授权。 */
+    /**
+     * 用户主动「忘记」当前工作区：只从列表删这一条，**不改**系统授权。
+     *
+     * 薄壳转 [remove]（不带 alsoRelease）—— 删除逻辑只留一处。原先它直接调
+     * `currentHandle()?.let { forgetWorkspace(it.treeUri) }`，在 Failed 状态下
+     * 一条都删不掉却照样把 state 置 None（评审 M5）。
+     */
     fun forget() {
-        // TODO(Task 4): 换成 remove(treeUri, alsoRelease) —— 当前 currentHandle() 在
-        //  Failed 状态下返 null，那时一项都不删却仍把 state 置 None。
-        cancelJob()
-        closeWatcher()
-        currentHandle()?.let { source.forgetWorkspace(it.treeUri) }
-        state = WorkspaceState.None
+        currentHandle()?.treeUri?.let { remove(it, alsoRelease = false) }
+            ?: run {
+                // Failed / Loading 下当前那条未知：无处可删，但仍要让界面离开一个
+                // 已经无效的「当前工作区」。
+                cancelJob()
+                closeWatcher()
+                state = WorkspaceState.None
+            }
     }
 
     /**
@@ -171,32 +307,44 @@ class WorkspaceController(
         // 旧工作区的监听必须先断，否则换目录后它还在替旧目录触发 refresh()。
         closeWatcher()
         state = WorkspaceState.Loading
+        loadingHandle = handle
         job = scope.launch {
-            // 阻塞遍历必须离开主线程：851 张图实测约 1 秒，千级更久，
-            // 留在主线程就是肉眼可见的掉帧甚至 ANR。
-            val first = withContext(ioDispatcher) { source.loadCollections(handle) }
+            try {
+                // 阻塞遍历必须离开主线程：851 张实测约 1 秒，千级更久，
+                // 留在主线程就是肉眼可见的掉帧甚至 ANR。
+                val first = withContext(ioDispatcher) { source.loadCollections(handle) }
 
-            // 授权失效的自动重试（D2b 退出条件 ③「授权失效恢复流程」）。
-            //
-            // **为什么必须自动重试一次而不是直接报失效**：Cold start 时
-            // takePersistableUriPermission 授予的权限可能尚未就绪，表现同样是
-            // SecurityException —— 与「用户真的撤销了授权」在平台层无法区分。
-            // 不重试的话，用户每次冷启动都会看到一次「授权已失效」，
-            // 然后点一下重选又莫名其妙地好了。
-            val cause = first.failureCause
-            if (cause == null || !shouldAutoRetry(cause, retriedTimes = 0)) {
-                state = first.toWorkspaceState(handle)
-                watchIfReady(handle, first)
-                return@launch
-            }
+                // 授权失效的自动重试（D2b 退出条件 ③「授权失效恢复流程」）。
+                //
+                // **为什么必须自动重试一次而不是直接报失效**：Cold start 时
+                // takePersistableUriPermission 授予的权限可能尚未就绪，表现同样是
+                // SecurityException —— 与「用户真的撤销了授权」在平台层无法区分。
+                // 不重试的话，用户每次冷启动都会看到一次「授权已失效」，
+                // 然后点一下重选又莫名其妙地好了。
+                val cause = first.failureCause
+                if (cause == null || !shouldAutoRetry(cause, retriedTimes = 0)) {
+                    rememberIfLoaded(first, handle)
+                    state = first.toWorkspaceState(handle)
+                    watchIfReady(handle, first)
+                    return@launch
+                }
 
-            val second = withContext(ioDispatcher) { source.loadCollections(handle) }
-            state = when (second) {
-                is LoadResult.Success -> second.toWorkspaceState(handle)
-                LoadResult.Denied -> WorkspaceState.Denied(handle, autoRetried = 1)
-                is LoadResult.Failed -> second.toWorkspaceState(handle)
+                val second = withContext(ioDispatcher) { source.loadCollections(handle) }
+                // 自动重试成功的那一支同样要 remember —— 「冷启动抖一下才读到」的那次
+                // 不更新顺序的话，restore 就永远恢复不到上次真正用过的目录。
+                rememberIfLoaded(second, handle)
+                state = when (second) {
+                    is LoadResult.Success -> second.toWorkspaceState(handle)
+                    LoadResult.Denied -> WorkspaceState.Denied(handle, autoRetried = 1)
+                    is LoadResult.Failed -> second.toWorkspaceState(handle)
+                }
+                watchIfReady(handle, second)
+            } finally {
+                // 无论读到与否，列表都可能已经变了（成功时被移到最前）。放在 finally 里
+                // 而不是每个分支末尾：`return@launch` 那条也是分支，漏掉就会留下一个
+                // 「状态已经是 Ready，列表却还是旧顺序」的界面。
+                refreshListings()
             }
-            watchIfReady(handle, second)
         }
     }
 
@@ -261,6 +409,10 @@ class WorkspaceController(
     private suspend fun applyRefresh(handle: WorkspaceHandle, result: LoadResult) {
         when (result) {
             is LoadResult.Success -> {
+                // 刷新读到了 ⇒ 它就是最新的，顺序据此更新（与 [load] 同一口径）。
+                // 漏掉这一支的表现是「刷新之后列表顺序回到旧样子」，只在**顺序确实
+                // 需要变**（上次启动失败过）时才看得出来，平时完全静默。
+                rememberIfLoaded(result, handle)
                 // 内容一模一样时**不用手写守卫**：`state` 是 `mutableStateOf`，
                 // 默认的 structural equality policy 在 `equals` 相等时不写入，
                 // 读到的仍是同一个旧实例（`WorkspaceState.Ready` 是 data class）。
@@ -291,6 +443,9 @@ class WorkspaceController(
             // 一次临时的读失败就把列表换成错误页，比保留旧数据糟得多。
             is LoadResult.Failed -> Unit
         }
+        // 同一处收口：成功那一支会把这条移到最前，失败分支虽不动存储，但授权状态
+        // 可能在这次刷新期间被用户在系统设置里撤销 —— 顺手重判，免得显示过期的 ✓。
+        refreshListings()
     }
 
     /**
@@ -317,4 +472,50 @@ class WorkspaceController(
 
     /** 当前状态里能取到的授权（`Ready` / `Denied` 才有，见 [handleOrNull]）。 */
     private fun currentHandle(): WorkspaceHandle? = state.handleOrNull()
+
+    /**
+     * 正在 [load] 的那份授权，**只在状态确实是 Loading 时**才作答。
+     *
+     * 为什么要那道状态守卫：`loadingHandle` 是普通字段、不清空（[load] 结束时若清一次，
+     * 就得在四条返回路径上各清一遍，漏一条就留下一个假的「正在加载」）。而 Loading 之外
+     * 的状态里它必然已经过时，守卫一句话就把陈旧值挡在外面。
+     */
+    private fun loadingHandleOrNull(): WorkspaceHandle? =
+        if (state is WorkspaceState.Loading) loadingHandle else null
+
+    /**
+     * 真的读到了才承认它是最新的 —— remember / pick / open 三个入口共用的唯一一处。
+     *
+     * **为什么必须落在这里而不是各入口自己调**：三个入口（[restore] 冷启动、
+     * [pick] 新选、[open] 从列表点）语义完全一致，散在调用点写三遍必然漂移；
+     * 而「失败也移到最前」会让一条打不开的记录反复霸占第一位（spec §6 第 2 条）。
+     *
+     * 幂等：已在最前时存储层原样不动，故 [restore] 不会平白改变顺序。
+     * **不在这里刷 [listings]**：调用方（[load] 的 finally、[applyRefresh] 的末尾）
+     * 统一收口，否则「成功要刷、失败也要刷」会变成四处各写一次。
+     */
+    private fun rememberIfLoaded(result: LoadResult, handle: WorkspaceHandle) {
+        if (result !is LoadResult.Success) return
+        listRejected = source.rememberWorkspace(handle) == RememberResult.RejectedAllPinned
+    }
+
+    /**
+     * 重算 [listings]：**先按 granted 分区，每区内部再按 pinned 稳定排序**。
+     *
+     * ## 为什么分区必须在外面
+     *
+     * `orderedForDisplay` 只认 `pinned`（它在 domain 里，看不见 `granted`，也不该看见 ——
+     * 那是运行时事实）。若把整表直接丢给它，一条钉住但**授权已被撤销**的记录会排到
+     * 有授权的那条**前面**，界面于是把「已失效」画在最上面、把能用的压到下面 ——
+     * 这正是 spec §7.3「上区 = 已持久授权」要防的形态。
+     *
+     * 分区是渲染的第一条规则，图钉只在区内部起作用（「图钉之间仍可互相拖拽互换」
+     * 也只在同一区内成立）。
+     */
+    private fun refreshListings() {
+        val (grantedPart, rememberedPart) = source.workspaces()
+            .map { WorkspaceListing(it, source.isPersistentGrant(it.handle.treeUri)) }
+            .partition { it.granted }
+        listings = orderedForDisplay(grantedPart) + orderedForDisplay(rememberedPart)
+    }
 }

@@ -12,6 +12,7 @@ import androidx.core.net.toUri
 import android.provider.DocumentsContract
 import android.util.Log
 import com.cyanix.pixfold.domain.model.SourceItem
+import com.cyanix.pixfold.domain.source.AndroidGrantReleaser
 import com.cyanix.pixfold.domain.source.LoadResult
 import com.cyanix.pixfold.domain.source.RememberResult
 import com.cyanix.pixfold.domain.source.SourceDoc
@@ -42,7 +43,7 @@ import java.util.concurrent.atomic.AtomicBoolean
  * ## 线程
  * 所有方法都是阻塞 IO。调用方负责放到 `Dispatchers.IO`（见 `WorkspaceViewModel`）。
  */
-class AndroidSafSource(context: Context) : WorkspaceSource {
+class AndroidSafSource(context: Context) : WorkspaceSource, AndroidGrantReleaser {
 
     private val appContext = context.applicationContext
     private val resolver: ContentResolver = appContext.contentResolver
@@ -107,11 +108,16 @@ class AndroidSafSource(context: Context) : WorkspaceSource {
     }
 
     /**
-     * 撤销这一条的系统持久授权。**只删列表不做这件事** —— 两者是不同强度的动作。
+     * 撤销这一条的系统持久授权。**只删列表不做这件事** —— 两者是不同强度的动作
+     * （[WorkspaceSource.forgetWorkspace] 只动记录，本方法才动系统授权）。
      *
-     * 现在还没有调用点（`remove(alsoRelease = true)` 是 Task 4 才加），先备好。
+     * 调用点只有 `WorkspaceController.remove(treeUri, alsoRelease = true)`：
+     * 用户在弹窗里明确勾了「同时撤销」才会走到这里。
+     *
+     * 失败只记日志不抛：列表条目已经先被移除，为一次撤销失败弹出崩溃与用户的
+     * 预期不符；下次打开列表时 [isPersistentGrant] 会把这条如实标成「只记住了路径」。
      */
-    fun releasePersistentGrant(treeUri: String) {
+    override fun releasePersistentGrant(treeUri: String) {
         try {
             resolver.releasePersistableUriPermission(
                 treeUri.toUri(),

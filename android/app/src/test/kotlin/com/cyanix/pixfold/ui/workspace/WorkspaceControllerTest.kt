@@ -84,9 +84,22 @@ class WorkspaceControllerTest {
         var remembered: WorkspaceHandle? = null
 
         override fun workspaces(): List<WorkspaceEntry> = entries.toList()
+
+        /**
+         * 与真实源同语义：**真的写进 [entries]**，已存在则保留 pinned 并移到最前。
+         *
+         * 原先这里只记下 `remembered` 就返回 `Added`，entries 一个字不动 ——
+         * 于是「pick 之后列表多了一条」「读到之后顺序变了」这两类断言根本无法写：
+         * 假源的行为与 [WorkspaceSource.rememberWorkspace] 的契约（「已存在 ⇒ 移到最前
+         * + 保留 pinned」）不一致，测出来的顺序也就不是真实源会给出的顺序。
+         */
         override fun rememberWorkspace(handle: WorkspaceHandle): RememberResult {
             remembered = handle
-            return RememberResult.Added
+            val existing = entries.indexOfFirst { it.handle.treeUri == handle.treeUri }
+            val pinned = existing >= 0 && entries[existing].pinned
+            if (existing >= 0) entries.removeAt(existing)
+            entries.add(0, WorkspaceEntry(handle, pinned))
+            return if (existing >= 0) RememberResult.MovedToFront else RememberResult.Added
         }
         override fun forgetWorkspace(treeUri: String) {
             entries.removeAll { it.handle.treeUri == treeUri }
@@ -254,6 +267,12 @@ class WorkspaceControllerTest {
 
         assertEquals("content://tree/new", source.remembered?.treeUri)
         assertEquals("来自平台的目录名", source.remembered?.displayName)
+        // 假源必须与真实源同语义：rememberWorkspace 真的写进列表。
+        // 否则「pick 之后列表多了一条」这类断言无从写起（见 ScriptedSource.rememberWorkspace）。
+        assertTrue(
+            source.workspaces().any { it.handle.treeUri == "content://tree/new" },
+            "pick 之后列表里必须真的多一条",
+        )
     }
 
     @Test
