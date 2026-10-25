@@ -227,6 +227,21 @@ class HomeWorkspaceTest {
     // ================= 4. 工作区列表弹窗(2026-10-25 规格 §7.3) =================
 
     /**
+     * 弹窗**初始不得存在** —— 它只能由用户点条打开。
+     *
+     * 这条是变异 A(把 `showWorkspaceList` 初值改成 `true`)的杀手:初值一旦是 `true`,
+     * 用户冷启动就被一个工作区列表盖住首页,而 `assertIsDisplayed` 类断言**看不见这件事**
+     * (弹窗是独立 window,背后节点仍算「已显示」,不判定遮挡)—— 实测把 840 条全跑一遍
+     * 一条都不红,正是这条断言补上的缺口。`assertDoesNotExist` 才有杀伤力。
+     */
+    @Test
+    fun `未点条之前不存在工作区列表弹窗`() {
+        rule.setContent { PixFoldApp(workspaceSource = ReadyWorkspaceSource()) }
+
+        rule.onNodeWithTag(TAG_WORKSPACE_DIALOG).assertDoesNotExist()
+    }
+
+    /**
      * 就绪态点工作区条必须打开列表弹窗,而不是再弹一次系统选择器。
      *
      * 判据来自规格 §7.1/§7.3:`WorkspaceBar` 整条可点,Ready 态走 `onOpenList`、
