@@ -36,7 +36,7 @@ import kotlinx.coroutines.withContext
  *
  * `ViewModel` 的价值是「配置变更（旋转）后存活」。本类持有的状态只影响工作流 A 的
  * 数据来源，而**目录授权本身持久化在 SAF 里**（[SafTreeStore] 对应的
- * `WorkspaceSource.lastWorkspace()`）—— 旋转后重建会重新 `restore()` 一次，
+ * `WorkspaceSource.workspaces()` 的第一条）—— 旋转后重建会重新 `restore()` 一次，
  * 结果相同。为一个可重建的状态引入 `lifecycle-viewmodel-compose` 依赖不划算。
  *
  * @param nameResolver 由 tree URI 解析出目录显示名（平台层做，需 `query`）。
@@ -102,6 +102,8 @@ class WorkspaceController(
      */
     fun restore() {
         // 「上次用过的」= 列表最前那条：rememberWorkspace 会把用过的移到最前。
+        // TODO(Task 4): 列表为空时直接 return，state 保持原值 —— 从 Ready 变成空列表
+        //  仍会显示 Ready。列表页的 remove() 落地时必须同时复位 state。
         val handle = source.workspaces().firstOrNull()?.handle ?: return
         load(handle)
     }
@@ -123,6 +125,8 @@ class WorkspaceController(
 
     /** 用户主动「忘记」当前工作区：只从列表删这一条，**不改**系统授权。 */
     fun forget() {
+        // TODO(Task 4): 换成 remove(treeUri, alsoRelease) —— 当前 currentHandle() 在
+        //  Failed 状态下返 null，那时一项都不删却仍把 state 置 None。
         cancelJob()
         closeWatcher()
         currentHandle()?.let { source.forgetWorkspace(it.treeUri) }

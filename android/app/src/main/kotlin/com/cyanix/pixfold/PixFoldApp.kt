@@ -122,7 +122,7 @@ fun PixFoldApp(
      *
      * **为什么必须留这道缝**（2026-10-24）：用户裁决「未选工作区时首页两张大卡禁用」
      * 之后，首页入口的可用性取决于 [WorkspaceState]。而 Robolectric 里没有任何
-     * `DocumentsProvider`，真实 [AndroidSafSource] 的 `lastWorkspace()` 恒为 null ⇒
+     * `DocumentsProvider`，真实 [AndroidSafSource] 的 `workspaces()` 恒为空列表 ⇒
      * state 恒为 [WorkspaceState.None] ⇒ 两张大卡恒禁用 ⇒ 24 处「在首页点卡片进工作流」
      * 的导航测试会**一起变红**。那不是行为回归，是测试环境里根本没有可授权的目录。
      *

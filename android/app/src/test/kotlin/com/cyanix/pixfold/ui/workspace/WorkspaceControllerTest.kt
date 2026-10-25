@@ -124,7 +124,8 @@ class WorkspaceControllerTest {
         var onLoad: ((WorkspaceHandle) -> Unit)? = null
 
         override fun workspaces(): List<WorkspaceEntry> = inner.workspaces()
-        override fun rememberWorkspace(handle: WorkspaceHandle): RememberResult = RememberResult.Added
+        override fun rememberWorkspace(handle: WorkspaceHandle): RememberResult =
+            inner.rememberWorkspace(handle)
         override fun forgetWorkspace(treeUri: String) = inner.forgetWorkspace(treeUri)
         override fun setPinned(treeUri: String, pinned: Boolean) = Unit
         override fun moveWorkspace(from: Int, to: Int) = Unit
@@ -256,11 +257,13 @@ class WorkspaceControllerTest {
     }
 
     @Test
-    fun `忘记工作区会清空状态并把它从列表里删掉`() = runTest {
-        // 列表世界里「忘记」= 逐条移除这一条，不再是「抹掉唯一的那个」。
-        // 判据从 lastWorkspace() 换成 workspaces()：列表里还留着的话，
-        // 下次冷启动 restore() 会把它当作最前那条恢复回来。
+    fun `忘记工作区只删这一条不连带其他条`() = runTest {
+        // 列表世界里「忘记」= 只移除这一条，不再是「抹掉唯一的那个」。
+        // **为什么必须铺两条**：只铺一条时「删一条」与「删全部」在断言层面不可区分 ——
+        // 若 forget() 误写成清空整个列表，单条用例照样绿。故另一条必须留在列表里。
+        val other = WorkspaceEntry(WorkspaceHandle("content://tree/other", "另一个"))
         val source = ScriptedSource(LoadResult.Success(collections()), last = handle)
+        source.entries.add(other)
         val controller = WorkspaceController(source, testScope(), ioDispatcher = testDispatcher())
         controller.restore()
         assertIs<WorkspaceState.Ready>(controller.state)
@@ -268,7 +271,15 @@ class WorkspaceControllerTest {
         controller.forget()
 
         assertEquals(WorkspaceState.None, controller.state)
-        assertTrue(source.workspaces().isEmpty(), "列表里也必须没了，否则下次启动又回来")
+        assertTrue(
+            source.workspaces().none { it.handle.treeUri == handle.treeUri },
+            "当前那条必须删掉，否则下次启动又回来",
+        )
+        assertTrue(
+            source.workspaces().any { it.handle.treeUri == other.handle.treeUri },
+            "其他条目不得被连带删掉",
+        )
+        assertEquals(1, source.workspaces().size, "只该少一条")
     }
 
     @Test
