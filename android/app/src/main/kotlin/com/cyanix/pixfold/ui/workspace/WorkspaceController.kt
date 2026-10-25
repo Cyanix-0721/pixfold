@@ -256,29 +256,6 @@ class WorkspaceController(
     }
 
     /**
-     * 用户主动「忘记」当前工作区：只从列表删这一条，**不改**系统授权。
-     *
-     * 薄壳转 [remove]（不带 alsoRelease）—— 删除逻辑只留一处。原先它直接调
-     * `currentHandle()?.let { forgetWorkspace(it.treeUri) }`，在 Failed 状态下
-     * 一条都删不掉却照样把 state 置 None（评审 M5）。
-     *
-     * ⚠️ **已被 `remove(treeUri, alsoRelease)` 取代，Task 7 接线时删除。**
-     * 现在已经**没有任何生产调用点**（列表 UI 直接按 treeUri 调 [remove]，因为删哪一条
-     * 与「当前是哪条」无关）；留着只是因为 Task 7 之前的调用方还没全部接完，
-     * 现在就删会迫使那一步同时改两件事。
-     */
-    fun forget() {
-        currentHandle()?.treeUri?.let { remove(it, alsoRelease = false) }
-            ?: run {
-                // Failed / Loading 下当前那条未知：无处可删，但仍要让界面离开一个
-                // 已经无效的「当前工作区」。
-                cancelJob()
-                closeWatcher()
-                state = WorkspaceState.None
-            }
-    }
-
-    /**
      * 释放本控制器持有的平台资源（变更监听）。
      *
      * 由界面层在 `DisposableEffect` 里调用。**必须存在**：`ContentObserver` 是注册在

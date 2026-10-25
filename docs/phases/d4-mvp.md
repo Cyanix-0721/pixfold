@@ -593,6 +593,24 @@
 > 四道闸门(`--rerun-tasks` 强制重跑):app **764** / domain **940** / lint 零告警 / APK **34,426,454 B**;变异 M1–M6 全 KILLED。分支 `d4/home-workspace`。**真机核对待做**。
 >
 
+> **▶ 工作区列表 v4 (2026-10-26)** —— 用户原话「加个硬上限」；「钉住的排到本区最前，多个图钉之间仍可互相拖拽」；「不做相册、不做指定文件管理器」；「删掉设置里那个假开关」（原话「不做」）。规格 `docs/superpowers/specs/2026-10-25-workspace-list-design.md`、计划 `docs/superpowers/plans/2026-10-25-workspace-list.md`，按 subagent-driven-development 分 T1–T11 交付，18 个提交。
+>
+> **一、数据模型与接口**：新增 `WorkspaceEntry(handle, pinned)` / `WorkspaceListing(entry, granted)`；`WorkspaceSource` 的旧三方法（`lastWorkspace` / `rememberWorkspace(handle)` / `forgetWorkspace`）换成列表接口（`workspaces()` / `openWorkspace` / `removeWorkspace(treeUri, alsoRelease)` / `moveWorkspace` / `togglePin`）；排序是 `android/domain/…/WorkspaceOrdering.kt` 里的纯函数（`orderedForDisplay` / `movedOrder`），domain 零 Android 依赖由 `AdapterBoundaryTest` 每次闸门强守。
+>
+> **二、两分区不是偏好，是运行时事实**：「已持久授权」与「只记住了路径」每次打开弹窗都重查 `persistedUriPermissions`，不缓存、不落盘。来源是 `AndroidSafSource.rememberWorkspace` 的既有语义 —— 它**先存 URI 再 `takePersistableUriPermission` 并吞掉异常**，因为该异常只意味着「这次没能提升为持久授权」，不等于 URI 现在不可用。设置页那个「文件访问方式」开关与分区无关（它从未被任何代码读取），删掉不影响分区判定。
+>
+> **三、上限 8 = 挤掉最久没打开的**（用户裁决「加个硬上限」）：`SafTreeStore` 存 JSON 列表（`kotlinx-serialization`），超过 8 条时丢队尾；全部 8 条都钉住时拒绝新增并置 `listRejected`，弹窗给一行提示 —— 静默失败是最坏的失败模式。
+>
+> **四、三个真缺陷（都不是编译错，全是「不崩不报错」的那种）**：(a) `applyRefresh()` 的 Denied→自动重试成功分支漏 `rememberIfLoaded` ⇒ 冷启动恢复旧工作区；(b) `openList()` 逐条判持久授权 = 8 次 Binder（`openList`/`togglePin`/`move`/`remove` 四个公开方法都在主线程同步调它）⇒ 改一次 `persistentGrants(): Set<String>`，KDoc 写明「上限放大或再加跨进程调用必须改 suspend」；(c) `move()` 两条用例只断 `source.entries` 不断 `controller.listings` ⇒ 删掉 `refreshListings()` 全绿（用户可见症状：拖完那条纹丝不动）。
+>
+> **五、Task 5 的 48dp 陷阱**：给工作区条整行加 `clickable` 之后，`Loading` 态因 `actionLabel = ""` 不画按钮，整行退化成 bodySmall 单行 **16.0dp**，而 `Modifier.clickable` 本身不提供最小触控尺寸。修法 = 外层 `heightIn(min = 48.dp)`，守卫用例用 `getUnclippedBoundsInRoot()` 现算高度（`DpRect.value` 就是 dp，无 px→dp 换算）。
+>
+> **六、M10 首轮存活是本轮第二次「假保障」示范**：让位位移内联在 `graphicsLayer { translationY = shift + … }` 里，屏幕外位移无断言可读 ⇒ 把 `-rowHeightPx` 与 `+rowHeightPx` 对调，841 条全绿。抽 `rowShiftFor(index, dragFrom, targetIndex, rowHeightPx)` / `rowDragOffsetFor(dragging, dragOffset)` 两个 internal 纯函数 + `WorkspaceDragGeometryTest` 7 条后才击杀。（首次示范是 chip v4 的 M5。）
+>
+> **七、并行派发的事故（已固化为 AGENTS.md §0.1 第 6 条）**：同一棵工作树上同时跑「Task 7 复审（要改 `PixFoldApp.kt` 做变异）」与「Task 8 实现（也要改生产文件做变异）」⇒ 互相污染、双方「跑完 git status 必须为空」性质失效。判据：两任务能否并行的唯一标准是**两者都不在变异阶段**，变异阶段工作树是独占资源。
+>
+> 四道闸门(`--rerun-tasks` 强制重跑)：app **848** / domain **950** / lint 零告警 / APK **34,543,005 B`；变异 M1–M10b 全 KILLED（M9 裁定为等价变异）。分支 `d4/home-workspace`。**真机核对（Task 11）待做。**
+
 优先交付（**GUI 仅 Android**，2026-09-10 变更）：
 
 - Android：单目录/单系列，图片预览与人工排序，逐卷元数据，CBZ 生成；

@@ -82,19 +82,16 @@ fun <T> WorkspaceDragList(
     Column(modifier) {
         items.forEachIndexed { index, item ->
             val dragging = index == dragFrom
-            // 让位：被拖行越过谁，谁就往反方向挪一格。
-            val shift = when {
-                targetIndex < 0 || dragging -> 0f
-                index in (dragFrom + 1)..targetIndex -> -rowHeightPx
-                index in targetIndex..(dragFrom - 1) -> rowHeightPx
-                else -> 0f
-            }
+            // 让位位移与拖动中的跟随位移都来自纯函数：几何要能离线断言（变异 M10 原本存活，
+            // 因为方向反了没有任何测试读得到 translationY）。
+            val shift = rowShiftFor(index, dragFrom, targetIndex, rowHeightPx)
+            val offset = rowDragOffsetFor(dragging, dragOffset)
             Box(
                 Modifier
                     .fillMaxWidth()
                     .height(WORKSPACE_ROW_HEIGHT)
                     .zIndex(if (dragging) 1f else 0f)
-                    .graphicsLayer { translationY = shift + if (dragging) dragOffset else 0f }
+                    .graphicsLayer { translationY = shift + offset }
                     .pointerInput(items) {
                         detectDragGesturesAfterLongPress(
                             onDragStart = {
@@ -129,7 +126,11 @@ fun <T> WorkspaceDragList(
  * 两条守卫各自防的事：
  *
  * 1. **`dragFrom < 0`（未在拖）** —— 没在拖的时候 `dragOffset` 是 0，直接算会得到
- *    `dragFrom` 本身，让整个列表误以为「正在拖第 0 行」并画出让位位移。
+ *    `dragFrom` 本身，让整个列表误以为「正在拖第 0 行」。
+ *    ⚠️ **删掉这条守卫的真实后果不是「画错位移」，而是堆被耗尽**：`-1` 会流进
+ *    `LazyListState.layoutInfo` 的可见项查找与让位计算，那条路径会不断产出新状态帧
+ *    并反复重组同一个可见区，几秒内抛 `OutOfMemoryError: Java heap space`（2026-10-26
+ *    Task 9 变异 M8 实测）。故它不能按「少一条美术修正」来理解。
  * 2. **`lastIndex < 0`（空列表）** —— `coerceIn(0, -1)` 会抛
  *    `IllegalArgumentException: Cannot coerce value to an empty range`。
  *    本项目在 `TwoLevelChipRows` 的 M5 上踩过同型崩溃。空列表并不罕见：
@@ -145,3 +146,42 @@ private fun targetIndexFor(
 } else {
     (dragFrom + (dragOffset / rowHeightPx).roundToInt()).coerceIn(0, lastIndex)
 }
+
+/**
+ * 某一行的**让位位移**（px，正负号表示方向）。
+ *
+ * 拖动中，被拖行越过谁，谁就往反方向挪一格 —— 这是「实时让位」的全部几何。
+ *
+ * 抽成纯函数的原因：它曾是 forEachIndexed 里的一段内联 when，而内联写法
+ * **离线断不到** —— 2026-10-26 Task 9 变异 M10 把 -rowHeightPx 与 +rowHeightPx
+ * 对调之后 841 条测试全绿（屏幕外的位移没有任何断言读得到）。方向反了在真机上的
+ * 表现是「拖谁谁不动、别人乱窜」，属用户一眼可见的缺陷，不该留给真机兜。
+ *
+ * @param index 正在计算的是第几行。
+ * @param dragFrom 被拖起的行下标；-1 = 没在拖。
+ * @param targetIndex 松手会落在哪一行（-1 = 无有效目标）。
+ * @param rowHeightPx 单行高度（px）。
+ */
+internal fun rowShiftFor(
+    index: Int,
+    dragFrom: Int,
+    targetIndex: Int,
+    rowHeightPx: Float,
+): Float = when {
+    // 没在拖 / 无有效目标 / 自己那一行（它跟着手指走，不该再让位）。
+    targetIndex < 0 || index == dragFrom -> 0f
+    // 向下拖：[dragFrom+1 .. targetIndex] 整体上移一格，补上被抽走的那一行。
+    index in (dragFrom + 1)..targetIndex -> -rowHeightPx
+    // 向上拖：[targetIndex .. dragFrom-1] 整体下移一格。
+    index in targetIndex..(dragFrom - 1) -> rowHeightPx
+    else -> 0f
+}
+
+/**
+ * 被拖行自己的跟随位移：只有它跟着手指走，其余行由 [rowShiftFor] 让位。
+ *
+ * 抽出来是为了让「拖动中位移 = 手指位移、非拖动行位移 = 0」也变成可断言的纯函数，
+ * 而不是嵌在 graphicsLayer 里的三元表达式。
+ */
+internal fun rowDragOffsetFor(dragging: Boolean, dragOffset: Float): Float =
+    if (dragging) dragOffset else 0f

@@ -207,10 +207,20 @@ interface WorkspaceSource {
     fun moveWorkspace(from: Int, to: Int)
 
     /**
-     * 这一条是否还持有系统持久授权。**平台层才能回答**（见 §2.3）。
-     * 默认 true —— 假源与不支持查询的实现按「都在」处理。
+     * 当前仍持有系统持久授权的全部 treeUri。**平台层才能回答**（见 §2.3）。
+     *
+     * 这是唯一真相源：**没有默认实现**，每个实现方必须回答。
+     * 单条版 [isPersistentGrant] 由它在接口层派生，实现方**不要覆盖**。
      */
-    fun isPersistentGrant(treeUri: String): Boolean = true
+    fun persistentGrants(): Set<String>
+
+    /**
+     * 这一条是否还持有系统持久授权。默认按 [persistentGrants] 派生。
+     *
+     * ⚠️ 实现方**不要覆盖本方法** —— 两个方法各自实现会出现「批量说 true、
+     * 单条说 false」而没有任何测试能自然发现（假源会各自实现得自洽）。
+     */
+    fun isPersistentGrant(treeUri: String): Boolean = treeUri in persistentGrants()
 
     // —— 以下与原接口相同 ——
     fun loadCollections(handle: WorkspaceHandle): LoadResult
@@ -227,12 +237,18 @@ interface WorkspaceSource {
 
 剔除顺序：新加第 9 条时，从**尾部**往前找第一条 `pinned == false` 的条目剔除。**8 条全钉住时拒绝新增**，返回 `RememberResult.RejectedAllPinned`（UI 提示「先取消一个图钉再添加」，见 §7.3）。
 
-### 5.4 `AndroidSafSource.isPersistentGrant` 实现
+### 5.4 `AndroidSafSource.persistentGrants` 实现
 
 ```kotlin
-override fun isPersistentGrant(treeUri: String): Boolean = try {
-    resolver.persistedUriPermissions.any { it.uri.toString() == treeUri && it.isReadPermission }
-} catch (e: Exception) { false }
+// 一次跨进程查询拿到全集，调用方逐条 in 判定。
+// 写成「逐条 any {}」会让 8 条列表产生 8 次 ContentResolver→ActivityManager 的 Binder 往返，
+// 而 openList() 在 Compose 点击路径上是同步执行的（见计划 Task 4 复盘 Important-2）。
+override fun persistentGrants(): Set<String> = try {
+    resolver.persistedUriPermissions
+        .filter { it.isReadPermission }
+        .map { it.uri.toString() }
+        .toSet()
+} catch (e: Exception) { emptySet() }
 ```
 
 ## 6. `WorkspaceController` 变更
@@ -244,7 +260,7 @@ override fun isPersistentGrant(treeUri: String): Boolean = try {
 var listings: List<WorkspaceListing> by mutableStateOf(emptyList())
     private set
 
-fun openList()                       // 重读 workspaces() + 逐条 isPersistentGrant()
+fun openList()                       // 重读 workspaces() + 一次 persistentGrants() 逐条 in 判定
 fun open(treeUri: String)            // 点一条：load(handle)，成功即 rememberWorkspace（移到最前）
 fun remove(treeUri: String, alsoRelease: Boolean)
 fun togglePin(treeUri: String)
@@ -253,7 +269,7 @@ fun move(from: Int, to: Int)         // 拖拽提交
 
 三个必须落在 KDoc 里的理由：
 
-1. **`openList()` 每次都重读 `isPersistentGrant`**：持久授权可能在应用外被撤销（用户在系统设置里删了），缓存它等于显示过期的 ✓。
+1. **`openList()` 每次都重读 `persistentGrants()`**：持久授权可能在应用外被撤销（用户在系统设置里删了），缓存它等于显示过期的 ✓。（每次调用**只查一次**批量接口，不逐条查。）
 2. **`open(treeUri)` 成功后才移到最前**：失败就移到最前，会让一条打不开的记录反复霸占第一位。
 
    实现口径（只有一处，不散在调用点）：**在 `load(handle)` 的成功分支里调 `source.rememberWorkspace(handle)`**。这条路径同时覆盖三种入口 —— `restore`（冷启动）、`pick`（用户新选）、`open`（从列表点一条）。三者语义一致：**真的读到了，才承认它是最新的**。
@@ -272,7 +288,85 @@ fun move(from: Int, to: Int)         // 拖拽提交
 改为：`WorkspaceBar` 增加 `onOpenList: () -> Unit`，整条可点（`Modifier.clickable`），右侧按钮文案从「更换」改为「工作区」。
 
 - **为什么整条可点**：列表里的操作（切换 / 图钉 / 拖拽 / 移除）远多于「换一个」，而「更换」这个词只描述了其中一个。
-- 状态映射全部保留（`WorkspaceBar` 现有 5 状态文案不变），只有动作语义变：任何状态下点它都打开列表。
+- 状态映射全部保留（
+`
+WorkspaceBar
+`
+ 现有 5 状态文案不变），只有**动作语义**变：
+  - 
+`
+Ready
+`
+（工作区正常）：整条 / 右侧按钮都打开**列表**；
+  - 其余状态（
+`
+None
+`
+ / 
+`
+Loading
+`
+ / 
+`
+Denied
+`
+ / 
+`
+Failed
+`
+）：整条 / 右侧按钮都走 
+`
+onPick
+`
+ = **系统选择器**。
+
+> **修正（2026-10-26，Task 7 复审 I-3）**：本节初稿写「任何状态下点它都打开列表」，实现后核对
+> **只在首页成立**。工作流页（
+`
+OrganizeSteps
+`
+ / 
+`
+LibraryPage
+`
+）只在该状态满足
+> 
+`
+WorkspaceState.showsWorkspaceBar
+`
+ 时渲染条，而那是 
+`
+Loading
+`
+ / 
+`
+Denied
+`
+ / 
+`
+Failed
+`
+ 三态
+> （2026-10-24 用户裁决「乙：工作流内的条只在异常/扫描中显示」）；
+`
+Ready
+`
+ 时工作流页根本不画条。
+> 于是 
+`
+rowAction = if (state is Ready) onOpenList else onPick
+`
+ 在工作流页**恒走 onPick** ——
+> 这在语义上恰好是对的：授权失效时用户要的是重新选目录，不是看一个全是失效项的列表。
+> 三处 
+`
+onOpenWorkspaceList
+`
+ 透传（含 
+`
+LibrarySteps
+`
+）保留为预防性接线，不算死代码。
 - `Loading` 状态下`actionLabel` 原本为空（`if (actionLabel.isNotEmpty())` 时才画按钮）；改版后 `Loading` 也画「工作区」按钮 —— 因为列表里可以切到别的目录，不让点等于把唯一的出口锁死。**文案文字与按钮都保留，只是按钮从「更换」变「工作区」、整条都可点。**
 
 ### 7.2 弹窗结构

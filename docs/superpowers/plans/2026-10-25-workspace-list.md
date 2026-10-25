@@ -18,7 +18,7 @@
 2. **顺序语义只有一条**（spec §4.3）：存储顺序 = 显示顺序；`pinned` 只在渲染时做**稳定**排序，**不改变存储位置**。图钉之间能互相拖拽互换全靠这一条。
 3. **拖拽下标换算必须「先删后插」且 `sj` 不特判**（spec §4.4）。这是全功能最容易错的一处，错的表现是「拖一格只动半格」。
 4. **`remove` 默认不撤销系统授权**（spec §6 第 3 条）。「从列表删掉」与「收回授权」是两件事。
-5. **`isPersistentGrant` 由平台层回答**，domain 层不得 `import android.*`（`AdapterBoundaryTest` 每次闸门都跑）。
+5. **持久授权判定由平台层回答**，domain 层不得 `import android.*`（`AdapterBoundaryTest` 每次闸门都跑）。接口形状是**批量**的 `fun persistentGrants(): Set<String>`（唯一真相源、无默认实现），单条版 `isPersistentGrant(treeUri) = treeUri in persistentGrants()` 是接口默认实现、实现方不得覆盖 —— 理由见 Task 4 复盘（Important-2）。
 6. **触控 ≥48dp**（AGENTS.md §2.7）。chip v4 的教训：`minimumInteractiveComponentSize()` 在 Robolectric 下量到 36dp，必须**加显式 `heightIn(min = 48.dp)`**。
 7. **`app` 模块测试用 `org.junit.Test`**（不是 `kotlin.test.Test`）；`domain` 模块用 `kotlin.test.Test`。
 8. **新增/删除字符串资源必须 values 与 values-zh 同步**，否则 lint `MissingTranslation` / `ExtraTranslation` 在 `warningsAsErrors = true` 下硬失败。
@@ -32,10 +32,10 @@
 | `android/domain/.../domain/source/WorkspaceEntry.kt` | **新建**：`WorkspaceEntry(handle, pinned)` |
 | `android/domain/.../domain/source/RememberResult.kt` | **新建**：`Added` / `MovedToFront` / `RejectedAllPinned` |
 | `android/domain/.../domain/source/WorkspaceListing.kt` | **新建**：`WorkspaceListing(entry, granted)` |
-| `android/domain/.../domain/source/WorkspaceSource.kt` | **改**：删三个单工作区方法，加五个列表方法 + `isPersistentGrant` |
+| `android/domain/.../domain/source/WorkspaceSource.kt` | **改**：删三个单工作区方法，加五个列表方法 + `persistentGrants()`（单条版是派生默认实现） |
 | `android/domain/.../domain/source/WorkspaceOrdering.kt` | **新建**：稳定排序 + 拖拽下标换算的纯函数 |
 | `android/app/.../data/saf/SafTreeStore.kt` | **重写**：JSON 列表存储 + 旧 key 迁移 + 8 条上限 |
-| `android/app/.../data/saf/AndroidSafSource.kt` | **改**：实现五个列表方法 + `isPersistentGrant` |
+| `android/app/.../data/saf/AndroidSafSource.kt` | **改**：实现五个列表方法 + `persistentGrants()`（一次跨进程查询拿全集） |
 | `android/app/.../ui/workspace/WorkspaceController.kt` | **改**：`listings` 状态 + `openList`/`open`/`remove`/`togglePin`/`move` |
 | `android/app/.../ui/workspace/WorkspaceBar.kt` | **改**：整条可点 + 按钮文案改「工作区」+ 新增 `onOpenList` |
 | `android/app/.../ui/workspace/WorkspaceListDialog.kt` | **新建**：两分区列表 + 图钉 + 拖拽 + 上限提示 + 撤销开关 |

@@ -75,6 +75,19 @@ class TwoEntrySource(
 
     override fun setPinned(treeUri: String, pinned: Boolean) = Unit
 
+    /**
+     * 真的把顺序换掉 —— 但**落点与生产实现不完全一致**，别拿它断行序。
+     *
+     * 生产实现是 `SafTreeStore.move`（`removeAt(from)` 后 `add(to.coerceIn(0, size))`），
+     * 这里照抄了同样的两步，差别在于「先删再按 to 插入」在 `from < to` 时会比直觉多前进一格：
+     * 把 A 拖到 B（from=0, to=1）的结果是 `[B, A]` 而不是「A 停在 B 原来的位置上」那种
+     * 需要调用方做 `to - 1` 修正的语义。生产侧由 `movedOrder`（`WorkspaceOrdering.kt:31`）
+     * 先算好落点，本替身没有那一层。
+     *
+     * ⇒ **本类是「非生产语义替身」**：它只保证「`moveCalls` 记下的 treeUri 对」与
+     * 「`workspaces()` 的顺序真的变了」两件事。任何基于 `workspaces()` 断具体行序的
+     * 断言都会读到假源自己的序，而不是生产序（2026-10-26 Task 7 复审 N-1）。
+     */
     override fun moveWorkspace(from: Int, to: Int) {
         val fromUri = entries.getOrNull(from)?.handle?.treeUri ?: return
         val toUri = entries.getOrNull(to)?.handle?.treeUri ?: return
