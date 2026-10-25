@@ -192,6 +192,12 @@ fun OrganizeSteps(
     /** 用户要求选择/更换工作区目录。仅 [workspaceState] 非 null 时会被调用。 */
     onPickWorkspace: () -> Unit = {},
     /**
+     * 用户点整条工作区条要求打开**工作区列表弹窗**（2026-10-25 规格 §7.1）。
+     *
+     * 默认 `{}` = 与本次接线前完全一致，既有 30 余处 `OrganizeSteps(…)` 测试一行都不用改。
+     */
+    onOpenWorkspaceList: () -> Unit = {},
+    /**
      * 任务完成通知的出口（用户 m09108：「让整理图片和打包完成结束后都触发下」）。
      *
      * 默认 `null` = **不发通知**，与既有 491 个 UI 测试的行为完全一致
@@ -345,7 +351,11 @@ fun OrganizeSteps(
         // 工作流里再常驻一条是同一功能摆两处。只保留「正忙」与「出问题」两种，
         // 判据收在 WorkspaceState.showsWorkspaceBar（理由特别是 Denied 那条见那儿）。
         if (workspaceState != null && workspaceState.showsWorkspaceBar) {
-            WorkspaceBar(state = workspaceState, onPick = onPickWorkspace)
+            WorkspaceBar(
+                state = workspaceState,
+                onPick = onPickWorkspace,
+                onOpenList = onOpenWorkspaceList,
+            )
         }
 
         // 页签行 + 右侧「重置全部」。M3 的 `PrimaryTabRow` **没有 trailing 槽位**

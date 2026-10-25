@@ -70,6 +70,14 @@ fun HomeScreen(
     workspaceState: WorkspaceState? = null,
     /** 用户要求选择/更换工作区目录。仅 [workspaceState] 非 null 时会被调用。 */
     onPickWorkspace: () -> Unit = {},
+    /**
+     * 用户点整条工作区条要求打开**工作区列表弹窗**（2026-10-25 规格 §7.1）。
+     *
+     * 默认 `{}` = 与本次接线前完全一致（点了没反应），既有首页测试一行都不用改。
+     * 只有 [WorkspaceState.Ready] 才走这个回调，其余态仍走 [onPickWorkspace] ——
+     * 这个分派在 [WorkspaceBar] 内部，本组件只负责把两个出口都递下去。
+     */
+    onOpenWorkspaceList: () -> Unit = {},
 ) {
     // `stringResource` 不能在 `semantics {}` 里调用(那不是 @Composable lambda),须先取出。
     val settingsCd = stringResource(R.string.home_settings_cd)
@@ -134,7 +142,11 @@ fun HomeScreen(
         //
         // 位置在卡之下、而不是标题行下方,是 `HANGOFF.md:211-212` 逐字定的形态。
         if (workspaceState != null) {
-            WorkspaceBar(state = workspaceState, onPick = onPickWorkspace)
+            WorkspaceBar(
+                state = workspaceState,
+                onPick = onPickWorkspace,
+                onOpenList = onOpenWorkspaceList,
+            )
         }
     }
 }

@@ -9,13 +9,17 @@ import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import com.cyanix.pixfold.PixFoldApp
 import com.cyanix.pixfold.R
+import com.cyanix.pixfold.ReadyWorkspaceSource
 import com.cyanix.pixfold.TestText
 import com.cyanix.pixfold.domain.mock.MockData
 import com.cyanix.pixfold.domain.source.WorkspaceHandle
 import com.cyanix.pixfold.ui.theme.PixFoldTheme
 import com.cyanix.pixfold.ui.workspace.TAG_WORKSPACE_ACTION
+import com.cyanix.pixfold.ui.workspace.TAG_WORKSPACE_ADD
 import com.cyanix.pixfold.ui.workspace.TAG_WORKSPACE_BAR
+import com.cyanix.pixfold.ui.workspace.TAG_WORKSPACE_DIALOG
 import com.cyanix.pixfold.ui.workspace.WorkspaceState
 import org.junit.Rule
 import org.junit.Test
@@ -218,5 +222,41 @@ class HomeWorkspaceTest {
         rule.onNodeWithTag(TAG_WORKSPACE_BAR).assertIsDisplayed()
         rule.onNodeWithTag(TAG_WORKSPACE_ACTION).performClick()
         assertEquals(1, picks, "首页必须能从条上直接选文件夹")
+    }
+
+    // ================= 4. 工作区列表弹窗(2026-10-25 规格 §7.3) =================
+
+    /**
+     * 就绪态点工作区条必须打开列表弹窗,而不是再弹一次系统选择器。
+     *
+     * 判据来自规格 §7.1/§7.3:`WorkspaceBar` 整条可点,Ready 态走 `onOpenList`、
+     * 其余态走 `onPick`。这里走的是**整条真实装配**(`PixFoldApp` + `ReadyWorkspaceSource`),
+     * 所以它同时覆盖两件事:三处调用点接上了 `onOpenWorkspaceList`,以及弹窗挂在
+     * NavHost 之外的顶层 —— 只要弹窗被写进某个页面里,这条就是第一个红的。
+     */
+    @Test
+    fun `就绪态点工作区条打开列表弹窗`() {
+        rule.setContent { PixFoldApp(workspaceSource = ReadyWorkspaceSource()) }
+
+        rule.onNodeWithTag(TAG_WORKSPACE_BAR).performClick()
+
+        rule.onNodeWithTag(TAG_WORKSPACE_DIALOG).assertIsDisplayed()
+    }
+
+    /**
+     * 弹窗里点「添加文件夹」不得把弹窗顶掉,也不得崩。
+     *
+     * 刻意**不**断言系统选择器被拉起:Robolectric 下 `rememberLauncherForActivityResult`
+     * 永远等不到真实 Activity result,断它只是假保障。这里只锁两件事 —— 点击不抛异常、
+     * 弹窗仍在。规格 §7.3 要的是「加完文件夹回到列表,能立刻点开新的那条」。
+     */
+    @Test
+    fun `弹窗里点添加文件夹不崩且弹窗还在`() {
+        rule.setContent { PixFoldApp(workspaceSource = ReadyWorkspaceSource()) }
+
+        rule.onNodeWithTag(TAG_WORKSPACE_BAR).performClick()
+        rule.onNodeWithTag(TAG_WORKSPACE_ADD).performClick()
+
+        rule.onNodeWithTag(TAG_WORKSPACE_DIALOG).assertIsDisplayed()
     }
 }

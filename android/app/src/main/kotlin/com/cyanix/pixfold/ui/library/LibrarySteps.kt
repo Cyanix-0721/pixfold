@@ -175,6 +175,13 @@ fun LibrarySteps(
     /** 用户要求选择/更换工作区目录。仅 [workspaceState] 非 null 时会被调用。 */
     onPickWorkspace: () -> Unit = {},
     /**
+     * 用户点整条工作区条要求打开**工作区列表弹窗**（2026-10-25 规格 §7.1）。
+     *
+     * 只是往 [LibraryPage] 透传：真正弹窗挂在 `PixFoldApp` 顶层（与页面切换解耦），
+     * 这里经手但不持有。默认 `{}` ⇒ 既有 `LibrarySteps(…)` 测试一行都不用改。
+     */
+    onOpenWorkspaceList: () -> Unit = {},
+    /**
      * 真实执行器（D2b）。`null` = **走模拟执行**（`executePackagePlans`）。
      *
      * 这个参数是「D1 原型」与「真实写入」之间唯一的开关，刻意做成可空而不做成
@@ -544,6 +551,7 @@ fun LibrarySteps(
                             // 工作区条只在注入状态时出现(D2b);默认 null ⇒ 既有测试布局不变
                             workspaceState = workspaceState,
                             onPickWorkspace = onPickWorkspace,
+                            onOpenWorkspaceList = onOpenWorkspaceList,
                             // 结构警告来自扫描结果,不是库状态 —— 由 PixFoldApp 现算注入
                             workspaceWarnings = workspaceWarnings,
                             modifier = Modifier.weight(1f),

@@ -79,6 +79,8 @@ import com.cyanix.pixfold.ui.settings.SettingsScreen
 import com.cyanix.pixfold.ui.theme.PixFoldTheme
 import com.cyanix.pixfold.ui.workspace.LocalThumbnailSource
 import com.cyanix.pixfold.ui.workspace.WorkspaceController
+import com.cyanix.pixfold.ui.workspace.WorkspaceListDialog
+import com.cyanix.pixfold.ui.workspace.rejectAllPinnedHint
 import com.cyanix.pixfold.ui.workspace.collectionsOr
 import com.cyanix.pixfold.ui.workspace.handleOrNull
 import com.cyanix.pixfold.ui.organize.OrganizeSteps
@@ -174,6 +176,19 @@ fun PixFoldApp(
             },
         )
     }
+    // 工作区列表弹窗的开关（2026-10-25 规格 §7.1/§7.3）。
+    //
+    // **弹窗本体必须挂在 NavHost 之外**（见下方 `DialogBlurHost` 内的那一处）：
+    // 这个 `showWorkspaceList` 只在换页时不动就能成立 —— 反过来若把弹窗写进某个
+    // 页面，用户点「添加文件夹」拉起系统选择器再回来，页面重建会把弹窗连开关一起丢掉，
+    // 表现为「加完目录，列表自己关了」。
+    var showWorkspaceList by remember { mutableStateOf(false) }
+    // 「点整条工作区条」的唯一出口。**先 `openList()` 再置开**：`openList()` 刷新
+    // `listings` 与 `listRejected`，弹窗首帧就拿到新鲜数据，不会先闪一帧空列表。
+    val openWorkspaceList: () -> Unit = {
+        workspaceController.openList()
+        showWorkspaceList = true
+    }
     // 冷启动恢复：上次授权过的目录自动重扫。**不缓存上次结果** ——
     // 目录内容随时会变，显示过期列表比重新扫一遍更糟。
     LaunchedEffect(Unit) { workspaceController.restore() }
@@ -228,7 +243,14 @@ fun PixFoldApp(
         ActivityResultContracts.OpenDocumentTree(),
     ) { uri ->
         // uri == null 表示用户取消了选择 —— 保持现状，不动已有授权。
-        if (uri != null) workspaceController.pick(uri.toString())
+        if (uri != null) {
+            // **顺序不能反**（规格 §7.3 + R26）：`pick()` 才会把新目录
+            // `rememberWorkspace` 进列表，`openList()` 才读得到它；
+            // 先 openList 再 pick 等于「加完文件夹，列表里看不到新的那条」。
+            workspaceController.pick(uri.toString())
+            // 弹窗是从弹窗内部拉起的，回来时**不关**（规格 §7.3「加完继续在列表里」）。
+            if (showWorkspaceList) workspaceController.openList()
+        }
     }
 
     // ---- 通知权限（D2b 第 2 项）----
@@ -533,6 +555,7 @@ fun PixFoldApp(
                             // 「当前工作区：xxx [更换]」，用户自己点进去。
                             workspaceState = workspaceState,
                             onPickWorkspace = { pickWorkspaceFolder.launch(null) },
+                            onOpenWorkspaceList = openWorkspaceList,
                         )
                     }
                 }
@@ -598,6 +621,7 @@ fun PixFoldApp(
                             // 故不做成第 4 个页签；选目录入口也长在工作流内部，不进首页。
                             workspaceState = workspaceState,
                             onPickWorkspace = { pickWorkspaceFolder.launch(null) },
+                            onOpenWorkspaceList = openWorkspaceList,
                             // 「整理图片」结束 → 发一条完成通知（用户 m09108）。
                             //
                             // 走 `TaskCompletionNotification.post`：那条渠道**不静音**，
@@ -689,6 +713,7 @@ fun PixFoldApp(
                             // 故在两处切目录互相同步。
                             workspaceState = workspaceState,
                             onPickWorkspace = { pickWorkspaceFolder.launch(null) },
+                            onOpenWorkspaceList = openWorkspaceList,
                             // 真实写入器。null 只在「没有工作区」时出现 —— 但那时
                             // `scannedVolumes` 已回退到 mock,模拟执行反而更诚实
                             // (不该往真实磁盘写一批来自 mock 路径的 CBZ)。
@@ -730,6 +755,50 @@ fun PixFoldApp(
                         )
                     }
                 }
+            }
+            // ---- 工作区列表弹窗（2026-10-25 规格 §7.2/§7.3）----
+            //
+            // **为什么挂在这里（DialogBlurHost 内、NavHost 之后）**：
+            //  1. 与页面切换解耦 —— 写进某个页面的话，换页/重建会把弹窗连开关一起丢掉，
+            //     用户点「添加文件夹」拉起系统选择器回来就看不到列表了；
+            //  2. 仍在 `CompositionLocalProvider(LocalThumbnailSource)` 内，与页面同处一层
+            //     主题/缩略图上下文，不会出现「弹窗里取不到主题色」；
+            //  3. 与全站弹窗同一套模糊宿主（`DialogBlurHost`），背景虚化自动生效。
+            //
+            // **必须用 `if (showWorkspaceList) { … }` 包裹，不许改成常驻组合（R24）**：
+            // `WorkspaceListDialog` 内部 `releaseGrant` 是 `remember`，只在**离开组合**时
+            // 销毁；常驻会让「移除顺便撤销授权」这种不可逆意图残留在下一次打开里。
+            if (showWorkspaceList) {
+                WorkspaceListDialog(
+                    listings = workspaceController.listings,
+                    currentTreeUri = workspaceHandle?.treeUri,
+                    onDismiss = { showWorkspaceList = false },
+                    onOpen = { treeUri ->
+                        showWorkspaceList = false
+                        workspaceController.open(treeUri)
+                    },
+                    onRemove = { treeUri, alsoRelease ->
+                        workspaceController.remove(treeUri, alsoRelease)
+                    },
+                    onTogglePin = { treeUri -> workspaceController.togglePin(treeUri) },
+                    // 弹窗给的是**整表下标**（两分区拼起来的顺序），而
+                    // `WorkspaceController.move` 收的是 treeUri —— 换算在这里做。
+                    // **只读一次 `listings` 快照（R25）**：读两次的话，两次读之间若被后台
+                    // 刷新（`listings` 是 `mutableStateOf`，页面随时可能刷新）改过，
+                    // from/to 就会指向不同的表，拖错行。
+                    onMove = { from, to ->
+                        val all = workspaceController.listings
+                        if (from in all.indices && to in all.indices) {
+                            workspaceController.move(
+                                all[from].entry.handle.treeUri,
+                                all[to].entry.handle.treeUri,
+                            )
+                        }
+                    },
+                    onAdd = { pickWorkspaceFolder.launch(null) },
+                    // 全钉住时「加不进」到不了 pick()，得在弹窗里说清楚为什么。
+                    rejectHint = if (workspaceController.listRejected) rejectAllPinnedHint() else null,
+                )
             }
             }
             }

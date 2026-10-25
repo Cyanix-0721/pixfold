@@ -109,6 +109,12 @@ fun LibraryPage(
     /** 用户要求选择/更换工作区目录。仅 [workspaceState] 非 null 时会被调用。 */
     onPickWorkspace: () -> Unit = {},
     /**
+     * 用户点整条工作区条要求打开**工作区列表弹窗**（2026-10-25 规格 §7.1）。
+     *
+     * 默认 `{}` = 与本次接线前完全一致，既有 `LibraryPageTest` 一行都不用改。
+     */
+    onOpenWorkspaceList: () -> Unit = {},
+    /**
      * 工作区结构警告(2026-10-20 裁决:系列下出现嵌套目录要警告)。
      *
      * 由上层(PixFoldApp)从**扫描结果**算出(`nestedDirWarnings(collections)`),
@@ -132,7 +138,11 @@ fun LibraryPage(
         // WorkspaceState.showsWorkspaceBar)。两处必须同时改 —— 只改一处的话,
         // 换个工作流进去就找不到重选入口,而不会有任何测试报错。
         if (workspaceState != null && workspaceState.showsWorkspaceBar) {
-            WorkspaceBar(state = workspaceState, onPick = onPickWorkspace)
+            WorkspaceBar(
+                state = workspaceState,
+                onPick = onPickWorkspace,
+                onOpenList = onOpenWorkspaceList,
+            )
         }
         Text(
             text = stringResource(R.string.lib_root, state.rootPath),
