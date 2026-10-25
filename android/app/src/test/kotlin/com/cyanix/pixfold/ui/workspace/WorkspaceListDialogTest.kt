@@ -105,13 +105,32 @@ class WorkspaceListDialogTest {
     /**
      * 空分区整块不渲染（规格 §7.3「分区为空 ⇒ 该分区整块不渲染，不显示空标题」）。
      *
-     * 变异靶子：把 `if (granted.isNotEmpty())` 改成恒真，本条即红。
+     * **这个方向**：上分区有内容、下分区为空 ⇒ 只有上标题。
+     *
+     * ⚠️ 这条**单独存在是不够的**。变异验证实测（M1 第一轮）：把
+     * `if (granted.isNotEmpty())` 改成恒真后本类 10 条**全绿** —— 因为本场景里
+     * granted 本来就非空，变异对断言的三件事（上标题在、下标题不在）毫无影响。
+     * 两个分区各需一个「自己为空」的场景，否则 `if` 的另一支永远没有断言压着。
      */
     @Test
     fun `分区为空时不画该分区标题`() {
         show(listOf(listing("a", granted = true)))
         rule.onNodeWithText(TestText.of(R.string.workspace_section_granted)).assertIsDisplayed()
         rule.onNodeWithText(TestText.of(R.string.workspace_section_stale)).assertDoesNotExist()
+    }
+
+    /**
+     * **反方向**：下分区有内容、上分区为空 ⇒ 只有下标题。
+     *
+     * 与上一条成对，才把「空分区不画标题」的两个 `if` 分支都钉住。
+     * 少了它，上分区的守卫（`granted.isNotEmpty()`）整支没有断言 —— 变异 M1 存活
+     * 就是这么来的（2026-10-25 实测，不是推断）。
+     */
+    @Test
+    fun `只有失效条目时不画已持久授权标题`() {
+        show(listOf(listing("b", granted = false)))
+        rule.onNodeWithText(TestText.of(R.string.workspace_section_stale)).assertIsDisplayed()
+        rule.onNodeWithText(TestText.of(R.string.workspace_section_granted)).assertDoesNotExist()
     }
 
     @Test
