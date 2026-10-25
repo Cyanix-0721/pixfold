@@ -114,5 +114,15 @@
     <string name="workspace_empty">这个文件夹里没有图片</string>
     <string name="workspace_empty_hint">换一个文件夹开始整理。</string>
     <string name="workspace_demo_note">当前显示演示数据 —— 选择文件夹即可操作真实文件</string>
+    <!-- ============ 工作区列表弹窗(D4 · 最近 8 条 + 图钉 + 拖拽) ============ -->
+    <string name="workspace_list_title">工作区文件夹</string>
+    <string name="workspace_section_granted">已持久授权</string>
+    <string name="workspace_section_stale">只记住了路径</string>
+    <string name="workspace_section_stale_hint">点按可重新授权。</string>
+    <string name="workspace_list_add">添加文件夹…</string>
+    <string name="workspace_in_use">使用中</string>
+    <string name="workspace_remove_cd">从列表移除 %1$s</string>
+    <string name="workspace_release_switch">同时撤销系统授权</string>
+    <string name="workspace_reject_all_pinned">全部文件夹都已钉住，先取消一个图钉再加。</string>
 
 </resources>

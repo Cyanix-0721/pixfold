@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Material Symbols "close" — 关闭 / 从列表移除一条的 ✕。
+  Source : https://github.com/google/material-design-icons
+  License: Apache License 2.0
+
+  与 ic_arrow_back / ic_push_pin_* 同策略:官方矢量几何数据 + painterResource,
+  不引入 material-icons 依赖(项目约定,见 HANGOFF §12.5)。
+
+  为什么不用 Icons.Default.Close:Close 属于 material-icons-core,
+  而本工程 classpath 上根本没有 material-icons 依赖(:app:dependencies 里
+  只有 material3 + material-ripple),写那个 import 直接编译不过。
+-->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <path
+        android:fillColor="@android:color/white"
+        android:pathData="M19,6.41L17.59,5 12,10.59 6.41,5 5,6.41 10.59,12 5,17.59 6.41,19 12,13.41 17.59,19 19,17.59 13.41,12z" />
+</vector>

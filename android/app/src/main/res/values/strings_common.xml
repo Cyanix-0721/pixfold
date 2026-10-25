@@ -136,5 +136,15 @@
     <string name="workspace_empty">This folder has no images</string>
     <string name="workspace_empty_hint">Pick another folder to organize.</string>
     <string name="workspace_demo_note">Showing demo data — choose a folder to work on real files</string>
+    <!-- ============ Workspace list dialog (D4 · 最近 8 条 + 图钉 + 拖拽) ============ -->
+    <string name="workspace_list_title">Workspace folders</string>
+    <string name="workspace_section_granted">Persistent access</string>
+    <string name="workspace_section_stale">Path remembered only</string>
+    <string name="workspace_section_stale_hint">Tap to re-grant access.</string>
+    <string name="workspace_list_add">Add folder…</string>
+    <string name="workspace_in_use">In use</string>
+    <string name="workspace_remove_cd">Remove %1$s from the list</string>
+    <string name="workspace_release_switch">Also revoke system access</string>
+    <string name="workspace_reject_all_pinned">All folders are pinned. Unpin one to add another.</string>
 
 </resources>
