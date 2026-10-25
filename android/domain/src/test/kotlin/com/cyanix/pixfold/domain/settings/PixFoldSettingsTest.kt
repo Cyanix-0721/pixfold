@@ -32,7 +32,6 @@ class PixFoldSettingsTest {
         )
         assertNull(s.landscapeDefaultColumns, "横屏默认列数同理,默认跟随自适应")
         assertEquals(AppLanguage.System, s.language)
-        assertEquals(StorageAccess.Saf, s.storageAccess, "文件访问默认 SAF")
         assertTrue(s.predictiveBackAnimation, "预测性返回动画默认开启")
     }
 
@@ -82,7 +81,6 @@ class PixFoldSettingsTest {
             portraitDefaultColumns = 3,
             landscapeDefaultColumns = 7,
             language = AppLanguage.English,
-            storageAccess = StorageAccess.AllFiles,
         )
         val changed = base.copy(colorStyle = ColorStyle.Rainbow)
         assertEquals(ColorStyle.Rainbow, changed.colorStyle)
@@ -94,6 +92,5 @@ class PixFoldSettingsTest {
         assertEquals(3, changed.portraitDefaultColumns)
         assertEquals(7, changed.landscapeDefaultColumns)
         assertEquals(AppLanguage.English, changed.language)
-        assertEquals(StorageAccess.AllFiles, changed.storageAccess)
     }
 }

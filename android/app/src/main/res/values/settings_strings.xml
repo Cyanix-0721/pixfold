@@ -23,10 +23,6 @@
     <string name="settings_section_language">Language</string>
     <string name="settings_language">Language</string>
     <string name="settings_section_behavior">Behavior</string>
-    <string name="settings_storage">File access</string>
-    <string name="settings_storage_saf_desc">Authorize folders via the system picker; privacy-friendly, no extra permission</string>
-    <string name="settings_storage_all_desc">Read and write storage directly; requires a one-time grant</string>
-    <string name="settings_storage_note">Takes effect once real file access is added</string>
     <string name="settings_section_about">About</string>
     <string name="settings_version">Version</string>
     <string name="settings_dev_suffix">dev build</string>
@@ -67,8 +63,6 @@
     <string name="spec_2025">Material 3 Expressive (2025)</string>
     <string name="language_chinese">中文</string>
     <string name="language_english">English</string>
-    <string name="storage_saf">SAF (recommended)</string>
-    <string name="storage_all">All files access</string>
     <string name="settings_predictive_back">Predictive back animation</string>
     <string name="settings_predictive_back_desc">Preview the exit while swiping back; off switches immediately</string>
     <string name="settings_columns_portrait">Default columns (portrait)</string>

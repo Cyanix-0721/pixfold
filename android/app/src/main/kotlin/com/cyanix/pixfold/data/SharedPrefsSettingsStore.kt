@@ -9,7 +9,6 @@ import com.cyanix.pixfold.domain.settings.ColorSpecVersion
 import com.cyanix.pixfold.domain.settings.ColorStyle
 import com.cyanix.pixfold.domain.settings.PixFoldSettings
 import com.cyanix.pixfold.domain.settings.SettingsStore
-import com.cyanix.pixfold.domain.settings.StorageAccess
 import com.cyanix.pixfold.domain.settings.ThemeMode
 
 /**
@@ -40,7 +39,6 @@ class SharedPrefsSettingsStore(context: Context) : SettingsStore {
         portraitDefaultColumns = readNullableColumns(KEY_COLUMNS_PORTRAIT),
         landscapeDefaultColumns = readNullableColumns(KEY_COLUMNS_LANDSCAPE),
         language = readEnum(KEY_LANGUAGE, AppLanguage.entries, AppLanguage.System),
-        storageAccess = readEnum(KEY_STORAGE, StorageAccess.entries, StorageAccess.Saf),
     )
 
     override fun save(settings: PixFoldSettings) {
@@ -53,7 +51,6 @@ class SharedPrefsSettingsStore(context: Context) : SettingsStore {
             putBoolean(KEY_PURE_BLACK, settings.pureBlack)
             putBoolean(KEY_PREDICTIVE_BACK, settings.predictiveBackAnimation)
             putString(KEY_LANGUAGE, settings.language.name)
-            putString(KEY_STORAGE, settings.storageAccess.name)
             // `null` = 跟随自适应 = "没选过" ⇒ **删掉这个 key**,而不是写一个哨兵数字。
             // 两者在语义上不同:写哨兵就得再挑一个永远不会被选中的值(如 0 或 -1),
             // 那个约定一旦被将来的合法取值撞上就静默出错;删除 key 则天然让旧版本
@@ -97,6 +94,5 @@ class SharedPrefsSettingsStore(context: Context) : SettingsStore {
         const val KEY_COLUMNS_PORTRAIT = "columns_portrait"
         const val KEY_COLUMNS_LANDSCAPE = "columns_landscape"
         const val KEY_LANGUAGE = "language"
-        const val KEY_STORAGE = "storage_access"
     }
 }

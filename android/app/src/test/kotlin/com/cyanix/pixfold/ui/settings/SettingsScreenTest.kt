@@ -21,7 +21,6 @@ import com.cyanix.pixfold.domain.settings.AppLanguage
 import com.cyanix.pixfold.domain.settings.ColorSpecVersion
 import com.cyanix.pixfold.domain.settings.ColorStyle
 import com.cyanix.pixfold.domain.settings.PixFoldSettings
-import com.cyanix.pixfold.domain.settings.StorageAccess
 import com.cyanix.pixfold.domain.settings.ThemeMode
 import com.cyanix.pixfold.ui.theme.PixFoldTheme
 import com.cyanix.pixfold.ui.theme.isAffectedByColorSpec
@@ -106,7 +105,6 @@ class SettingsScreenTest {
             TAG_SETTINGS_COLOR_SPEC,
             TAG_SETTINGS_PURE_BLACK,
             TAG_SETTINGS_LANGUAGE,
-            TAG_SETTINGS_STORAGE,
             TAG_SETTINGS_COLUMNS_PORTRAIT,
             TAG_SETTINGS_COLUMNS_LANDSCAPE,
             TAG_SETTINGS_PREDICTIVE_BACK,
@@ -121,6 +119,8 @@ class SettingsScreenTest {
         }
         // 主题三态三项都在
         ThemeMode.entries.forEach { rule.onNodeWithTag(themeOptionTag(it)).assertExists() }
+        // 假开关已删（2026-10-25 用户裁决）：它存的偏好从没有代码读取。
+        rule.onNodeWithTag("settings-storage").assertDoesNotExist()
     }
 
     @Test
@@ -199,14 +199,6 @@ class SettingsScreenTest {
         rule.onNodeWithTag(TAG_SETTINGS_COLOR_SPEC).assertIsEnabled()
         tap(TAG_SETTINGS_COLOR_SPEC)
         rule.onNodeWithTag(TAG_CHOICE_DIALOG).assertExists()
-    }
-
-    @Test
-    fun `storage access selection reports it upward`() {
-        show()
-        tap(TAG_SETTINGS_STORAGE)
-        chooseOption(TAG_SETTINGS_STORAGE, StorageAccess.entries.indexOf(StorageAccess.AllFiles))
-        assertEquals(StorageAccess.AllFiles, latest.storageAccess)
     }
 
     @Test
@@ -364,7 +356,6 @@ class SettingsScreenTest {
             portraitDefaultColumns = 3,
             landscapeDefaultColumns = 5,
             language = AppLanguage.English,
-            storageAccess = StorageAccess.AllFiles,
         )
         show(custom)
         tap(TAG_SETTINGS_RESET)
@@ -373,7 +364,7 @@ class SettingsScreenTest {
         assertEquals(custom, latest, "确认之前不得改动设置")
 
         tap(TAG_SETTINGS_RESET_CONFIRM)
-        assertEquals(PixFoldSettings(), latest, "确认后应整体回到默认值(含语言、文件访问与两向默认列数)")
+        assertEquals(PixFoldSettings(), latest, "确认后应整体回到默认值(含语言与两向默认列数)")
     }
 
     @Test

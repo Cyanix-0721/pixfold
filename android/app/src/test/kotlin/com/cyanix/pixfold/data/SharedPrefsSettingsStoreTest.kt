@@ -6,7 +6,6 @@ import com.cyanix.pixfold.domain.settings.AccentChoice
 import com.cyanix.pixfold.domain.settings.AppLanguage
 import com.cyanix.pixfold.domain.settings.ColorStyle
 import com.cyanix.pixfold.domain.settings.PixFoldSettings
-import com.cyanix.pixfold.domain.settings.StorageAccess
 import com.cyanix.pixfold.domain.settings.ThemeMode
 import org.junit.Before
 import org.junit.Test
@@ -67,7 +66,6 @@ class SharedPrefsSettingsStoreTest {
         portraitDefaultColumns = 3,
         landscapeDefaultColumns = 7,
         language = AppLanguage.English,
-        storageAccess = StorageAccess.AllFiles,
     )
 
     /**

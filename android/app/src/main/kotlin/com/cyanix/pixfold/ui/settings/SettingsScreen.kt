@@ -50,7 +50,6 @@ import com.cyanix.pixfold.domain.settings.AppLanguage
 import com.cyanix.pixfold.domain.settings.ColorSpecVersion
 import com.cyanix.pixfold.domain.settings.ColorStyle
 import com.cyanix.pixfold.domain.settings.PixFoldSettings
-import com.cyanix.pixfold.domain.settings.StorageAccess
 import com.cyanix.pixfold.domain.settings.ThemeMode
 import com.cyanix.pixfold.ui.components.LANDSCAPE_MAX_COLUMNS
 import com.cyanix.pixfold.ui.components.PORTRAIT_MAX_COLUMNS
@@ -76,7 +75,6 @@ const val TAG_SETTINGS_COLOR_STYLE = "settings-color-style"
 const val TAG_SETTINGS_COLOR_SPEC = "settings-color-spec"
 const val TAG_SETTINGS_PURE_BLACK = "settings-pure-black"
 const val TAG_SETTINGS_LANGUAGE = "settings-language"
-const val TAG_SETTINGS_STORAGE = "settings-storage"
 /** 网格默认列数:竖屏 / 横屏两行(用户 2026-09-26 第二轮裁决「设置里竖屏横屏分出 2 个选项」)。 */
 const val TAG_SETTINGS_COLUMNS_PORTRAIT = "settings-columns-portrait"
 const val TAG_SETTINGS_COLUMNS_LANDSCAPE = "settings-columns-landscape"
@@ -255,22 +253,11 @@ fun SettingsScreen(
             Divider()
 
             // ================= 行为 =================
+            // 「文件访问方式」(SAF / 全部文件访问)已于 2026-10-25 删除 —— 用户裁决
+            //「不做相册模式,目前方案是 SAF」;它存的偏好从没有代码读取去改变行为,
+            // 留着等于在设置里放一个不会生效的开关。本节标题保留:网格默认列数与
+            // 预测性返回仍在这一节里。
             SectionHeader(stringResource(R.string.settings_section_behavior))
-            ChoiceRow(
-                label = stringResource(R.string.settings_storage),
-                current = stringResource(storageLabel(settings.storageAccess)),
-                tag = TAG_SETTINGS_STORAGE,
-                options = StorageAccess.entries.map { it to stringResource(storageLabel(it)) },
-                onSelect = { onChange(settings.copy(storageAccess = it)) },
-            )
-            Note(
-                when (settings.storageAccess) {
-                    StorageAccess.Saf -> stringResource(R.string.settings_storage_saf_desc)
-                    StorageAccess.AllFiles -> stringResource(R.string.settings_storage_all_desc)
-                },
-            )
-            // D1 不连真实文件系统,此项只记偏好 —— 如实标注,不假装已生效。
-            Note(stringResource(R.string.settings_storage_note))
 
             // 网格默认列数(用户 2026-09-26 第二轮裁决:「设置里竖屏横屏分出 2 个选项,
             // 默认都是自适应值作为默认」+「设置里两个方向各多一项『跟随自适应』(显示算出的数)」)。
@@ -755,9 +742,4 @@ private fun languageLabel(language: AppLanguage): Int = when (language) {
     AppLanguage.System -> R.string.settings_theme_system
     AppLanguage.Chinese -> R.string.language_chinese
     AppLanguage.English -> R.string.language_english
-}
-
-private fun storageLabel(access: StorageAccess): Int = when (access) {
-    StorageAccess.Saf -> R.string.storage_saf
-    StorageAccess.AllFiles -> R.string.storage_all
 }

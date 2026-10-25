@@ -76,19 +76,6 @@ enum class AppLanguage {
 }
 
 /**
- * 文件访问方式(为接入真实文件系统预留)。
- *
- * [Saf] 通过系统文件选择器授权目录,**无需额外权限**、隐私友好,是 D2a 已验证的方案;
- * [AllFiles] 直接读写存储,首次需授权"所有文件访问"。
- *
- * > D1 不连真实文件系统,故本项**只持久化偏好**,不改变实际行为。
- */
-enum class StorageAccess {
-    Saf,
-    AllFiles,
-}
-
-/**
  * 应用设置(纯数据,可持久化)。
  *
  * **本类不含任何面向用户的文案** —— 枚举取值 → 显示文案的映射在 `app` 层
@@ -139,7 +126,6 @@ data class PixFoldSettings(
     /** 网格视图的**横屏**默认列数。语义同 [portraitDefaultColumns]。 */
     val landscapeDefaultColumns: Int? = null,
     val language: AppLanguage = AppLanguage.System,
-    val storageAccess: StorageAccess = StorageAccess.Saf,
 ) {
     /**
      * 是否使用系统动态取色(Monet)。

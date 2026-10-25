@@ -23,10 +23,6 @@
     <string name="settings_section_language">语言</string>
     <string name="settings_language">语言</string>
     <string name="settings_section_behavior">行为</string>
-    <string name="settings_storage">文件访问方式</string>
-    <string name="settings_storage_saf_desc">通过系统文件选择器授权目录，隐私友好、无需额外权限</string>
-    <string name="settings_storage_all_desc">直接读写存储，首次使用时需授权</string>
-    <string name="settings_storage_note">将在接入真实文件系统后生效</string>
     <string name="settings_section_about">关于</string>
     <string name="settings_version">版本</string>
     <string name="settings_dev_suffix">开发版</string>
@@ -67,8 +63,6 @@
     <string name="spec_2025">Material 3 Expressive (2025)</string>
     <string name="language_chinese">中文</string>
     <string name="language_english">English</string>
-    <string name="storage_saf">SAF（推荐）</string>
-    <string name="storage_all">全部文件访问</string>
     <string name="settings_predictive_back">返回手势跟随动画</string>
     <string name="settings_predictive_back_desc">返回手势进行中实时预览退场；关闭则立即切走</string>
     <string name="settings_columns_portrait">竖屏默认列数</string>
