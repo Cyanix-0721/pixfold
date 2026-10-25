@@ -40,6 +40,7 @@ import com.cyanix.pixfold.domain.library.setVolumeIncluded
 import com.cyanix.pixfold.ui.components.PageActionBar
 import com.cyanix.pixfold.ui.workspace.WorkspaceBar
 import com.cyanix.pixfold.ui.workspace.WorkspaceState
+import com.cyanix.pixfold.ui.workspace.showsWorkspaceBar
 import com.cyanix.pixfold.ui.text.textOf
 
 const val TAG_LIBRARY_PAGE = "library-page"
@@ -126,7 +127,11 @@ fun LibraryPage(
     ) {
         // 工作区条常驻在标题行**之前**：它决定下面整个列表的来源，
         // 放在列表里会随滚动消失（与工作流 A 的落点一致，见 HANGOFF §4「从属层」）。
-        if (workspaceState != null) {
+        //
+        // **2026-10-24 用户裁决(乙)：常态不再显示**(理由见工作流 A 同处注释与
+        // WorkspaceState.showsWorkspaceBar)。两处必须同时改 —— 只改一处的话,
+        // 换个工作流进去就找不到重选入口,而不会有任何测试报错。
+        if (workspaceState != null && workspaceState.showsWorkspaceBar) {
             WorkspaceBar(state = workspaceState, onPick = onPickWorkspace)
         }
         Text(

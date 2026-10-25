@@ -16,6 +16,10 @@ import com.cyanix.pixfold.domain.library.LibraryState
 import com.cyanix.pixfold.domain.library.libraryStateOf
 import com.cyanix.pixfold.domain.text.Msg
 import com.cyanix.pixfold.domain.text.TextKey
+import com.cyanix.pixfold.domain.source.WorkspaceHandle
+import com.cyanix.pixfold.ui.workspace.TAG_WORKSPACE_ACTION
+import com.cyanix.pixfold.ui.workspace.TAG_WORKSPACE_BAR
+import com.cyanix.pixfold.ui.workspace.WorkspaceState
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -39,12 +43,18 @@ class LibraryPageTest {
 
     private val library = MockDataB.library
 
-    private fun show(onChange: (LibraryState) -> Unit = {}) {
+    private val handle = WorkspaceHandle(treeUri = "content://tree/x", displayName = "照片库")
+
+    private fun show(
+        onChange: (LibraryState) -> Unit = {},
+        state: WorkspaceState? = null,
+    ) {
         rule.setContent {
             LibraryPage(
                 state = libraryStateOf(library.rootPath, library.volumes),
                 onStateChange = onChange,
                 contentInsets = WindowInsets(0, 0, 0, 0),
+                workspaceState = state,
             )
         }
     }
@@ -132,7 +142,7 @@ class LibraryPageTest {
     @Test
     fun `unchecking a volume reports the new state`() {
         var latest: LibraryState? = null
-        show { latest = it }
+        show(onChange = { latest = it })
         rule.onNodeWithTag(TAG_LIBRARY_LIST).performScrollToNode(hasTestTag(volumeIncludedTag("aot-1")))
         rule.onNodeWithTag(volumeIncludedTag("aot-1")).performClick()
         rule.waitForIdle()
@@ -142,7 +152,7 @@ class LibraryPageTest {
     @Test
     fun `tapping a volume selects it and marks it as current`() {
         var latest: LibraryState? = null
-        show { latest = it }
+        show(onChange = { latest = it })
         rule.onNodeWithTag(TAG_LIBRARY_LIST).performScrollToNode(hasTestTag(volumeCardTag("op-101")))
         rule.onNodeWithTag(volumeCardTag("op-101")).performClick()
         rule.waitForIdle()
@@ -243,5 +253,26 @@ class LibraryPageTest {
     fun `no warnings means no warning nodes`() {
         show()
         rule.onNodeWithTag(structureWarningTag(0)).assertDoesNotExist()
+    }
+
+    // ============ 工作区条只在「正忙 / 出问题」时出现（2026-10-24 用户裁决 乙） ============
+    //
+    // 这条来自一次**变异存活**：把 LibraryPage 里的
+    // `workspaceState != null && workspaceState.showsWorkspaceBar` 改回
+    // `workspaceState != null`（即改版前的写法），762 个测试一个都没红 ——
+    // 工作流 A 那侧有 OrganizeWorkspaceTest 守着，工作流 B 这侧完全没有。
+    // 两处必须同时改是这条改判的原始理由（见 WorkspaceState.showsWorkspaceBar 的 KDoc），
+    // 只守一处等于没守。
+    @Test
+    fun `常态下工作流 B 里不再挂工作区条`() {
+        show(state = WorkspaceState.Ready(handle, emptyList()))
+        rule.onNodeWithTag(TAG_WORKSPACE_BAR).assertDoesNotExist()
+    }
+
+    @Test
+    fun `授权失效时工作流 B 里条必须还在`() {
+        show(state = WorkspaceState.Denied(handle))
+        rule.onNodeWithTag(TAG_WORKSPACE_BAR).assertIsDisplayed()
+        rule.onNodeWithTag(TAG_WORKSPACE_ACTION).assertIsDisplayed()
     }
 }

@@ -75,8 +75,10 @@ class OrganizeWorkspaceTest {
     }
 
     @Test
-    fun `接上工作区后条显示在页签上方`() {
-        setContent(state = WorkspaceState.None)
+    fun `授权失效时条显示在页签上方`() {
+        // 2026-10-24 用户裁决(乙)：常态(None/Ready)不再挂这条 —— 选目录入口搬到首页了。
+        // 只有「正忙」与「出问题」两种状态才留,这里用 Denied 作为代表。
+        setContent(state = WorkspaceState.Denied(handle))
 
         rule.onNodeWithTag(TAG_WORKSPACE_BAR).assertIsDisplayed()
         rule.onNodeWithTag(TAG_STEP_TABS).assertIsDisplayed()
@@ -88,13 +90,6 @@ class OrganizeWorkspaceTest {
             "工作区条必须在页签行上方（bar.top=${bar.top} tabs.top=${tabs.top}）",
             bar.top < tabs.top,
         )
-    }
-
-    @Test
-    fun `成功时条显示目录名`() {
-        setContent(state = WorkspaceState.Ready(handle, MockData.workspaceA.collections))
-
-        rule.onNodeWithText(TestText.of(R.string.workspace_current, "照片库")).assertIsDisplayed()
     }
 
     @Test
@@ -117,6 +112,48 @@ class OrganizeWorkspaceTest {
 
         rule.onNodeWithTag(TAG_EMPTY_WORKSPACE_PICK).performClick()
         assertEquals(1, picks, "空态必须给出重选入口，否则用户只能退出应用")
+    }
+
+    @Test
+    fun `常态下工作流里不再挂工作区条`() {
+        // 2026-10-24 用户裁决(乙)的第 1 条:**只在授权失效/读取失败/扫描中显示**。
+        // None 与 Ready 都不挂 —— 入口已经搬到首页,工作流里再摆一条是同一功能两处。
+        // 这条与上面「默认不显示条」是一对:那条守 workspaceState == null,
+        // 这条守「接了但正常」,漏掉任一条都留得下后退空间。
+        setContent(state = WorkspaceState.Ready(handle, MockData.workspaceA.collections))
+        rule.onNodeWithTag(TAG_WORKSPACE_BAR).assertDoesNotExist()
+    }
+
+    @Test
+    fun `未选工作区时工作流里也不挂条`() {
+        // 与上一条分开写:createComposeRule 的 setContent 只能调用一次,
+        // 塞进同一条会在第二次调用处抛 "setContent cannot be called twice"。
+        setContent(state = WorkspaceState.None)
+        rule.onNodeWithTag(TAG_WORKSPACE_BAR).assertDoesNotExist()
+    }
+
+    @Test
+    fun `数据源断了的时候条必须还在`() {
+        // 这是本轮最关键的一条守卫:collectionsOr 在非 Ready 状态一律回退 mock,
+        // 也就是说 Denied / Failed 时界面上照样有一整列看着正常的图片。条是那种处境下
+        // **唯一**的重选入口 —— 若有人把它一并收掉,用户会以为自己在整理真实文件。
+        setContent(state = WorkspaceState.Denied(handle))
+        rule.onNodeWithTag(TAG_WORKSPACE_ACTION).assertIsDisplayed()
+    }
+
+    @Test
+    fun `读取失败的时候条也必须还在`() {
+        setContent(state = WorkspaceState.Failed("io"))
+        rule.onNodeWithTag(TAG_WORKSPACE_ACTION).assertIsDisplayed()
+    }
+
+    @Test
+    fun `扫描中条显示但不给动作`() {
+        setContent(state = WorkspaceState.Loading)
+
+        rule.onNodeWithTag(TAG_WORKSPACE_BAR).assertIsDisplayed()
+        // 扫描中再点一次会并发两个扫描,且用户没有可做的决定 ⇒ 不给按钮。
+        rule.onNodeWithTag(TAG_WORKSPACE_ACTION).assertDoesNotExist()
     }
 
     @Test

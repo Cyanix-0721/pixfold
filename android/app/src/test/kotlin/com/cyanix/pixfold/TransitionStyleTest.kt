@@ -156,7 +156,7 @@ class TransitionStyleTest {
     @Test
     fun `the step level back gesture fades without scaling`() {
         rule.setContent {
-            PixFoldApp(store = InMemorySettingsStore(PixFoldSettings(predictiveBackAnimation = true)))
+            PixFoldApp(store = InMemorySettingsStore(PixFoldSettings(predictiveBackAnimation = true)), workspaceSource = ReadyWorkspaceSource())
         }
         openNamingStep()
 
@@ -200,7 +200,7 @@ class TransitionStyleTest {
     @Test
     fun `the page level back gesture both fades and scales`() {
         rule.setContent {
-            PixFoldApp(store = InMemorySettingsStore(PixFoldSettings(predictiveBackAnimation = true)))
+            PixFoldApp(store = InMemorySettingsStore(PixFoldSettings(predictiveBackAnimation = true)), workspaceSource = ReadyWorkspaceSource())
         }
         openSettingsPage()
 
@@ -244,7 +244,7 @@ class TransitionStyleTest {
     @Test
     fun `with the switch off neither level transforms`() {
         rule.setContent {
-            PixFoldApp(store = InMemorySettingsStore(PixFoldSettings(predictiveBackAnimation = false)))
+            PixFoldApp(store = InMemorySettingsStore(PixFoldSettings(predictiveBackAnimation = false)), workspaceSource = ReadyWorkspaceSource())
         }
         openSettingsPage()
 

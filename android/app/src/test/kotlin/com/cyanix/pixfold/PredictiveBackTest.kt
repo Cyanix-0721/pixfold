@@ -110,7 +110,7 @@ class PredictiveBackTest {
 
     @Test
     fun `a completed predictive gesture walks workflow A down one step`() {
-        rule.setContent { PixFoldApp() }
+        rule.setContent { PixFoldApp(workspaceSource = ReadyWorkspaceSource()) }
         openNamingStep()
 
         completeGesture()
@@ -125,7 +125,7 @@ class PredictiveBackTest {
         rule.setContent {
             PixFoldApp(
                 store = InMemorySettingsStore(PixFoldSettings(predictiveBackAnimation = false)),
-            )
+             workspaceSource = ReadyWorkspaceSource())
         }
         openNamingStep()
 
@@ -137,7 +137,7 @@ class PredictiveBackTest {
 
     @Test
     fun `a completed predictive gesture walks workflow B from the pack step to metadata`() {
-        rule.setContent { PixFoldApp() }
+        rule.setContent { PixFoldApp(workspaceSource = ReadyWorkspaceSource()) }
         rule.onNodeWithText(TestText.of(R.string.home_workflow_b)).performClick()
         rule.onNodeWithTag(TAG_B_STEP_PACK).performClick()
         rule.onNodeWithTag(TAG_PACK_PAGE).assertIsDisplayed()
@@ -151,7 +151,7 @@ class PredictiveBackTest {
 
     @Test
     fun `a cancelled predictive gesture leaves the naming step in place`() {
-        rule.setContent { PixFoldApp() }
+        rule.setContent { PixFoldApp(workspaceSource = ReadyWorkspaceSource()) }
         openNamingStep()
 
         gestureTo(0.9f)

@@ -97,6 +97,39 @@ val WorkspaceState.canOrganize: Boolean
     }
 
 /**
+ * 工作流页面里要不要挂那条工作区条（2026-10-24 用户裁决 乙/甲/乙 的第 1 条）。
+ *
+ * ## 规则：只在**出问题或正忙**时显示
+ *
+ * | 状态 | 显示 | 理由 |
+ * | --- | --- | --- |
+ * | [None] | ❌ | 选目录的入口已经搬到首页；工作流里再放一条「当前显示演示数据 + 选择文件夹」是同一个功能摆两处 |
+ * | [Loading] | ✅ | 扫描可能几秒（千级文件更久），不说明的话用户只会觉得点不动 |
+ * | [Ready] | ❌ | 一切正常时这条是纯噪声 —— 首页那一条已经承担了「我在哪个目录」 |
+ * | [Denied] | ✅ | **必须**。见下面那条真正的理由 |
+ * | [Failed] | ✅ | 同上 |
+ *
+ * ## 为什么 Denied / Failed **不能**跟着一起删
+ *
+ * [collectionsOr] 在非 `Ready` 状态下一律回退 mock。也就是说授权失效后，
+ * 界面上**照样有一整列看起来正常的图片**，用户会以为自己在整理真实文件 ——
+ * 排序、改名一路做下去，最后因为读不到文件而全部失败，或者更糟：做完了才发现
+ * 什么都没写进自己的文件夹。这条条是那种处境下**唯一**的重选入口。
+ *
+ * 把「正常时收起」和「异常时常驻」拆成两个状态判断，而不是在调用点各写一遍 `when`,
+ * 是因为两处调用点（工作流 A / B）必须**同时**改 —— 只改一处的表现是「换个工作流进去
+ * 就没有重选入口了」，而这种缺漏不会有任何测试报错，只要没人正好在那条路径上点。
+ */
+val WorkspaceState.showsWorkspaceBar: Boolean
+    get() = when (this) {
+        WorkspaceState.None -> false
+        WorkspaceState.Loading -> true
+        is WorkspaceState.Ready -> false
+        is WorkspaceState.Denied -> true
+        is WorkspaceState.Failed -> true
+    }
+
+/**
  * 当前状态里能取到的授权（[Ready] / [Denied] 才有）。
  *
  * **为什么需要它**：刷新（`WorkspaceController.refresh`）与「是否换了工作区」的

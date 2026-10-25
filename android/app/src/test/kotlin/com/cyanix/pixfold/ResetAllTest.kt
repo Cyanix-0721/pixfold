@@ -164,7 +164,7 @@ class ResetAllTest {
      */
     @Test
     fun `returning home resets the workflow so re-entering starts clean`() {
-        rule.setContent { PixFoldApp() }
+        rule.setContent { PixFoldApp(workspaceSource = ReadyWorkspaceSource()) }
 
         rule.onNodeWithText(TestText.of(R.string.home_workflow_a)).performClick()
         rule.waitForIdle()

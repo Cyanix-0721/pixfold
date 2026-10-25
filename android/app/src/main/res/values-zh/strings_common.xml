@@ -37,6 +37,8 @@
     <string name="home_workflow_a_subtitle">排序、重命名，按你的规则预览</string>
     <string name="home_workflow_b">打包漫画</string>
     <string name="home_workflow_b_subtitle">补全元数据，按卷打包成 CBZ</string>
+    <!-- 2026-10-24(用户裁决 乙/甲/乙):未选工作区时两张大卡禁用,这一行说明为什么。 -->
+    <string name="home_workspace_gate_hint">当前显示演示数据 —— 先在下方选择文件夹,再开始整理</string>
 
     <!--
       ============ 重置全部(ResetAllButton) ============

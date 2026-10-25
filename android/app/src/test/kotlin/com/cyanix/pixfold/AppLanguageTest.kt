@@ -67,7 +67,7 @@ class AppLanguageTest {
         assertEquals(english, appLocales(), "前置条件:系统侧应已存下 English")
 
         // 应用内设置保持默认 —— 即 AppLanguage.System
-        rule.setContent { PixFoldApp(store = InMemorySettingsStore()) }
+        rule.setContent { PixFoldApp(store = InMemorySettingsStore(), workspaceSource = ReadyWorkspaceSource()) }
         rule.waitForIdle()
 
         assertEquals(
@@ -84,7 +84,7 @@ class AppLanguageTest {
      * 那会把缺陷从"乱清"变成"根本不生效"。
      */
     @Test
-    fun `changing language in settings writes system per-app locale`() {        rule.setContent { PixFoldApp(store = InMemorySettingsStore()) }
+    fun `changing language in settings writes system per-app locale`() {        rule.setContent { PixFoldApp(store = InMemorySettingsStore(), workspaceSource = ReadyWorkspaceSource()) }
         rule.waitForIdle()
 
         // 首页 → 设置
@@ -117,7 +117,7 @@ class AppLanguageTest {
     @Test
     fun `stored explicit language is applied on startup`() {
         rule.setContent {
-            PixFoldApp(store = InMemorySettingsStore(PixFoldSettings(language = AppLanguage.English)))
+            PixFoldApp(store = InMemorySettingsStore(PixFoldSettings(language = AppLanguage.English)), workspaceSource = ReadyWorkspaceSource())
         }
         rule.waitForIdle()
 

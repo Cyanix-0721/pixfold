@@ -26,6 +26,8 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import com.cyanix.pixfold.R
+import com.cyanix.pixfold.ui.workspace.WorkspaceBar
+import com.cyanix.pixfold.ui.workspace.WorkspaceState
 
 /**
  * 首页:两条工作流入口(验收第 19 项"从首页完整走通")。
@@ -57,6 +59,17 @@ fun HomeScreen(
     modifier: Modifier = Modifier,
     onOpenSettings: () -> Unit = {},
     contentInsets: WindowInsets = WindowInsets.safeDrawing,
+    /**
+     * 工作区状态。`null` = **不接工作区**(不画条、不禁用大卡) ——
+     * 与 [com.cyanix.pixfold.ui.organize.OrganizeSteps] /
+     * [com.cyanix.pixfold.ui.library.LibraryPage] 的同名参数语义完全一致,
+     * 默认 `null` 让既有首页测试的布局与断言一行都不用改。
+     *
+     * @see canStartWorkflow
+     */
+    workspaceState: WorkspaceState? = null,
+    /** 用户要求选择/更换工作区目录。仅 [workspaceState] 非 null 时会被调用。 */
+    onPickWorkspace: () -> Unit = {},
 ) {
     // `stringResource` 不能在 `semantics {}` 里调用(那不是 @Composable lambda),须先取出。
     val settingsCd = stringResource(R.string.home_settings_cd)
@@ -98,15 +111,69 @@ fun HomeScreen(
                 )
             }
         }
-        WorkflowEntry(organizeTitle, organizeSubtitle, onOpenOrganize)
-        WorkflowEntry(libraryTitle, librarySubtitle, onOpenLibrary)
+        val canStart = canStartWorkflow(workspaceState)
+        WorkflowEntry(organizeTitle, organizeSubtitle, onOpenOrganize, enabled = canStart)
+        WorkflowEntry(libraryTitle, librarySubtitle, onOpenLibrary, enabled = canStart)
+
+        // 两张卡都点不动时必须**说明为什么**,否则首屏就是一堵死墙。
+        // 只在真的被挡住时才出现,工作区就绪时这一行不存在。
+        if (!canStart) {
+            Text(
+                text = stringResource(R.string.home_workspace_gate_hint),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .testTag(TAG_WORKSPACE_GATE_HINT),
+            )
+        }
+
+        // 工作区条:两张大卡**之下**的从属层(HANGOFF §4,2026-10-15 用户裁决:
+        // 「Workspace 是范围,两个工作流是任务,层级不同」;摆成第三张等权卡会误导用户
+        // 以为「选工作区」也是一件能做完的事)。
+        //
+        // 位置在卡之下、而不是标题行下方,是 `HANGOFF.md:211-212` 逐字定的形态。
+        if (workspaceState != null) {
+            WorkspaceBar(state = workspaceState, onPick = onPickWorkspace)
+        }
     }
+}
+
+/**
+ * 首页两条工作流入口此刻**能不能进**(2026-10-24 用户裁决 乙/甲/乙)。
+ *
+ * ## 判据为什么是「就绪且非空」而不是 [WorkspaceState.canOrganize]
+ *
+ * `canOrganize` 在 [WorkspaceState.None] / `Denied` / `Failed` 上**都返回 true** ——
+ * 那是 D1 的语义：「没选目录时就拿 mock 数据演示,界面上总得有点东西看」。
+ * 首页入口要回答的是**另一个问题**:「点进去以后用户操作的是不是他自己的文件」。
+ * 在 mock 上排序改名、做完却发现什么都没写进自己文件夹,是这个应用最坏的一种失败,
+ * 所以入口这道门按「真有一份可读的真实目录」判定。
+ *
+ * `Ready` 但**空列表**同样不可进:用户选了个没有图片的文件夹,进去只会看到空态,
+ * 真正的下一步是换一个文件夹(条上就有「选择文件夹」)。
+ *
+ * ## 判据为什么不对 `null` 生效
+ *
+ * `null` = 宿主**没接**工作区(既有测试与 D1 演示路径),此时本组件无权假定制它有,
+ * 否则 24 处导航测试会因为首页突然不可点而全部变红 —— 那不是「行为变更」,是没接线。
+ */
+internal fun canStartWorkflow(state: WorkspaceState?): Boolean = when (state) {
+    null -> true
+    WorkspaceState.None -> false
+    WorkspaceState.Loading -> false
+    is WorkspaceState.Ready -> state.collections.isNotEmpty()
+    is WorkspaceState.Denied -> false
+    is WorkspaceState.Failed -> false
 }
 
 const val TAG_TITLE = "home-title"
 
 /** 首页右上角的设置入口。 */
 const val TAG_SETTINGS_BUTTON = "home-settings"
+
+/** 两张大卡被禁用时那一行说明（只有被挡住时才出现）。 */
+const val TAG_WORKSPACE_GATE_HINT = "home-workspace-gate-hint"
 
 /**
  * 首页的大卡片入口:标题一行 + 副标题一行。
@@ -140,13 +207,31 @@ const val TAG_SETTINGS_BUTTON = "home-settings"
  * (副标题是补充说明,读屏时标题已足够标识这个入口)。
  */
 @Composable
-private fun WorkflowEntry(title: String, subtitle: String, onClick: () -> Unit) {
+private fun WorkflowEntry(
+    title: String,
+    subtitle: String,
+    onClick: () -> Unit,
+    enabled: Boolean = true,
+) {
+    // enabled = false 走 clickable 的 enabled 参数，不是把 onClick 换成空 lambda：
+    // 只有前者会往语义树写 Disabled，读屏才知道「这个入口现在用不了」；
+    // 换成空 lambda 虽然点了没反应，但读屏照样报「按钮」，用户会一直点。
+    // 测试侧的 assertIsNotEnabled 也依赖这条语义。
     Card(
         modifier = Modifier
             .fillMaxWidth()
-            .clickable(onClick = onClick)
+            .clickable(enabled = enabled, onClick = onClick)
             .semantics { contentDescription = title },
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+        border = BorderStroke(
+            1.dp,
+            if (enabled) {
+                MaterialTheme.colorScheme.outlineVariant
+            } else {
+                // 禁用态描边再淡一档：纯黑模式下阴影本来就不可见，若描边不变，
+                // 「灰标题 + 正常描边」看起来仍像可用入口，用户会反复点。
+                MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f)
+            },
+        ),
     ) {
         Column(
             modifier = Modifier
@@ -157,12 +242,18 @@ private fun WorkflowEntry(title: String, subtitle: String, onClick: () -> Unit) 
             Text(
                 text = title,
                 style = MaterialTheme.typography.titleLarge,
-                color = MaterialTheme.colorScheme.onSurface,
+                color = if (enabled) {
+                    MaterialTheme.colorScheme.onSurface
+                } else {
+                    MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f)
+                },
             )
             Text(
                 text = subtitle,
                 style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(
+                    alpha = if (enabled) 1f else 0.38f,
+                ),
             )
         }
     }

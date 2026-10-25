@@ -16,6 +16,7 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.unit.dp
 import com.cyanix.pixfold.PixFoldApp
+import com.cyanix.pixfold.ReadyWorkspaceSource
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -34,7 +35,7 @@ class HomeScreenTest {
 
     @Test
     fun `home renders both workflow entries`() {
-        rule.setContent { PixFoldApp() }
+        rule.setContent { PixFoldApp(workspaceSource = ReadyWorkspaceSource()) }
         rule.onNodeWithText(TestText.of(R.string.home_workflow_a)).assertIsDisplayed()
         rule.onNodeWithText(TestText.of(R.string.home_workflow_b)).assertIsDisplayed()
     }

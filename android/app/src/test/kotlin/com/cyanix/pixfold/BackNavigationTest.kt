@@ -57,7 +57,7 @@ class BackNavigationTest {
     }
 
     private fun openNamingStep() {
-        rule.setContent { PixFoldApp() }
+        rule.setContent { PixFoldApp(workspaceSource = ReadyWorkspaceSource()) }
         rule.onNodeWithText(TestText.of(R.string.home_workflow_a)).performClick()
         rule.onNodeWithTag(TAG_STEP_NAMING).performClick()
         rule.waitForIdle()
@@ -78,7 +78,7 @@ class BackNavigationTest {
 
     @Test
     fun `back from sort step returns to home`() {
-        rule.setContent { PixFoldApp() }
+        rule.setContent { PixFoldApp(workspaceSource = ReadyWorkspaceSource()) }
         rule.onNodeWithText(TestText.of(R.string.home_workflow_a)).performClick()
         assertTrue(rule.onAllNodesWithTag(TAG_GRID_CARD).fetchSemanticsNodes().isNotEmpty(), "应停在工作流 A")
 
@@ -89,7 +89,7 @@ class BackNavigationTest {
 
     @Test
     fun `back from preview closes the preview and stays in workflow A`() {
-        rule.setContent { PixFoldApp() }
+        rule.setContent { PixFoldApp(workspaceSource = ReadyWorkspaceSource()) }
         rule.onNodeWithText(TestText.of(R.string.home_workflow_a)).performClick()
         rule.onAllNodesWithTag(TAG_GRID_CARD)[0].performClick()
         rule.onNodeWithTag(TAG_PREVIEW).assertIsDisplayed()
@@ -104,7 +104,7 @@ class BackNavigationTest {
 
     @Test
     fun `back from workflow B first step returns to home`() {
-        rule.setContent { PixFoldApp() }
+        rule.setContent { PixFoldApp(workspaceSource = ReadyWorkspaceSource()) }
         rule.onNodeWithText(TestText.of(R.string.home_workflow_b)).performClick()
         rule.onNodeWithTag(TAG_LIBRARY_PAGE).assertIsDisplayed()
 
@@ -115,7 +115,7 @@ class BackNavigationTest {
     @Test
     fun `back from workflow B third step walks down to the library step`() {
         // 层级:步骤3 打包计划 -> 步骤2 元数据 -> 步骤1 漫画库 -> 首页
-        rule.setContent { PixFoldApp() }
+        rule.setContent { PixFoldApp(workspaceSource = ReadyWorkspaceSource()) }
         rule.onNodeWithText(TestText.of(R.string.home_workflow_b)).performClick()
         rule.onNodeWithTag(TAG_B_STEP_PACK).performClick()
         rule.onNodeWithTag(TAG_PACK_PAGE).assertIsDisplayed()
@@ -133,7 +133,7 @@ class BackNavigationTest {
     @Test
     fun `the whole back chain walks down level by level`() {
         // 端到端走一遍层级:命名 -> 排序 -> 首页
-        rule.setContent { PixFoldApp() }
+        rule.setContent { PixFoldApp(workspaceSource = ReadyWorkspaceSource()) }
         rule.onNodeWithText(TestText.of(R.string.home_workflow_a)).performClick()
         rule.onNodeWithTag(TAG_STEP_NAMING).performClick()
         rule.onNodeWithTag(TAG_STEP_BACK).assertIsDisplayed()
@@ -162,7 +162,7 @@ class BackNavigationTest {
      */
     @Test
     fun `a backward tab jump in workflow A keeps the back chain linear`() {
-        rule.setContent { PixFoldApp() }
+        rule.setContent { PixFoldApp(workspaceSource = ReadyWorkspaceSource()) }
         rule.onNodeWithText(TestText.of(R.string.home_workflow_a)).performClick()
         rule.onNodeWithTag(TAG_STEP_NAMING).performClick()
         rule.onNodeWithTag(TAG_TO_PLAN).performClick()
@@ -181,7 +181,7 @@ class BackNavigationTest {
     /** 同上,工作流 B 走的是独立的 `goToLibraryStep`。 */
     @Test
     fun `a backward tab jump in workflow B keeps the back chain linear`() {
-        rule.setContent { PixFoldApp() }
+        rule.setContent { PixFoldApp(workspaceSource = ReadyWorkspaceSource()) }
         rule.onNodeWithText(TestText.of(R.string.home_workflow_b)).performClick()
         // 步骤1 -> 步骤3(按 helper 会逐级推入元数据、打包)
         rule.onNodeWithTag(TAG_B_STEP_PACK).performClick()

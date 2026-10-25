@@ -54,14 +54,14 @@ class AppNavigationTest {
 
     @Test
     fun `workflow A entry actually opens the grid page`() {
-        rule.setContent { PixFoldApp() }
+        rule.setContent { PixFoldApp(workspaceSource = ReadyWorkspaceSource()) }
         rule.onNodeWithText(TestText.of(R.string.home_workflow_a)).performClick()
         rule.onNodeWithTag(TAG_GRID).assertIsDisplayed()
     }
 
     @Test
     fun `tapping a thumbnail opens preview and close returns`() {
-        rule.setContent { PixFoldApp() }
+        rule.setContent { PixFoldApp(workspaceSource = ReadyWorkspaceSource()) }
         rule.onNodeWithText(TestText.of(R.string.home_workflow_a)).performClick()
         rule.onNodeWithTag(TAG_GRID).assertIsDisplayed()
 
@@ -74,7 +74,7 @@ class AppNavigationTest {
 
     @Test
     fun `preview opened from grid allows paging`() {
-        rule.setContent { PixFoldApp() }
+        rule.setContent { PixFoldApp(workspaceSource = ReadyWorkspaceSource()) }
         rule.onNodeWithText(TestText.of(R.string.home_workflow_a)).performClick()
         rule.onAllNodesWithTag(TAG_GRID_CARD)[0].performClick()
 
@@ -87,10 +87,16 @@ class AppNavigationTest {
     fun `workflow B entry actually opens the library step`() {
         // P5 起工作流 B 有真实页面:断言"真的到了漫画库步骤"(出现卷卡片),
         // 而不是只断言回调被调用 —— 后者会放过"回调触发但界面没换"的缺陷。
-        rule.setContent { PixFoldApp() }
+        //
+        // **2026-10-24 改判**:原来断的是 `aot-1`,那是 `MockDataB.library` 的卷,
+        // 只在"没有工作区 ⇒ 回退演示数据"时才会出现。首页准入改成"未选工作区则禁用
+        // 大卡"(用户裁决 3 = 乙)之后,这条路走不到了;注入了就绪工作区的本用例,
+        // 卷 id 直接来自 `collections`(见 `ComicVolumesFrom`: `id = collection.id`)。
+        // 断言的强度没降:仍是"某张具体的卷卡片在",而不是"页面在"。
+        rule.setContent { PixFoldApp(workspaceSource = ReadyWorkspaceSource()) }
         rule.onNodeWithText(TestText.of(R.string.home_workflow_b)).performClick()
         rule.onNodeWithTag(TAG_LIBRARY_PAGE).assertIsDisplayed()
-        rule.onAllNodesWithTag(volumeCardTag("aot-1")).assertCountEquals(1)
+        rule.onAllNodesWithTag(volumeCardTag("trip")).assertCountEquals(1)
     }
 
     // ============ 预览取图必须用**当前页序**,不是集合声明序 ============
@@ -108,7 +114,7 @@ class AppNavigationTest {
 
     @Test
     fun `preview shows the very card that was tapped when page order differs from declaration order`() {
-        rule.setContent { PixFoldApp() }
+        rule.setContent { PixFoldApp(workspaceSource = ReadyWorkspaceSource()) }
         rule.onNodeWithText(TestText.of(R.string.home_workflow_a)).performClick()
         rule.onNodeWithTag(collectionTag("cn")).performClick()
 
@@ -121,7 +127,7 @@ class AppNavigationTest {
 
     @Test
     fun `preview follows the collection currently being sorted`() {
-        rule.setContent { PixFoldApp() }
+        rule.setContent { PixFoldApp(workspaceSource = ReadyWorkspaceSource()) }
         rule.onNodeWithText(TestText.of(R.string.home_workflow_a)).performClick()
         rule.onNodeWithTag(collectionTag("cn")).performClick()
         rule.onAllNodesWithTag(TAG_GRID_CARD)[0].performClick()
@@ -141,7 +147,7 @@ class AppNavigationTest {
     // 声明的首图是 `第十二话`,页序首图才是 `第一话`,断言用后者的 id。
     @Test
     fun `renaming in the preview reaches the naming page and is reflected there`() {
-        rule.setContent { PixFoldApp() }
+        rule.setContent { PixFoldApp(workspaceSource = ReadyWorkspaceSource()) }
         rule.onNodeWithText(TestText.of(R.string.home_workflow_a)).performClick()
         rule.onNodeWithTag(collectionTag("cn")).performClick()
 
@@ -179,7 +185,7 @@ class AppNavigationTest {
     // 漏上报时根里仍是旧值,重建后命名页就会退回建议名。
     @Test
     fun `edits made in the naming step survive a round trip that recreates the step container`() {
-        rule.setContent { PixFoldApp() }
+        rule.setContent { PixFoldApp(workspaceSource = ReadyWorkspaceSource()) }
         rule.onNodeWithText(TestText.of(R.string.home_workflow_a)).performClick()
         rule.onNodeWithTag(collectionTag("cn")).performClick()
         rule.onNodeWithTag(TAG_NEXT_STEP).performClick()
@@ -212,7 +218,7 @@ class AppNavigationTest {
 
     @Test
     fun `starting from a notification opens the pack step directly`() {
-        rule.setContent { PixFoldApp(openPackOnStart = true) }
+        rule.setContent { PixFoldApp(openPackOnStart = true, workspaceSource = ReadyWorkspaceSource()) }
         rule.waitForIdle()
 
         // 首页的入口卡片必须已经不在：否则说明压根没导航。
@@ -224,7 +230,7 @@ class AppNavigationTest {
     @Test
     fun `a normal launch still starts on the home screen`() {
         // 反向断言：没有那个 extra 时绝不能自己跳进工作流。
-        rule.setContent { PixFoldApp() }
+        rule.setContent { PixFoldApp(workspaceSource = ReadyWorkspaceSource()) }
         rule.waitForIdle()
 
         rule.onAllNodesWithText(TestText.of(R.string.home_workflow_b)).assertCountEquals(1)
@@ -245,7 +251,7 @@ class AppNavigationTest {
     fun `consuming the pack request reports back to the host`() {
         var handled = false
         rule.setContent {
-            PixFoldApp(openPackOnStart = true, onPackRouteHandled = { handled = true })
+            PixFoldApp(openPackOnStart = true, onPackRouteHandled = { handled = true }, workspaceSource = ReadyWorkspaceSource())
         }
         rule.waitForIdle()
 
@@ -264,7 +270,7 @@ class AppNavigationTest {
     @Test
     fun `a normal launch does not report a pack request`() {
         var handled = false
-        rule.setContent { PixFoldApp(onPackRouteHandled = { handled = true }) }
+        rule.setContent { PixFoldApp(onPackRouteHandled = { handled = true }, workspaceSource = ReadyWorkspaceSource()) }
         rule.waitForIdle()
 
         assertEquals(false, handled, "没有通知请求时不该回清")

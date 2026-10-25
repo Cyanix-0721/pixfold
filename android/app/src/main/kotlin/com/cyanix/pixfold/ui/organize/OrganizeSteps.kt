@@ -74,6 +74,7 @@ import com.cyanix.pixfold.nav.organizeStepIndex
 import com.cyanix.pixfold.ui.components.ResetAllButton
 import com.cyanix.pixfold.ui.workspace.WorkspaceBar
 import com.cyanix.pixfold.ui.workspace.WorkspaceState
+import com.cyanix.pixfold.ui.workspace.showsWorkspaceBar
 import com.cyanix.pixfold.ui.plan.ExecutionReportPage
 
 const val TAG_STEP_TABS = "step-tabs"
@@ -339,7 +340,11 @@ fun OrganizeSteps(
         // 「范围」而非「任务」，与三条工作流步骤不同层；做成第 4 个 Tab 会打破 3 步
         // 线性流程，并牵动 organizeStepIndex()/goToOrganizeStep()/popWorkflowStep()
         // 与约 30 条导航测试。放在页签行外层的顶部即可获得「工作流内部」的位置。
-        if (workspaceState != null) {
+        //
+        // **2026-10-24 用户裁决(乙)：常态不再显示** —— 选目录的入口搬到首页了，
+        // 工作流里再常驻一条是同一功能摆两处。只保留「正忙」与「出问题」两种，
+        // 判据收在 WorkspaceState.showsWorkspaceBar（理由特别是 Denied 那条见那儿）。
+        if (workspaceState != null && workspaceState.showsWorkspaceBar) {
             WorkspaceBar(state = workspaceState, onPick = onPickWorkspace)
         }
 

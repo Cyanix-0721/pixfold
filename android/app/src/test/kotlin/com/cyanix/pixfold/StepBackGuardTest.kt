@@ -82,7 +82,7 @@ class StepBackGuardTest {
 
     @Test
     fun `double tapping back on the naming step must not empty the nested stack`() {
-        rule.setContent { PixFoldApp() }
+        rule.setContent { PixFoldApp(workspaceSource = ReadyWorkspaceSource()) }
         rule.onNodeWithText(TestText.of(R.string.home_workflow_a)).performClick()
         rule.onNodeWithTag(TAG_STEP_NAMING).performClick()
         rule.waitForIdle()
@@ -100,7 +100,7 @@ class StepBackGuardTest {
     @Test
     fun `double tapping back on the metadata step must not empty the nested stack`() {
         // 工作流 B 的步骤容器是**另一份实现**(`LibrarySteps`),护栏必须同样接上
-        rule.setContent { PixFoldApp() }
+        rule.setContent { PixFoldApp(workspaceSource = ReadyWorkspaceSource()) }
         rule.onNodeWithText(TestText.of(R.string.home_workflow_b)).performClick()
         rule.onNodeWithTag(TAG_B_STEP_METADATA).performClick()
         rule.waitForIdle()

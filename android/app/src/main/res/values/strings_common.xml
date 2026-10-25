@@ -53,6 +53,8 @@
     <string name="home_workflow_a_subtitle">Sort, rename and preview by your own rules</string>
     <string name="home_workflow_b">Pack comics</string>
     <string name="home_workflow_b_subtitle">Fill in metadata and pack volumes into CBZ</string>
+    <!-- 2026-10-24(用户裁决 乙/甲/乙):未选工作区时两张大卡禁用,这一行说明为什么。 -->
+    <string name="home_workspace_gate_hint">Demo data — pick a folder below to work on your own files</string>
 
     <!--
       ============ Reset all (ResetAllButton) ============

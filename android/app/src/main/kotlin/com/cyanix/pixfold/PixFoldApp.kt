@@ -46,6 +46,7 @@ import com.cyanix.pixfold.domain.organize.reconcileOrganizeState
 import com.cyanix.pixfold.domain.organize.organizeStateOf
 import com.cyanix.pixfold.data.SharedPrefsSettingsStore
 import com.cyanix.pixfold.data.saf.AndroidSafSource
+import com.cyanix.pixfold.domain.source.WorkspaceSource
 import com.cyanix.pixfold.data.saf.AndroidThumbnailSource
 import com.cyanix.pixfold.data.saf.SafExistingComicInfoProbe
 import com.cyanix.pixfold.data.saf.SafOutputExistsProbe
@@ -116,6 +117,19 @@ fun PixFoldApp(
      * 默认空实现让既有测试与普通启动路径零改动。
      */
     onPackRouteHandled: () -> Unit = {},
+    /**
+     * 工作区来源。默认用 [AndroidSafSource]（真实 SAF 遍历）。
+     *
+     * **为什么必须留这道缝**（2026-10-24）：用户裁决「未选工作区时首页两张大卡禁用」
+     * 之后，首页入口的可用性取决于 [WorkspaceState]。而 Robolectric 里没有任何
+     * `DocumentsProvider`，真实 [AndroidSafSource] 的 `lastWorkspace()` 恒为 null ⇒
+     * state 恒为 [WorkspaceState.None] ⇒ 两张大卡恒禁用 ⇒ 24 处「在首页点卡片进工作流」
+     * 的导航测试会**一起变红**。那不是行为回归，是测试环境里根本没有可授权的目录。
+     *
+     * 注入一个假源就能让那些测试重新拿到 `Ready` —— 与 `store: SettingsStore?`
+     * 同一套思路（domain 定接口 + app 层实现 + 测试注入内存实现）。
+     */
+    workspaceSource: WorkspaceSource? = null,
 ) {
     val context = LocalContext.current
     val settingsStore = store ?: remember { SharedPrefsSettingsStore(context) }
@@ -141,19 +155,23 @@ fun PixFoldApp(
     //   AndroidSafSource    —— 平台层，DocumentsContract 递归遍历 + readBytes
     //   WorkspaceController —— 协程编排 + UI 状态机（扫描在 Dispatchers.IO）
     //   本函数              —— 把结果接到工作流 A 的数据源上
-    val workspaceSource = remember { AndroidSafSource(context) }
+    // 注入优先：测试用假源绕过真实 SAF（见参数 KDoc）。
+    val source: WorkspaceSource = workspaceSource ?: remember { AndroidSafSource(context) }
     // 平台实现只管读；缓存与并发闸门在装饰器里（详见 CachingThumbnailSource 的 KDoc）。
     val thumbnailSource = remember {
         CachingThumbnailSource(AndroidThumbnailSource(context))
     }
     val workspaceScope = rememberCoroutineScope()
-    val workspaceController = remember(workspaceSource, workspaceScope) {
+    val workspaceController = remember(source, workspaceScope) {
         WorkspaceController(
-            source = workspaceSource,
+            source = source,
             scope = workspaceScope,
             // 显示名要靠 provider query 才能拿到（tree URI 本身不含目录名），
             // 故留在平台层；控制器只接收「URI → 名字」这个纯函数。
-            nameResolver = { workspaceSource.displayNameOf(it) },
+            // 真实实现有 displayNameOf（要查 provider），假源只实现接口 ⇒ 用扩展函数兜住。
+            nameResolver = { treeUri ->
+                (source as? AndroidSafSource)?.displayNameOf(treeUri).orEmpty()
+            },
         )
     }
     // 冷启动恢复：上次授权过的目录自动重扫。**不缓存上次结果** ——
@@ -508,6 +526,13 @@ fun PixFoldApp(
                             onOpenOrganize = { navController.navigate(OrganizeRoute) },
                             onOpenLibrary = { navController.navigate(LibraryRoute) },
                             onOpenSettings = { navController.navigate(SettingsRoute) },
+                            // 工作区条 + 入口准入（2026-10-24 用户裁决 乙/甲/乙）。
+                            //
+                            // **选完停首页，不自动跳**（裁决 2 = 甲）：两条工作流是平级任务，
+                            // 扫描完就替用户跳进某一条等于替他决定了要做什么。选完这条会变成
+                            // 「当前工作区：xxx [更换]」，用户自己点进去。
+                            workspaceState = workspaceState,
+                            onPickWorkspace = { pickWorkspaceFolder.launch(null) },
                         )
                     }
                 }
