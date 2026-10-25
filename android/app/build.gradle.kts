@@ -117,6 +117,9 @@ dependencies {
     implementation(libs.material.color.utilities)
     implementation(libs.navigation.compose)
     implementation(libs.kotlinx.serialization.core)
+    // 工作区列表存 SharedPreferences 里的 JSON 数组(见 data/saf/SafTreeStore.kt)。
+    // 不用 org.json:它在纯 JVM 单测里是空壳(Robolectric 之外抛 Stub!)。
+    implementation(libs.kotlinx.serialization.json)
     // D2a:SAF 遍历/读字节必须离开主线程。
     // lifecycle-runtime-compose 提供 collectAsStateWithLifecycle(页面销毁即停止收集);
     // coroutines-android 提供 Dispatchers.IO / Main。

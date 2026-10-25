@@ -46,7 +46,9 @@ class AndroidSafSource(context: Context) : WorkspaceSource {
     private val resolver: ContentResolver = appContext.contentResolver
     private val treeStore = SafTreeStore(appContext)
 
-    override fun lastWorkspace(): WorkspaceHandle? = treeStore.load()
+    // Task 2 把存储层换成列表后,"上次的工作区"= 列表最前那条(remember 会把最近用过的插到最前)。
+    // 列表式接口(读取全部条目、图钉、拖拽)由 Task 3 改 WorkspaceSource 时接出来。
+    override fun lastWorkspace(): WorkspaceHandle? = treeStore.loadAll().firstOrNull()?.handle
 
     /**
      * 记住授权：先 `takePersistableUriPermission`，再落 SharedPreferences。
@@ -58,7 +60,7 @@ class AndroidSafSource(context: Context) : WorkspaceSource {
      * 真的失效时由 `loadCollections` 返回 [LoadResult.Denied] 走重选流程。
      */
     override fun rememberWorkspace(handle: WorkspaceHandle) {
-        treeStore.save(handle)
+        treeStore.remember(handle)
         try {
             resolver.takePersistableUriPermission(
                 handle.treeUri.toUri(),
@@ -73,7 +75,11 @@ class AndroidSafSource(context: Context) : WorkspaceSource {
         }
     }
 
-    override fun forgetWorkspace() = treeStore.clear()
+    // 旧接口语义是"忘掉当前那个工作区",在只有一个工作区的年代等价于清空。
+    // 列表世界里"忘掉"应是逐条移除 —— 那属于 Task 3 改接口的范围,这里先保持旧行为。
+    override fun forgetWorkspace() {
+        treeStore.loadAll().forEach { treeStore.forget(it.handle.treeUri) }
+    }
 
     /**
      * 取树 URI 对应目录的显示名（D2a）。

@@ -10,6 +10,8 @@ materialKolor = "5.0.1"
 androidxTestExtJunit = "1.3.0"
 navigationCompose = "2.10.2"
 kotlinxSerializationCore = "1.11.0"
+# 与 core 同版本:两者必须同步升级,否则 Json 实现与 core 内部 API 会错配。
+kotlinxSerializationJson = "1.11.0"
 kotlinxCoroutines = "1.11.0"
 lifecycle = "2.11.0"
 coreKtx = "1.19.0"
@@ -38,6 +40,7 @@ aboutlibraries-compose-m3 = { group = "com.mikepenz", name = "aboutlibraries-com
 material-color-utilities = { group = "com.materialkolor", name = "material-color-utilities", version.ref = "materialKolor" }
 navigation-compose = { group = "androidx.navigation", name = "navigation-compose", version.ref = "navigationCompose" }
 kotlinx-serialization-core = { group = "org.jetbrains.kotlinx", name = "kotlinx-serialization-core", version.ref = "kotlinxSerializationCore" }
+kotlinx-serialization-json = { group = "org.jetbrains.kotlinx", name = "kotlinx-serialization-json", version.ref = "kotlinxSerializationJson" }
 kotlinx-coroutines-android = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-android", version.ref = "kotlinxCoroutines" }
 lifecycle-runtime-compose = { group = "androidx.lifecycle", name = "lifecycle-runtime-compose", version.ref = "lifecycle" }
 core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
