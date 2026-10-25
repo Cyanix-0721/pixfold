@@ -3,6 +3,7 @@ package com.cyanix.pixfold.ui.workspace
 import androidx.activity.ComponentActivity
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsNotDisplayed
+import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
@@ -18,6 +19,7 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 import kotlin.test.assertEquals
+import kotlin.test.assertTrue
 
 /**
  * [WorkspaceBar] 的状态 → 文案/按钮映射。
@@ -86,6 +88,36 @@ class WorkspaceBarTest {
         // 扫描中再点一次会并发第二个扫描，且用户此刻没有可做的决定。
         rule.onNodeWithTag(TAG_WORKSPACE_ACTION).assertIsNotDisplayed()
         assertEquals(0, picks)
+    }
+
+    /**
+     * 扫描中整条必须仍有 **≥48dp** 的触控区（AGENTS.md §2.7 硬约束）。
+     *
+     * ## 这条守的是 Task 5 评审 Important 1
+     *
+     * Task 5 给 Row 加了 `.clickable(onClick = rowAction)` 让整条可点，而
+     * `Modifier.clickable` **自己不给最小触控尺寸**。其余四态之所以安全，是因为
+     * 右侧 `TextButton` 的 M3 `minimumInteractiveComponentSize()` 把行撑到 ≥48dp；
+     * 而 [WorkspaceState.Loading] 分支把 `actionLabel` 置空 ⇒ 按钮不渲染 ⇒
+     * 那层保护恰好缺席，行高退化成一行 `bodySmall` 文本（离线实测 **16.0dp**）。
+     *
+     * `showsWorkspaceBar` 在 Loading 态为 true，所以这是**生产上真实存在**的
+     * 不足 48dp 触控区，不是测试环境的假象。
+     *
+     * 离线可断：高度由 `.heightIn(min = 48.dp)` 撑出来，**不依赖文本测量**
+     * （Robolectric 只在宽度方向量不准）。同型先例见
+     * `ui/components/ChipLayoutRulesTest.kt` 的 `the collapse chip has a 48dp touch target`。
+     */
+    @Test
+    fun `扫描中整条仍有 48dp 触控区`() {
+        setContent(WorkspaceState.Loading)
+
+        val bar = rule.onNodeWithTag(TAG_WORKSPACE_BAR).getUnclippedBoundsInRoot()
+        val height = bar.bottom.value - bar.top.value
+        assertTrue(
+            height >= 48f,
+            "扫描中整条是这一态唯一的可点区域，触摸目标必须 ≥48dp（AGENTS.md §2.7），实际 ${height}dp",
+        )
     }
 
     @Test

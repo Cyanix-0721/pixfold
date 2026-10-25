@@ -4,6 +4,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -121,6 +122,11 @@ fun WorkspaceBar(
     Row(
         modifier = modifier
             .fillMaxWidth()
+            // 触控目标 ≥48dp（AGENTS.md §2.7）。Loading 态不渲染右侧 TextButton，
+            // 而 Modifier.clickable **自己不给**最小触控尺寸 —— 其余四态全靠 TextButton
+            // 的 M3 minimumInteractiveComponentSize() 把行撑到 48dp，那层保护在这一态缺席，
+            // 行高会退化成一行 bodySmall 文本（离线实测 16.0dp）。故由本行自己兜底。
+            .heightIn(min = 48.dp)
             .testTag(TAG_WORKSPACE_BAR)
             .clickable(onClick = rowAction)
             // 必须合并：不合并时读屏把「当前工作区：x」与右侧按钮念成两个独立可聚焦节点，
