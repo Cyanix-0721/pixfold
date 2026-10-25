@@ -1,18 +1,24 @@
 package com.cyanix.pixfold.ui
 
 import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.getBoundsInRoot
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollTo
+import androidx.compose.ui.test.performTouchInput
 import com.cyanix.pixfold.PixFoldApp
 import com.cyanix.pixfold.R
 import com.cyanix.pixfold.ReadyWorkspaceSource
 import com.cyanix.pixfold.TestText
+import com.cyanix.pixfold.TwoEntrySource
 import com.cyanix.pixfold.domain.mock.MockData
 import com.cyanix.pixfold.domain.source.WorkspaceHandle
 import com.cyanix.pixfold.ui.theme.PixFoldTheme
@@ -21,6 +27,7 @@ import com.cyanix.pixfold.ui.workspace.TAG_WORKSPACE_ADD
 import com.cyanix.pixfold.ui.workspace.TAG_WORKSPACE_BAR
 import com.cyanix.pixfold.ui.workspace.TAG_WORKSPACE_DIALOG
 import com.cyanix.pixfold.ui.workspace.WorkspaceState
+import com.cyanix.pixfold.ui.workspace.workspaceRowTag
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -248,6 +255,18 @@ class HomeWorkspaceTest {
      * 其余态走 `onPick`。这里走的是**整条真实装配**(`PixFoldApp` + `ReadyWorkspaceSource`),
      * 所以它同时覆盖两件事:三处调用点接上了 `onOpenWorkspaceList`,以及弹窗挂在
      * NavHost 之外的顶层 —— 只要弹窗被写进某个页面里,这条就是第一个红的。
+     *
+     * ## 为什么断 `assertExists` 而不是 `assertIsDisplayed`(2026-10-25 评审 M-3 订正)
+     *
+     * **`assertIsDisplayed` 不感知 Dialog 遮挡**。弹窗是独立 window(实测开弹窗前后的
+     * semantics root 数:1 → 2),它盖住的背景节点仍然「在语义树里且 bounds 非空」,
+     * 于是对着背后的东西调 `assertIsDisplayed` 照样通过 —— 它验的是「存在且在屏内」,
+     * **不是**「没被盖住」。用它断「弹窗还在」会误导后来人以为这条断言验了层级。
+     *
+     * 反过来它对「**不存在**」是有效的(`assertIsDisplayed` 会抛 `is not displayed`),
+     * 所以「弹窗初始不显示」那一条用 `assertDoesNotExist` 依然是对的、也是变异 A 的唯一杀手。
+     *
+     * ⇒ **本类以及后续所有用例:Dialog 的「在不在」一律用 `assertExists` / `assertDoesNotExist`。**
      */
     @Test
     fun `就绪态点工作区条打开列表弹窗`() {
@@ -255,7 +274,8 @@ class HomeWorkspaceTest {
 
         rule.onNodeWithTag(TAG_WORKSPACE_BAR).performClick()
 
-        rule.onNodeWithTag(TAG_WORKSPACE_DIALOG).assertIsDisplayed()
+        // assertExists:见上方 KDoc —— assertIsDisplayed 看不见 Dialog 遮挡,是假保障。
+        rule.onNodeWithTag(TAG_WORKSPACE_DIALOG).assertExists()
     }
 
     /**
@@ -264,6 +284,10 @@ class HomeWorkspaceTest {
      * 刻意**不**断言系统选择器被拉起:Robolectric 下 `rememberLauncherForActivityResult`
      * 永远等不到真实 Activity result,断它只是假保障。这里只锁两件事 —— 点击不抛异常、
      * 弹窗仍在。规格 §7.3 要的是「加完文件夹回到列表,能立刻点开新的那条」。
+     *
+     * 同前一条:**`assertExists`,不用 `assertIsDisplayed`** —— 弹窗是独立 window,
+     * `assertIsDisplayed` 不判遮挡,拿它断「弹窗还在」只给出「存在且在屏内」,
+     * 后面的人会以为它验了层级(评审 M-3 / 第四节实测)。
      */
     @Test
     fun `弹窗里点添加文件夹不崩且弹窗还在`() {
@@ -272,6 +296,102 @@ class HomeWorkspaceTest {
         rule.onNodeWithTag(TAG_WORKSPACE_BAR).performClick()
         rule.onNodeWithTag(TAG_WORKSPACE_ADD).performClick()
 
-        rule.onNodeWithTag(TAG_WORKSPACE_DIALOG).assertIsDisplayed()
+        rule.onNodeWithTag(TAG_WORKSPACE_DIALOG).assertExists()
+    }
+
+    // ============ 5. 两条 entry 的装配:拖拽上报 / 「使用中」唯一性 ============
+    //
+    // 下面两条都换 [TwoEntrySource]:一条 entry 的假源在语义上**压不住**它们 ——
+    // 拖拽时 from == to,错序与正确归到同一下标;「使用中」也没法挂到「另一行」上。
+    // 这是 Task 7 评审 I-1 / I-2 的结论(两条变异原先存活,补上这两条后转 KILLED)。
+
+    /**
+     * **`PixFoldApp.onMove` 上报的是「被拖那条 → 目标那条」,不是反过来的。**
+     *
+     * 压的是 `PixFoldApp.kt:793-794` 的 `all[from]` / `all[to]` 写反(评审 M8)。
+     * 写反的线上表现不崩、不报错:拖 A 到 B 的位置,结果 B 被挪到了 A 的位置 ——
+     * 用户只会觉得「拖了但不是我想要的效果」,而这种错最难被自己发现。
+     *
+     * 断的是 **treeUri 对**而不是下标对:假源在 `moveWorkspace(from, to)` 调用瞬间
+     * 把下标换成 URI(见 `TwoEntrySource.moveCalls`),于是断言写成
+     * `(alpha, beta)` 这种一眼能判对错的形态。
+     *
+     * `assertEquals(listOf(...))` 而不是 `assertTrue(size == 1)` + 单独断内容:
+     * 一次手势若被识别成「拖拽 + 点击」各一次,`onMove` 会多调一遍,`size` 与内容
+     * 一起断才拦得住那种多出来的调用。
+     */
+    @Test
+    fun `拖工作区行上报的是被拖那条与目标那条`() {
+        val source = TwoEntrySource()
+        rule.setContent { PixFoldApp(workspaceSource = source) }
+        rule.onNodeWithTag(TAG_WORKSPACE_BAR).performClick()
+
+        dragWorkspaceRow(workspaceRowTag(source.uriA), workspaceRowTag(source.uriB))
+
+        assertEquals(
+            listOf(source.uriA to source.uriB),
+            source.moveCalls.toList(),
+            "第 1 行拖到第 2 行,onMove 必须恰好收到一次 (alpha, beta)",
+        )
+    }
+
+    /**
+     * **「使用中」只出现在当前那一行**,不是每行都标、也不是一行都不标。
+     *
+     * 压的是 `PixFoldApp.kt:774` 的 `currentTreeUri = workspaceHandle?.treeUri`
+     * 被改成 `null`(评审 M9):那之后标记**全灭**,用户分不清哪个目录是当前打开的,
+     * 切错目录不会立刻察觉 —— 而首页那条「当前工作区: …」在长目录名下会被省略号截断。
+     *
+     * 用 `onAllNodesWithText` + `assertCountEquals(1)` 而不是
+     * `onNodeWithText(...).assertExists()`:**存在性断言在「只标了 1 行」与
+     * 「两行都标了」上是同一个结果**,数个数才区分得开。
+     *
+     * 走 **merged tree**(默认)即可:行根有 `.clickable`,会 mergeDescendants,
+     * 行内的 `Text` 被合并进行节点 —— 所以这里数到的是**行**,恰好对应
+     * 「有几行被标成使用中」这个语义,正是要问的问题。
+     */
+    @Test
+    fun `使用中标记只出现在当前那一行`() {
+        val source = TwoEntrySource()
+        rule.setContent { PixFoldApp(workspaceSource = source) }
+        rule.onNodeWithTag(TAG_WORKSPACE_BAR).performClick()
+
+        rule.onAllNodesWithText(TestText.of(R.string.workspace_in_use))
+            .assertCountEquals(1)
+    }
+
+    /**
+     * 模拟一次从 [fromTag] 行拖到 [toTag] 行的完整手势。
+     *
+     * 手法照抄 `WorkspaceListDialogTest.kt:267-286`(Task 6 已用它压住
+     * `WorkspaceListDialog` 里的拖拽下标):`down → advanceEventTime(700) → moveBy →
+     * moveTo → up`。
+     *
+     * **`advanceEventTime(700)` 不能省**:`detectDragGesturesAfterLongPress` 要真的越过
+     * 长按阈值(默认 500ms)才会把 down 升级成 drag;少这一步只有一次点击,`onMove`
+     * 一次都不会调,用例会以「一条都没收到」而红 —— 那种红是手势没启动,不是实现错。
+     *
+     * **两个节点必须减同一个 origin**(from 行的 `boundsInRoot.topLeft`):
+     * `performTouchInput` 收的是**节点本地坐标**,拿两个不同的 `boundsInRoot.center`
+     * 直接相减会带上两行之间的绝对偏移 ⇒ 位移算出来是 0 或翻倍(Task 6 踩过)。
+     */
+    private fun dragWorkspaceRow(fromTag: String, toTag: String) {
+        // 弹窗正文是 300dp 上限的 verticalScroll:行可能在视口外,先确保它进来。
+        rule.onNodeWithTag(fromTag).performScrollTo()
+        rule.waitForIdle()
+
+        val node = rule.onNodeWithTag(fromTag).fetchSemanticsNode()
+        val origin = node.boundsInRoot.topLeft
+        val from = node.boundsInRoot.center - origin
+        val to = rule.onNodeWithTag(toTag).fetchSemanticsNode().boundsInRoot.center - origin
+
+        rule.onNodeWithTag(fromTag).performTouchInput {
+            down(from)
+            advanceEventTime(700) // 长按阈值必须真实经过,否则拖拽不启动
+            moveBy(Offset(0f, -20f))
+            moveTo(to)
+            up()
+        }
+        rule.waitForIdle()
     }
 }
