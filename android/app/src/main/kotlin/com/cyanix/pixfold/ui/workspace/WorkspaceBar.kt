@@ -1,5 +1,6 @@
 package com.cyanix.pixfold.ui.workspace
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -43,7 +44,7 @@ const val TAG_WORKSPACE_ACTION = "workspace-action"
  * | --- | --- | --- |
  * | [WorkspaceState.None] | 未选择工作区 | 选择文件夹 |
  * | [WorkspaceState.Loading] | 正在扫描文件夹… | （无，扫描中不给动作） |
- * | [WorkspaceState.Ready] | 当前工作区：{名字} | 更换 |
+ * | [WorkspaceState.Ready] | 当前工作区：{名字} | 工作区（打开列表） |
  * | [WorkspaceState.Denied] | 授权已失效，请重新选择 | 重新选择 |
  * | [WorkspaceState.Failed] | 无法读取该文件夹 | 重新选择 |
  *
@@ -54,16 +55,23 @@ const val TAG_WORKSPACE_ACTION = "workspace-action"
  * 每次变更上报」的约定。
  *
  * @param state 当前工作区状态。
- * @param onPick 用户要求选择/更换目录。**所有状态共用这一个回调** ——
- *   更换与重选在 SAF 层面是同一个动作（再走一次 `ACTION_OPEN_DOCUMENT_TREE`），
+ * @param onPick 用户要求选择/更换目录。**非 Ready 状态共用这一个回调** ——
+ *   重选在 SAF 层面是同一个动作（再走一次 `ACTION_OPEN_DOCUMENT_TREE`），
  *   拆成两个回调只会让调用方多写一个无意义的转接。
+ * @param onOpenList 用户要求查看已授权的工作区列表。**只有 [WorkspaceState.Ready] 会接到它** ——
+ *   其余状态下列表为空或全是失效项，点进去只会让人更困惑，那些状态的整条点击仍走 [onPick]。
  */
 @Composable
 fun WorkspaceBar(
     state: WorkspaceState,
     onPick: () -> Unit,
     modifier: Modifier = Modifier,
+    onOpenList: () -> Unit = {},
 ) {
+    // 只有 Ready 有列表可开。其余态列表为空或全是失效项，点进去只会让人更困惑；
+    // 直接给系统选择器 —— 那是它们唯一的出路。
+    val rowAction = if (state is WorkspaceState.Ready) onOpenList else onPick
+
     // 文案在组合上下文里解析：semantics{} 的 lambda 不是 @Composable。
     val actionLabel: String
     val actionCd: String
@@ -83,8 +91,8 @@ fun WorkspaceBar(
             statusCd = null
         }
         is WorkspaceState.Ready -> {
-            actionLabel = stringResource(R.string.workspace_change)
-            actionCd = stringResource(R.string.workspace_change_cd)
+            actionLabel = stringResource(R.string.workspace_button)
+            actionCd = stringResource(R.string.workspace_button_cd)
             statusText = stringResource(R.string.workspace_current, state.handle.displayName)
             statusCd = stringResource(R.string.workspace_current_cd, state.handle.displayName)
         }
@@ -114,6 +122,10 @@ fun WorkspaceBar(
         modifier = modifier
             .fillMaxWidth()
             .testTag(TAG_WORKSPACE_BAR)
+            .clickable(onClick = rowAction)
+            // 必须合并：不合并时读屏把「当前工作区：x」与右侧按钮念成两个独立可聚焦节点，
+            // 而整条又是第三个可点区域 —— 用户听到三样东西，其中两样做同一件事。
+            .semantics(mergeDescendants = true) {}
             .padding(start = 16.dp, end = 4.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.SpaceBetween,
@@ -142,7 +154,7 @@ fun WorkspaceBar(
         // 扫描中不给按钮：此时再点一次会并发两个扫描，且用户没有可做的决定。
         if (actionLabel.isNotEmpty()) {
             TextButton(
-                onClick = onPick,
+                onClick = rowAction,
                 modifier = Modifier
                     .testTag(TAG_WORKSPACE_ACTION)
                     .semantics { contentDescription = actionCd },

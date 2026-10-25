@@ -53,6 +53,16 @@ class WorkspaceBarTest {
             }
         }
 
+    private fun setContentWithList(
+        state: WorkspaceState,
+        onPick: () -> Unit = {},
+        onOpenList: () -> Unit = {},
+    ) = rule.setContent {
+        PixFoldTheme(darkTheme = false, dynamicColor = false) {
+            WorkspaceBar(state = state, onPick = onPick, onOpenList = onOpenList)
+        }
+    }
+
     @Test
     fun `未选目录时显示演示数据说明与选择入口`() {
         var picks = 0
@@ -79,7 +89,7 @@ class WorkspaceBarTest {
     }
 
     @Test
-    fun `成功时显示目录名并可更换`() {
+    fun `成功时显示目录名与工作区入口`() {
         val state = WorkspaceState.Ready(
             handle = handle,
             collections = listOf(
@@ -90,7 +100,9 @@ class WorkspaceBarTest {
 
         // 带目录名：用户要能确认「选的是不是我要的那个文件夹」。
         rule.onNodeWithText(TestText.of(R.string.workspace_current, "照片库")).assertIsDisplayed()
-        rule.onNodeWithText(TestText.of(R.string.workspace_change)).assertIsDisplayed()
+        // 有列表之后 Ready 态的按钮打开的是**列表**而非系统选择器，文案随之改键：
+        // 仍叫「更换」会让人以为按下去直接跳系统选择器（Task 5 的改判）。
+        rule.onNodeWithText(TestText.of(R.string.workspace_button)).assertIsDisplayed()
     }
 
     @Test
@@ -145,5 +157,43 @@ class WorkspaceBarTest {
         rule.onNodeWithTag(TAG_WORKSPACE_ACTION).assertExists()
         rule.onNodeWithTag(TAG_WORKSPACE_ACTION).performClick()
         assertEquals(1, picks)
+    }
+
+    @Test
+    fun `就绪态点击整条会打开列表`() {
+        var opened = 0
+        setContentWithList(WorkspaceState.Ready(handle, emptyList()), onOpenList = { opened++ })
+
+        rule.onNodeWithTag(TAG_WORKSPACE_BAR).performClick()
+
+        assertEquals(1, opened, "整条都该能打开列表，不能只有右侧小按钮")
+    }
+
+    @Test
+    fun `就绪态右侧按钮打开列表而不是系统选择器`() {
+        var opened = 0
+        var picked = 0
+        setContentWithList(
+            WorkspaceState.Ready(handle, emptyList()),
+            onPick = { picked++ },
+            onOpenList = { opened++ },
+        )
+
+        rule.onNodeWithTag(TAG_WORKSPACE_ACTION).performClick()
+
+        assertEquals(1, opened)
+        assertEquals(0, picked, "就绪态的按钮是「工作区」，不是「更换」")
+    }
+
+    @Test
+    fun `未选工作区时点击整条仍直接走系统选择器`() {
+        var opened = 0
+        var picked = 0
+        setContentWithList(WorkspaceState.None, onPick = { picked++ }, onOpenList = { opened++ })
+
+        rule.onNodeWithTag(TAG_WORKSPACE_BAR).performClick()
+
+        assertEquals(1, picked, "没有列表可开时，整条点击必须仍能选文件夹")
+        assertEquals(0, opened)
     }
 }
