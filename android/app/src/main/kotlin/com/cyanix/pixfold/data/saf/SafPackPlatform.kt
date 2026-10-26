@@ -123,75 +123,12 @@ class SafCbzOutputSink(
      *
      * 注意 `createDocument` 只接受**文档** URI,不接受 tree URI。
      */
-    private fun parentDocumentUri(dirRel: String): Uri? {
-        val rootDocId = try {
-            DocumentsContract.getTreeDocumentId(treeUri)
-        } catch (e: Exception) {
-            Log.w(TAG, "tree URI 无法取根 document id", e)
-            return null
-        }
-        if (dirRel.isEmpty()) {
-            return DocumentsContract.buildDocumentUriUsingTree(treeUri, rootDocId)
-        }
-        // 逐级下钻:每级用 buildChildDocumentsUriUsingTree 查子目录的 documentId
-        var currentDocId = rootDocId
-        for (segment in dirRel.split('/')) {
-            if (segment.isEmpty()) continue
-            val childrenUri = DocumentsContract.buildChildDocumentsUriUsingTree(treeUri, currentDocId)
-            val childId = queryChildDocId(childrenUri, segment, wantDirectory = true) ?: return null
-            currentDocId = childId
-        }
-        return DocumentsContract.buildDocumentUriUsingTree(treeUri, currentDocId)
-    }
+    private fun parentDocumentUri(dirRel: String): Uri? =
+        safParentDocumentUri(resolver, treeUri, dirRel)
 
     /** 在 parent 下找同名子项;优先按 display name 精确匹配。 */
-    private fun findChild(parentUri: Uri, displayName: String): Uri? {
-        val parentDocId = try {
-            DocumentsContract.getDocumentId(parentUri)
-        } catch (e: Exception) {
-            return null
-        }
-        val childrenUri = DocumentsContract.buildChildDocumentsUriUsingTree(treeUri, parentDocId)
-        return queryChildUri(childrenUri, displayName, wantDirectory = false)
-    }
-
-    private fun queryChildDocId(childrenUri: Uri, displayName: String, wantDirectory: Boolean): String? =
-        queryChildren(childrenUri) { docId, name, mime ->
-            if (name != displayName) return@queryChildren null
-            val isDir = mime == DocumentsContract.Document.MIME_TYPE_DIR
-            if (isDir != wantDirectory) return@queryChildren null
-            docId
-        }
-
-    private fun queryChildUri(childrenUri: Uri, displayName: String, wantDirectory: Boolean): Uri? {
-        val docId = queryChildDocId(childrenUri, displayName, wantDirectory) ?: return null
-        return DocumentsContract.buildDocumentUriUsingTree(treeUri, docId)
-    }
-
-    private inline fun <T> queryChildren(
-        childrenUri: Uri,
-        onRow: (docId: String, displayName: String, mimeType: String) -> T?,
-    ): T? {
-        val projection = arrayOf(
-            DocumentsContract.Document.COLUMN_DOCUMENT_ID,
-            DocumentsContract.Document.COLUMN_DISPLAY_NAME,
-            DocumentsContract.Document.COLUMN_MIME_TYPE,
-        )
-        return try {
-            resolver.query(childrenUri, projection, null, null, null)?.use { cursor ->
-                while (cursor.moveToNext()) {
-                    val docId = cursor.getString(0) ?: continue
-                    val name = cursor.getString(1) ?: continue
-                    val mime = cursor.getString(2) ?: ""
-                    onRow(docId, name, mime)?.let { return it }
-                }
-                null
-            }
-        } catch (e: Exception) {
-            Log.w(TAG, "查询子项失败", e)
-            null
-        }
-    }
+    private fun findChild(parentUri: Uri, displayName: String): Uri? =
+        safFindChild(resolver, treeUri, parentUri, displayName)
 
     private companion object {
         const val TAG = "SafCbzOutputSink"
@@ -247,43 +184,8 @@ class SafOutputExistsProbe(
         }
     }
 
-    private fun parentDocumentUri(dirRel: String): Uri? {
-        val rootDocId = try {
-            DocumentsContract.getTreeDocumentId(treeUri)
-        } catch (e: Exception) {
-            return null
-        }
-        if (dirRel.isEmpty()) return DocumentsContract.buildDocumentUriUsingTree(treeUri, rootDocId)
-        var currentDocId = rootDocId
-        for (segment in dirRel.split('/')) {
-            if (segment.isEmpty()) continue
-            val childrenUri = DocumentsContract.buildChildDocumentsUriUsingTree(treeUri, currentDocId)
-            currentDocId = queryDirId(childrenUri, segment) ?: return null
-        }
-        return DocumentsContract.buildDocumentUriUsingTree(treeUri, currentDocId)
-    }
-
-    private fun queryDirId(childrenUri: Uri, displayName: String): String? {
-        val projection = arrayOf(
-            DocumentsContract.Document.COLUMN_DOCUMENT_ID,
-            DocumentsContract.Document.COLUMN_DISPLAY_NAME,
-            DocumentsContract.Document.COLUMN_MIME_TYPE,
-        )
-        return try {
-            resolver.query(childrenUri, projection, null, null, null)?.use { cursor ->
-                while (cursor.moveToNext()) {
-                    val name = cursor.getString(1)
-                    val mime = cursor.getString(2) ?: ""
-                    if (name == displayName && mime == DocumentsContract.Document.MIME_TYPE_DIR) {
-                        return cursor.getString(0)
-                    }
-                }
-                null
-            }
-        } catch (e: Exception) {
-            null
-        }
-    }
+    private fun parentDocumentUri(dirRel: String): Uri? =
+        safParentDocumentUri(resolver, treeUri, dirRel)
 
     private companion object {
         const val TAG = "SafOutputExistsProbe"
@@ -516,3 +418,113 @@ class SafExistingComicInfoProbe(
         const val MAX_ENTRIES_SCANNED = 16
     }
 }
+
+// ---------------------------------------------------------------------------
+// SAF 树查询的公共实现
+// ---------------------------------------------------------------------------
+
+/**
+ * 把「相对工作区根的目录路径」解析成 **document URI**。
+ *
+ * ## 为什么抽成文件级函数
+ *
+ * 同一个逻辑原本在 `SafCbzOutputSink` 与 `SafOutputExistsProbe` 各有一份（逐字重复），
+ * 工作流 C 的 `SafMetaUpdater` 还需要第三份。三份重复的 SAF 下钻代码里只要有一份写错
+ * （比如漏了 `wantDirectory = true`），表现都是「某个系列的包找不到」——
+ * 这类缺陷在真机上极难定位，因为它只在**有子目录**的工作区里出现。
+ *
+ * 抽出来后每个调用点只剩一行，并且同一条下钻规则只有一处实现。
+ *
+ * @param dirRel 相对工作区根的目录路径，空串 = 根目录本身
+ * @return 该目录的 document URI；路径不存在 / 非目录 / 查询抛异常 ⇒ null
+ */
+internal fun safParentDocumentUri(resolver: ContentResolver, treeUri: Uri, dirRel: String): Uri? {
+    val rootDocId = try {
+        DocumentsContract.getTreeDocumentId(treeUri)
+    } catch (e: Exception) {
+        Log.w(SAF_TAG, "tree URI 无法取根 document id", e)
+        return null
+    }
+    if (dirRel.isEmpty()) {
+        return DocumentsContract.buildDocumentUriUsingTree(treeUri, rootDocId)
+    }
+    // 逐级下钻：每级用 buildChildDocumentsUriUsingTree 查子目录的 documentId
+    var currentDocId = rootDocId
+    for (segment in dirRel.split('/')) {
+        if (segment.isEmpty()) continue
+        val childrenUri = DocumentsContract.buildChildDocumentsUriUsingTree(treeUri, currentDocId)
+        currentDocId = safQueryChildDocId(resolver, childrenUri, segment, wantDirectory = true) ?: return null
+    }
+    return DocumentsContract.buildDocumentUriUsingTree(treeUri, currentDocId)
+}
+
+/** 在 [parentUri] 下找同名子项，返回它的 document URI。找不到 ⇒ null。 */
+internal fun safFindChild(
+    resolver: ContentResolver,
+    treeUri: Uri,
+    parentUri: Uri,
+    displayName: String,
+): Uri? {
+    val parentDocId = try {
+        DocumentsContract.getDocumentId(parentUri)
+    } catch (e: Exception) {
+        return null
+    }
+    val childrenUri = DocumentsContract.buildChildDocumentsUriUsingTree(treeUri, parentDocId)
+    return safQueryChildUri(resolver, treeUri, childrenUri, displayName, wantDirectory = false)
+}
+
+/** 在 children 列表里按名字 + 是否目录筛出子项的 documentId。 */
+internal fun safQueryChildDocId(
+    resolver: ContentResolver,
+    childrenUri: Uri,
+    displayName: String,
+    wantDirectory: Boolean,
+): String? = safQueryChildren(resolver, childrenUri) { docId, name, mime ->
+    if (name != displayName) return@safQueryChildren null
+    val isDir = mime == DocumentsContract.Document.MIME_TYPE_DIR
+    if (isDir != wantDirectory) return@safQueryChildren null
+    docId
+}
+
+/** 同上，但直接拼成 document URI。 */
+internal fun safQueryChildUri(
+    resolver: ContentResolver,
+    treeUri: Uri,
+    childrenUri: Uri,
+    displayName: String,
+    wantDirectory: Boolean,
+): Uri? {
+    val docId = safQueryChildDocId(resolver, childrenUri, displayName, wantDirectory) ?: return null
+    return DocumentsContract.buildDocumentUriUsingTree(treeUri, docId)
+}
+
+/** SAF 子项列表的唯一遍历实现。**查询失败一律返回 null，不抛**（扫描路径不得因一处坏树中断）。 */
+private inline fun <T> safQueryChildren(
+    resolver: ContentResolver,
+    childrenUri: Uri,
+    onRow: (docId: String, displayName: String, mimeType: String) -> T?,
+): T? {
+    val projection = arrayOf(
+        DocumentsContract.Document.COLUMN_DOCUMENT_ID,
+        DocumentsContract.Document.COLUMN_DISPLAY_NAME,
+        DocumentsContract.Document.COLUMN_MIME_TYPE,
+    )
+    return try {
+        resolver.query(childrenUri, projection, null, null, null)?.use { cursor ->
+            while (cursor.moveToNext()) {
+                val docId = cursor.getString(0) ?: continue
+                val name = cursor.getString(1) ?: continue
+                val mime = cursor.getString(2) ?: ""
+                onRow(docId, name, mime)?.let { return it }
+            }
+            null
+        }
+    } catch (e: Exception) {
+        Log.w(SAF_TAG, "查询子项失败", e)
+        null
+    }
+}
+
+private const val SAF_TAG = "SafTree"
+
