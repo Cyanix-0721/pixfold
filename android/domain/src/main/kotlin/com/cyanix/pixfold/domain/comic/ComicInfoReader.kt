@@ -185,3 +185,35 @@ fun applyExistingComicInfo(
 
 /** 建议值来源：已有 `ComicInfo.xml`。与目录层级的来源字符串并列，界面据此如实展示。 */
 const val COMIC_INFO_SOURCE: String = "已有 ComicInfo.xml（优先级高于目录层级）"
+
+/**
+ * 用一份**刚写进磁盘的** `ComicInfo.xml` 回填当前值（工作流 C 成功后调用）。
+ *
+ * ## 与 [applyExistingComicInfo] 的关系
+ *
+ * 规则**逐条相同**：只改当前值、建议值一个字不动、缺失标签把当前值留空而不是落回
+ * 建议值、`cbzFileName` / `outputDir` / `overridden` 都不碰。
+ * 差别只在数据来源：那边是探针去读文件，这里 XML 全文已经在手里。
+ *
+ * ## 为什么不去重读磁盘
+ *
+ * 刚写的就是它。重读要多打开一次整包（`ZipInputStream` 扫到 ComicInfo 为止），
+ * 换来的是「可能读到一半被别的应用改了」的不确定性 —— 花了成本买回一个风险。
+ *
+ * ## 解析失败
+ *
+ * 原样返回。最坏是界面继续显示旧值，好过把五个字段一起清空。
+ */
+fun withComicInfoValues(volume: ComicVolume, xml: String): ComicVolume {
+    val data = parseComicInfo(xml) ?: return volume
+    return volume.copy(
+        title = data.title.orEmpty(),
+        series = data.series.orEmpty(),
+        writer = data.writer.orEmpty(),
+        volume = data.number,
+        language = data.language,
+        // 建议值（titleSug / seriesSug / writerSug / dir*Sug）与 overridden / cbzFileName /
+        // outputDir 全部不传 —— copy 的默认语义就是保留，「恢复建议值」按钮因此仍然
+        // 回到目录结构推导的结果，与无 ComicInfo 时一致。
+    )
+}
