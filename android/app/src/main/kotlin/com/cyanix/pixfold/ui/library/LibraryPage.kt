@@ -15,12 +15,15 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.Button
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.semantics.contentDescription
@@ -69,6 +72,14 @@ fun volumeIncludedTag(id: String) = "library-included-$id"
 
 /** 系列分组标题。 */
 fun seriesHeaderTag(series: String) = "library-series-$series"
+
+/**
+ * 某卷的「更新元数据」图标按钮（工作流 C 入口一）。
+ *
+ * 独立 tag 而不是复用 [volumeCardTag]：后者是整行，点它走「选中」；
+ * 共用 tag 会让「点更新按钮」与「点整行」在测试里无法区分。
+ */
+fun volumeUpdateTag(id: String) = "library-update-$id"
 
 /**
  * 某卷的"建议值 + 来源"文本节点。
@@ -122,6 +133,16 @@ fun LibraryPage(
      * 用户在库里的任何操作都不该让它出现/消失。默认空 ⇒ 既有测试零改动。
      */
     workspaceWarnings: List<Msg> = emptyList(),
+    /**
+     * 用户点某一卷的「更新元数据」图标（工作流 C，2026-10-26 规格 §8.1）。
+     *
+     * `null` = **不渲染这个入口**（默认值让既有 12 个测试文件一行都不用改，
+     * 与 [workspaceState] 等参数同一既定做法）。真实应用由 `LibrarySteps` 注入。
+     *
+     * 只在 `volume.outputExists == true` 时出现：没有 CBZ 的卷连「更新元数据」的对象
+     * 都没有 —— 那不是失败提示，是入口不该存在。
+     */
+    onUpdateMeta: ((ComicVolume) -> Unit)? = null,
 ) {
     // 要进 semantics{},故先在组合上下文里解析
     val nextCd = stringResource(R.string.lib_next_cd)
@@ -218,6 +239,7 @@ fun LibraryPage(
                         onToggleIncluded = { checked ->
                             onStateChange(setVolumeIncluded(state, volume.id, checked))
                         },
+                        onUpdateMeta = onUpdateMeta?.let { cb -> { cb(volume) } },
                     )
                 }
             }
@@ -294,6 +316,8 @@ private fun VolumeRow(
     selected: Boolean,
     onSelect: () -> Unit,
     onToggleIncluded: (Boolean) -> Unit,
+    /** `null` = 不渲染「更新元数据」图标（见 [LibraryPage.onUpdateMeta]）。 */
+    onUpdateMeta: (() -> Unit)? = null,
 ) {
     // 要进 semantics{} / 需要现场解析领域 `Msg`,故先在组合上下文里取到局部变量
     val selectedSuffix = if (selected) stringResource(R.string.lib_volume_cd_selected) else ""
@@ -301,6 +325,7 @@ private fun VolumeRow(
     val includeCd = stringResource(R.string.lib_include_cd, volume.id)
     val issuesText = volume.pendingIssues.map { textOf(it) }
         .joinToString(stringResource(R.string.lib_issue_separator))
+    val updateCd = stringResource(R.string.update_meta_action_cd)
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -373,6 +398,23 @@ private fun VolumeRow(
                         color = MaterialTheme.colorScheme.error,
                     )
                 }
+            }
+        }
+        // 工作流 C 入口一。**必须自带 clickable（IconButton 自带）** —— 整行已经是
+        // clickable(onSelect)，子节点不消费点击就会被行吞掉，表现为「点了，卷被选中，
+        // 什么也没发生」。既有先例：VolumeChipRow 里的 PinToggle。
+        if (onUpdateMeta != null && volume.outputExists) {
+            IconButton(
+                onClick = onUpdateMeta,
+                modifier = Modifier
+                    .testTag(volumeUpdateTag(volume.id))
+                    .semantics { contentDescription = updateCd },
+            ) {
+                Icon(
+                    painter = painterResource(R.drawable.ic_edit_note),
+                    // 内容描述挂在外层（含文字语义的节点），图标本身置 null 避免读两遍。
+                    contentDescription = null,
+                )
             }
         }
     }

@@ -25,6 +25,7 @@ import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -107,6 +108,15 @@ const val TAG_BATCH_FORCE = "metadata-batch-force"
 const val TAG_METADATA_NEXT = "metadata-next"
 
 /**
+ * 「更新元数据」按钮(工作流 C 入口二,常驻底栏的第三槽)。
+ *
+ * 与 [TAG_METADATA_NEXT] 分开:两者在同一底栏同时存在,共用 tag 时
+ * `onNodeWithTag` 多节点匹配直接失败 —— 且它们语义不同(一个是推进流程,
+ * 一个是就地写盘终局)。
+ */
+const val TAG_METADATA_UPDATE = "metadata-update"
+
+/**
  * 空工作区的显式空态(2026-10-19)。
  *
  * 真实 SAF 工作区可能**一卷都没有**:目录里没有任何图片,或所有图片都散在根目录
@@ -158,6 +168,13 @@ fun MetadataPage(
     contentInsets: WindowInsets = WindowInsets.safeDrawing,
     onNext: (() -> Unit)? = null,
     onBack: (() -> Unit)? = null,
+    /**
+     * 用户点底栏「更新元数据」（工作流 C，2026-10-26 规格 §8.2）。
+     *
+     * `null` = **不渲染这个入口**（默认值，既有测试零改动）。
+     * 只在当前卷 `outputExists == true` 时出现，与库页入口同一条判据。
+     */
+    onUpdateMeta: ((ComicVolume) -> Unit)? = null,
 ) {
     // **必须带 key**(2026-10-22 修)。
     //
@@ -382,7 +399,9 @@ fun MetadataPage(
 
         // 底栏:左 = 返回上一步,右 = 下一步 打包计划(用户 2026-09-25 指定)。
         // 任一回调为 null 时不渲染底栏 —— 测试直接组合本页,底栏凭空出现会改变可视区域。
-        if (onBack != null || onNext != null) {
+        // 第三槽「更新元数据」的判据：当前卷在磁盘上真有归档。
+        val updateCb = onUpdateMeta?.takeIf { volume.outputExists }
+        if (onBack != null || onNext != null || updateCb != null) {
             val back = onBack
             val next = onNext
             val backCd = stringResource(R.string.b_step_back_cd)
@@ -406,6 +425,19 @@ fun MetadataPage(
                                 .testTag(TAG_METADATA_NEXT)
                                 .semantics { contentDescription = nextCd },
                         ) { Text(stringResource(R.string.meta_next)) }
+                    }
+                },
+                // 工作流 C 入口二：走 extraContent 槽位（按钮行**下方**的整行按钮），
+                // 而不是塞进 leading/trailing —— 那两个槽位的语义分别是「退回类」与
+                // 「推进流程」，就地更新是**另一种终局**，挤进去会让人以为它也能推进。
+                extraContent = {
+                    if (updateCb != null) {
+                        OutlinedButton(
+                            onClick = { updateCb(volume) },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .testTag(TAG_METADATA_UPDATE),
+                        ) { Text(stringResource(R.string.update_meta_action)) }
                     }
                 },
             )
