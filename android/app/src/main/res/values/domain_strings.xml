@@ -236,4 +236,17 @@
     <!-- Placeholder order matches zh 1:1 (TranslationCoverageTest): %1$s = nested folder, %2$s = series. -->
     <string name="domain_nested_series_dir">Nested folder %1$s under series %2$s — a series should contain only single-volume folders or archives</string>
 
+
+    <!-- ============ Workflow C: update ComicInfo.xml inside an existing CBZ ============ -->
+    <string name="domain_update_meta_title">Update metadata</string>
+    <string name="domain_update_meta_size_warning">The archive is %1$s. The whole file is rewritten, and this cannot be undone.</string>
+    <string name="domain_update_meta_entry_summary">Every entry is kept (%1$d). Only ComicInfo.xml is replaced.</string>
+    <string name="domain_update_done_summary">%1$s now carries the new ComicInfo.xml (entries: %2$d).</string>
+    <string name="domain_update_fail_target_missing">The archive is gone — it may have been deleted or renamed. Refresh the library and try again.</string>
+    <string name="domain_update_fail_permission_lost">Access to the folder was revoked. Pick the workspace folder again.</string>
+    <string name="domain_update_fail_no_space">Not enough free space to write the new archive. Free some space and retry.</string>
+    <string name="domain_update_fail_not_a_zip">This file is not a valid CBZ.</string>
+    <string name="domain_update_fail_read_failed">Reading or writing the archive failed. It may be damaged or in use by another app — retry.</string>
+    <string name="domain_update_fail_replace_failed">The new archive could not be moved into place. The original is still on disk.</string>
+
 </resources>

@@ -112,4 +112,21 @@
     <string name="pack_included_count_hint">\u0020(excluded volumes are not packaged)</string>
     <string name="pack_lang_unset">Not written</string>
 
+
+    <!-- ============ Workflow C · update ComicInfo.xml in an existing CBZ ============ -->
+    <string name="update_meta_action">Update metadata</string>
+    <string name="update_meta_action_cd">Update the metadata inside the existing archive</string>
+    <string name="update_meta_unknown_size">of unknown size</string>
+    <string name="update_meta_confirm">Update</string>
+    <string name="update_meta_done_title">Metadata updated</string>
+    <string name="update_meta_fail_title">Update failed</string>
+
+
+    <string name="update_meta_progress_title">Updating metadata</string>
+    <string name="update_meta_cancelling">Cancelling…</string>
+    <string name="update_meta_cancel_title">Cancel the update?</string>
+    <string name="update_meta_cancel_body">The temporary archive is discarded and the original stays untouched.</string>
+    <string name="update_meta_cancel_ok">Cancel update</string>
+    <string name="update_meta_cancel_dismiss">Keep updating</string>
+
 </resources>

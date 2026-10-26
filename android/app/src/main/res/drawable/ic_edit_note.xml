@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Material Symbols "edit_note" — 就地更新元数据的入口图标（笔 + 三条横线）。
+  Source : https://github.com/google/material-design-icons
+  License: Apache License 2.0
+
+  与 ic_close / ic_undo 同策略：官方矢量几何数据 + painterResource，
+  不引入 material-icons 依赖（AGENTS.md 明令，包体积不值）。
+
+  ⚠️ 官方图形是 24×24 viewBox、原点在 (0,0)，与 VectorDrawable 语义一致，
+  故这里**不需要** ic_undo 那套 y 轴平移变换（那个坑来自 960 格 grid 的
+  `0 -960 960 960` viewBox）。
+-->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <path
+        android:fillColor="@android:color/white"
+        android:pathData="M3,10h11v2H3V10zM3,16h9v2H3V16zM3,4v2h15V4H3zM17.1,10.5l3.7,3.7l-9.9,9.9H7.1v-3.8L17.1,10.5zM20.4,8.2l-1.4-1.4c-0.4-0.4 -1,-0.4 -1.4,0l-1.4,1.4l3.7,3.7l1.4,-1.4C20.8,9.2 20.8,8.6 20.4,8.2z" />
+</vector>

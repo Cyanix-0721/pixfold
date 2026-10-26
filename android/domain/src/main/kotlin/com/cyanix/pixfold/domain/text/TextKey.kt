@@ -275,4 +275,21 @@ enum class TextKey {
     // ---------------- 工作区结构警告(nestedDirWarnings,显示在书架页) ----------------
     /** 「系列 %1$s 下出现嵌套目录 %2$s —— 应只放单本文件夹或压缩包」;args = [系列名, 嵌套层相对路径]。 */
     NestedSeriesDir,
+
+    // ---------------- 工作流 C:就地更新已有 CBZ 的 ComicInfo.xml ----------------
+    /** 「更新元数据」——按钮、确认框标题、进度框标题共用。 */
+    UpdateMetaTitle,
+    /** 「压缩包体积 %1$s,整包重写,无法撤销」;args = [包大小文案]。 */
+    UpdateMetaSizeWarning,
+    /** 「保留全部 %1$d 个条目,只替换 ComicInfo.xml」;args = [条目数]。 */
+    UpdateMetaEntrySummary,
+    /** 「元数据已更新:%1$s 现在有 %2$d 个条目」;args = [包名, 条目数]。 */
+    UpdateDoneSummary,
+    /** 六条失败原因([UpdateFailure] 的映射目标,见 CbzUpdateDialogs.updateFailureKey)。 */
+    UpdateFailTargetMissing,
+    UpdateFailPermissionLost,
+    UpdateFailNoSpace,
+    UpdateFailNotAZip,
+    UpdateFailReadFailed,
+    UpdateFailReplaceFailed,
 }

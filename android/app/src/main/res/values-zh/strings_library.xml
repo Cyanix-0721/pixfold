@@ -104,4 +104,21 @@
     <string name="pack_included_count_hint">（未勾选的卷不会打包）</string>
     <string name="pack_lang_unset">不写入</string>
 
+
+    <!-- ============ 工作流 C · 就地更新已有 CBZ 的 ComicInfo.xml ============ -->
+    <string name="update_meta_action">更新元数据</string>
+    <string name="update_meta_action_cd">更新已有压缩包里的元数据</string>
+    <string name="update_meta_unknown_size">未知</string>
+    <string name="update_meta_confirm">更新</string>
+    <string name="update_meta_done_title">元数据已更新</string>
+    <string name="update_meta_fail_title">更新失败</string>
+
+
+    <string name="update_meta_progress_title">正在更新元数据</string>
+    <string name="update_meta_cancelling">正在取消…</string>
+    <string name="update_meta_cancel_title">要取消更新吗？</string>
+    <string name="update_meta_cancel_body">临时包会被丢弃，原包不受影响。</string>
+    <string name="update_meta_cancel_ok">取消更新</string>
+    <string name="update_meta_cancel_dismiss">继续更新</string>
+
 </resources>

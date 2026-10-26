@@ -326,4 +326,16 @@ internal fun TextKey.resId(): Int = when (this) {
 
     // 工作区结构警告
     TextKey.NestedSeriesDir -> R.string.domain_nested_series_dir
+
+    // 工作流 C:就地更新已有 CBZ 的 ComicInfo.xml
+    TextKey.UpdateMetaTitle -> R.string.domain_update_meta_title
+    TextKey.UpdateMetaSizeWarning -> R.string.domain_update_meta_size_warning
+    TextKey.UpdateMetaEntrySummary -> R.string.domain_update_meta_entry_summary
+    TextKey.UpdateDoneSummary -> R.string.domain_update_done_summary
+    TextKey.UpdateFailTargetMissing -> R.string.domain_update_fail_target_missing
+    TextKey.UpdateFailPermissionLost -> R.string.domain_update_fail_permission_lost
+    TextKey.UpdateFailNoSpace -> R.string.domain_update_fail_no_space
+    TextKey.UpdateFailNotAZip -> R.string.domain_update_fail_not_a_zip
+    TextKey.UpdateFailReadFailed -> R.string.domain_update_fail_read_failed
+    TextKey.UpdateFailReplaceFailed -> R.string.domain_update_fail_replace_failed
 }
