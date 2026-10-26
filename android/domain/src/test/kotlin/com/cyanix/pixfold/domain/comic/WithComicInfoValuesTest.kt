@@ -100,6 +100,33 @@ class WithComicInfoValuesTest {
         assertEquals(original, withComicInfoValues(original, "这不是 xml"))
     }
 
+
+    /**
+     * **回填是幂等的** —— 对一个「当前值已经和 XML 一致」的卷，
+     * `withComicInfoValues(volume, ComicInfo.build(volume))` 必须原样返回它。
+     *
+     * 这条测试的用途不是测回填功能，而是**钉住一个结论**：工作流 C 成功后调不调
+     * `withComicInfoValues` 在界面上看不出差别（因为写进包的 XML 就是从当前值
+     * 生成的）。任何「删掉回填」的变异因此在 UI 层不可观测 —— 那是等价变异，
+     * 不是断言缺口。**这个等价性依赖 `build` 与 `parse` 互逆**；
+     * 将来若 ComicInfo.build 开始丢弃字段（例如只写非空值而 parse 把它们读成 null），
+     * 这条测试会红，那时回填就从「无害」变成「必要」，UI 层也必须补断言。
+     */
+    @Test
+    fun `rebuilding from a synced volume is a no-op`() {
+        val original = volume().copy(title = "标题 & <特殊> 字符", volume = 7, language = LangChoice.Zh)
+        assertEquals(original, withComicInfoValues(original, ComicInfo.build(original)))
+    }
+
+    @Test
+    fun `rebuilding clears fields the old xml did not carry`() {
+        // 反向：**不同步**时回填必须真的改东西，否则上面那条「幂等」会退化成空断言。
+        val xml = ComicInfo.build(volume().copy(title = "新标题", volume = 9, language = LangChoice.Ja))
+        val out = withComicInfoValues(volume(), xml)
+        assertEquals("新标题", out.title)
+        assertEquals(9, out.volume)
+        assertEquals(LangChoice.Ja, out.language)
+    }
     @Test
     fun `agrees with applyExistingComicInfo on the same xml`() {
         val xml = ComicInfo.build(volume().copy(title = "T", series = "S", writer = "W", volume = 3))

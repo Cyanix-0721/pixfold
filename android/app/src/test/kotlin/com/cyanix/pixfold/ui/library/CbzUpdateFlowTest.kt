@@ -113,9 +113,6 @@ class CbzUpdateFlowTest {
         rule.waitUntil(timeoutMillis = 5_000) {
             rule.onAllNodesWithTag(TAG_UPDATE_RESULT_DIALOG).fetchSemanticsNodes().isNotEmpty()
         }
-        rule.waitUntil(timeoutMillis = 5_000) {
-            rule.onAllNodesWithTag(TAG_UPDATE_RESULT_DIALOG).fetchSemanticsNodes().isNotEmpty()
-        }
         rule.waitForIdle()
     }
 
@@ -146,6 +143,7 @@ class CbzUpdateFlowTest {
         rule.onNodeWithTag(TAG_METADATA_UPDATE).performClick()
         rule.waitForIdle()
         confirmInDialog()
+        awaitResultDialog()
 
         rule.onNodeWithTag(TAG_UPDATE_RESULT_DIALOG).assertIsDisplayed()
         assertEquals(1, fake.updateCalls, "点一次确认只该执行一次")
@@ -165,6 +163,7 @@ class CbzUpdateFlowTest {
         rule.onNodeWithTag(TAG_METADATA_UPDATE).performClick()
         rule.waitForIdle()
         confirmInDialog()
+        awaitResultDialog()
         rule.onNodeWithTag(TAG_UPDATE_RESULT_DIALOG).assertIsDisplayed()
         assertEquals(TestText.of(R.string.domain_update_fail_no_space), resultBody())
     }

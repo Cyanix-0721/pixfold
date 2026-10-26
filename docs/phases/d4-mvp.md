@@ -627,6 +627,53 @@
 >
 > ④ 的「撤权后条重现」**未能在真机复现**：造出 `Denied`（prefs 注入未授权 URI）后首页两卡禁用、进不去工作流，这条路径只能由 `OrganizeWorkspaceTest`「数据源断了的时候条必须还在」离线守。另测一条补充路径：把工作区根目录 `mv` 走再回前台 ⇒ 落 `Ready(空)` 的空态页（自带「选择文件夹」入口），恢复目录后 `共 3 张` 自然回来，**不是缺陷**。
 
+
+> **▶ 工作流 C：给已有 CBZ 就地更新 ComicInfo.xml (2026-10-26 深夜)** —— 用户 m06900「按你的想法来吧，我觉得可以」批准方案后开工；
+> 规格 `docs/superpowers/specs/2026-10-26-cbz-update-design.md`、计划 `docs/superpowers/plans/2026-10-26-cbz-update.md`，
+> 按 Native（内联执行）走 Task1–Task8。分支 `d4/cbz-update`。
+>
+> **一、三处用户裁决**：Q1 **丙** = 库页卷行 + 元数据页底栏两处入口（只给「磁盘上真有包」的卷显示，判据 `volume.outputExists`）；
+> Q2 **甲** = 单卷（不做批量）；Q3 **甲** = 临时文件 → 原包改名 `.bak` → 临时改名原名 → 删 `.bak`，
+> `renameDocument` 不支持时退化「删原包 → 临时改名」。「宁可留一个能手动捡回来的备份，也不要出现包没了」。
+>
+> **二、技术前提（决定了整个实现形状）**：CBZ 是 ZIP，**无法只改一个条目** —— 中央目录记录每个条目的偏移/size/CRC。
+> 三条路里尾部追加同名条目 ❌（ZIP 对重名无定义行为，会破坏「`ComicInfo.xml` 恒为第一个条目」契约）、
+> 原地覆写改 CRC ❌（要求新 XML 不比旧的长 + SAF 随机写），**只剩流式整包重写 ✅**（峰值 64 KiB 缓冲）。
+> 代价要说在前面：4.73 GiB 的包只改元数据也要读写 4.73 GiB，所以确认框第一行就写体积。
+>
+> **三、`CbzMetaRewriter` 的三条硬约束**：①先写新 `ComicInfo.xml`（保证恒第 0 条）、再逐条复制其余条目，**遇到旧 ComicInfo 一律丢弃**
+> （大小写不敏感 + 允许带目录前缀，双份变体折叠成一份）；②输出全 **STORED**（与自家 `CbzWriter` 一致，阅读器兼容契约不变）；
+> ③输入若是 **DEFLATED** 条目，`ZipInputStream` 给不出 size/crc（全是 -1）⇒ 边读边算，超过 `INLINE_LIMIT_BYTES = 8 MiB`
+> 就落 `cacheDir` 临时文件（`spillDir == null` 且 `size < 0` 时直接抛 —— 宁可失败也不写坏包）。
+> 流所有权：**`ZipInputStream` 刻意不用 `use`**（`close()` 会连带关掉底层流，而流归调用方），只 `finish()` + `flush()`。
+>
+> **四、`SafMetaUpdater` 的平台细节**：(a) 临时包必须与目标**同目录** —— `renameDocument` 只在同一父目录内改名，跨目录的 copy 换来的只是「临时文件不碍眼」；
+> (b) 每卷先 `deleteIfExists(tempName)` 清上轮残留，但**备份不删**（那可能是用户唯一一份原包）；
+> (c) 取消只在**条目边界**检查（`shouldStop()` 抛 `CancelledSignal`）—— 半途硬停会留下说不清状态的包；
+> (d) 删备份失败只 `Log.w`，**结果仍是 Updated**（包已经是新的了，为一条清理失败把成功改回失败是本末倒置）。
+>
+> **五、一个「不崩不报错」的真缺陷（闸门首轮红抓出）**：`LibrarySteps` 里先 `updating = false` 再 `updateResult = outcome`，
+> 两次独立状态写之间可能提交一帧「进度框和结果框都没有」⇒ 单跑绿、整套红。修法 = 把 `updating = false` 挪到协程**最后**（先设结果再关进度），
+> 任何一帧至少有一个框。同类病在 D2a「白屏」与「输入框没反应」都犯过：**两次状态写之间的那一帧是真实存在的界面**。
+> 测试侧的对应坑：执行块走 `withContext(Dispatchers.IO)`，Robolectric 下是**真实线程池**、不归 Compose 测试调度器管，
+> `rule.waitForIdle()` 会立刻返回 ⇒ 必须 `waitUntil` 轮询结果框出现。
+>
+> **六、变异 M1–M8 的三条存活裁定**（都是「为什么不该硬补断言」）：
+> **M3（删 `zip.setLevel(0)`）是等价变异** —— 每个条目都由 `stored(...)` 显式设了 `ZipEntry.STORED`，`setLevel(0)` 对 STORED 条目无影响；
+> 真正能破坏 STORED 的是 **M3b（删 `entry.method`）**，已被 10 条测试击杀。⇒ `setLevel(0)` 是冗余但无害的防御性写法，保留。
+> **M4（删取消检查）属于「只能真机断」** —— 真实取消逻辑在平台层，`SafMetaUpdaterTest` 只能测 `preflight`（Robolectric 无 `DocumentsProvider`，`update()` 全链路离线跑不起来），
+> UI 侧用的是 `FakeCbzMetaUpdater`（不执行真实取消）⇒ 已登记进 spec §9.5，不伪造假断言。
+> **M7（删成功后回填）是等价变异** —— 写进包的 XML 就是 `ComicInfo.build(当前值)` 产出的，回填是 `parse∘build` 的恒等操作，UI 上看不出差别。
+> 但「恒等」依赖 `build` 与 `parse` 互逆，故在 domain 补了两条反向守卫：`rebuilding from a synced volume is a no-op`（钉住互逆，将来 `build` 若开始丢字段会红）
+> + `rebuilding clears fields the old xml did not carry`（防前者退化成空断言）。
+>
+> **七、四道闸门**（`--rerun-tasks` 强制重跑）：app **864** / domain **976** / lint `No issues found.` / APK **34,685,788 B**。
+> lint 的结论读 `android/app/build/reports/lint-results-debug.txt` 末行，**gradle 日志里 grep 不到「No issues found」**。
+> 首轮还修了两处 lint：`PluralsCandidate` ×2（`%d` 紧接名词 ⇒ 改文案措辞去掉名词，而不是加 `tools:ignore`）、
+> `AutoboxingStateCreation`（进度计数改 `mutableIntStateOf`，那是本功能最热的写点）。
+>
+> **八、真机核对待做（2026-10-27 等用户重新授权）**：确认框体积行 / 进度框可取消 / 取消后磁盘零残留（无 `.updating`） / 成功后备注三段落盘且 `.bak` 已消失 / 空间不足时明确阻断 / 权限被撤时报「权限」而非「读取失败」。
+
 优先交付（**GUI 仅 Android**，2026-09-10 变更）：
 
 - Android：单目录/单系列，图片预览与人工排序，逐卷元数据，CBZ 生成；
