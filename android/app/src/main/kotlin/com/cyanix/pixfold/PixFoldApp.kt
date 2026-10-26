@@ -48,9 +48,12 @@ import com.cyanix.pixfold.data.SharedPrefsSettingsStore
 import com.cyanix.pixfold.data.saf.AndroidSafSource
 import com.cyanix.pixfold.domain.source.WorkspaceSource
 import com.cyanix.pixfold.data.saf.AndroidThumbnailSource
+import com.cyanix.pixfold.data.saf.FilesystemSpaceSource
 import com.cyanix.pixfold.data.saf.SafExistingComicInfoProbe
 import com.cyanix.pixfold.data.saf.SafOutputExistsProbe
+import com.cyanix.pixfold.data.saf.SafMetaUpdater
 import com.cyanix.pixfold.data.saf.SafPackExecutor
+import com.cyanix.pixfold.data.saf.outputDirRelOf
 import com.cyanix.pixfold.data.saf.SafRenameActions
 import com.cyanix.pixfold.data.saf.SafUndoActions
 import com.cyanix.pixfold.data.task.TaskCompletionNotification
@@ -132,6 +135,14 @@ fun PixFoldApp(
      * 同一套思路（domain 定接口 + app 层实现 + 测试注入内存实现）。
      */
     workspaceSource: WorkspaceSource? = null,
+    /**
+     * 工作流 C 的平台层（就地更新已有 CBZ 的元数据）。默认 `null` = 生产路径
+     * 在内部用 SafMetaUpdater 构造（**需要工作区**，没有工作区时它也构造不出来 ⇒
+     * 两个入口都不渲染，与「没有真实工作区就不该往盘上写」同一条立场）。
+     *
+     * 留这道缝是为了让测试能注入假实现 —— 与 workspaceSource 同一套思路。
+     */
+    metaUpdater: com.cyanix.pixfold.domain.pack.CbzMetaUpdater? = null,
 ) {
     val context = LocalContext.current
     val settingsStore = store ?: remember { SharedPrefsSettingsStore(context) }
@@ -375,6 +386,31 @@ fun PixFoldApp(
             // 打包时会静默覆盖别人已有的文件;它为 false 而实际存在,撤销记录会把
             // 「覆盖」记成「新建」,撤销时**删掉用户原来的文件**(缺陷 R3)。
             val packTreeUri = workspaceHandle?.treeUri?.let { it.toUri() }
+            // 工作流 C 的平台层（2026-10-26 规格 §8.7）。
+            //
+            // **必须 `remember`**，理由与 `packExecutor` 完全同源（2026-10-20 真实缺陷）：
+            // 不 remember 时每次重组都新建一个 `SafMetaUpdater`，而下层若拿它当
+            // `LaunchedEffect` 的 key，就会把「换了个新对象」当成「条件变了」无限重启。
+            //
+            // `dirOfVolume` 必须与打包链用**同一个** `outputDirRelOf`：两边对「卷在哪个目录」
+            // 的理解一旦分叉，更新会把元数据写进一个用户看不见的地方（或者直接找不到包）。
+            // 注入优先（测试给假实现），与 `workspaceSource` 同一套思路。
+            // ⚠️ remember 与「注入优先」**分成两步**，不要写成 `metaUpdater ?: remember { }`：
+            // 后者是**条件调用 remember**，参数一变（注入值从 null 变成实现）槽位就错位。
+            // 分两步时 remember 无条件执行，注入只覆盖结果 —— 行为等价，槽位稳定。
+            val builtMetaUpdater: com.cyanix.pixfold.domain.pack.CbzMetaUpdater? =
+                remember(packTreeUri, workspaceHandle?.displayName) {
+                    val uri = packTreeUri ?: return@remember null
+                    val rootName = workspaceHandle?.displayName.orEmpty()
+                    val space = FilesystemSpaceSource(context)
+                    SafMetaUpdater(
+                        context = context,
+                        treeUri = uri,
+                        spaceBytesOf = { space.availableBytesOf(it) },
+                        dirOfVolume = { vol -> outputDirRelOf(vol.outputDir, rootName) },
+                    )
+                }
+            val resolvedMetaUpdater = metaUpdater ?: builtMetaUpdater
             // probe 的目录解析必须与 `dirOfVolume` 用**同一套**规则,否则「判断存在」
             // 和「实际写入」会看两个不同的目录。规则由 `comicVolumesFrom` 的输出目录
             // 建议值定义:卷目录的父目录;根下一级时回退工作区根的显示名。
@@ -752,6 +788,8 @@ fun PixFoldApp(
                             workspaceWarnings = remember(collections) {
                                 nestedDirWarnings(collections)
                             },
+                            // 工作流 C（2026-10-26）。null = 没有工作区 ⇒ 两个入口都不渲染。
+                            metaUpdater = resolvedMetaUpdater,
                         )
                     }
                 }

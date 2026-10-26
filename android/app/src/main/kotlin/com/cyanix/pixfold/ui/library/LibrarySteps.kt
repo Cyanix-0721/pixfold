@@ -77,7 +77,16 @@ import com.cyanix.pixfold.ui.components.ResetAllButton
 import com.cyanix.pixfold.ui.text.WarnLine
 import com.cyanix.pixfold.ui.workspace.WorkspaceState
 import com.cyanix.pixfold.ui.workspace.handleOrNull
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import com.cyanix.pixfold.domain.comic.ComicInfo
+import com.cyanix.pixfold.domain.comic.withComicInfoValues
+import com.cyanix.pixfold.domain.pack.CbzMetaUpdateOutcome
+import com.cyanix.pixfold.domain.pack.CbzMetaUpdatePlan
+import com.cyanix.pixfold.domain.pack.CbzMetaUpdater
+import com.cyanix.pixfold.domain.pack.UpdateFailure
+import com.cyanix.pixfold.domain.pack.UpdatePreflight
 import com.cyanix.pixfold.ui.plan.ExecutionReportPage
 
 /**
@@ -240,6 +249,18 @@ fun LibrarySteps(
      * 默认空 ⇒ 既有测试零改动。
      */
     workspaceWarnings: List<Msg> = emptyList(),
+    /**
+     * 工作流 C 的平台层（就地更新已有 CBZ 的元数据）。
+     *
+     * `null` = **两个入口都不渲染**、且工作流 C 的一切入口都不出现（默认值 ⇒
+     * 既有 24 处导航测试一行都不用改，与 [packExecutor] 同一既定做法）。
+     * 真实应用由 `PixFoldApp` 用 `remember(workspaceHandle)` 构造 `SafMetaUpdater` 注入。
+     *
+     * 为什么不像 [packExecutor] 那样「null 就走模拟」：更新元数据是**不可逆**的
+     * 写盘动作（用户裁决 Q3 甲：三段式替换、没有撤销）。模拟成功会让界面报「已更新」
+     * 而磁盘上什么都没变 —— 那比不显示入口糟得多。
+     */
+    metaUpdater: CbzMetaUpdater? = null,
 ) {
     // 跨步骤共享的唯一状态源。这些状态**必须留在嵌套 NavHost 之外** ——
     // 它们要跨步骤存活,而 NavHost 里每个 destination 都是独立作用域。
@@ -298,6 +319,38 @@ fun LibrarySteps(
     // 空间临界 / 估算下界 / 需要 Zip64 三类告知项全都没有出口。
     var pagePreflight by remember { mutableStateOf<PackUiPreflight?>(null) }
     val scope = rememberCoroutineScope()
+
+    // ---- 工作流 C：就地更新已有 CBZ 的元数据（2026-10-26 规格 §8.6）----
+    //
+    // 全部 remember(rootPath)：这是「当前工作区」域内的状态，换工作区必须归零 ——
+    // 否则用户在 A 工作区点了「更新」，切到 B 后确认框还浮着，一按确认就往 A 的
+    // 路径写（target 里存的是旧卷对象）。
+    //
+    // 和打包链状态分开持有，理由与「打包进度不复用执行报告」同源：
+    // 两种动作的取消语义、结果形态、可撤销性都不同，混在一个状态里必然要加判别字段。
+    /** 非 null ⇒ 确认框显示中。存的是**快照**，不是 id：换库后对不上就关掉它。 */
+    var updateTarget by remember(rootPath) { mutableStateOf<ComicVolume?>(null) }
+    /** 确认框里的体积读数；null = 还没算出来 / 拿不到（显示「未知」）。 */
+    var updateSizeBytes by remember(rootPath) { mutableStateOf<Long?>(null) }
+    /** 确认框里的条目数；null = 未知（那一行不显示）。 */
+    var updateEntryCount by remember(rootPath) { mutableStateOf<Int?>(null) }
+    /** 非 null ⇒ 空间不足之类的**执行前**结论，确认框上要明确说出来。 */
+    var updatePreflight by remember(rootPath) { mutableStateOf<UpdatePreflight?>(null) }
+    /** 执行中 ⇒ 进度弹窗。 */
+    var updating by remember(rootPath) { mutableStateOf(false) }
+    var updateDone by remember(rootPath) { mutableStateOf(0) }
+    var updateTotal by remember(rootPath) { mutableStateOf(0) }
+    // 取消已发出、正等条目边界。**每次执行前复位** —— 复用会让上次的取消污染下一次
+    // （与打包链 `cancelling` 同一个坑，2026-10-19 踩过）。
+    var updateCancelling by remember(rootPath) { mutableStateOf(false) }
+    var updateCancelToken by remember(rootPath) { mutableStateOf<CancellationToken?>(null) }
+    /** 非 null ⇒ 结果弹框（`Cancelled` 不设它：取消不弹「失败」）。 */
+    var updateResult by remember(rootPath) { mutableStateOf<CbzMetaUpdateOutcome?>(null) }
+    //
+    // 结果与进度弹窗要显示**包名**，而那时 `updateTarget` 已经被清成 null 了
+    // （startUpdate 一进门就清：确认框关掉才轮到进度框）。所以名字得单独留一份 ——
+    // 指望进度运行时再回 `updateTarget` 拿，会拿到 null 并让弹窗写「null」。
+    var updateVolumeName by remember(rootPath) { mutableStateOf("") }
     // 拒绝文案与结果故障要在非 composable 的回调里取 `Context` 解析文案
     val context = androidx.compose.ui.platform.LocalContext.current
     // 这两条文案要**在组合期**取，不能在点击回调里 `context.getString`：
@@ -443,6 +496,103 @@ fun LibrarySteps(
         state = updateVolume(state, applyDirMetaSuggestions(volume))
     }
 
+    /**
+     * 打开发更新确认框（工作流 C 入口的共同落点）。
+     *
+     * 两件事必须在**弹框之前**做完，且都在 IO 线程：
+     *  - `targetExists` —— 包被删/改名时弹一个「要点确认」的框再告诉用户
+     *    「包不见了」是骗人的，直接给结果框；
+     *  - `preflight` —— 体积这一行是用户在确认框里最想知道的事（整包会被重写）。
+     *
+     * 拿不到体积就保持 `null` ⇒ 界面显示「未知」，**不删掉这一行**。
+     */
+    fun requestUpdate(volume: ComicVolume) {
+        val updater = metaUpdater ?: return
+        updatePreflight = null
+        updateSizeBytes = null
+        updateEntryCount = null
+        updateDone = 0
+        updateTotal = 0
+        updateCancelling = false
+        updateTarget = volume
+        updateVolumeName = volume.cbzFileName
+        scope.launch {
+            val plan = CbzMetaUpdatePlan(
+                volumeId = volume.id,
+                comicInfoXml = ComicInfo.build(volume),
+                targetDisplayName = volume.cbzFileName,
+                entryCount = 0,
+            )
+            val exists = withContext(Dispatchers.IO) {
+                runCatching { updater.targetExists(volume) }.getOrDefault(false)
+            }
+            if (!exists) {
+                updateTarget = null
+                updateResult = CbzMetaUpdateOutcome.Failed(UpdateFailure.TargetMissing, volume.cbzFileName)
+                return@launch
+            }
+            val pre = withContext(Dispatchers.IO) {
+                runCatching { updater.preflight(plan, volume) }.getOrDefault(UpdatePreflight.Unknown)
+            }
+            // 期间用户可能已经关掉了确认框 —— 别把迟到结论塞回一个已关闭的框。
+            if (updateTarget?.id != volume.id) return@launch
+            updatePreflight = pre
+            updateSizeBytes = (pre as? UpdatePreflight.Ready)?.estimatedReadBytes
+        }
+    }
+
+    /**
+     * 真正执行更新（确认框点「更新」之后）。
+     *
+     * `shouldStop` 传 `{ token.isCancelled }`：平台层**只在条目边界**问一次，
+     * 停在条目中间会留下中央目录不完整的包，而原包此刻一字节未动。
+     */
+    fun startUpdate(volume: ComicVolume) {
+        val updater = metaUpdater ?: return
+        updateTarget = null
+        // 每次执行前复位：上次取消过会让这一次的按钮一进来就是禁用态。
+        updateCancelling = false
+        updateDone = 0
+        updateTotal = 0
+        updating = true
+        val token = CancellationToken()
+        updateCancelToken = token
+        val plan = CbzMetaUpdatePlan(
+            volumeId = volume.id,
+            comicInfoXml = ComicInfo.build(volume),
+            targetDisplayName = volume.cbzFileName,
+            entryCount = updateEntryCount ?: 0,
+        )
+        scope.launch {
+            val outcome = withContext(Dispatchers.IO) {
+                runCatching {
+                    updater.update(plan, volume, { token.isCancelled }) { done, total ->
+                        updateDone = done
+                        updateTotal = total
+                    }
+                }.getOrElse { e ->
+                    CbzMetaUpdateOutcome.Failed(
+                        UpdateFailure.ReadFailed,
+                        e.message ?: e::class.simpleName,
+                    )
+                }
+            }
+            updating = false
+            updateCancelToken = null
+            updateCancelling = false
+            if (outcome is CbzMetaUpdateOutcome.Updated) {
+                // 规格 §8.8：磁盘上的 XML 已经是新的，但内存里的 title/series 还是旧的。
+                // 用**刚写进去的那份 XML** 回填，不重读磁盘 —— 用户下次看到的就是新值。
+                // 建议值一个字都不动（与 applyExistingComicInfo 同一立场）。
+                state = updateVolume(state, withComicInfoValues(volume, plan.comicInfoXml))
+            }
+            // 取消是用户自己按的，弹「更新失败：已取消」等于把他的决定说成一次故障。
+            val suppressed = outcome is CbzMetaUpdateOutcome.Failed &&
+                outcome.reason == UpdateFailure.Cancelled
+            if (!suppressed) updateResult = outcome
+        }
+    }
+
     fun resetAll() {
         // 重置时若有任务在跑,先叫停 —— 否则重置完界面归零,后台还在往磁盘写,
         // 用户看到的是「我明明重置了,文件却还在变多」。
@@ -467,6 +617,14 @@ fun LibrarySteps(
         confirmFlow = ConfirmFlowState()
         report = null
         undoMessage = null
+        // 工作流 C 的弹窗也归零：重置后还浮着一个「要更新 xxx 吗」的框，
+        // 用户点确认就会往盘上写 —— 而他已经明确说「全部重来」。
+        updateTarget = null
+        updateResult = null
+        updating = false
+        updateCancelling = false
+        updateCancelToken?.cancel()
+        updateCancelToken = null
         // 回到步骤 1(退回一律用 pop,保持返回链线性)
         navController.goToLibraryStep(currentIndex, 0)
     }
@@ -554,6 +712,9 @@ fun LibrarySteps(
                             onOpenWorkspaceList = onOpenWorkspaceList,
                             // 结构警告来自扫描结果,不是库状态 —— 由 PixFoldApp 现算注入
                             workspaceWarnings = workspaceWarnings,
+                            // 工作流 C 入口一。`metaUpdater == null` ⇒ 不渲染这个图标
+                            // （默认路径),既有测试与「无工作区」状态都走这条。
+                            onUpdateMeta = metaUpdater?.let { _ -> { vol: ComicVolume -> requestUpdate(vol) } },
                             modifier = Modifier.weight(1f),
                         )
                     }
@@ -569,6 +730,8 @@ fun LibrarySteps(
                             contentInsets = innerInsets,
                             onNext = { navController.navigate(LibraryPackRoute) },
                             onBack = { navController.popWorkflowStep() },
+                            // 工作流 C 入口二（底栏第三槽）。
+                            onUpdateMeta = metaUpdater?.let { _ -> { vol: ComicVolume -> requestUpdate(vol) } },
                             modifier = Modifier.weight(1f),
                         )
                     }
@@ -732,6 +895,56 @@ fun LibrarySteps(
                     }
                 }
             }
+        }
+
+        // ---- 工作流 C 的三个弹窗（2026-10-26 规格 §8.3–§8.5）----
+        //
+        // 挂在 Column 内的最外层（NavHost 之外）：更新动作与「当前停在哪一页」无关 ——
+        // 用户在步骤 2 点「更新元数据」时，页签/返回栈都可能变化，弹窗跟着页面走会
+        // 出现「页面变了弹窗还浮着」或反过来的错位。
+        //
+        // 三者互斥且**顺序有讲究**：先确认框，再进度，最后结果。同一帧里至多一个非空
+        // （startUpdate 会先清 updateTarget 才置 updating，收尾会先清 updating 才置
+        // updateResult），所以这里是三个独立的 if 而不是 when。
+        val confirmTarget = updateTarget
+        if (confirmTarget != null) {
+            CbzUpdateConfirmDialog(
+                volumeName = confirmTarget.cbzFileName,
+                entryCount = updateEntryCount,
+                sizeBytes = updateSizeBytes,
+                // 拿到 NoSpace 时**不许**继续 —— 预检的结论是「写了就会失败」，
+                // 让它走到执行只会在磁盘上留一个删掉的临时包和多等十几秒。
+                onConfirm = {
+                    val pre = updatePreflight
+                    if (pre is UpdatePreflight.NoSpace) {
+                        updateTarget = null
+                        updateResult = CbzMetaUpdateOutcome.Failed(UpdateFailure.NoSpace)
+                    } else {
+                        startUpdate(confirmTarget)
+                    }
+                },
+                onCancel = { updateTarget = null },
+            )
+        }
+        if (updating) {
+            CbzUpdateProgressDialog(
+                done = updateDone,
+                total = updateTotal,
+                cancelling = updateCancelling,
+                volumeName = updateVolumeName,
+                onCancel = {
+                    updateCancelling = true
+                    updateCancelToken?.cancel()
+                },
+            )
+        }
+        val result = updateResult
+        if (result != null) {
+            CbzUpdateResultDialog(
+                outcome = result,
+                volumeName = updateVolumeName,
+                onDone = { updateResult = null },
+            )
         }
     }
 }
