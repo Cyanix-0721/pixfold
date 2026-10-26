@@ -18,6 +18,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
@@ -338,8 +339,10 @@ fun LibrarySteps(
     var updatePreflight by remember(rootPath) { mutableStateOf<UpdatePreflight?>(null) }
     /** 执行中 ⇒ 进度弹窗。 */
     var updating by remember(rootPath) { mutableStateOf(false) }
-    var updateDone by remember(rootPath) { mutableStateOf(0) }
-    var updateTotal by remember(rootPath) { mutableStateOf(0) }
+    // 用 mutableIntStateOf 而不是 mutableStateOf(0)：后者会把 Int 装箱，
+    // 每次进度回调（每个条目一次）都多一次分配，而进度回调正是本功能最热的写点。
+    var updateDone by remember(rootPath) { mutableIntStateOf(0) }
+    var updateTotal by remember(rootPath) { mutableIntStateOf(0) }
     // 取消已发出、正等条目边界。**每次执行前复位** —— 复用会让上次的取消污染下一次
     // （与打包链 `cancelling` 同一个坑，2026-10-19 踩过）。
     var updateCancelling by remember(rootPath) { mutableStateOf(false) }
@@ -577,7 +580,11 @@ fun LibrarySteps(
                     )
                 }
             }
-            updating = false
+            // `updating = false` 必须放在**最后**：它是「进度框消失」的判据，而
+            // `updateResult` 是「结果框出现」的判据。先关进度再设结果，两者之间
+            // 会有一帧「两个框都没有」—— 测试线程落在那一帧上就会读到「没有结果框」
+            // （实测：同一份代码单跑绿、整套跑红）。反过来先设结果再关进度，任何一帧
+            // 都至少有一个框在，界面也不会闪一下空白。
             updateCancelToken = null
             updateCancelling = false
             if (outcome is CbzMetaUpdateOutcome.Updated) {
@@ -590,6 +597,7 @@ fun LibrarySteps(
             val suppressed = outcome is CbzMetaUpdateOutcome.Failed &&
                 outcome.reason == UpdateFailure.Cancelled
             if (!suppressed) updateResult = outcome
+            updating = false
         }
     }
 

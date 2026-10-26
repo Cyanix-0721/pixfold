@@ -101,6 +101,24 @@ class CbzUpdateFlowTest {
         rule.waitForIdle()
     }
 
+    /**
+     * 等结果框出现。
+     *
+     * **为什么不能只靠 [awaitUpdateSettled]**：执行协程里 `updating = false` 与
+     * `updateResult = outcome` 是两次独立的状态写入，Compose 可能在两者之间提交一帧 ——
+     * 那一帧上前两个框都已消失、结果框还没出来。测试线程正好落在那儿就会红（实际发生过：
+     * 同一份代码单跑绿、整套跑红）。等「结果框出现」才是终态判据。
+     */
+    private fun awaitResultDialog() {
+        rule.waitUntil(timeoutMillis = 5_000) {
+            rule.onAllNodesWithTag(TAG_UPDATE_RESULT_DIALOG).fetchSemanticsNodes().isNotEmpty()
+        }
+        rule.waitUntil(timeoutMillis = 5_000) {
+            rule.onAllNodesWithTag(TAG_UPDATE_RESULT_DIALOG).fetchSemanticsNodes().isNotEmpty()
+        }
+        rule.waitForIdle()
+    }
+
     private fun resultBody(): String =
         rule.onNodeWithTag(TAG_UPDATE_RESULT_BODY)
             .fetchSemanticsNode()
