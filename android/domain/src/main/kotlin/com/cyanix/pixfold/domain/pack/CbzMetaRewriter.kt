@@ -43,12 +43,30 @@ import java.util.zip.ZipOutputStream
  * 单条目峰值 = 该条目大小（不超过 [INLINE_LIMIT_BYTES]）或一个磁盘临时文件。
  * 不会缓冲整包 —— 4.73 GiB 的包转写时堆占用是个位数 MB。
  */
+/**
+ * 输入根本不是 ZIP 包。
+ *
+ * ## 为什么需要这个类型
+ *
+ * `ZipInputStream.nextEntry` 对非 ZIP 输入**不抛异常**，只是返回 `null`。
+ * 2026-10-27 真机撞到的缺陷：一个 17 字节的纯文本文件被当成"空包"转写，
+ * 产出只剩 `ComicInfo.xml` 一个条目，界面上却报「元数据已更新」——
+ * 用户原来的内容静默消失。
+ *
+ * 所以 [CbzMetaRewriter.rewrite] 在**写任何字节之前**先看头部魔数，
+ * 不是 ZIP 就抛本异常，让平台层转成 [com.cyanix.pixfold.domain.pack.UpdateFailure.NotAZip]。
+ */
+class NotAZipException(message: String) : Exception(message)
+
 object CbzMetaRewriter {
 
     /** 小于这个大小的条目留在内存里，超过就落 [spillDir] 的临时文件。 */
     internal const val INLINE_LIMIT_BYTES: Long = 8L * 1024 * 1024
 
     private const val BUFFER_BYTES = 64 * 1024
+
+    /** ZIP 本地文件头魔数 `PK\003\004` 的长度。空 ZIP（只有中央目录）是 `PK\005\006`。 */
+    private const val ZIP_MAGIC_BYTES = 4
 
     /**
      * 把 [input] 里的 CBZ 转写成 [out]，只把 `ComicInfo.xml` 换成 [comicInfoXml]。
@@ -63,6 +81,7 @@ object CbzMetaRewriter {
      * @param onEntryWritten 每写完一条回调 `(已写条目数, 总条目数)`。总条目数传 `0` =
      *                    **未知**（`ZipInputStream` 读到末尾才知道有几条），调用方据此显示不确定态进度。
      * @return 写出的条目总数（含新的 ComicInfo.xml）
+     * @throws NotAZipException [input] 的头部魔数不是 ZIP。**抛出时 [out] 一个字节都没写。**
      * @throws IllegalStateException 见 [spillDir]；或某条目读到一半失败
      */
     fun rewrite(
@@ -74,6 +93,17 @@ object CbzMetaRewriter {
         onEntryWritten: (done: Int, total: Int) -> Unit = { _, _ -> },
     ): Int {
         require(timeMillis > 0) { "timeMillis 必须为正：$timeMillis" }
+
+        // 探测必须在建 ZipOutputStream 之前：一旦开始写，非 ZIP 输入就会
+        // 静默产出一个只含 ComicInfo 的包（真机缺陷，见 NotAZipException）。
+        val source = BufferedInputStream(input)
+        val head = ByteArray(ZIP_MAGIC_BYTES)
+        source.mark(ZIP_MAGIC_BYTES)
+        val headLen = source.read(head)
+        source.reset()
+        if (!looksLikeZip(head, headLen)) {
+            throw NotAZipException("文件头不是 ZIP：" + hexOf(head, headLen))
+        }
 
         val zip = ZipOutputStream(out)
         zip.setLevel(0)
@@ -87,7 +117,7 @@ object CbzMetaRewriter {
         onEntryWritten(written, 0)
 
         // ZipInputStream.close() 会关掉底层 input —— 所有权在调用方，故不用 use。
-        val zin = ZipInputStream(BufferedInputStream(input))
+        val zin = ZipInputStream(source)
         while (true) {
             val entry = zin.nextEntry ?: break
             if (entry.isDirectory) {
@@ -177,6 +207,27 @@ object CbzMetaRewriter {
             runCatching { spill?.delete() }
         }
     }
+
+    /**
+     * 头部是不是 ZIP。
+     *
+     * 认两种魔数：`PK\003\004`（有本地文件头，正常包）与 `PK\005\006`（空包，只有中央目录）。
+     * 空包也要认 —— 用户可能有一个刚建好还没放图的 CBZ，那种包更新元数据是合法的。
+     *
+     * **不认** `PK\007\008`（跨卷分片标记）：那说明这只是一个多卷包的一片，
+     * 单独转写它产出的是残缺包。
+     */
+    private fun looksLikeZip(head: ByteArray, len: Int): Boolean {
+        if (len < ZIP_MAGIC_BYTES) return false
+        if (head[0] != 'P'.code.toByte() || head[1] != 'K'.code.toByte()) return false
+        val third = head[2].toInt() and 0xFF
+        val fourth = head[3].toInt() and 0xFF
+        return (third == 0x03 && fourth == 0x04) || (third == 0x05 && fourth == 0x06)
+    }
+
+    /** 报错时把前几个字节打成十六进制，用户报障时能直接看出"这不是包"。 */
+    private fun hexOf(head: ByteArray, len: Int): String =
+        (0 until len).joinToString(" ") { "%02X".format(head[it]) }
 
     /** STORED 条目必须自带 size / compressedSize / crc，否则 ZipOutputStream 会抛。 */
     private fun stored(name: String, bytes: ByteArray, timeMillis: Long): ZipEntry {

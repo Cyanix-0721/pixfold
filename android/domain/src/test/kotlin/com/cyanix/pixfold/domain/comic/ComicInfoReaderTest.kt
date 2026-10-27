@@ -343,6 +343,43 @@ class ComicInfoReaderTest {
         assertEquals("新建议系列", reconciled.seriesSug.value)
     }
 
+    // ---------- 探针返回值的三态语义 ----------
+
+    @Test
+    fun `a package with no ComicInfo entry empties the current values`() {
+        // 包里**没有** ComicInfo.xml ⇒ 空对象 ⇒ 当前值清空(用户裁决「没写就默认是空的」)。
+        val entry = comicInfoOfEntry(null)
+        assertNotNull(entry, "没有条目 = 文件在但没写,不是「读不出来」")
+        assertTrue(entry.isEmpty)
+
+        val volume = volumeWith(title = "建议标题", series = "建议系列", writer = "建议作者")
+        val filled = applyExistingComicInfo(listOf(volume), probeReturning(entry)).single()
+        assertEquals("", filled.title)
+        assertEquals("建议标题", filled.titleSug.value, "建议值仍可用,「恢复建议值」还能救回来")
+    }
+
+    @Test
+    fun `an unreadable ComicInfo entry keeps the current values`() {
+        // 2026-10-27 真机缺陷：条目在但解析不出时，旧实现返回空对象 ⇒ 当前值被清空 ⇒
+        // 用户点更新把空值写回文件(295 B 的 XML 变成 232 B 全空标签)。
+        // 「读不出来」必须与「没有」区分开：前者保持建议值，什么都不改。
+        assertNull(comicInfoOfEntry("<ComicInfo><Title>未闭合"))
+
+        val volume = volumeWith(title = "建议标题", series = "建议系列", writer = "建议作者")
+        val filled = applyExistingComicInfo(listOf(volume), probeReturning(comicInfoOfEntry("<ComicInfo><Title>未闭合"))).single()
+        assertEquals("建议标题", filled.title, "解析失败不得清空当前值")
+        assertEquals("建议系列", filled.series)
+        assertEquals("建议作者", filled.writer)
+    }
+
+    @Test
+    fun `a readable ComicInfo entry becomes the current values`() {
+        val entry = assertNotNull(comicInfoOfEntry("<ComicInfo><Title>文件标题</Title></ComicInfo>"))
+        val volume = volumeWith(title = "建议标题", series = "建议系列", writer = "建议作者")
+        val filled = applyExistingComicInfo(listOf(volume), probeReturning(entry)).single()
+        assertEquals("文件标题", filled.title)
+    }
+
     // ---------- 夹具 ----------
 
     private fun volumeWith(

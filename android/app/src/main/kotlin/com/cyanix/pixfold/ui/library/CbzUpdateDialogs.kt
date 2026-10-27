@@ -51,6 +51,9 @@ const val TAG_UPDATE_RESULT_DIALOG = "update-result-dialog"
 /** 结果弹框正文（断言具体失败原因）。 */
 const val TAG_UPDATE_RESULT_BODY = "update-result-body"
 
+/** 结果弹框的关闭按钮（断言「完成」/「关闭」用词）。 */
+const val TAG_UPDATE_RESULT_CONFIRM = "update-result-confirm"
+
 /**
  * [UpdateFailure] -> 文案键。
  *
@@ -282,7 +285,14 @@ fun CbzUpdateResultDialog(
         },
         text = { Text(body, modifier = Modifier.testTag(TAG_UPDATE_RESULT_BODY)) },
         confirmButton = {
-            TextButton(onClick = onDone) { Text(textOf(TextKey.GeneralConfirmOk)) }
+            // 成功说「完成」、失败说「关闭」—— 两者都不是「执行」：框里已经没有待执行的动作，
+            // 再写「执行」会让人以为要点它才生效（真机实测被误读）。
+            TextButton(
+                onClick = onDone,
+                modifier = Modifier.testTag(TAG_UPDATE_RESULT_CONFIRM),
+            ) {
+                Text(textOf(if (ok) TextKey.GeneralDone else TextKey.GeneralClose))
+            }
         },
     )
 }

@@ -12,7 +12,7 @@ import com.cyanix.pixfold.domain.comic.ExistingComicInfoProbe
 import com.cyanix.pixfold.domain.comic.OutputExistsProbe
 import com.cyanix.pixfold.domain.comic.PageBytes
 import com.cyanix.pixfold.domain.model.ComicVolume
-import com.cyanix.pixfold.domain.comic.parseComicInfo
+import com.cyanix.pixfold.domain.comic.comicInfoOfEntry
 import com.cyanix.pixfold.domain.pack.CbzOutputSink
 import com.cyanix.pixfold.domain.plan.VolumePackPlan
 import java.io.BufferedInputStream
@@ -307,7 +307,10 @@ class FilesystemSpaceSource(context: Context) {
  *
  * - 没有同名 CBZ ⇒ `null`(调用方保持建议值);
  * - CBZ 在但里面没有 `ComicInfo.xml` ⇒ `ComicInfoData()` 空对象(调用方清空当前值);
- * - 包坏了 / 读不出来 ⇒ `null`(与「没有」同样处理 —— 扫描路径不得因坏包中断)。
+ * - 包坏了 / 读不出来 / 条目在但解析失败 ⇒ `null`(调用方**什么都不改**，保持建议值)。
+ *
+ * 最后一条是 2026-10-27 真机缺陷的修复点：原先「解析失败」被兜底成空对象，于是每个
+ * 有元数据的包都被当成空包，用户点一次更新就把文件里的 XML 写成全空标签。
  *
  * ## 为什么只读 `ComicInfo.xml` 一个条目
  *
@@ -367,8 +370,10 @@ class SafExistingComicInfoProbe(
                         break
                     }
                 }
-                // 包在但没有 ComicInfo.xml ⇒ 空对象(调用方清空当前值),不是 null。
-                xml?.let { parseComicInfo(it) } ?: ComicInfoData()
+                // 三态交给领域层：没有条目 ⇒ 空对象(清空当前值)；条目在但解析不出 ⇒ null
+                // (保持建议值)。见 `comicInfoOfEntry` 的 KDoc —— 把两者混成一个空对象
+                // 会让「读不懂」变成「把用户的元数据清空」。
+                comicInfoOfEntry(xml)
             }
         }
     } catch (e: Exception) {

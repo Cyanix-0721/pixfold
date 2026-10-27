@@ -21,13 +21,16 @@ import org.robolectric.annotation.Config
  *
  * ## 为什么只测预检
  *
- * 三段式替换（原包 → 备份 → 临时 → 原名 → 删备份）的每一步都依赖真实的
- * `DocumentsProvider` —— Robolectric 没有真 provider，`renameDocument` 之类的调用
- * 只会拿到 shadow 的回放值。在这种环境里断言「替换成功」等于自欺。
+ * 替换动作本身依赖真实的 `DocumentsProvider` —— Robolectric 没有真 provider，
+ * `renameDocument` 之类的调用只会拿到 shadow 的回放值。在这种环境里断言
+ * 「替换成功」等于自欺。
  *
- * 该路径登记在 spec §9.5 的「只能真机断」清单里（Task 8c 回写进 🔌 待办）。
+ * 所以替换的**分支逻辑**被抽成了纯函数 [replaceTarget]（见 `SafReplaceTarget.kt`），
+ * 甲 / 乙 / 都失败六条路径由 [SafReplaceTargetTest] 离线钉死；
+ * 这里只留预检 —— 纯算术 + 两个可注入的取数函数。
  *
- * 预检则完全可测：它是纯算术 + 两个可注入的取数函数。
+ * 剩下**只能真机断**的是「把 Uri 接进 replaceTarget 之后，真实 provider 认不认」，
+ * 登记在 spec §9.5 清单里。
  */
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [36])

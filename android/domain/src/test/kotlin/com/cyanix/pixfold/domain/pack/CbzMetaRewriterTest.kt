@@ -193,6 +193,46 @@ class CbzMetaRewriterTest {
         assertFailsWith<IllegalStateException> { rewrite(src, spillDir = null) }
     }
 
+    // T8b
+    @Test
+    fun `a file that is not a zip is rejected instead of being silently emptied`() {
+        // 真机撞到的缺陷（2026-10-27）：ZipInputStream 对非 ZIP 输入不抛异常，
+        // 只是 nextEntry 返回 null ⇒ 旧实现会产出「只含 ComicInfo 的包」并报成功，
+        // 用户原来那份内容静默消失。
+        val out = ByteArrayOutputStream()
+        assertFailsWith<NotAZipException> {
+            CbzMetaRewriter.rewrite(
+                input = "not a zip at all".toByteArray(Charsets.UTF_8).inputStream(),
+                out = out,
+                comicInfoXml = xml,
+                timeMillis = time,
+                spillDir = null,
+            )
+        }
+        assertEquals(0, out.size(), "拒绝时必须一个字节都不写，否则临时包里会留下半成品")
+    }
+
+    // T8c
+    @Test
+    fun `an empty file is rejected as not a zip`() {
+        val out = ByteArrayOutputStream()
+        assertFailsWith<NotAZipException> {
+            CbzMetaRewriter.rewrite(ByteArrayInputStream(ByteArray(0)), out, xml, time, null)
+        }
+        assertEquals(0, out.size())
+    }
+
+    // T8d
+    @Test
+    fun `a file with a zip-like but broken header is rejected too`() {
+        // 自解压包（exe 前缀）ZipInputStream 本来就读不出来 —— 与其静默清空，
+        // 不如明确拒绝。这里用 PK 开头但三四字节不对的假头。
+        val fake = byteArrayOf(0x50, 0x4B, 0x09, 0x09) + ByteArray(32)
+        assertFailsWith<NotAZipException> {
+            CbzMetaRewriter.rewrite(fake.inputStream(), ByteArrayOutputStream(), xml, time, null)
+        }
+    }
+
     // T9
     @Test
     fun `page entry names are preserved verbatim, never renumbered`() {

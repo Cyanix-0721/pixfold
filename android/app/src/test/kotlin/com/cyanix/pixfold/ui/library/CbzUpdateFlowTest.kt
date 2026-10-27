@@ -2,6 +2,7 @@ package com.cyanix.pixfold.ui.library
 
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithTag
@@ -150,6 +151,39 @@ class CbzUpdateFlowTest {
         val plan = fake.lastPlan!!
         assertEquals(ComicInfo.build(withArchive), plan.comicInfoXml, "写进包的必须是界面上那一份")
         assertEquals(withArchive.cbzFileName, plan.targetDisplayName)
+    }
+
+    @Test
+    fun `the result dialog closes with a word that matches the outcome`() {
+        // 结果框是「陈述结局」，不是「发起动作」。原先复用了 GeneralConfirmOk
+        // （en "Run" / zh "执行"），成功框上显示「执行」让人以为还要再点一次才生效。
+        val fake = FakeCbzMetaUpdater()
+        show(fake)
+        goToMetadata()
+        selectArchiveVolume()
+        rule.onNodeWithTag(TAG_METADATA_UPDATE).performClick()
+        rule.waitForIdle()
+        confirmInDialog()
+        awaitResultDialog()
+        rule.onNodeWithTag(TAG_UPDATE_RESULT_CONFIRM)
+            .assertTextEquals(TestText.of(R.string.domain_general_done))
+    }
+
+    @Test
+    fun `a failed result dialog closes with Close rather than Done`() {
+        // 失败时「完成」是错的 —— 用户没有完成任何事。
+        val fake = FakeCbzMetaUpdater(
+            outcome = CbzMetaUpdateOutcome.Failed(UpdateFailure.NoSpace),
+        )
+        show(fake)
+        goToMetadata()
+        selectArchiveVolume()
+        rule.onNodeWithTag(TAG_METADATA_UPDATE).performClick()
+        rule.waitForIdle()
+        confirmInDialog()
+        awaitResultDialog()
+        rule.onNodeWithTag(TAG_UPDATE_RESULT_CONFIRM)
+            .assertTextEquals(TestText.of(R.string.domain_general_close))
     }
 
     @Test

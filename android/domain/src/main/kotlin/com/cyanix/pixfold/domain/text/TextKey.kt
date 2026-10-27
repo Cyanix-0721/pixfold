@@ -121,6 +121,10 @@ enum class TextKey {
     GeneralConfirmTitle,
     GeneralConfirmCancel,
     GeneralConfirmOk,
+    /** 「完成」—— 结果框上陈述结局，与「执行」(GeneralConfirmOk) 语义不同。 */
+    GeneralDone,
+    /** 「关闭」—— 失败结果框用；此时说「完成」是错的。 */
+    GeneralClose,
 
     // ---------------- 待确认标记 / 未命名系列 ----------------
     PendingLanguage,

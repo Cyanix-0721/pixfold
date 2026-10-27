@@ -10,6 +10,7 @@ import com.cyanix.pixfold.domain.pack.CbzMetaUpdateOutcome
 import com.cyanix.pixfold.domain.pack.CbzMetaUpdatePlan
 import com.cyanix.pixfold.domain.pack.CbzMetaUpdater
 import com.cyanix.pixfold.domain.pack.CbzMetaRewriter
+import com.cyanix.pixfold.domain.pack.NotAZipException
 import com.cyanix.pixfold.domain.pack.UpdateFailure
 import com.cyanix.pixfold.domain.pack.UpdatePreflight
 import java.io.File
@@ -159,60 +160,48 @@ class SafMetaUpdater(
         } catch (e: CancelledSignal) {
             deleteQuietly(tempUri)
             return CbzMetaUpdateOutcome.Failed(UpdateFailure.Cancelled)
+        } catch (e: NotAZipException) {
+            // 输入不是 ZIP：重写器在写第一个字节之前就抛了，临时包必然为空 ⇒ 直接删。
+            // 真机缺陷（2026-10-27）：以前这种输入会被当成"空包"，产出只剩 ComicInfo 的
+            // 包并报成功，用户原来的内容静默消失。
+            deleteQuietly(tempUri)
+            return CbzMetaUpdateOutcome.Failed(UpdateFailure.NotAZip, e.message)
         } catch (e: SecurityException) {
             return failAndClean(tempUri, UpdateFailure.PermissionLost, e.message)
         } catch (e: Exception) {
             return failAndClean(tempUri, UpdateFailure.ReadFailed, e.message)
         }
 
-        // ---- 三段式替换 ----
-        // ① 原包 → 备份
-        val backupUri = try {
-            renameDocument(resolver, target, backupName)
-        } catch (e: Exception) {
-            null
-        }
-        if (backupUri == null) {
-            deleteQuietly(tempUri)
-            return CbzMetaUpdateOutcome.Failed(
-                UpdateFailure.ReplaceFailed,
-                "无法把原包改名为 $backupName（原包未动，临时包已清理）",
-            )
-        }
-
-        // ② 临时包 → 原名
-        val promoted = try {
-            renameDocument(resolver, tempUri, volume.cbzFileName)
-        } catch (e: Exception) {
-            null
-        }
-        if (promoted == null) {
-            // 回滚：把备份改回原名。回滚成功 ⇒ 磁盘回到起点，报 ReplaceFailed 即可。
-            val rolledBack = try {
-                renameDocument(resolver, backupUri, volume.cbzFileName) != null
-            } catch (e: Exception) {
-                false
+        // ---- 替换：原包换成新包（甲：改名→改名→删备份；甲走不通退化乙：删→改名）----
+        // 具体分支与文案全在 replaceTarget 里（纯函数，离线可测）。
+        val replaced = replaceTarget(
+            original = target,
+            temp = tempUri,
+            targetName = volume.cbzFileName,
+            backupName = backupName,
+            tempName = tempName,
+            rename = { item, name -> renameDocument(resolver, item, name) },
+            delete = { item -> deleteDocument(resolver, item) },
+        )
+        return when (replaced) {
+            is ReplaceOutcome.Promoted -> {
+                // 备份删不掉不算失败：包已经是完整的新包了，
+                // 因为删不掉一个多余备份就报失败，会让用户以为要重来一遍。
+                if (replaced.leftover != null) Log.w(TAG, "删除备份失败（不影响结果）：$backupName")
+                if (replaced.viaFallback) {
+                    // 只读包最常走这条：原包改不了名，只能删掉它再让新包占原名。
+                    // 新包由 createDocument 新建，权限不继承原包的只读位 ⇒ 更新后即可读写。
+                    Log.i(TAG, "原包无法改名，已按「删除 + 改名」方式替换：${volume.cbzFileName}")
+                }
+                CbzMetaUpdateOutcome.Updated(entryCount, xmlBytes)
             }
-            deleteQuietly(tempUri)
-            return CbzMetaUpdateOutcome.Failed(
-                UpdateFailure.ReplaceFailed,
-                if (rolledBack) {
-                    "无法把新包改名为 ${volume.cbzFileName}（原包已恢复）"
-                } else {
-                    "无法把新包改名为 ${volume.cbzFileName}，且原包留在 $backupName —— 请手动把它改回原名"
-                },
-            )
+            is ReplaceOutcome.Failed -> {
+                // keepTemp = true 只出现在乙路径「原包已删、新包改名失败」——
+                // 那时临时包是唯一的数据，必须留在磁盘上。
+                if (!replaced.keepTemp) deleteQuietly(tempUri)
+                CbzMetaUpdateOutcome.Failed(UpdateFailure.ReplaceFailed, replaced.detail)
+            }
         }
-
-        // ③ 删备份。**这一步失败算成功**：包已经是完整的新包了，
-        // 因为删不掉一个多余备份就报失败，会让用户以为要重来一遍。
-        val deleted = try {
-            deleteDocument(resolver, backupUri)
-        } catch (e: Exception) {
-            false
-        }
-        if (!deleted) Log.w(TAG, "删除备份失败（不影响结果）：$backupName")
-        return CbzMetaUpdateOutcome.Updated(entryCount, xmlBytes)
     }
 
     /** 取消信号。用独立异常类型是为了不把它和真正的 IO 异常混成一条分支。 */

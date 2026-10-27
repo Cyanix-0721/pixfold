@@ -247,6 +247,11 @@
     <string name="domain_update_fail_no_space">Not enough free space to write the new archive. Free some space and retry.</string>
     <string name="domain_update_fail_not_a_zip">This file is not a valid CBZ.</string>
     <string name="domain_update_fail_read_failed">Reading or writing the archive failed. It may be damaged or in use by another app — retry.</string>
-    <string name="domain_update_fail_replace_failed">The new archive could not be moved into place. The original is still on disk.</string>
+    <!-- 中性表述：具体停在哪一步由 detail 说（原包可能还在，也可能已删、新包留在 .updating） -->
+    <string name="domain_update_fail_replace_failed">The new archive could not be moved into place.</string>
+
+    <!-- ============ 通用按钮：结果框（只陈述结局，不是「执行」） ============ -->
+    <string name="domain_general_done">Done</string>
+    <string name="domain_general_close">Close</string>
 
 </resources>

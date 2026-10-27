@@ -252,6 +252,8 @@ internal fun TextKey.resId(): Int = when (this) {
     TextKey.GeneralConfirmTitle -> R.string.domain_general_confirm_title
     TextKey.GeneralConfirmCancel -> R.string.domain_general_confirm_cancel
     TextKey.GeneralConfirmOk -> R.string.domain_general_confirm_ok
+    TextKey.GeneralDone -> R.string.domain_general_done
+    TextKey.GeneralClose -> R.string.domain_general_close
 
     // 待确认标记 / 未命名系列
     TextKey.PendingLanguage -> R.string.domain_pending_language

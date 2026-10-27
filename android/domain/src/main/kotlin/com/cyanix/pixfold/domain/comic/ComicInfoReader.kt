@@ -57,16 +57,19 @@ data class ComicInfoData(
  *
  * 安全：禁用 DTD 与外部实体(XML 外部实体注入)。ComicInfo 从不需要 DTD。
  */
-fun parseComicInfo(xml: String): ComicInfoData? = runCatching {
-    val factory = DocumentBuilderFactory.newInstance().apply {
-        isNamespaceAware = true
-        // 三连：禁止 DTD / 禁止外部实体 / 禁止 XInclude —— 我们只需要元素文本。
-        setFeature("http://apache.org/xml/features/disallow-doctype-decl", true)
-        setFeature("http://xml.org/sax/features/external-general-entities", false)
-        setFeature("http://xml.org/sax/features/external-parameter-entities", false)
-        isXIncludeAware = false
-        isExpandEntityReferences = false
-    }
+fun parseComicInfo(xml: String): ComicInfoData? = parseComicInfo(xml, DocumentBuilderFactory.newInstance())
+
+/**
+ * [parseComicInfo] 的可注入版本 —— 只供测试喂「加固项一个都不支持」的工厂。
+ *
+ * 生产路径永远走无参重载。把它 `internal` 而不是公开，是为了不让调用方误以为
+ * 「换一个工厂」是受支持的行为。
+ */
+internal fun parseComicInfo(xml: String, factory: DocumentBuilderFactory): ComicInfoData? = runCatching {
+    // 文本层先拒 DOCTYPE：feature 一个都设不上时（见 `harden` 的说明）这是**唯一**的
+    // XXE 防线，所以它不能依赖工厂能力。
+    if (hasDoctype(xml)) return null
+    factory.harden()
     val doc = factory.newDocumentBuilder()
         .parse(ByteArrayInputStream(xml.toByteArray(Charsets.UTF_8)))
     val root = doc.documentElement ?: return null
@@ -79,6 +82,46 @@ fun parseComicInfo(xml: String): ComicInfoData? = runCatching {
         language = langChoiceOf(root.textOf("LanguageISO")),
     )
 }.getOrNull()
+
+/**
+ * 文本层检测 `<!DOCTYPE`（大小写不敏感）。
+ *
+ * ## 为什么不能只靠 `disallow-doctype-decl`
+ *
+ * 那条 feature 是 **Xerces 专有**的。Android 的 XML 实现是 Harmony
+ * `DocumentBuilderFactoryImpl`，对不认识的 feature 会抛
+ * `ParserConfigurationException`；即使它不抛、只是静默忽略，防线也就没了。
+ * 2026-10-27 真机缺陷正是「设置 feature 失败 ⇒ `runCatching` 吞成 null ⇒ 整份 XML
+ * 读不出来」，所以这里改用**与解析器能力无关**的判据。
+ *
+ * ## 为什么可以粗暴地拒绝
+ *
+ * ComicInfo.xml 从不需要 DTD —— 它是一份固定五个标签的平铺文档。误杀一份带 DTD 的
+ * 第三方包，后果是「当前值留空、建议值可用」，远小于 XXE 或「整包读不出」。
+ */
+private fun hasDoctype(xml: String): Boolean = xml.contains("<!doctype", ignoreCase = true)
+
+/**
+ * 尽可能加固 `DocumentBuilderFactory`；**任何一项设不上都继续往下走**。
+ *
+ * ## 为什么逐项 try 而不是一把梭
+ *
+ * 每个 `setFeature` 都可能抛 `ParserConfigurationException`（规范允许「不认识就抛」）。
+ * 原先五连设写在 `runCatching` 里，任何一条抛都会让**整个解析**失败 —— 安全加固把功能
+ * 弄坏了。这里改成逐项独立，能设上的设上，设不上的记下来（调用方不需要知道）。
+ *
+ * 剩下的防线不止一条：`hasDoctype` 已在文本层拒掉 DTD，本函数的
+ * `isExpandEntityReferences = false` 再挡一层实体展开。
+ */
+private fun DocumentBuilderFactory.harden() {
+    // 每一项都独立：设不上不影响其余项，更不影响后面的解析。
+    runCatching { isNamespaceAware = true }
+    runCatching { setFeature("http://apache.org/xml/features/disallow-doctype-decl", true) }
+    runCatching { setFeature("http://xml.org/sax/features/external-general-entities", false) }
+    runCatching { setFeature("http://xml.org/sax/features/external-parameter-entities", false) }
+    runCatching { isXIncludeAware = false }
+    runCatching { isExpandEntityReferences = false }
+}
 
 /**
  * 读子元素的文本；**缺失或空白都算 `null`**。
@@ -119,6 +162,32 @@ private fun langChoiceOf(raw: String?): LangChoice = when (raw?.lowercase()) {
 fun interface ExistingComicInfoProbe {
     fun read(volume: ComicVolume): ComicInfoData?
 }
+
+/**
+ * 把「从 CBZ 里读出来的那一条 `ComicInfo.xml`」翻译成 [ComicInfoData] —— **三态**。
+ *
+ * ## 三态是本函数存在的全部理由
+ *
+ * | 情况 | 返回 | 调用方行为 |
+ * | --- | --- | --- |
+ * | 包里没有 `ComicInfo.xml` | `ComicInfoData()` 空对象 | 当前值清空（用户裁决「没写就默认是空的」） |
+ * | 条目在、能解析 | 解析结果 | 当前值取文件值 |
+ * | 条目在、**解析不出来** | `null` | 什么都不改，保持建议值 |
+ *
+ * ## 为什么第三条不能也返回空对象（2026-10-27 真机缺陷）
+ *
+ * 旧实现是 `xml?.let { parseComicInfo(it) } ?: ComicInfoData()` —— 把「有 XML 但读不懂」
+ * 与「根本没有 XML」混成同一个空对象。真机上 `parseComicInfo` 因为安全加固项设不上而
+ * 整体失败，于是**每一个有元数据的包都被当成空包**：元数据页当前值全空，用户点一次
+ * 「更新元数据」就把 295 B 的 XML 写成 232 B 的空标签，**静默丢掉全部元数据**。
+ *
+ * 「读不懂」的正确语义是「这次不知道，别动」。宁可让界面显示上一次的值，也不能
+ * 用「空」覆盖文件里真实存在的内容 —— 前者可以重试，后者要用户手动补。
+ *
+ * @param xml 条目全文；`null` 表示包里没有这个条目
+ */
+fun comicInfoOfEntry(xml: String?): ComicInfoData? =
+    if (xml == null) ComicInfoData() else parseComicInfo(xml)
 
 /**
  * 把已有 `ComicInfo.xml` 的值填进**当前值**，建议值一个字都不动。

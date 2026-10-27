@@ -73,7 +73,8 @@ sealed interface CbzMetaUpdateOutcome {
  *  - [NoSpace] —— 腾空间；
  *  - [NotAZip] —— 这个文件根本不是 CBZ，换一个；
  *  - [ReadFailed] —— 包坏了或正被别的应用占用，重试；
- *  - [ReplaceFailed] —— 环境问题（只读卷？），最坏情况需要手动删备份；
+ *  - [ReplaceFailed] —— 环境问题（只读卷？）。具体停在哪一步由 `detail` 说：
+ *    原包可能还在、也可能已被删掉而新包留在 `.updating` 下，所以文案本身必须中性；
  *  - [Cancelled] —— 用户自己按的，不需要建议。
  */
 enum class UpdateFailure {
@@ -93,6 +94,16 @@ enum class UpdateFailure {
     ReadFailed,
 
     /** 三段式替换失败，原包可能还在备份里。建议：按提示手动恢复。 */
+    /**
+     * 新包没能替换到位。
+     *
+     * 三种落点（由 detail 区分，**不要**在枚举里再拆 —— 用户看到的动作一样，
+     * 都是「去目录里看一眼」）：原包未动 / 原包已恢复 / 原包留在 `.updating.bak` /
+     * 原包已删、新包留在 `.updating`。
+     *
+     * 只读包会走「删除 + 改名」这条退化路径：原包改不了名就先删掉它，
+     * 再让新建的临时包占原名 —— 新包权限由 provider 新建时决定，不继承只读位。
+     */
     ReplaceFailed,
 
     /** 用户主动取消。不给建议。 */
