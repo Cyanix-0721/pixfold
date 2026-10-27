@@ -672,7 +672,21 @@
 > 首轮还修了两处 lint：`PluralsCandidate` ×2（`%d` 紧接名词 ⇒ 改文案措辞去掉名词，而不是加 `tools:ignore`）、
 > `AutoboxingStateCreation`（进度计数改 `mutableIntStateOf`，那是本功能最热的写点）。
 >
-> **八、真机核对待做（2026-10-27 等用户重新授权）**：确认框体积行 / 进度框可取消 / 取消后磁盘零残留（无 `.updating`） / 成功后备注三段落盘且 `.bak` 已消失 / 空间不足时明确阻断 / 权限被撤时报「权限」而非「读取失败」。
+> **八、真机核对（2026-10-27，分支 `d4/cbz-update-fix`）—— 验收 1/2/3/4/5 全通过，验收 6 待下轮**：
+> ① **两处入口都在**（验收 1）：库页卷行右侧「更新已有压缩包里的元数据」（`content-desc` 命中，bounds `[1068,1356][1236,1524]`）+ 元数据页底栏「更新元数据」；
+> ② **确认框**（验收 2）：标题「更新元数据」/ 包名 / 正文「压缩包体积 10.9 MB。整包会被重写，且无法撤销。」；
+> ③ **结果框**（验收 4）：`元数据已更新 / … 已写入新的 ComicInfo.xml（条目数：4）。`，拉回包验条目序 = `ComicInfo.xml`(295 B STORED) → `001.jpg` → `002.jpg` → `003.jpg`，四条 `compress_type` 全 0；
+> ④ **元数据页改值 → 更新 → 当前值立刻反映**（验收 5）：Title 改 `RO-Updated-Title` 后包内只该字段变，输入框无需重扫即显示新值；
+> ⑤ **进度与取消**（验收 3）：2.2 GB / 701 条目包实测进度数字 `0 → 122 → 258 → 391 → 530 → 595` 推进（`onEntryWritten` 的 `total` 恒传 0 ⇒ 只显示分子，`CbzProgressDialog` 走不确定环，设计如此），取消后原包 md5 `3012a3fc6859ce9d40914c91109a616b` / size `2202074390` **逐字节不变**、目录无 `.updating` / `.updating.bak` 残留；
+> ⑥ **只读包更新后变可读写**（用户 m08989 新需求）：前置 `chmod 444` 的 `-r--r--r--` 包，更新后变 `-rw-rw----`，走「删原包 → 临时包改名」的乙路径。
+>
+> **九、2026-10-27 真机撞出的四个真缺陷（全部已修，提交 `635e0cf`）**：
+> ① **非 ZIP 静默清空**（最严重，用户数据无声丢失）—— `ZipInputStream.nextEntry` 对非 ZIP 输入**不抛异常只返回 null**，于是 17 字节文本文件被当成空包转写，产出只剩一条 `ComicInfo.xml` 却报「元数据已更新」。而 `UpdateFailure.NotAZip` 在整个生产代码里**从未被返回过**（六种失败文案里有一种永远显示不出来）。修法 = `CbzMetaRewriter.rewrite` 在**建 `ZipOutputStream` 之前**读 4 字节魔数（认 `PK\003\004` 与 `PK\005\006`，不认跨卷分片），不符即抛 `NotAZipException`，**抛出时一个字节都没写**；`SafMetaUpdater` 接住转 `Failed(NotAZip)`。守卫 T8b/T8c/T8d 三条 + 变异 M1/M3 全 KILLED。
+> ② **`parseComicInfo` 在真机上整份失败** —— 五连设 feature 包在同一个 `runCatching` 里，Android 的 `DocumentBuilderFactory` 不支持任一项就 `ParserConfigurationException` ⇒ 每个有元数据的包都被当成空包。修法 = 拆出 `internal` 重载供测试注入敌意工厂，六项各包一层 `runCatching`，并在文本层先 `hasDoctype` 直接拒（与解析器能力无关）。`ComicInfoHardeningTest` 4 条守卫（敌意工厂比真机更极端）。**注：Robolectric 下 XML 工厂是 JDK Xerces（`FACTORY=com.sun.org.apache.xerces.internal.jaxp.DocumentBuilderFactoryImpl`），三个 feature 全 OK ⇒ 这个缺陷离线永远复现不出来**，属 §7.4「只能真机」类别。
+> ③ **只读包三段式必然失败** —— 原包只读时 `renameDocument` 与 `deleteDocument` 都被拒，且原包已被改名成 `.updating.bak` 后改不回来。修法 = 抽 `replaceTarget` 纯函数（`SafReplaceTarget.kt`），甲路径失败即退化乙路径「删原包 → 临时包改名」，`keepTemp` 为真时不删临时包（那可能是唯一一份），八条 `SafReplaceTargetTest` 用例；变异 M1–M5 全 KILLED（M4 首轮存活 ⇒ 补「备份删不掉仍算成功但需上报」用例后击杀）。
+> ④ **结果框按钮文案「执行」** —— 复用了 `TextKey.GeneralConfirmOk`（打包计划页的「执行」）。修法 = 新增 `GeneralDone`（完成）/ `GeneralClose`（关闭），按结果成败分别显示。
+>
+> **十、已知未修（登记，非阻塞）**：取消时 `deleteQuietly` 必现 `W SafMetaUpdater: 清理临时文件失败` + `IllegalStateException: Failed to delete …cbz.updating`，但三个时间点（0.3s/1.3s/3.3s）实测文件**都已不在**，属「provider 先删后抛」的日志噪音，用户可见结果正确（原包未动、无残留）。
 
 优先交付（**GUI 仅 Android**，2026-09-10 变更）：
 

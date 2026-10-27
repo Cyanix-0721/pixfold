@@ -218,6 +218,14 @@ D5  增加模板、撤销、多系列批处理等增强功能（**「更新 CBZ�
 >
 > 变异 M1–M8 里有 **两条等价变异 + 一条只能真机断**：`setLevel(0)` 对显式设了 STORED 的条目无影响（真正能破坏 STORED 的 M3b 被 10 条测试击杀）；「删掉成功后回填」在 `parse∘build` 互逆时恒等（已补两条反向守卫钉住这个前提）；「删掉取消检查」的真实路径在平台层，Robolectric 无 `DocumentsProvider` ⇒ 登记进 spec §9.5「只能真机断」，不伪造假断言。
 >
+> **2026-10-27 真机核对（分支 `d4/cbz-update-fix`，提交 `635e0cf`）**：验收 **1/2/3/4/5 全通过** —— 两处入口都在；确认框写明「压缩包体积 10.9 MB。整包会被重写，且无法撤销。」；结果框「元数据已更新 / 条目数：4」且拉回包验条目序 = `ComicInfo.xml`(295 B STORED) → `001.jpg` → `002.jpg` → `003.jpg` 全 `compress_type=0`；元数据页改 Title 后当前值立刻反映、无需重扫；2.2 GB / 701 条目包实测进度 `0 → 122 → 258 → 391 → 530 → 595` 推进，取消后原包 md5 与 size `2202074390` **逐字节不变**、无 `.updating` 残留。
+>
+> **只读 CBZ 更新后变可读写**（用户新需求：「以前用 kuro reader 打包的 cbz 都是只读的」）：`chmod 444` 的 `-r--r--r--` 包更新后变 `-rw-rw----`，走「删原包 → 临时包改名」的退化路径。
+>
+> **同轮撞出并修掉四个真缺陷**：① **非 ZIP 静默清空**（`ZipInputStream.nextEntry` 对非 ZIP 不抛只返 null ⇒ 17 字节文本被当成空包转写、产出只剩一条 `ComicInfo.xml` 却报成功；而 `UpdateFailure.NotAZip` 在生产代码里**从未被返回过**）⇒ `CbzMetaRewriter` 在建 `ZipOutputStream` **之前**读 4 字节魔数，不符即抛 `NotAZipException`（抛出时零字节写入）② **`parseComicInfo` 在真机上整份失败**（五连设 feature 同在一个 `runCatching`，Android 工厂不支持任一项即 `ParserConfigurationException` ⇒ 每个有元数据的包被当空包）⇒ 六项各包 `runCatching` + 文本层 `hasDoctype` 先拒 + `internal` 重载供敌意工厂测试；**Robolectric 下是 JDK Xerces、三 feature 全 OK ⇒ 该缺陷离线永远复现不出来** ③ **只读包三段式必然失败**（改名与删除都被拒，且原包已改成 `.updating.bak` 后改不回来）⇒ 抽 `replaceTarget` 纯函数，甲失败退化乙、`keepTemp` 为真时不删临时包 ④ **结果框按钮文案「执行」**（误用 `GeneralConfirmOk`）⇒ 新增 `GeneralDone`/`GeneralClose`。
+>
+> 变异 M1/M3（魔数）+ M1–M5（replaceTarget，M4 首轮存活 ⇒ 补「备份删不掉仍算成功但需上报」用例后击杀）全 KILLED；闸门 app **874** / domain **986** / lint `No issues found.` / APK **34,686,556 B**。**验收 6（六种失败文案可读可区分）待下轮真机补齐**。已知未修（非阻塞）：取消时 `deleteQuietly` 必现 `Failed to delete …cbz.updating` 的 W，但三个时间点实测文件都已不在 ⇒「provider 先删后抛」的日志噪音，用户可见结果正确。
+>
 > 四道闸门(`--rerun-tasks` 强制重跑)：app **864** / domain **976** / lint `No issues found.` / APK **34,685,788 B**。**真机核对留到 2026-10-27 等用户重新授权**。
 >> 进度(2026-10-26，**工作区列表 v4 落地（SDD 十一个任务全部交付，真机 2026-10-26 全部通过）**)：用户裁决「加个硬上限」+「钉住的排到本区最前，多个图钉之间仍可互相拖拽」+「不做相册、不做指定文件管理器」+「删掉设置里那个假开关」。落地：① **两分区列表** —— 「已持久授权」与「只记住了路径」按 `contentResolver.persistedUriPermissions` **每次打开实时判定**，分区之间不让拖拽跨越；② **图钉 = 本区置顶**，钉住项之间仍可互换；③ **长按整行任意位置拖动**排序（刻意不加独立抓手）；④ **上限 8 条**，满时挤掉最久没打开的那条（全钉住则拒绝新增并提示）；⑤ ✕ 只删记录不动磁盘，弹窗底部 Switch 可选「同时撤销持久授权」（默认关、不持久化）；⑥ 删掉设置页那个**从未被任何代码读取**的「文件访问方式」开关（`StorageAccess` 全链条 + 两份资源各 6 键），结论 = 只用 SAF，manifest 一行存储权限都不加。
 >
