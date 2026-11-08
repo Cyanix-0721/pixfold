@@ -327,21 +327,37 @@ UndoRecord      可撤销操作所需的逆向信息
 > 按语义分层的排版与 48dp 触控目标;组件一律用 `androidx.compose.material3`。
 > **不自行发明视觉语言**,不混用 M2 组件与自定义“仿 MD”样式。
 
-**"最新 MD"的落地边界(2026-09-16 一手核实 + 编译实测)**:
+**"最新 MD"的落地边界**:
 
 - Google 当前的"最新 MD"是 **Material 3 Expressive(M3E)**(`MaterialExpressiveTheme` / `MotionScheme` /
-  `ButtonGroup` / `SplitButton` / `LoadingIndicator` 等)。
-- **但 M3E 的公开 API 目前只在 `material3:1.5.0-alpha28` 中可用**;最新 **stable** 为 **`1.4.0`**,
-  其中 M3E 相关类型**全部标记 `internal`、应用层无法调用**(实测编译报
-  `Cannot access 'MaterialExpressiveTheme' … it is internal in file`)。
-  **连最新的 Compose BOM `2026.09.00` 也仍锁 material3 `1.4.0`**;亦**不存在**独立的
-  `material3-expressive` 构件(仓库返回 404)。
-- **故本阶段决定(用户 2026-09-16 拍板)**:**先用 stable `1.4.0` 把布局与信息密度做出来**,
-  **M3E 留到 P7 真机走查后评估**——届时若确需 M3E 观感,再单独决策是否引入 alpha 依赖
-  (属"零三方依赖"约定的例外,须显式记录并锁版本)。
-- **stable 1.4.0 下已实测可用**(探针编译通过):`lightColorScheme` / `darkColorScheme`(静态配色)、
+  `ButtonGroup` / `SplitButton` / `LoadingIndicator` / `MaterialShapes` 等)。
+- **当前基准 = `material3:1.5.0-rc01`(2026-11-08 用户裁决引入,见下)**。
+  Compose BOM `2026.09.00` 仍锁 `1.4.0`,故在 `android/gradle/libs.versions.toml` 里
+  **单独给 `compose-material3` 指定 `version.ref = "material3"`**(显式版本优先于 BOM 约束),
+  实测依赖解析为 `androidx.compose.material3:material3:1.4.0 -> 1.5.0-rc01`。
+  亦**不存在**独立的 `material3-expressive` 构件(仓库返回 404)。
+- **运行期门槛 = minSdk 24**(解 aar 的 `AndroidManifest.xml` 得 `<uses-sdk android:minSdkVersion="24" />`),
+  Android 16(API 36)远高于此,**能跑**。真正的门槛在**构建期**:aar-metadata 要求
+  `minCompileSdk=37` / `minAndroidGradlePluginVersion=9.1.0`,本项目 `compileSdk = 37`、AGP 9.4.1 已满足。
+- ⚠️ **2026-09-16 的旧结论被 2026-11-08 一手复核证伪**:当时记的是"stable `1.4.0` 里 M3E 相关类型
+  全部标记 `internal`、应用层无法调用"。实际 javap 1.4.0 的 `MaterialThemeKt` 有
+  `public static final void MaterialExpressiveTheme(...)`,`MotionScheme` 接口与
+  `MotionScheme$Companion.standard()/expressive()` 也全 public ⇒ **1.4.0 就能用主题与动效**,
+  真正缺的只是**expressive 组件**(上述 `FloatingToolbarKt` / `LoadingIndicatorKt` / `ButtonGroupKt` /
+  `SplitButtonKt` / `ToggleButtonKt` / `MaterialShapes` / `FloatingActionButtonMenuKt`,
+  1.4.0 全无、1.5.0-rc01 全有)。
+- **本阶段决定(用户 2026-11-08 拍板,选项乙)**:**引入 `1.5.0-rc01` 覆盖 BOM,启用 M3E** ——
+  `Theme.kt` 由 `MaterialTheme` 换成 `MaterialExpressiveTheme(motionScheme = MotionScheme.expressive())`,
+  并为后续 expressive 组件留好入口。属"零三方依赖"约定的例外(仍是 Google 官方构件,但非 stable),
+  **须锁版本**。升级代价实测:APK 34,702,940 → **37,349,550 B**(+2.6 MB)。
+- **升级带来的唯一破坏性变更**:`ExposedDropdownMenu` 从 `ExposedDropdownMenuBoxScope` 的成员函数
+  改成**顶层扩展方法**(旧成员带 `Deprecated(level = HIDDEN)`),原来靠 BoxScope 隐式可见的调用点
+  必须显式 `import androidx.compose.material3.ExposedDropdownMenu`(已改 `MetadataPage.kt` / `SchemeEditor.kt`)。
+- **stable 1.4.0 下曾实测可用**(仍成立):`lightColorScheme` / `darkColorScheme`(静态配色)、
   `dynamicLightColorScheme` / `dynamicDarkColorScheme`(**动态取色,Android 12+**)、
-  `MaterialTheme` 的 `colorScheme` / `typography` / `shapes`。**这些是本阶段 M3 合规的实现手段。**
+  `MaterialTheme` 的 `colorScheme` / `typography` / `shapes`。**这些是 M3 合规的实现手段。**
+- ⚠️ `MaterialExpressiveTheme` 与 `MaterialTheme` 的差别**只在 motionScheme**:反编译见前者内部
+  仍取 `MaterialTheme.getShapes()` 的默认 shapes,expressive 与否**不换形状**。
 
 **执行要求**(纳入 D1 各 UI 阶段的验收自检):
 

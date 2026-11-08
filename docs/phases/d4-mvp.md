@@ -714,6 +714,19 @@
 >
 > 守卫：`WorkspaceStateTest`「失败也要带上授权 否则刷新与重试入口全部静默失效」、`WorkspaceControllerTest`「首次加载失败后刷新仍然会重扫」、`WorkspaceControllerListTest`「Failed 带授权时删别的条目 不把重选入口一起关掉」。变异 M1（`handleOrNull` 的 Failed 改回 null）与 M4（`failedUnknown` 去掉 `&& currentHandle() == null` 半句）均 **KILLED**。
 
+> **十三、material3 升到 1.5.0-rc01 + 启用 M3E 主题（2026-11-08，分支 `d4/expressive`）**：
+> 用户原话「对了我想要官方 MD expressive，现在有升级到测试版依赖吗」⇒ 裁决**乙**：不换 BOM，单独给 `compose-material3` 指定 `version.ref = "material3" = "1.5.0-rc01"`（显式版本优先于 BOM 约束），并在 `Theme.kt` 把 `MaterialTheme` 换成 `MaterialExpressiveTheme(motionScheme = MotionScheme.expressive())`。
+>
+> **⚠️ 本轮证伪了一条写进三处文档的旧结论**：`HANGOFF.md` §6.5 / `AGENTS.md` 约束 7 / `README.md` 第 9 条都写着「M3E 的公开 API 只在 `1.5.0-alpha28`，stable `1.4.0` 里 M3E 类型全部 internal、应用层无法调用」。**javap 1.4.0 的 `MaterialThemeKt` 有 `public static final void MaterialExpressiveTheme(...)`**，`MotionScheme` 接口与 `MotionScheme$Companion.standard()/expressive()` 也全 public ⇒ **1.4.0 就能用主题与动效**；真正缺的只是**expressive 组件**（`FloatingToolbarKt` / `LoadingIndicatorKt` / `ButtonGroupKt` / `SplitButtonKt` / `ToggleButtonKt` / `MaterialShapes` / `FloatingActionButtonMenuKt`，1.4.0 全无、1.5.0-rc01 全有）。三处已按新结论改写。
+>
+> **运行期 vs 构建期（用户追问「我手机安卓16可以用吧」）**：解 `material3-android-1.5.0-rc01.aar` 的 `AndroidManifest.xml` 得 `<uses-sdk android:minSdkVersion="24" />` ⇒ **运行期门槛 24，安卓 16（API 36）能跑**。门槛在构建期：`META-INF/com/android/build/gradle/aar-metadata.properties` 要求 `minCompileSdk=37` / `minAndroidGradlePluginVersion=9.1.0`，本项目 `compileSdk = 37`（`android/app/build.gradle.kts:14`）、AGP 9.4.1 已满足。
+>
+> **升级撞出的唯一破坏性变更**：`ExposedDropdownMenu` 从 `ExposedDropdownMenuBoxScope` 的成员函数改成**顶层扩展方法**（旧成员带 `Deprecated(level = HIDDEN, message = "Use the version of ExposedDropdownMenu defined as an extension method")`，新的是 `ExposedDropdownMenuKt.ExposedDropdownMenu-kbRbctU`）⇒ 原来靠 BoxScope 隐式可见的调用点全部 `Unresolved reference`（`MetadataPage.kt:755` / `SchemeEditor.kt:668,700,732`）并连带报 `@Composable invocations can only happen from the context of a @Composable function`。修法 = 显式 `import androidx.compose.material3.ExposedDropdownMenu`，**不需要 OptIn**。
+>
+> **`MaterialExpressiveTheme` 与 `MaterialTheme` 的差别只在 motionScheme**：反编译见前者内部仍调 `MaterialTheme.getShapes()` 取默认 shapes，expressive 与否**不换形状**。故守卫只能盯动效 —— `ThemeTest` 新增「expressive theme installs the expressive motion scheme」，取 `MaterialTheme.motionScheme.defaultSpatialSpec<Float>()` 与 `MotionScheme.standard()` 的比 `assertNotEquals`。变异 M（换回 `MaterialTheme`）**KILLED**（`890 tests completed, 1 failed`，`ThemeTest.kt:82`）。
+>
+> 四道闸门（`--rerun-tasks`，`62 actionable tasks: 62 executed`）：app **890** / domain **986** / lint `No issues found.` / APK **37,349,550 B**（升级前 34,702,940 B，**+2.6 MB** 是 material3 1.5.0 的体积增量）。两条编译 warning（`PixFoldApp.kt:767:74` 多余安全调用 / `LibrarySteps.kt:442:62` 恒真 Elvis）是**既有**的，与 lint 无关（`warningsAsErrors` 只作用于 lint）。
+
 优先交付（**GUI 仅 Android**，2026-09-10 变更）：
 
 - Android：单目录/单系列，图片预览与人工排序，逐卷元数据，CBZ 生成；

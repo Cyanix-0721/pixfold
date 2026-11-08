@@ -59,4 +59,30 @@ class ThemeTest {
 
         assertNotEquals(lightPrimary, darkPrimary, "深色模式必须切换配色(不能只做浅色一套)")
     }
+
+    /**
+     * expressive 主题必须真的把 `MotionScheme.expressive()` 装进去。
+     *
+     * 为什么这条断言有意义:`MaterialExpressiveTheme` 与 `MaterialTheme` 的差别**只**在
+     * motionScheme(颜色/形状/排版走同一套)。若谁把调用改回 `MaterialTheme`,编译照过、
+     * 界面对、所有既有测试照绿 —— 只有动效悄悄退回 standard。这里用「默认空间动效规格
+     * 与 standard 不相等」把它钉住(SpringSpec 是 data class,可直接比较)。
+     */
+    @Test
+    fun `expressive theme installs the expressive motion scheme`() {
+        var spatial: androidx.compose.animation.core.FiniteAnimationSpec<Float>? = null
+
+        rule.setContent {
+            PixFoldTheme(dynamicColor = false) {
+                spatial = MaterialTheme.motionScheme.defaultSpatialSpec()
+            }
+        }
+
+        val standard = androidx.compose.material3.MotionScheme.standard().defaultSpatialSpec<Float>()
+        assertNotEquals(
+            standard,
+            spatial,
+            "主题装的应是 MotionScheme.expressive(),而不是 standard",
+        )
+    }
 }

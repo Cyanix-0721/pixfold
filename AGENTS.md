@@ -93,8 +93,9 @@
 6. **Android SAF 优先验证**:目录授权、遍历、读写、缩略图、后台任务。
 7. **UI 符合最新 Material Design**(§6.5):用 material3 语义角色(颜色/排版/形状),不硬编码;
    支持深色模式;Android 12+ 动态取色;触控 ≥48dp;纯图标按钮给 `contentDescription`。
-   **当前基准 = material3 1.4.0(stable)**;M3E 的公开 API 只在 1.5.0-alpha28,不在本阶段范围
-   (P7 走查后评估,详见 §6.5 与 `docs/notes/d1-toolchain-evidence.md` §7)。
+   **当前基准 = material3 1.5.0-rc01**(2026-11-08 用户裁决,单独指定版本覆盖 BOM,启用 M3E
+   `MaterialExpressiveTheme` + `MotionScheme.expressive()`;运行期 minSdk 24、构建期要求
+   compileSdk 37/AGP 9.1.0 均已满足;详见 §6.5)。**非 stable,版本须锁死**。
 
 ## 3. 领域词汇
 
