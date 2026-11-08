@@ -688,6 +688,14 @@
 >
 > **十、已知未修（登记，非阻塞）**：取消时 `deleteQuietly` 必现 `W SafMetaUpdater: 清理临时文件失败` + `IllegalStateException: Failed to delete …cbz.updating`，但三个时间点（0.3s/1.3s/3.3s）实测文件**都已不在**，属「provider 先删后抛」的日志噪音，用户可见结果正确（原包未动、无残留）。
 
+> **十一、验收 6（六种失败文案可读可区分）真机核对（2026-11-08，分支 `d4/cbz-update-verify6`）—— 通过**：
+> 六条文案分两类核：**能真造的三条逐字比对**、**造不出来的三条核观感（换行/截断/可读性）**。
+> ① **`NotAZip`（真造）**：`/test/notazip/v1 第01卷.cbz` 写成 33 B 纯文本 `this is not a zip archive at all` ⇒ 结果框标题「更新失败」、正文「这个文件不是合法的 CBZ。」+ 技术细节第二行「文件头不是 ZIP：<四组十六进制字节>」（即 `this` 这四个 ASCII 字符的十六进制，与实际文件头逐字节一致）。
+> ② **`TargetMissing`（真造）**：先 `cp` 备份再 `rm` 掉 `/test/sem1/普通单本 第01卷 第01卷.cbz`，**不重启、不刷新列表**直接点该卷行的更新按钮 ⇒ 结果框正文「压缩包不在了，可能已被删除或改名——刷新列表后重试。」+ 第二行包名「普通单本 第01卷 第01卷.cbz」。证实 `requestUpdate` 的 `targetExists` 前置探测生效（`LibrarySteps.kt:530`），**没有**先弹一个骗人的「体积未知」确认框。
+> ③ **`ReadFailed`（真造）**：`/test/readfail/v1 第01卷.cbz` 写成 46 B —— 前 4 字节是合法魔数 `PK\003\004`、其后全垃圾 ⇒ 过了魔数探测，在 `ZipInputStream` 解析条目时抛异常，落 `Failed(ReadFailed, e.message)` ⇒ 结果框正文「读写压缩包失败，可能已损坏或被别的应用占用——重试一次。」，**不带**技术细节（`e.message` 为 null）。三条文案在真机上**互不混淆**，且都能一眼看出下一步动作。
+> ④ **`NoSpace` / `PermissionLost` / `ReplaceFailed` 未真造**：造 `NoSpace` 需要把设备剩余空间压到「包大小 + 32 MiB」以下（本机 test 工作区最大包 2.2 GB，压空间会波及用户其它数据）；`PermissionLost` 需要在执行窗口内撤权（预检与执行之间只有毫秒级）；`ReplaceFailed` 需要 provider 在改名阶段失败。三条由 `CbzUpdateFailureTextTest` 的六条两两不同 + 逐条资源比对离线守，真机上只核了文案长度（最长一条 `ReadFailed` 47 个全角字，在 361dp 视口下**换 2 行、未截断**）。
+> ⑤ **技术细节的排版**：`NotAZip` 那条是唯一带 detail 的，detail 排在正文**之后**、同为 `bodyMedium` 但降到 `onSurfaceVariant`，与正文之间隔一行 —— 与 `CbzUpdateFailureTextTest` 的「detail follows the readable message rather than replacing it」一致。
+
 优先交付（**GUI 仅 Android**，2026-09-10 变更）：
 
 - Android：单目录/单系列，图片预览与人工排序，逐卷元数据，CBZ 生成；
