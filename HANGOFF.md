@@ -358,6 +358,13 @@ UndoRecord      可撤销操作所需的逆向信息
   `MaterialTheme` 的 `colorScheme` / `typography` / `shapes`。**这些是 M3 合规的实现手段。**
 - ⚠️ `MaterialExpressiveTheme` 与 `MaterialTheme` 的差别**只在 motionScheme**:反编译见前者内部
   仍取 `MaterialTheme.getShapes()` 的默认 shapes,expressive 与否**不换形状**。
+- **真机核对通过(2026-11-08)**:PJX110 / Android 16 装包启动正常,首页、设置页整页渲染无错位无崩溃;
+  同一页在「Material 3 (2021)」/「Material 3 Expressive (2025)」两态逐像素对比 219,369/219,620 点不同(99.9%)
+  ⇒ 色彩标准开关确实接在算法上。
+- **待办(用户 2026-11-08 裁决「那先不管」)**:**「色彩标准」当前形态是 `ChoiceRow`(弹对话框单选),
+  不是按钮切换**。改 `SingleChoiceSegmentedButtonRow` 需把标签缩成 `2021` / `2025`(361dp 减边距后
+  每段仅约 164dp,而「Material 3 Expressive (2025)」文字就超 190dp),全名进 `contentDescription`;
+  并须一并处理该行在 5/9 个色彩风格下整行置灰(`COLOR_SPEC_SENSITIVE_STYLES`)的观感问题。
 
 **执行要求**(纳入 D1 各 UI 阶段的验收自检):
 

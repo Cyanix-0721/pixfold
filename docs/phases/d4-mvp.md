@@ -726,6 +726,10 @@
 > **`MaterialExpressiveTheme` 与 `MaterialTheme` 的差别只在 motionScheme**：反编译见前者内部仍调 `MaterialTheme.getShapes()` 取默认 shapes，expressive 与否**不换形状**。故守卫只能盯动效 —— `ThemeTest` 新增「expressive theme installs the expressive motion scheme」，取 `MaterialTheme.motionScheme.defaultSpatialSpec<Float>()` 与 `MotionScheme.standard()` 的比 `assertNotEquals`。变异 M（换回 `MaterialTheme`）**KILLED**（`890 tests completed, 1 failed`，`ThemeTest.kt:82`）。
 >
 > 四道闸门（`--rerun-tasks`，`62 actionable tasks: 62 executed`）：app **890** / domain **986** / lint `No issues found.` / APK **37,349,550 B**（升级前 34,702,940 B，**+2.6 MB** 是 material3 1.5.0 的体积增量）。两条编译 warning（`PixFoldApp.kt:767:74` 多余安全调用 / `LibrarySteps.kt:442:62` 恒真 Elvis）是**既有**的，与 lint 无关（`warningsAsErrors` 只作用于 lint）。
+>
+> **真机核对（2026-11-08，分支 `d4/expressive-verify`，用户授权后执行）**：PJX110 / Android 16 / 1264×2780px / 560dpi 装 `app-debug.apk`（`Success`）后启动，首页两张大卡「整理图片 / 打包漫画」均可点、工作区条显示「当前工作区:test」、齿轮在 `x1135 y281`；进设置页整页渲染正常，`ChoiceRow` / `SwitchRow` / `RadioButton` 三类控件在 `MaterialExpressiveTheme` 下**无错位、无崩溃**（`adb logcat -b crash -d | grep -c com.cyanix.pixfold` = **0**，缓冲区里只有其它应用的记录）。**色彩标准的实际切换效果也取了证**：同一页面在「Material 3 (2021)」与「Material 3 Expressive (2025)」两态下逐像素对比（4px 步长采样 219,620 点），**219,369 点不同（99.9%）**，底色 `#1A1112` → `#130C0D` ⇒ 该开关**真的接在算法上**，不是假开关。遗留的「观感是否生硬」属 §7.4「只能真机（用户判定）」类别，用户未提出异议即视为通过。
+>
+> **「色彩标准」的形态是 `ChoiceRow`（弹对话框单选），不是按钮切换 —— 用户 2026-11-08 裁决「那先不管」**。历史：2026-09-21 定形时它与「强调色 / 色彩风格 / 语言」同一套 `ChoiceRow`，KDoc 理由（选项多、窄屏不挤、便于断言）本是给 9 种色彩风格写的，被色彩标准顺手沿用。改成 `SingleChoiceSegmentedButtonRow` 的技术代价已盘清：两个标签「Material 3 (2021)」/「Material 3 Expressive (2025)」在 361dp 减边距后各只有约 164dp，而第二个标签文字就超 190dp，**必须缩成 `2021` / `2025` 两个数字**、全名进 `contentDescription`；现成用法见 `ui/organize/SortAndPreviewPage.kt:629` 的 `ModeToggle`。另有连带问题：该行在 5/9 个色彩风格下**整行置灰**（`COLOR_SPEC_SENSITIVE_STYLES`），置灰的分段按钮在 M3 里观感比置灰的行更奇怪，改形态时须一并处理。**本轮不做，登记为待办。**
 
 优先交付（**GUI 仅 Android**，2026-09-10 变更）：
 
