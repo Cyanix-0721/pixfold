@@ -686,7 +686,13 @@
 > ③ **只读包三段式必然失败** —— 原包只读时 `renameDocument` 与 `deleteDocument` 都被拒，且原包已被改名成 `.updating.bak` 后改不回来。修法 = 抽 `replaceTarget` 纯函数（`SafReplaceTarget.kt`），甲路径失败即退化乙路径「删原包 → 临时包改名」，`keepTemp` 为真时不删临时包（那可能是唯一一份），八条 `SafReplaceTargetTest` 用例；变异 M1–M5 全 KILLED（M4 首轮存活 ⇒ 补「备份删不掉仍算成功但需上报」用例后击杀）。
 > ④ **结果框按钮文案「执行」** —— 复用了 `TextKey.GeneralConfirmOk`（打包计划页的「执行」）。修法 = 新增 `GeneralDone`（完成）/ `GeneralClose`（关闭），按结果成败分别显示。
 >
-> **十、已知未修（登记，非阻塞）**：取消时 `deleteQuietly` 必现 `W SafMetaUpdater: 清理临时文件失败` + `IllegalStateException: Failed to delete …cbz.updating`，但三个时间点（0.3s/1.3s/3.3s）实测文件**都已不在**，属「provider 先删后抛」的日志噪音，用户可见结果正确（原包未动、无残留）。
+> **十、`deleteQuietly` 日志噪音（2026-11-08 已修；此前登记为「已知未修」）**：取消/失败清理时必现 `W SafMetaUpdater: 清理临时文件失败` + `IllegalStateException: Failed to delete …cbz.updating`，但三个时间点（0.3s/1.3s/3.3s）实测文件**都已不在**，用户可见结果正确（原包未动、无残留）。
+>
+> **根因（AOSP 源码定稿）**：`com.android.internal.content.FileSystemProvider.deleteDocument` 的顺序是 `if (file.exists() && !file.delete()) throw new IllegalStateException("Failed to delete " + file);` → `onDocIdChanged(docId)` → `onDocIdDeleted(docId)` → `updateMediaStore(getContext(), visibleFile);`。**抛点晚于真正的删除** —— 文件已经没了，随后清 MediaStore 那一步抛，客户端收到 `IllegalStateException`（`DocumentsContract.rethrowIfNecessary` 对 `RuntimeException` 原样透传）。所以「异常类型」不能当判据，判据只能是**事后文件还在不在**。
+>
+> **修法**：抽 `SafCleanupLog.kt` 的 `cleanupLogFor(outcome: Boolean?, stillExists: Boolean?): CleanupLog` 纯函数 —— 返回 true ⇒ `Silent`；文件已不在 ⇒ `Notice`（`Log.i` 一行、**不带堆栈**）；文件还在 / 查不出来 ⇒ `Warning`（`Log.w` 带堆栈，这是真缺陷）。`SafMetaUpdater.deleteQuietly` 只在 `deleteDocument` 未返回 true 时才多问一次 `documentExists`（正常路径零额外 Binder 往返）。**查询本身失败返回 `null` 而不是 `true`**：宁可多一条 warning，也不能把真失败藏成「已忽略」。
+>
+> 守卫 `SafCleanupLogTest` 5 条；变异 M2（删掉良性判定）与 M2b（`stillExists != true` 把「查不出来」当已删）均 KILLED。**真机待补**：修复效果只有真机日志能证（离线没有真实 `DocumentsProvider`）。
 
 > **十一、验收 6（六种失败文案可读可区分）真机核对（2026-11-08，分支 `d4/cbz-update-verify6`）—— 通过**：
 > 六条文案分两类核：**能真造的三条逐字比对**、**造不出来的三条核观感（换行/截断/可读性）**。
@@ -694,7 +700,19 @@
 > ② **`TargetMissing`（真造）**：先 `cp` 备份再 `rm` 掉 `/test/sem1/普通单本 第01卷 第01卷.cbz`，**不重启、不刷新列表**直接点该卷行的更新按钮 ⇒ 结果框正文「压缩包不在了，可能已被删除或改名——刷新列表后重试。」+ 第二行包名「普通单本 第01卷 第01卷.cbz」。证实 `requestUpdate` 的 `targetExists` 前置探测生效（`LibrarySteps.kt:530`），**没有**先弹一个骗人的「体积未知」确认框。
 > ③ **`ReadFailed`（真造）**：`/test/readfail/v1 第01卷.cbz` 写成 46 B —— 前 4 字节是合法魔数 `PK\003\004`、其后全垃圾 ⇒ 过了魔数探测，在 `ZipInputStream` 解析条目时抛异常，落 `Failed(ReadFailed, e.message)` ⇒ 结果框正文「读写压缩包失败，可能已损坏或被别的应用占用——重试一次。」，**不带**技术细节（`e.message` 为 null）。三条文案在真机上**互不混淆**，且都能一眼看出下一步动作。
 > ④ **`NoSpace` / `PermissionLost` / `ReplaceFailed` 未真造**：造 `NoSpace` 需要把设备剩余空间压到「包大小 + 32 MiB」以下（本机 test 工作区最大包 2.2 GB，压空间会波及用户其它数据）；`PermissionLost` 需要在执行窗口内撤权（预检与执行之间只有毫秒级）；`ReplaceFailed` 需要 provider 在改名阶段失败。三条由 `CbzUpdateFailureTextTest` 的六条两两不同 + 逐条资源比对离线守，真机上只核了文案长度（最长一条 `ReadFailed` 47 个全角字，在 361dp 视口下**换 2 行、未截断**）。
+
 > ⑤ **技术细节的排版**：`NotAZip` 那条是唯一带 detail 的，detail 排在正文**之后**、同为 `bodyMedium` 但降到 `onSurfaceVariant`，与正文之间隔一行 —— 与 `CbzUpdateFailureTextTest` 的「detail follows the readable message rather than replacing it」一致。
+>
+> **十二、`WorkspaceState.Failed` 不带 handle ⇒ 刷新与重试入口全部静默失效（2026-11-08 已修，分支 `d4/leftovers`）**：
+> 这条不是工作流 C 的缺陷，是更早挂在 `WorkspaceController` 里的。症状 —— **首次加载失败后，回到前台/改完文件回来，界面永远停在「无法读取该文件夹」，刷新按钮点不动**。
+>
+> **根因链**：`WorkspaceState.Failed` 只有 `message`、**不带 handle** ⇒ `WorkspaceState.handleOrNull()` 对 Failed 返回 null ⇒ `WorkspaceController.refresh()`（`android/app/src/main/kotlin/com/cyanix/pixfold/ui/workspace/WorkspaceController.kt:353` 起）首行 `if (currentHandle() == null) return` 直接返回。唯一用户入口是 `PixFoldApp.kt:237` 的 `ON_RESUME`（`skipFirstResume` AtomicBoolean 跳首次）⇒ 一次临时 IO 失败就把「重试」永久锁死。
+>
+> **修法**：`data class Failed(val message: String, val handle: WorkspaceHandle? = null)`；`LoadResult.toWorkspaceState` 的 `is LoadResult.Failed -> WorkspaceState.Failed(message, handle)`；`handleOrNull()` 改 `is WorkspaceState.Failed -> handle`（剩 `None` / `Loading` 仍返 null）。**`handle == null` 只保留给「真不可知」**——离线造不出这条分支（`state` 的 setter 是 private，`toWorkspaceState` 现在总带 handle），已在测试文件写明「刻意不设断言」，不留假保障。
+>
+> **连带回归（自查发现）**：`WorkspaceController.remove(treeUri, alsoRelease)` 原来写 `if (wasCurrent || state is WorkspaceState.Failed || listings.isEmpty())` —— 删**任意一条**工作区就把工作区条关掉，而工作区条是授权失效时**唯一的重选入口**，与 `Denied` 分支的既有理由自相矛盾。改为 `val failedUnknown = state is WorkspaceState.Failed && currentHandle() == null` / `if (wasCurrent || failedUnknown || listings.isEmpty())`：带 handle 的 Failed 能如实判断「删的是不是当前那条」，与 Denied 同口径。
+>
+> 守卫：`WorkspaceStateTest`「失败也要带上授权 否则刷新与重试入口全部静默失效」、`WorkspaceControllerTest`「首次加载失败后刷新仍然会重扫」、`WorkspaceControllerListTest`「Failed 带授权时删别的条目 不把重选入口一起关掉」。变异 M1（`handleOrNull` 的 Failed 改回 null）与 M4（`failedUnknown` 去掉 `&& currentHandle() == null` 半句）均 **KILLED**。
 
 优先交付（**GUI 仅 Android**，2026-09-10 变更）：
 

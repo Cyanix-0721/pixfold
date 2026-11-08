@@ -69,6 +69,17 @@ class WorkspaceStateTest {
     }
 
     @Test
+    fun `失败也要带上授权 否则刷新与重试入口全部静默失效`() {
+        // 缺陷实证（2026-11-08）：Failed 只带 message ⇒ handleOrNull() 返 null ⇒
+        // WorkspaceController.refresh() 第一行就 return。表现为「第一次没读进来，
+        // 之后回前台 / 改完文件回来永远看不到变化」，不崩不报错，只是像坏了。
+        val failed = assertIs<WorkspaceState.Failed>(LoadResult.Failed("磁盘拔掉了").toWorkspaceState(handle))
+
+        assertEquals(handle, failed.handle, "失败的那条也必须记住是哪个目录")
+        assertEquals(handle, failed.handleOrNull(), "刷新靠它定位要重扫哪个目录")
+    }
+
+    @Test
     fun `只有 Ready 用真实集合 其余一律回退 mock`() {
         assertEquals(realCollections, WorkspaceState.Ready(handle, realCollections).collectionsOr(mockCollections))
 

@@ -14,6 +14,7 @@ import com.cyanix.pixfold.domain.pack.NotAZipException
 import com.cyanix.pixfold.domain.pack.UpdateFailure
 import com.cyanix.pixfold.domain.pack.UpdatePreflight
 import java.io.File
+import java.io.FileNotFoundException
 
 /**
  * 工作流 C 的 SAF 实现：把一卷已有 CBZ 里的 `ComicInfo.xml` 换掉。
@@ -212,12 +213,43 @@ class SafMetaUpdater(
         return CbzMetaUpdateOutcome.Failed(reason, detail)
     }
 
+    /**
+     * 删临时文件，失败只记日志（清理不成功绝不能反过来把成功的更新报成失败）。
+     *
+     * 日志分级见 [cleanupLogFor]：provider 可能「删掉了才抛」，所以判据是
+     * 「事后文件还在不在」，不是异常类型。以前无条件 `Log.w` 打堆栈，
+     * 真机上每轮更新都刷一段红字，而文件其实早就没了。
+     */
     private fun deleteQuietly(uri: Uri) {
-        try {
+        var failure: Exception? = null
+        val deleted: Boolean? = try {
             deleteDocument(resolver, uri)
         } catch (e: Exception) {
-            Log.w(TAG, "清理临时文件失败：$uri", e)
+            failure = e
+            null
         }
+        if (deleted == true) return
+        when (cleanupLogFor(outcome = deleted, stillExists = documentExists(uri))) {
+            CleanupLog.Silent -> Unit
+            CleanupLog.Notice ->
+                Log.i(TAG, "清理临时文件：provider 报了错但文件已不在（已忽略）：$uri")
+            CleanupLog.Warning -> Log.w(TAG, "清理临时文件失败：$uri", failure)
+        }
+    }
+
+    /**
+     * 目标 document 是否还在。
+     *
+     * 查询本身失败时返回 **null**（= 不知道），由 [cleanupLogFor] 保守当「还在」：
+     * 宁可多打一条 warning，也不能把真正的删除失败藏成「已忽略」。
+     */
+    private fun documentExists(uri: Uri): Boolean? = try {
+        resolver.query(uri, arrayOf(DocumentsContract.Document.COLUMN_DOCUMENT_ID), null, null, null)
+            ?.use { it.count > 0 } ?: false
+    } catch (e: FileNotFoundException) {
+        false
+    } catch (e: Exception) {
+        null
     }
 
     private fun deleteIfExists(parentUri: Uri, displayName: String) {

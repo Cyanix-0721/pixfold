@@ -397,6 +397,29 @@ class WorkspaceControllerTest {
     }
 
     @Test
+    fun `首次加载失败后刷新仍然会重扫`() = runTest {
+        // 缺陷实证（2026-11-08）：Failed 不带 handle ⇒ refresh() 首行 currentHandle() 为 null
+        // 直接返回。用户看到的是「读取失败，请重新选择」—— 但他多半只是文件夹暂时读不到
+        // （SD 卡抖动、别的应用占着），重试一次就能好。刷新按钮/回前台全成了死操作。
+        //
+        // 脚本：restore 的首轮 + 自动重试各失败一次（Io 属于可重试），第三轮成功。
+        val source = WatchableSource(
+            LoadResult.Failed("磁盘拔掉了"),
+            LoadResult.Failed("磁盘拔掉了"),
+            LoadResult.Success(collections()),
+            last = handle,
+        )
+        val controller = WorkspaceController(source, testScope(), ioDispatcher = testDispatcher())
+        controller.restore()
+        assertIs<WorkspaceState.Failed>(controller.state)
+
+        controller.refresh()
+
+        assertIs<WorkspaceState.Ready>(controller.state)
+        assertEquals(3, source.loadCalls.size, "刷新必须真的再扫一次，而不是静默返回")
+    }
+
+    @Test
     fun `加载成功后自动挂上变更监听`() = runTest {
         val source = WatchableSource(LoadResult.Success(collections()), last = handle)
         val controller = WorkspaceController(source, testScope(), ioDispatcher = testDispatcher())

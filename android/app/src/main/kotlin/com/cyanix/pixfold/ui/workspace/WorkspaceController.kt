@@ -173,10 +173,11 @@ class WorkspaceController(
      *
      * ## 「是不是当前那条」为什么不能只看 [currentHandle]
      *
-     * - [WorkspaceState.Failed] **不带 handle**（只有 message）⇒ 那时「当前是哪条」不可知。
-     *   既然无从判断，就按「可能正是它」处理：停在一条可能已被删掉的目录的 Failed 上，
-     *   是对用户说了一句假话。旧 `forget()` 正是在这里返 nil，于是**一条都删不掉**
-     *   （评审 M5），用户点了 ✕ 列表照旧，下次启动又回来。
+     * - [WorkspaceState.Failed] 带 handle（2026-11-08 起）⇒ 能如实判断，与其他状态同口径。
+     *   它一度**不带** handle（只有 message），那时「当前是哪条」不可知，只好按「可能正是它」
+     *   处理 —— 停在一条可能已被删掉的目录的 Failed 上，是对用户说了一句假话；而旧 `forget()`
+     *   正是在这里返 nil，于是**一条都删不掉**（评审 M5），用户点了 ✕ 列表照旧。
+     *   `handle == null` 的 Failed 仍按「不可知」处理（冷启动无目录的极端路径 / 测试手搓）。
      * - [WorkspaceState.Denied] 带 handle ⇒ 能如实判断，故**不能**无条件回 [WorkspaceState.None]：
      *   那条工作区条是授权失效时唯一的重选入口（见 `WorkspaceState.showsWorkspaceBar`），
      *   删掉一条无关记录不该把它一起关掉。
@@ -197,8 +198,10 @@ class WorkspaceController(
         refreshListings()
 
         // 列表空了也回 None：目录已不再被记住，界面不能再停在一个凭空的「当前工作区」上。
-        // Failed 态无条件复位 —— 那时「当前是哪条」不可知，见上方 KDoc。
-        if (wasCurrent || state is WorkspaceState.Failed || listings.isEmpty()) {
+        // Failed 只在**取不到 handle** 时才算「当前是哪条不可知」——带 handle 的 Failed
+        // 能如实判断，删一条无关记录不该顺手把重选入口关掉（见上方 KDoc）。
+        val failedUnknown = state is WorkspaceState.Failed && currentHandle() == null
+        if (wasCurrent || failedUnknown || listings.isEmpty()) {
             cancelJob()
             closeWatcher()
             state = WorkspaceState.None
@@ -341,8 +344,11 @@ class WorkspaceController(
      * `ContentObserver`（用户在文件管理器里改了文件）。
      *
      * 语义：
-     * - 状态是 [WorkspaceState.None] / [WorkspaceState.Failed] 时什么都不做 ——
-     *   前者没有目录可扫，后者连 handle 都没留下（[WorkspaceState.Failed] 只带 message）。
+     * - 状态是 [WorkspaceState.None] / [WorkspaceState.Loading] 时什么都不做 ——
+     *   前者没有目录可扫，后者有一轮 [load] 正在跑、插一轮刷新会与它抢同一个 job。
+     *   **[WorkspaceState.Failed] 不在此列**（2026-11-08 修）：它现在带着 handle，
+     *   一次临时 IO 失败（SD 卡抖动、别的应用占着文件）之后用户改完文件回来、
+     *   或手动点刷新，都应当真的重扫一次，而不是永远停在「无法读取该文件夹」。
      * - **不进入 `Loading`**：界面继续渲染旧列表，只在 [isRefreshing] 为真时显示提示。
      * - 结果与当前列表**完全相等时不发新实例**：下游 `remember(collections)` 是全量
      *   重建工作流状态的 key，多发一次新实例就等于让用户的排序/命名被重置一次。

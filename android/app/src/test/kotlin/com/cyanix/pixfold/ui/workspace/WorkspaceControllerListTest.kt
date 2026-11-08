@@ -393,6 +393,36 @@ class WorkspaceControllerListTest {
     }
 
     @Test
+    fun `Failed 带授权时删别的条目 不把重选入口一起关掉`() = runTest {
+        // 2026-11-08：Failed 现在带 handle（否则刷新是静默 no-op），于是它不再是
+        // 「当前是哪条不可知」的状态 —— 与 Denied 同口径，只有删到**当前那条**才回 None。
+        // 旧写法 `state is WorkspaceState.Failed` 无条件复位，用户删一条无关记录就会
+        // 把工作区条（授权失效时唯一的重选入口）一起关掉。
+        val a = WorkspaceEntry(handle("a"))
+        val source = ListSource(
+            mutableListOf(a, WorkspaceEntry(handle("b"))),
+            result = LoadResult.Failed("磁盘满了"),
+        )
+        val controller = controller(source, testScope())
+        controller.open(a.handle.treeUri)
+        assertIs<WorkspaceState.Failed>(controller.state)
+
+        controller.remove("content://tree/b", alsoRelease = false)
+
+        assertEquals(
+            a.handle,
+            assertIs<WorkspaceState.Failed>(controller.state).handleOrNull(),
+            "删的是别的条目，当前那条读不到的事实没变，条必须还在",
+        )
+    }
+
+    // ⚠️ 「Failed 且 handle == null」那条分支（`failedUnknown`）**刻意不设断言**：
+    // `state` 的 setter 是 private，而 `toWorkspaceState` 现在总是把 handle 带上，
+    // 离线造不出 handle 为 null 的 Failed（只有「冷启动时压根没有目录」那条极端路径会有）。
+    // 留着只会是假保障。它要守的是「别停在一条已被删掉的目录上说假话」，
+    // 属只能真机/人工判定的类别。
+
+    @Test
     fun `移除后列表变空也回 None`() = runTest {
         // 「当前那条」不可信的场景：状态停在 Ready(a)，但存储里已经没有 a 了
         // （旧版本写坏 / 另一个进程删过）。此时删掉最后一条 b，当前目录已经不可能

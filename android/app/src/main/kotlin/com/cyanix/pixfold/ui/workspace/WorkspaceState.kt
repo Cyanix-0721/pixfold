@@ -55,8 +55,21 @@ sealed interface WorkspaceState {
         val autoRetried: Int = 0,
     ) : WorkspaceState
 
-    /** 其他失败（IO 错误等）。`message` 只用于日志/调试，界面文案另定。 */
-    data class Failed(val message: String) : WorkspaceState
+    /**
+     * 其他失败（IO 错误等）。`message` 只用于日志/调试，界面文案另定。
+     *
+     * @param handle 失败的那份授权。**必须带**（2026-11-08 修）：
+     *   [WorkspaceController.refresh] 靠它定位「重扫哪个目录」。以前只带 message，
+     *   于是首次加载失败之后刷新是**静默 no-op** —— 用户改完文件回到应用、或手动点刷新，
+     *   界面永远停在「无法读取该文件夹」，而那次失败往往只是 SD 卡抖了一下。
+     *   这种缺陷不崩不报错，只是让应用显得坏了。
+     *
+     *   `null` 只出现在冷启动根本没有目录的极端路径，以及测试里手搓的状态。
+     */
+    data class Failed(
+        val message: String,
+        val handle: WorkspaceHandle? = null,
+    ) : WorkspaceState
 }
 
 /**
@@ -68,7 +81,7 @@ sealed interface WorkspaceState {
 fun LoadResult.toWorkspaceState(handle: WorkspaceHandle): WorkspaceState = when (this) {
     is LoadResult.Success -> WorkspaceState.Ready(handle = handle, collections = collections)
     LoadResult.Denied -> WorkspaceState.Denied(handle)
-    is LoadResult.Failed -> WorkspaceState.Failed(message)
+    is LoadResult.Failed -> WorkspaceState.Failed(message, handle)
 }
 
 /**
@@ -130,17 +143,23 @@ val WorkspaceState.showsWorkspaceBar: Boolean
     }
 
 /**
- * 当前状态里能取到的授权（[Ready] / [Denied] 才有）。
+ * 当前状态里能取到的授权（[Ready] / [Denied] / [Failed] 才有）。
  *
  * **为什么需要它**：刷新（`WorkspaceController.refresh`）与「是否换了工作区」的
  * 判断都只需要知道「现在是哪个目录」，却各自手写一遍 `when` 分支的话，将来新增
  * 一个状态变体很容易漏改其中一处 —— 漏在刷新侧的表现是「某个状态下刷新静默失效」，
  * 没有任何报错。收成一个扩展函数，编译器会在新增变体时直接报穷尽性错误。
+ *
+ * ⚠️ [WorkspaceState.Failed] **必须算在内**（2026-11-08 修）：它一度被漏掉，
+ * 于是首次加载失败后 [WorkspaceController.refresh] 首行就返回 —— 用户改完文件
+ * 回来、或手动点刷新，界面永远停在「无法读取该文件夹」。那种失败往往只是一次
+ * 临时 IO（SD 卡抖动、别的应用占着文件），重扫一次就好。
  */
 fun WorkspaceState.handleOrNull(): WorkspaceHandle? = when (this) {
     is WorkspaceState.Ready -> handle
     is WorkspaceState.Denied -> handle
-    WorkspaceState.None, WorkspaceState.Loading, is WorkspaceState.Failed -> null
+    is WorkspaceState.Failed -> handle
+    WorkspaceState.None, WorkspaceState.Loading -> null
 }
 
 // ==================== 授权失效恢复（D2b 退出条件 ③） ====================
