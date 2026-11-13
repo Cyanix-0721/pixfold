@@ -128,7 +128,7 @@
 
 ### 4.5 全量迁移落地（2026-11-14，用户升级范围）
 
-**结论：全量迁移完成，代码与四道闸门已绿并已提交（不推送）；真机核对顺延到 2026-11-15（用户 2026-11-14 裁决先提交、明天确认后再 push）。**
+**结论：全量迁移完成，代码与四道闸门已绿并已提交（不推送，提交号 `d240f53`）；真机核对顺延到 2026-11-15（用户 2026-11-14 裁决先提交、明天确认后再 push）。**
 
 - **范围**：13 个 route 全部实现 `NavKey`；3 个 `NavHost` 全部换成 `NavDisplay`——根导航一个、工作流 A/B 各一个，各自持 `NavBackStack<NavKey>`（不再有 nested graph）。
 - **依赖**：`androidx.navigation3:navigation3-runtime:1.2.1` + `navigation3-ui:1.2.1` 进入生产依赖；旧 `navigation-compose:2.10.2` 已从依赖与 catalog 移除（全仓无 `androidx.navigation.*` 旧 API 引用）。
