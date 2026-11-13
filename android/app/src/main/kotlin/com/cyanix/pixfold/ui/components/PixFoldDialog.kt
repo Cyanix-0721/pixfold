@@ -93,7 +93,7 @@ val LocalDialogBlur = compositionLocalOf { DialogBlurController() }
 /**
  * 包住页面内容：有弹窗打开时模糊并压暗背景。
  *
- * 放在 NavHost 外层即可覆盖所有页面 —— 弹窗是独立窗口，本来就盖在最上面，
+ * 放在 NavDisplay 外层即可覆盖所有页面 —— 弹窗是独立窗口，本来就盖在最上面，
  * 这一层只管「下面那层长什么样」。
  *
  * @param blurRadius 模糊半径。12dp 在 361dp 宽的屏幕上刚好「看得出形状、读不出字」，
@@ -111,7 +111,7 @@ fun DialogBlurHost(
         //
         // 第一版写成 `if (!hasOpenDialog) { content() } else { Box { Box { content() } } }`，
         // 结果是「弹窗一打开就自己消失」：`hasOpenDialog` 变 true 时 `content()` 的
-        // 调用位置从 slot 1 跳到 slot 3，Compose 视为不同子树 ⇒ **整个 NavHost 被
+        // 调用位置从 slot 1 跳到 slot 3，Compose 视为不同子树 ⇒ **整个 NavDisplay 被
         // 销毁重建** ⇒ 弹窗的 `showDialog`/`open` 状态随 `remember` 一起丢失。
         // 两条既有测试（`AppLanguageTest` 的语言选择、`AppNavigationTest` 的预览重命名）
         // 正是这么红的。

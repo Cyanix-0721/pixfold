@@ -153,7 +153,7 @@ class BackNavigationTest {
      * Tab **反向**跳转后返回链仍须是线性的。
      *
      * 步骤序号以前是 `stepIndex: Int`,Tab 点击只是赋值,返回链天然线性。
-     * 迁移到嵌套 NavHost 后,Tab 跳转若不 `popBackStack` 而是 `navigate`,
+     * 迁移到工作流子 NavDisplay 后,Tab 跳转若不 `popTo` 而是直接 `add` 目标,
      * 返回栈会变成 `[步骤1, 步骤2, 步骤3, 步骤1]` —— 此时按返回会退到**步骤3**,
      * 而不是退到首页,层级返回就断了。
      *

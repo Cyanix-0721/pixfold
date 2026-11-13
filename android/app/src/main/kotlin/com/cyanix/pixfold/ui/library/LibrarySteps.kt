@@ -32,9 +32,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
-import androidx.navigation.compose.composable
-import androidx.navigation.compose.currentBackStackEntryAsState
-import androidx.navigation.compose.rememberNavController
+import androidx.navigation3.runtime.rememberNavBackStack
 import com.cyanix.pixfold.R
 import com.cyanix.pixfold.data.task.PackTaskBus
 import com.cyanix.pixfold.data.task.PackTaskRequest
@@ -71,6 +69,7 @@ import com.cyanix.pixfold.nav.LibraryShelfRoute
 import com.cyanix.pixfold.nav.LibraryMetadataRoute
 import com.cyanix.pixfold.nav.LibraryPackRoute
 import com.cyanix.pixfold.nav.goToLibraryStep
+import com.cyanix.pixfold.nav.popTo
 import com.cyanix.pixfold.nav.popWorkflowStep
 import com.cyanix.pixfold.nav.libraryStepIndex
 import com.cyanix.pixfold.ui.components.DirMetaButton
@@ -151,13 +150,15 @@ enum class LibraryStep(val labelRes: Int) {
  * 与 `OrganizeSteps` 同构:状态提在这一层,**三个步骤共享同一个
  * [LibraryState]**(含 `activeVolumeId`)—— 否则"在第 1 步选中的卷"在切到第 2 步时会丢失。
  *
- * ## 步骤切换 = 嵌套 NavHost(2026-09-22 迁移)
+ * ## 步骤切换 = 工作流子 NavDisplay(2026-09-22 NavHost → 2026-11-14 Nav3)
  *
  * 迁移前"当前步骤"是 `var stepIndex by remember { mutableIntStateOf(0) }`,返回靠
- * `stepIndex -= 1` 模拟。现在由嵌套 NavHost 托管步骤返回栈:步骤 3 → 2 → 1 → 首页
- * 逐级后退,且步骤级手势跟随的"目标页停在背后"由 NavHost 免费提供。
+ * `stepIndex -= 1` 模拟。现在由本组件自己的 `NavBackStack` + 子 `NavDisplay`
+ * 托管步骤返回栈:步骤 3 → 2 → 1 → 首页逐级后退,且步骤级手势跟随的"目标页停在
+ * 背后"由 [PixFoldNavHost] 统一提供。
  *
- * 内层栈深为 1 时嵌套 NavHost 的返回处理器会**自动让位**给外层,故"步骤 1 再返回 →
+ * 步骤栈深为 1 时 `popWorkflowStep` 返回 false、不消费事件,系统返回交回根
+ * `NavDisplay` 处理(根栈此时是 LibraryRoute,再返回即首页),故"步骤 1 再返回 →
  * 回首页"无需本组件写代码,`onBack` 参数因此被删除。
  *
  * @param volumes 库内容;默认由上层注入(便于测试换数据)。
@@ -170,7 +171,7 @@ fun LibrarySteps(
     contentInsets: WindowInsets = WindowInsets.safeDrawing,
     /**
      * 步骤级返回是否使用**预测性返回动画**(来自 `settings.predictiveBackAnimation`)。
-     * 默认 true(与设置默认值一致);false 时嵌套 NavHost 的手势转场被关掉,
+     * 默认 true(与设置默认值一致);false 时工作流子 NavDisplay 的手势转场被关掉,
      * 但普通返回动画保留(即"关掉手势跟随,但不硬切")。
      */
     predictiveBackAnimation: Boolean = true,
@@ -263,8 +264,8 @@ fun LibrarySteps(
      */
     metaUpdater: CbzMetaUpdater? = null,
 ) {
-    // 跨步骤共享的唯一状态源。这些状态**必须留在嵌套 NavHost 之外** ——
-    // 它们要跨步骤存活,而 NavHost 里每个 destination 都是独立作用域。
+    // 跨步骤共享的唯一状态源。这些状态**必须留在工作流子 NavDisplay 之外** ——
+    // 它们要跨步骤存活,而 NavDisplay 里每个 destination 都是独立作用域。
     //
     // ⚠️ key 用 `volumes`（2026-10-19，与工作流 A 的热切换白屏同源）：
     // 工作流 B 的数据源接上真实工作区后，重扫/换工作区都会传下**新的** `volumes`。
@@ -422,10 +423,9 @@ fun LibrarySteps(
     }
 
 
-    val navController = rememberNavController()
-    // 当前步骤**从导航栈派生**(理由同 OrganizeSteps):手势进行中 entry 不变,序号稳定。
-    val navBackStackEntry by navController.currentBackStackEntryAsState()
-    val currentIndex = navBackStackEntry?.destination.libraryStepIndex()
+    val backStack = rememberNavBackStack(LibraryShelfRoute)
+    // 当前步骤**从导航栈派生**(理由同 OrganizeSteps):手势进行中栈不变,序号稳定。
+    val currentIndex = backStack.lastOrNull().libraryStepIndex()
 
     // 点通知进来 ⇒ 直接落到步骤 3。
     //
@@ -439,7 +439,7 @@ fun LibrarySteps(
         // 复用 `goToLibraryStep`：它保证返回栈是**线性链**（往回 pop、往前 push），
         // 直接 `navigate(LibraryPackRoute)` 会让返回栈变成 [Shelf, Pack] ——
         // 少掉元数据这一步，按返回会从打包页直接回书架。
-        navController.goToLibraryStep(current = currentIndex ?: 0, target = LibraryStep.Pack.ordinal)
+        backStack.goToLibraryStep(current = currentIndex, target = LibraryStep.Pack.ordinal)
         // 跳完立刻回清上层标志：这个参数在 Activity 重建后仍是 true，若留着，
         // 用户从步骤 3 按返回回书架后会立刻被弹回来（真机第二轮实测）。
         onStartAtPackStepHandled()
@@ -634,7 +634,7 @@ fun LibrarySteps(
         updateCancelToken?.cancel()
         updateCancelToken = null
         // 回到步骤 1(退回一律用 pop,保持返回链线性)
-        navController.goToLibraryStep(currentIndex, 0)
+        backStack.goToLibraryStep(currentIndex, 0)
     }
 
     Column(
@@ -667,7 +667,7 @@ fun LibrarySteps(
                     Tab(
                         selected = currentIndex == i,
                         // 跳步走 goToLibraryStep,保证返回链始终线性(详见该函数注释)
-                        onClick = { navController.goToLibraryStep(currentIndex, i) },
+                        onClick = { backStack.goToLibraryStep(currentIndex, i) },
                         text = { Text(stepLabel) },
                         modifier = Modifier
                             .testTag(
@@ -698,12 +698,11 @@ fun LibrarySteps(
         // 左 = 退回、右 = 推进)。原先常驻在 TabRow 与内容之间的那个返回按钮已删除 ——
         // 它把内容夹在中间,且与底栏的推进按钮分处两端,不符合统一的底栏布局。
         PixFoldNavHost(
-            navController = navController,
-            startDestination = LibraryShelfRoute,
+            backStack = backStack,
             predictiveBackAnimation = predictiveBackAnimation,
             // 步骤级 = 只淡出:上级页原样露出(用户规格)
             style = NavTransitionStyle.Step,
-            // weight 挂在嵌套 NavHost 自身(ColumnScope 扩展),理由同 OrganizeSteps
+            // weight 挂在工作流子 NavDisplay 自身(ColumnScope 扩展),理由同 OrganizeSteps
             modifier = Modifier.weight(1f),
         ) {
             composable<LibraryShelfRoute> {
@@ -713,7 +712,7 @@ fun LibrarySteps(
                             state = state,
                             onStateChange = { state = it },
                             contentInsets = innerInsets,
-                            onNext = { navController.navigate(LibraryMetadataRoute) },
+                            onNext = { backStack.add(LibraryMetadataRoute) },
                             // 工作区条只在注入状态时出现(D2b);默认 null ⇒ 既有测试布局不变
                             workspaceState = workspaceState,
                             onPickWorkspace = onPickWorkspace,
@@ -736,8 +735,8 @@ fun LibrarySteps(
                             libraryState = state,
                             onLibraryChange = { state = it },
                             contentInsets = innerInsets,
-                            onNext = { navController.navigate(LibraryPackRoute) },
-                            onBack = { navController.popWorkflowStep() },
+                            onNext = { backStack.add(LibraryPackRoute) },
+                            onBack = { backStack.popWorkflowStep() },
                             // 工作流 C 入口二（底栏第三槽）。
                             onUpdateMeta = metaUpdater?.let { _ -> { vol: ComicVolume -> requestUpdate(vol) } },
                             modifier = Modifier.weight(1f),
@@ -763,7 +762,7 @@ fun LibrarySteps(
                                     // 同 OrganizeSteps:用 pop 让 [Metadata, Pack] 整体出栈
                                     report = null
                                     undoMessage = null
-                                    navController.popBackStack(LibraryShelfRoute, inclusive = false)
+                                    backStack.popTo(LibraryShelfRoute)
                                 },
                                 modifier = Modifier.weight(1f),
                             )
@@ -896,7 +895,7 @@ fun LibrarySteps(
                                 cancelling = effectiveCancelling,
                                 executionError = executionError,
                                 pagePreflight = pagePreflight,
-                                onBack = { navController.popWorkflowStep() },
+                                onBack = { backStack.popWorkflowStep() },
                                 modifier = Modifier.weight(1f),
                             )
                         }
@@ -907,7 +906,7 @@ fun LibrarySteps(
 
         // ---- 工作流 C 的三个弹窗（2026-10-26 规格 §8.3–§8.5）----
         //
-        // 挂在 Column 内的最外层（NavHost 之外）：更新动作与「当前停在哪一页」无关 ——
+        // 挂在 Column 内的最外层（NavDisplay 之外）：更新动作与「当前停在哪一页」无关 ——
         // 用户在步骤 2 点「更新元数据」时，页签/返回栈都可能变化，弹窗跟着页面走会
         // 出现「页面变了弹窗还浮着」或反过来的错位。
         //

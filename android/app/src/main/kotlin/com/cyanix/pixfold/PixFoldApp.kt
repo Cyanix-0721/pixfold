@@ -24,9 +24,7 @@ import androidx.compose.ui.platform.LocalResources
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
-import androidx.navigation.compose.composable
-import androidx.navigation.compose.rememberNavController
-import androidx.navigation.toRoute
+import androidx.navigation3.runtime.rememberNavBackStack
 import com.cyanix.pixfold.domain.mock.MockData
 import com.cyanix.pixfold.domain.mock.MockDataB
 import com.cyanix.pixfold.domain.comic.applyExistingComicInfo
@@ -71,6 +69,7 @@ import com.cyanix.pixfold.nav.HomeRoute
 import com.cyanix.pixfold.nav.LicensesRoute
 import com.cyanix.pixfold.nav.NavTransitionStyle
 import com.cyanix.pixfold.nav.PixFoldNavHost
+import com.cyanix.pixfold.nav.popOne
 import com.cyanix.pixfold.nav.PreviewRoute
 import com.cyanix.pixfold.nav.SettingsRoute
 import com.cyanix.pixfold.nav.OrganizeRoute
@@ -94,10 +93,10 @@ import java.util.concurrent.atomic.AtomicBoolean
 /**
  * 应用根:主题、设置、演示数据与**根导航图**。
  *
- * 路由由 `navigation-compose` 的 type-safe route 接管(2026-09-22 迁移)。
+ * 路由由 **Navigation 3** 的 type-safe `NavKey` + `NavBackStack` 接管(2026-11-14 全量迁移;
+ * 更早的 `navigation-compose` 时期见 `docs/notes/d1-navigation-compose-migration.md`)。
  * 迁移前是 `sealed interface Screen` + `mutableStateOf` 的手写路由 —— 它没有返回栈、
- * 没有转场引擎,因此"目标页显示在背后"这类预测性返回效果无从实现;
- * 官方适配要求也用 Navigation 组件托管返回栈(见 `docs/notes/d1-navigation-compose-migration.md`)。
+ * 没有转场引擎,因此"目标页显示在背后"这类预测性返回效果无从实现。
  *
  * @param store 设置存储。默认用 [SharedPrefsSettingsStore];测试可注入内存实现,
  *   从而无需 Android 持久化环境即可断言"设置真的驱动了主题"。
@@ -149,9 +148,7 @@ fun PixFoldApp(
     val settingsStore = store ?: remember { SharedPrefsSettingsStore(context) }
     // 设置在**应用根**持有:主题、语言、各页面都要读它,提上层是唯一合理位置。
     var settings by remember { mutableStateOf(settingsStore.load()) }
-    // 包 remember:避免每次重组都产生新 lambda 身份。即便不包也无害 ——
-    // `NavGraph.equals` 是**结构相等**(见 docs/notes/d1-navigation-compose-migration.md F4),
-    // 图实例变化不会清空返回栈。
+    // 包 remember:避免每次重组都产生新 lambda 身份,设置写入是稳定的引用。
     val updateSettings: (PixFoldSettings) -> Unit = remember(settingsStore) {
         { next ->
             settings = next
@@ -170,7 +167,13 @@ fun PixFoldApp(
     //   WorkspaceController —— 协程编排 + UI 状态机（扫描在 Dispatchers.IO）
     //   本函数              —— 把结果接到工作流 A 的数据源上
     // 注入优先：测试用假源绕过真实 SAF（见参数 KDoc）。
-    val source: WorkspaceSource = workspaceSource ?: remember { AndroidSafSource(context) }
+    // 注入的源也要记住**首个实例**（无 key）：测试的 setContent lambda 每次重组都会新建一个
+    // ReadyWorkspaceSource，若直接使用未 remember 的实例，WorkspaceController 的
+    // remember(source, …) 会把每次重组都当成「换了数据源」重建控制器，冷启动
+    // restore() 的结果随即被丢掉。生产路径首次为 null 时同样记住平台实现。
+    val source: WorkspaceSource = remember {
+        workspaceSource ?: AndroidSafSource(context)
+    }
     // 平台实现只管读；缓存与并发闸门在装饰器里（详见 CachingThumbnailSource 的 KDoc）。
     // 解码交给 Coil 3（阶段二）：Coil 自己的内存/磁盘缓存都关掉，避免与外层
     // CachingThumbnailSource 的 LRU 重复占内存，也避免把 SAF 盘上字节复制进 cacheDir。
@@ -200,7 +203,7 @@ fun PixFoldApp(
     }
     // 工作区列表弹窗的开关（2026-10-25 规格 §7.1/§7.3）。
     //
-    // **弹窗本体必须挂在 NavHost 之外**（见下方 `DialogBlurHost` 内的那一处）：
+    // **弹窗本体必须挂在 NavDisplay 之外**（见下方 `DialogBlurHost` 内的那一处）：
     // 这个 `showWorkspaceList` 只在换页时不动就能成立 —— 反过来若把弹窗写进某个
     // 页面，用户点「添加文件夹」拉起系统选择器再回来，页面重建会把弹窗连开关一起丢掉，
     // 表现为「加完目录，列表自己关了」。
@@ -347,7 +350,7 @@ fun PixFoldApp(
             // 测试环境不提供它（默认 null）⇒ 一律走 D1 的程序化缩略图，
             // 既有 491 个测试的断言一行都不用改。
             CompositionLocalProvider(LocalThumbnailSource provides thumbnailSource) {
-            val navController = rememberNavController()
+            val backStack = rememberNavBackStack(HomeRoute)
 
             // 点通知启动 ⇒ 直接进「打包漫画」。
             //
@@ -366,7 +369,7 @@ fun PixFoldApp(
             LaunchedEffect(openPackOnStart) {
                 if (!openPackOnStart) return@LaunchedEffect
                 startAtPack = true
-                navController.navigate(LibraryRoute) { launchSingleTop = true }
+                if (backStack.lastOrNull() != LibraryRoute) backStack.add(LibraryRoute)
                 onPackRouteHandled()
             }
 
@@ -553,19 +556,18 @@ fun PixFoldApp(
                 namingState = reconcileNamingState(namingState, collections)
             }
 
-            // 返回手势/返回键:由 NavHost 自带的 handler 统一处理(它会随返回栈深度
+            // 返回手势/返回键:由 NavDisplay 的 onBack 统一处理(它会随返回栈深度
             // 自动 enable/disable)。返回首页 = pop 掉 Organize/B;首页(栈深 1)时
-            // NavHost 不再注册 handler,交回系统退出应用 —— 与迁移前 `rootBack = null` 同义。
+            // NavDisplay 不再处理返回,交回系统退出应用 —— 与迁移前 `rootBack = null` 同义。
             //
             // 注意:返回栈是**唯一**事实来源,不再有 `screen` 这样的第二份状态。
             // 全站弹窗背景模糊：弹窗是独立 window，拿不到宿主内容，
             // 只能由宿主在「有弹窗打开时」给页面加 `Modifier.blur`。
-            // 放在 NavHost 外层 ⇒ 一处覆盖所有页面。
+            // 放在 NavDisplay 外层 ⇒ 一处覆盖所有页面。
             val dialogBlur = remember { DialogBlurController() }
             DialogBlurHost(controller = dialogBlur) {
             PixFoldNavHost(
-                navController = navController,
-                startDestination = HomeRoute,
+                backStack = backStack,
                 predictiveBackAnimation = settings.predictiveBackAnimation,
                 // 根级 = 大页面切换:虚化 + 缩小
                 style = NavTransitionStyle.Page,
@@ -592,9 +594,9 @@ fun PixFoldApp(
                     }
                     DestinationSurface {
                         HomeScreen(
-                            onOpenOrganize = { navController.navigate(OrganizeRoute) },
-                            onOpenLibrary = { navController.navigate(LibraryRoute) },
-                            onOpenSettings = { navController.navigate(SettingsRoute) },
+                            onOpenOrganize = { backStack.add(OrganizeRoute) },
+                            onOpenLibrary = { backStack.add(LibraryRoute) },
+                            onOpenSettings = { backStack.add(SettingsRoute) },
                             // 工作区条 + 入口准入（2026-10-24 用户裁决 乙/甲/乙）。
                             //
                             // **选完停首页，不自动跳**（裁决 2 = 甲）：两条工作流是平级任务，
@@ -612,15 +614,15 @@ fun PixFoldApp(
                         SettingsScreen(
                             settings = settings,
                             onChange = updateSettings,
-                            onBack = { navController.popBackStack() },
-                            onOpenLicenses = { navController.navigate(LicensesRoute) },
+                            onBack = { backStack.popOne() },
+                            onOpenLicenses = { backStack.add(LicensesRoute) },
                         )
                     }
                 }
 
                 composable<LicensesRoute> {
                     DestinationSurface {
-                        LicensesScreen(onBack = { navController.popBackStack() })
+                        LicensesScreen(onBack = { backStack.popOne() })
                     }
                 }
 
@@ -647,9 +649,9 @@ fun PixFoldApp(
                     DestinationSurface {
                         OrganizeSteps(
                             collections = collections,
-                            // 步骤级返回同样跟随手势进度:开关透传进嵌套 NavHost 的转场策略。
+                            // 步骤级返回同样跟随手势进度:开关透传进工作流子 NavDisplay 的转场策略。
                             predictiveBackAnimation = settings.predictiveBackAnimation,
-                            onOpenPreview = { index -> navController.navigate(PreviewRoute(index)) },
+                            onOpenPreview = { index -> backStack.add(PreviewRoute(index)) },
                             onActiveCollectionChange = { activeCollectionId = it },
                             // ⚠️ 必须回传当前集合:打开预览会让本目的地离开组合,
                             // 内部的 `remember { activeId }` 随之销毁;关闭预览回来是
@@ -700,10 +702,10 @@ fun PixFoldApp(
                     }
                 }
 
-                composable<PreviewRoute> { entry ->
+                composable<PreviewRoute> { route ->
                     // 预览是最内层:返回即关闭预览,回到工作流 A。
                     // (ImagePreview 内部也有自己的关闭按钮;二者语义一致。)
-                    val route = entry.toRoute<PreviewRoute>()
+                    // Navigation3 的目的地 lambda 直接收到 route key,无需 toRoute。
                     // 空列表时（用户选了空目录）没有可预览的图 —— 直接不渲染内容。
                     // 注意这里**不能**用 `?: collections.first()`：空目录是合法状态，
                     // 抛 NoSuchElementException 会让预览页崩掉。
@@ -734,7 +736,7 @@ fun PixFoldApp(
                         ImagePreview(
                             items = pageOrder,
                             initialIndex = route.index,
-                            onClose = { navController.popBackStack() },
+                            onClose = { backStack.popOne() },
                             // 重命名写回**命名页同一个** `namingState.overrides`
                             // (键 = SourceItem.id,值 = 完整文件名,空值即撤销覆盖),
                             // 故两处改名互相同步 —— 不是两份状态。
@@ -807,7 +809,7 @@ fun PixFoldApp(
             }
             // ---- 工作区列表弹窗（2026-10-25 规格 §7.2/§7.3）----
             //
-            // **为什么挂在这里（DialogBlurHost 内、NavHost 之后）**：
+            // **为什么挂在这里（DialogBlurHost 内、NavDisplay 之后）**：
             //  1. 与页面切换解耦 —— 写进某个页面的话，换页/重建会把弹窗连开关一起丢掉，
             //     用户点「添加文件夹」拉起系统选择器回来就看不到列表了；
             //  2. 仍在 `CompositionLocalProvider(LocalThumbnailSource)` 内，与页面同处一层

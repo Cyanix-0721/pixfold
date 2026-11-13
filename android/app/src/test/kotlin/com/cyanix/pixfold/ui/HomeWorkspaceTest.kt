@@ -254,7 +254,7 @@ class HomeWorkspaceTest {
      * 判据来自规格 §7.1/§7.3:`WorkspaceBar` 整条可点,Ready 态走 `onOpenList`、
      * 其余态走 `onPick`。这里走的是**整条真实装配**(`PixFoldApp` + `ReadyWorkspaceSource`),
      * 所以它同时覆盖两件事:三处调用点接上了 `onOpenWorkspaceList`,以及弹窗挂在
-     * NavHost 之外的顶层 —— 只要弹窗被写进某个页面里,这条就是第一个红的。
+     * NavDisplay 之外的顶层 —— 只要弹窗被写进某个页面里,这条就是第一个红的。
      *
      * ## 为什么断 `assertExists` 而不是 `assertIsDisplayed`(2026-10-25 评审 M-3 订正)
      *

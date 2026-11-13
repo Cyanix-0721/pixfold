@@ -13,7 +13,8 @@ robolectric = "4.17"
 aboutLibraries = "15.2.0"
 materialKolor = "5.0.1"
 androidxTestExtJunit = "1.3.0"
-navigationCompose = "2.10.2"
+# Navigation 3(2026-11-14 全量迁移):1.2.1 稳定版,运行时 + Compose UI 两件套。
+navigation3 = "1.2.1"
 kotlinxSerializationCore = "1.11.0"
 # 与 core 同版本:两者必须同步升级,否则 Json 实现与 core 内部 API 会错配。
 kotlinxSerializationJson = "1.11.0"
@@ -46,7 +47,8 @@ androidx-test-ext-junit = { group = "androidx.test.ext", name = "junit", version
 aboutlibraries-core = { group = "com.mikepenz", name = "aboutlibraries-core", version.ref = "aboutLibraries" }
 aboutlibraries-compose-m3 = { group = "com.mikepenz", name = "aboutlibraries-compose-m3", version.ref = "aboutLibraries" }
 material-color-utilities = { group = "com.materialkolor", name = "material-color-utilities", version.ref = "materialKolor" }
-navigation-compose = { group = "androidx.navigation", name = "navigation-compose", version.ref = "navigationCompose" }
+navigation3-runtime = { group = "androidx.navigation3", name = "navigation3-runtime", version.ref = "navigation3" }
+navigation3-ui = { group = "androidx.navigation3", name = "navigation3-ui", version.ref = "navigation3" }
 kotlinx-serialization-core = { group = "org.jetbrains.kotlinx", name = "kotlinx-serialization-core", version.ref = "kotlinxSerializationCore" }
 kotlinx-serialization-json = { group = "org.jetbrains.kotlinx", name = "kotlinx-serialization-json", version.ref = "kotlinxSerializationJson" }
 kotlinx-coroutines-android = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-android", version.ref = "kotlinxCoroutines" }

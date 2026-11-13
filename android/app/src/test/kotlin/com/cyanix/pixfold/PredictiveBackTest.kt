@@ -37,10 +37,11 @@ import kotlin.test.assertTrue
  *
  * ## 迁移后为什么这些断言仍然成立(且更该留下)
  *
- * 2026-09-22 把两级导航都换成了 `androidx.navigation` 的 NavHost。**这类回归最容易
- * 悄悄发生**:嵌套 NavHost 的返回处理器在栈深为 1 时会自动禁用、预测性转场只能在
- * `NavHost` 级配置(目的地没有该参数)、开关必须一路传到嵌套图的转场策略 —— 任何
- * 一处漏掉,层级的"后退一步"或"手势跟手"就会消失,而普通的功能测试**全都还是绿的**。
+ * 2026-09-22 换成 navigation-compose 的 NavHost,2026-11-14 再全量换成 Navigation 3 的
+ * `NavDisplay`。**这类回归最容易悄悄发生**:工作流子 `NavDisplay` 的 `onBack` 在栈深为 1
+ * 时必须不消费事件、预测性转场只在宿主级配置(目的地没有该参数)、开关必须一路传到
+ * 每个子 `NavDisplay` 的转场策略 —— 任何一处漏掉,层级的"后退一步"或"手势跟手"就会
+ * 消失,而普通的功能测试**全都还是绿的**。
  *
  * ## 本测试能断言什么、不能断言什么(诚实边界)
  *
@@ -53,7 +54,7 @@ import kotlin.test.assertTrue
  * `boundsInRoot`(缩放)与 `captureToImage` 像素(淡出)。
  *
  * 事件驱动方式:`OnBackPressedDispatcher.dispatchOnBackStarted/Progressed/Cancelled`
- * 与 `onBackPressed()` 均为 androidx.activity 1.13.0 的公开 API;NavHost 的预测性返回
+ * 与 `onBackPressed()` 均为 androidx.activity 1.13.0 的公开 API;NavDisplay 的预测性返回
  * 正是挂在同一条 dispatcher 链路上,故这与系统手势走的是**同一条链路**。
  */
 @RunWith(RobolectricTestRunner::class)
@@ -120,7 +121,7 @@ class PredictiveBackTest {
 
     @Test
     fun `with the animation switch off, back still walks workflow A down one step`() {
-        // 开关关掉后嵌套 NavHost 不再跟随手势,但**层级语义必须一模一样** ——
+        // 开关关掉后工作流子 NavDisplay 不再跟随手势,但**层级语义必须一模一样** ——
         // 关的是动画,不是返回本身(用户裁决的 (b) 案)。
         rule.setContent {
             PixFoldApp(

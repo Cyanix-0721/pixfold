@@ -153,7 +153,7 @@ class ResetAllTest {
      * ## 为什么必须走真的 `PixFoldApp`(而不是裸组合 `OrganizeSteps`)
      *
      * 这条规则是**导航层**的:工作流 A 的共享状态提升在 `PixFoldApp` 里,「回主页」
-     * 是根 NavHost 的一次 pop。裸组合 `OrganizeSteps` 时那条 pop 根本不存在,
+     * 是根 NavDisplay 的一次 pop。裸组合 `OrganizeSteps` 时那条 pop 根本不存在,
      * 断言会假绿。
      *
      * ## 与上一条用例互补

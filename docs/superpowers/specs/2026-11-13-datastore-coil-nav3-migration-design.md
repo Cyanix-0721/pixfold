@@ -91,6 +91,52 @@
 - `android/app/src/main/kotlin/com/cyanix/pixfold/nav/PixFoldNav.kt`、`PixFoldApp.kt:339/555`
 - 相关导航测试
 
+### 4.4 spike 实测结果(2026-11-13,1.2.1 真机)
+
+**结论:通过。** 根导航 6 目的地可迁、两档预测性返回可复刻、`predictiveBackAnimation` 开关有效。
+
+#### API 差异表(均以 javap 核实真实签名)
+
+| 关注点 | navigation-compose 2.10.2(现版) | Navigation3 1.2.1 |
+| --- | --- | --- |
+| 路由标识 | `@Serializable` type-safe route + `NavHost`/`composable<T>` | `@Serializable` 类型实现 `NavKey` + `entryProvider { entry<T> { } }` |
+| 返回栈 | `NavController` 隐式栈;`navigate`/`popBackStack`/`hasRoute` | 显式 `NavBackStack<NavKey>`(可变的 List);`add`/`removeAt`/`rememberNavBackStack` 可保存 |
+| 嵌套图 | `NavGraphBuilder.nestedGraph` | **无 nested graph**;单一扁平栈,多栈需多个 `NavDisplay` 或自行分段 |
+| 前进转场 | `NavHost(enterTransition/exitTransition)`,lambda 收 `AnimatedContentTransitionScope<NavBackStackEntry>` | `NavDisplay(transitionSpec: (AnimatedContentTransitionScope<Scene<T>>) -> ContentTransform)` |
+| 返回转场 | `popExitTransition`/`popEnterTransition` | `popTransitionSpec`,同上 `ContentTransform(None, exit)` |
+| 预测性返回 | `predictivePop*Transition`;NavHost 内建按手指 progress 驱动 | `predictivePopTransitionSpec: AnimatedContentTransitionScope<Scene<T>>.(Int) -> ContentTransform`;实测同样跟手,Int 为手势进度 |
+| 默认时长 | 700ms 淡入淡出(现版已覆盖成 None) | `DEFAULT_TRANSITION_DURATION_MILLISECOND` + `defaultTransitionSpec()`(同样可覆盖) |
+| ViewModel 装饰器 | 无此概念,ViewModel 走 lifecycle-viewmodel-compose | `rememberViewModelStoreNavEntryDecorator` 在 `lifecycle-viewmodel-navigation3`,**仅 2.12.0-alpha05,无稳定版**;本项目未用 ViewModel,不受影响 |
+| 返回事件 | `NavHost` + `BackHandler` | `NavDisplay(onBack = …)` |
+| 返回相关测试 | 可拿到 `NavController` 做断言 | 直接操作 List,导航 API 断言需改写;现有 15 条多为 UI 行为测试,语义可复用 |
+
+#### 复刻方案(已真机逐帧验证)
+
+- 前进:`transitionSpec = { ContentTransform(EnterTransition.None, ExitTransition.None) }` —— 与现版「进入瞬切」一致。
+- 返回:`popTransitionSpec = { ContentTransform(EnterTransition.None, style.exit() ) }`;Page 档 `scaleOut(0.90f) + fadeOut()`、Step 档 `fadeOut()`。
+- 手势:`predictivePopTransitionSpec = { _ -> ContentTransform(EnterTransition.None, if (predictiveBackAnimation) exit else ExitTransition.None) }` —— 关开关时拖动期间页面纹丝不动,松手仍 pop。
+- 每个目的地仍套 `DestinationSurface`(M3 background 底板),否则缩小的上层页会与下层文字重叠。
+
+#### 全量迁移工作量与风险
+
+1. 13 个 route 改 `NavKey`(机械)。
+2. 3 个 `NavHost`(根 + 工作流 A/B)→ 建议 1 根 `NavDisplay` + 每个工作流一个子 `NavDisplay`(各自 back stack);这是**主要设计点**,需用户确认工作流内转场/返回语义如何映射。
+3. `nav/StepNavigation.kt`(104 行,步骤序号由返回栈派生、双击 pop 防护、Tab 线性跳转)整段重写。
+4. 15 条返回测试重跑;两条直接断言 nav 行为的测试(`StepBackGuardTest`、`BackNavigationTest`)需按新 API 改写。
+5. 设置项 `predictiveBackAnimation` 直接接到 `predictivePopTransitionSpec`,已验证有效。
+6. 风险:Nav3 1.2.1 较新、生态组件(ViewModel 装饰器)仍 alpha;若将来需要 per-destination ViewModel,要接受 alpha 或自行实现。
+
+### 4.5 全量迁移落地（2026-11-14，用户升级范围）
+
+**结论：全量迁移完成，代码与四道闸门已绿并已提交（不推送）；真机核对顺延到 2026-11-15（用户 2026-11-14 裁决先提交、明天确认后再 push）。**
+
+- **范围**：13 个 route 全部实现 `NavKey`；3 个 `NavHost` 全部换成 `NavDisplay`——根导航一个、工作流 A/B 各一个，各自持 `NavBackStack<NavKey>`（不再有 nested graph）。
+- **依赖**：`androidx.navigation3:navigation3-runtime:1.2.1` + `navigation3-ui:1.2.1` 进入生产依赖；旧 `navigation-compose:2.10.2` 已从依赖与 catalog 移除（全仓无 `androidx.navigation.*` 旧 API 引用）。
+- **`nav/PixFoldNav.kt`**：`PixFoldNavHost(backStack: NavBackStack<NavKey>, predictiveBackAnimation, style, modifier, builder)`；`NavDisplay(onBack={ backStack.popOne() }, entryDecorators=listOf(rememberSaveableStateHolderNavEntryDecorator()), transitionSpec=ContentTransform(None,None), popTransitionSpec=ContentTransform(None, style.exitTransition()), predictivePopTransitionSpec={ _ -> ContentTransform(None, if (predictiveBackAnimation) style.exitTransition() else None) })`；保留 `PREDICTIVE_MIN_SCALE=0.90f` 与 `DestinationSurface`。
+- **`nav/StepNavigation.kt`**：从 `NavController` 扩展改成 `NavBackStack<NavKey>` 扩展；`organizeStepIndex` / `libraryStepIndex` 用 `when (key)`；`popWorkflowStep` = `if (size <= 1) false else removeAt(lastIndex)`；`popOne` = `if (size > 1) removeAt`；`popTo(key)` 弹到指定 key；`goToOrganizeStep` / `goToLibraryStep` 往回 `popTo`、往前逐级 `add`。
+- **实测缺陷与修复**：`NavDisplay` 只以 `backStack` 的 equals 作 NavEntry 缓存键，`entryProvider` 不参与 key ⇒ entryProvider 只在栈变化时调用；原先在首次组合时捕获 `workspaceState=None`，工作区变 Ready 后 Home 内容不重组，首页入口一直 `[Disabled]`，31 条测试红。修法：`rememberUpdatedState(builder)`，content 每次重组时重新 apply builder。清理临时插桩与调试测试后，`:app:testDebugUnitTest` 896 / 0、`:domain:test` 986 / 0，四道闸门 `--rerun-tasks` 62 executed、BUILD SUCCESSFUL、lint 零告警。
+- **保留物**：`android/app/src/debug/` 的 Nav3 spike Activity 作参考，release 不含。
+
 ## 5. 验收与顺序
 - 阶段一(DataStore)→ 阶段二(Coil)→ 阶段三(Nav3 spike)。
 - 每阶段独立分支,独立四道闸门 + 真机 + `docs/INDEX.md` 登记。
@@ -107,7 +153,7 @@
 1. DataStore:**取消**(2026-11-13 用户重新判断):设置与工作区列表保留 `SharedPreferences` 更合适,详见 §2 顶部裁决。
 2. 首帧:候选方案见 §7.1,待定。
 3. Coil:**换**(接受 `okio` 传递依赖;真机若不达标再评估,不硬换)。
-4. Nav3:先 spike,不全量。
+4. Nav3:**先 spike,不全量**(2026-11-14 用户升级为**全量迁移**,见 §4.5)。
 5. 迁移兼容:DataStore 迁移**保留**旧 SharedPreferences 一个版本周期,便于回滚。
 
 ### 7.1 首帧候选(对应 §2.2 DataStore Flow)

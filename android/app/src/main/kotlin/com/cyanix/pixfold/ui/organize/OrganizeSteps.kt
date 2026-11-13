@@ -29,9 +29,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
-import androidx.navigation.compose.composable
-import androidx.navigation.compose.currentBackStackEntryAsState
-import androidx.navigation.compose.rememberNavController
+import androidx.navigation3.runtime.rememberNavBackStack
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -69,6 +67,7 @@ import com.cyanix.pixfold.nav.OrganizeNamingRoute
 import com.cyanix.pixfold.nav.OrganizePlanRoute
 import com.cyanix.pixfold.nav.OrganizeSortRoute
 import com.cyanix.pixfold.nav.goToOrganizeStep
+import com.cyanix.pixfold.nav.popTo
 import com.cyanix.pixfold.nav.popWorkflowStep
 import com.cyanix.pixfold.nav.organizeStepIndex
 import com.cyanix.pixfold.ui.components.ResetAllButton
@@ -119,21 +118,22 @@ enum class OrganizeStep(val labelRes: Int) {
  *
  * 用 M3 `TabRow` 而非自绘步骤条:直接获得 M3 的选中/未选中语义色、指示器与无障碍支持。
  *
- * ## 步骤切换 = 嵌套 NavHost(2026-09-22 迁移)
+ * ## 步骤切换 = 工作流子 NavDisplay(2026-09-22 NavHost → 2026-11-14 Nav3)
  *
  * 迁移前这里的"当前步骤"是 `var stepIndex by remember { mutableIntStateOf(0) }`,
- * 返回栈靠 `stepIndex -= 1` 模拟。现在改用**嵌套 NavHost**托管步骤返回栈:
- * 步骤级返回由 NavHost 自己处理,预测性返回的"目标页停在背后"也就免费拿到了。
+ * 返回栈靠 `stepIndex -= 1` 模拟。现在由本组件自己的 `NavBackStack` + 子
+ * `NavDisplay` 托管步骤返回栈:步骤级返回由 `onBack` 处理,预测性返回的
+ * "目标页停在背后"由 [PixFoldNavHost] 统一提供。
  *
  * **为什么步骤序号仍然存在**:`TabRow` 需要一个选中下标,而它是从**导航栈派生**的
  * (见 [organizeStepIndex]),不再是独立状态 —— 于是不存在"两份状态不同步"的问题。
  *
- * **TabRow 为什么留在 NavHost 外面**:它要常驻(不随步骤内容转场),而且这样
+ * **TabRow 为什么留在 NavDisplay 外面**:它要常驻(不随步骤内容转场),而且这样
  * `TAG_STEP_*` 这些 testTag 在任意时刻都只有一份被组合,转场期间不会出现重复 tag。
  *
- * 嵌套图的返回由**内层** NavHost 处理;内层栈深为 1 时它自动让位给外层
- * (navigation 的 `enabled = currentBackStack.size > 1`),故"步骤 1 再返回 → 回首页"
- * 无需本组件写任何代码,也不再需要 `onBack` 参数。
+ * 步骤栈深为 1 时 `popWorkflowStep` 返回 false、不消费事件,系统返回交回根
+ * `NavDisplay` 处理(根栈此时是 OrganizeRoute,再返回即首页),故"步骤 1 再返回 →
+ * 回首页"无需本组件写代码,也不再需要 `onBack` 参数。
  */
 @Composable
 fun OrganizeSteps(
@@ -144,7 +144,7 @@ fun OrganizeSteps(
     onActiveCollectionChange: (String) -> Unit = {},
     /**
      * 步骤级返回是否使用**预测性返回动画**(来自 `settings.predictiveBackAnimation`)。
-     * 默认 true(与设置默认值一致);false 时嵌套 NavHost 的手势转场被关掉,
+     * 默认 true(与设置默认值一致);false 时工作流子 NavDisplay 的手势转场被关掉,
      * 但普通返回动画保留(即"关掉手势跟随,但不硬切")。
      */
     predictiveBackAnimation: Boolean = true,
@@ -231,8 +231,8 @@ fun OrganizeSteps(
      */
     undoActions: UndoActions? = null,
 ) {
-    // 跨步骤共享的唯一状态源。这些状态**必须留在嵌套 NavHost 之外** ——
-    // 它们要跨步骤存活,而 NavHost 里每个 destination 都是独立作用域。
+    // 跨步骤共享的唯一状态源。这些状态**必须留在工作流子 NavDisplay 之外** ——
+    // 它们要跨步骤存活,而 NavDisplay 里每个 destination 都是独立作用域。
     //
     // 模式与 `SortAndPreviewPage` / `NamingPage` 一致:**本地状态权威,初值取自上层,
     // 每次变更上报**。刻意不用 `externalState ?: local` —— 那样上层一旦传值,
@@ -295,11 +295,10 @@ fun OrganizeSteps(
 
     val activeCollection = collections.firstOrNull { it.id == activeId } ?: collections.firstOrNull()
 
-    val navController = rememberNavController()
-    // 当前步骤**从导航栈派生**。返回手势进行中 NavHost 尚未提交 pop,
-    // 故 entry 不变 —— 序号在整段手势里稳定,不会抖。
-    val navBackStackEntry by navController.currentBackStackEntryAsState()
-    val currentIndex = navBackStackEntry?.destination.organizeStepIndex()
+    val backStack = rememberNavBackStack(OrganizeSortRoute)
+    // 当前步骤**从导航栈派生**。返回手势进行中栈尚未提交 pop,
+    // 故最后一个 key 不变 —— 序号在整段手势里稳定,不会抖。
+    val currentIndex = backStack.lastOrNull().organizeStepIndex()
 
     /**
      * 重置**整个工作流**的调整(用户 2026-10-14 裁决)。
@@ -332,7 +331,7 @@ fun OrganizeSteps(
         activeId = firstId
         onActiveCollectionChange(firstId)
         // 回到步骤 1:往回跳一律用 pop(见 goToOrganizeStep 的注释),保持返回链线性
-        navController.goToOrganizeStep(currentIndex, 0)
+        backStack.goToOrganizeStep(currentIndex, 0)
     }
 
     Column(
@@ -378,7 +377,7 @@ fun OrganizeSteps(
                         selected = currentIndex == i,
                         // 跳步必须走 goToOrganizeStep:往回 pop、往前逐级 push,
                         // 保证返回链始终是线性的一步一退(详见该函数注释)。
-                        onClick = { navController.goToOrganizeStep(currentIndex, i) },
+                        onClick = { backStack.goToOrganizeStep(currentIndex, i) },
                         text = { Text(stepLabel) },
                         modifier = Modifier
                             .testTag(
@@ -418,8 +417,7 @@ fun OrganizeSteps(
         }
 
         PixFoldNavHost(
-            navController = navController,
-            startDestination = OrganizeSortRoute,
+            backStack = backStack,
             predictiveBackAnimation = predictiveBackAnimation,
             // 步骤级 = 只淡出:上级页原样露出(用户规格)
             style = NavTransitionStyle.Step,
@@ -448,7 +446,7 @@ fun OrganizeSteps(
                             },
                             externalState = state,
                             onStateChange = { updateState(it) },
-                            onNext = { navController.navigate(OrganizeNamingRoute) },
+                            onNext = { backStack.add(OrganizeNamingRoute) },
                             portraitDefaultColumns = portraitDefaultColumns,
                             landscapeDefaultColumns = landscapeDefaultColumns,
                             modifier = Modifier.weight(1f),
@@ -472,8 +470,8 @@ fun OrganizeSteps(
                                 contentInsets = innerInsets,
                                 initialState = namingState,
                                 onStateChange = { updateNamingState(it) },
-                                onBack = { navController.popWorkflowStep() },
-                                onNext = { navController.navigate(OrganizePlanRoute) },
+                                onBack = { backStack.popWorkflowStep() },
+                                onNext = { backStack.add(OrganizePlanRoute) },
                                 // 步骤 2 的集合芯片**与步骤 1 共用同一个 `activeId`**
                                 // (用户 2026-10-19 裁决「共用同一个选中项」)。
                                 // 这里只上报,`activeId` 的唯一持有者仍是本组件 ——
@@ -545,7 +543,7 @@ fun OrganizeSteps(
                                     // 否则返回会回到刚执行完的计划页。
                                     report = null
                                     undoMessage = null
-                                    navController.popBackStack(OrganizeSortRoute, inclusive = false)
+                                    backStack.popTo(OrganizeSortRoute)
                                 },
                                 modifier = Modifier.weight(1f),
                             )
@@ -627,7 +625,7 @@ fun OrganizeSteps(
                                 onExecute = {},
                                 contentInsets = innerInsets,
                                 modifier = Modifier.weight(1f),
-                                onBack = { navController.popWorkflowStep() },
+                                onBack = { backStack.popWorkflowStep() },
                                 executing = executing,
                                 progress = progress,
                                 onCancelExecution = { cancelToken?.cancel() },

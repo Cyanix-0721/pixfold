@@ -1,10 +1,8 @@
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.compose.compiler)
-    // 导航迁移(2026-09-22)起 route 用 type-safe 形式:
-    // `@Serializable` route 类需要这个插件在**编译期**生成序列化器。
-    // 注意 navigation 只把 kotlinx-serialization-core 放在 runtime 变体,
-    // 编译期必须自己加 —— 见 docs/notes/d1-navigation-compose-migration.md §4.1。
+    // 导航 route 用 type-safe 形式(2026-09-22 navigation-compose 起,2026-11-14 迁 Nav3):
+    // `@Serializable` 的 route / NavKey 需要这个插件在**编译期**生成序列化器。
     alias(libs.plugins.kotlin.serialization)
     alias(libs.plugins.aboutLibraries)
 }
@@ -115,7 +113,9 @@ dependencies {
     implementation(libs.aboutlibraries.core)
     implementation(libs.aboutlibraries.compose.m3)
     implementation(libs.material.color.utilities)
-    implementation(libs.navigation.compose)
+    // Navigation 3(2026-11-14 全量迁移):13 route 为 NavKey,3 个 NavHost 换 NavDisplay。
+    implementation(libs.navigation3.runtime)
+    implementation(libs.navigation3.ui)
     implementation(libs.kotlinx.serialization.core)
     // 工作区列表存 SharedPreferences 里的 JSON 数组(见 data/saf/SafTreeStore.kt)。
     // 不用 org.json:它在纯 JVM 单测里是空壳(Robolectric 之外抛 Stub!)。
