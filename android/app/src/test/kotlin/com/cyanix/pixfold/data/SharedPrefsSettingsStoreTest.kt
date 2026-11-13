@@ -4,6 +4,7 @@ import android.content.Context
 import androidx.test.core.app.ApplicationProvider
 import com.cyanix.pixfold.domain.settings.AccentChoice
 import com.cyanix.pixfold.domain.settings.AppLanguage
+import com.cyanix.pixfold.domain.settings.ColorSpecVersion
 import com.cyanix.pixfold.domain.settings.ColorStyle
 import com.cyanix.pixfold.domain.settings.PixFoldSettings
 import com.cyanix.pixfold.domain.settings.ThemeMode
@@ -13,6 +14,7 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 import kotlin.test.assertEquals
+import kotlin.test.assertNotEquals
 import kotlin.test.assertNull
 
 /**
@@ -40,6 +42,23 @@ class SharedPrefsSettingsStoreTest {
         const val PREFS_NAME = "pixfold_settings"
         const val KEY_COLUMNS_PORTRAIT = "columns_portrait"
         const val KEY_COLUMNS_LANDSCAPE = "columns_landscape"
+
+        /**
+         * 每个构造参数一个**非默认**样本值,顺序 = [PixFoldSettings] 的声明顺序,
+         * 名字 = getter 去掉 `get`(用于反射逐字段断言"样本确实非默认")。
+         * 新增字段时在这里补一行,否则参数个数断言会先红。
+         */
+        val PARAMETER_SAMPLE: List<Pair<String, Any?>> = listOf(
+            "themeMode" to ThemeMode.Dark,
+            "accent" to AccentChoice.Pink,
+            "colorStyle" to ColorStyle.FruitSalad,
+            "colorSpec" to ColorSpecVersion.V2025,
+            "pureBlack" to true,
+            "predictiveBackAnimation" to false,
+            "portraitDefaultColumns" to 3,
+            "landscapeDefaultColumns" to 7,
+            "language" to AppLanguage.English,
+        )
     }
 
     private lateinit var context: Context
@@ -55,6 +74,16 @@ class SharedPrefsSettingsStoreTest {
     private fun prefs() = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
 
     private fun store() = SharedPrefsSettingsStore(context)
+
+    /** 用 [PARAMETER_SAMPLE] 反射构造一个"每个字段都非默认"的实例。 */
+    private fun sampleSettings(): PixFoldSettings {
+        val primary = PixFoldSettings::class.java.declaredConstructors
+            .filterNot { it.isSynthetic }
+            .maxByOrNull { it.parameterCount }!!
+        val args = PARAMETER_SAMPLE.map { it.second }.toTypedArray()
+        @Suppress("UNCHECKED_CAST")
+        return primary.newInstance(*args) as PixFoldSettings
+    }
 
     /** 一个"每个字段都不是默认值"的实例,用来证明不是靠默认值蒙对的。 */
     private val custom = PixFoldSettings(
@@ -165,5 +194,45 @@ class SharedPrefsSettingsStoreTest {
         store().save(PixFoldSettings(portraitDefaultColumns = null))
 
         assertNull(store().load().portraitDefaultColumns, "改成跟随自适应后旧值不得残留")
+    }
+
+    /**
+     * 反射驱动的全字段往返:证明**每一个构造参数**都真的存盘并读回,而不是靠默认值蒙对。
+     *
+     * 与上方手写的 `custom` 相比,这里补上了两个缺口:
+     * 1. `custom` 没给 `colorSpec` 赋值(它恰好等于默认 `V2021`),所以 `colorSpec`
+     *    即使漏存也会假绿 —— 本用例显式给 `V2025`,并逐字段断言"样本字段都非默认",
+     *    任何字段漏存都会红。
+     * 2. 用反射读构造参数个数,一旦新增/删除字段,这里会先红,提醒同步样本与
+     *    [SharedPrefsSettingsStore] 的接线 —— 而不是让新字段静默地不持久化。
+     */
+    @Test
+    fun `every constructor parameter survives a save load round trip`() {
+        val primary = PixFoldSettings::class.java.declaredConstructors
+            .filterNot { it.isSynthetic }
+            .maxByOrNull { it.parameterCount }!!
+        assertEquals(
+            PARAMETER_SAMPLE.size,
+            primary.parameterCount,
+            "PixFoldSettings 构造参数应 ${PARAMETER_SAMPLE.size} 个;新增/删除字段时请同步本测试的样本值,并确认 SharedPrefsSettingsStore 已接线",
+        )
+
+        val sample = sampleSettings()
+        val default = PixFoldSettings()
+
+        // 证明样本每个字段都**不是默认值** —— 否则该字段即使漏存,往返断言也会假绿。
+        PARAMETER_SAMPLE.forEach { (name, _) ->
+            val getter = PixFoldSettings::class.java.getMethod(
+                "get" + name.replaceFirstChar { it.uppercase() },
+            )
+            assertNotEquals(
+                getter.invoke(default),
+                getter.invoke(sample),
+                "样本字段 $name 必须非默认,否则该字段漏存不会被发现",
+            )
+        }
+
+        store().save(sample)
+        assertEquals(sample, store().load(), "每个构造参数都应存盘往返")
     }
 }
