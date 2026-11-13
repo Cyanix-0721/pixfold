@@ -153,3 +153,14 @@ Nav3 1.2.1 较新,自定义预测性返回转场 API 可能与现版不同;nesti
 - **四道闸门** `--rerun-tasks` 全量：BUILD SUCCESSFUL；app 891 / domain 986 测试 0 失败；lint 零告警。
 - **Ruling（构建链路）**：worktree 内 `android/run-gradle.bat` 第 20 行硬编码主仓库路径，本阶段改用直呼 worktree 的 `gradlew.bat`（`cmd.exe /c "cd /d <worktree>\android && call mise exec -- cmd /c gradlew.bat <tasks>"`），并复制 `local.properties`（gitignored）到 worktree android。
 
+### 阶段 2 —— Coil 缩略图解码（2026-11-13）
+
+- **T2.1: complete**。`android/gradle/libs.versions.toml` 加 `coil="3.6.3"` 与 library `io.coil-kt.coil3:coil`；`android/app/build.gradle.kts` 加 `implementation(libs.coil)`。零逻辑改动 `:app:assembleDebug` 绿。
+- **T2.2: complete**。新增 `android/app/src/main/kotlin/com/cyanix/pixfold/data/coil/CoilThumbnailSource.kt`（`CoilImageFetcher` fun interface + `CoilThumbnailSource` 装饰 + `ImageLoaderCoilImageFetcher`；Coil 内存/磁盘缓存双 `CachePolicy.DISABLED`，缓存与并发仍由外层 `CachingThumbnailSource` 负责）+ `android/app/src/test/kotlin/com/cyanix/pixfold/data/coil/CoilThumbnailSourceTest.kt`（Robolectric sdk=[36]，5 测试）。
+- **变异验证**：把成功转换断成 `?.let { null }` ⇒ 只有 `success_image_is_wrapped_as_image_bitmap` 红（failures=1），其余 4 绿；`cp` 还原。
+- **T2.3: complete**。`android/app/src/main/kotlin/com/cyanix/pixfold/PixFoldApp.kt:174-187` 注入从 `AndroidThumbnailSource` 换成 `CoilThumbnailSource(ImageLoaderCoilImageFetcher(context, coilImageLoader))`，`coilImageLoader` 用 `coil3.ImageLoader.Builder(context).memoryCachePolicy(DISABLED).diskCachePolicy(DISABLED)`；移除 `AndroidThumbnailSource` import，加 `data.coil.*` 两条 import。
+- **四道闸门** `--rerun-tasks` 全量：BUILD SUCCESSFUL 1m37s；app 896 / domain 986 测试 0 失败；lint 零告警。
+- **真机核对（2026-11-13，PJX110 Android16 1264×2780/560dpi）**：首页正常、工作区 test 保留；整理图片 3 图系列缩略图全为真实图像；1599 张系列缩略图正常、懒加载滚动到 ~0121–0128 仍正确；PSS 起始 118MB → 滚动后 132MB → 横屏重排后 175MB；全程无 FATAL/AndroidRuntime/OOM/coil3 报错。结论：**Coil 收编成立**，缩略图正确性与内存不劣于自研，保留。
+- **Ruling**：`AndroidThumbnailSource.kt` 暂不删除——计划约定旧代码真机通过后、Nav3 阶段收尾再一并清理；当前保留作回退对照。
+
+

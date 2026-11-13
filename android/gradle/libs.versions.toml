@@ -20,6 +20,8 @@ kotlinxSerializationJson = "1.11.0"
 kotlinxCoroutines = "1.11.0"
 lifecycle = "2.11.0"
 coreKtx = "1.19.0"
+# Coil 3(图片加载);core artifact 不绑网络栈,本项目图片全走 SAF 的 content://,无需 coil-network-okhttp。
+coil = "3.6.3"
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }
@@ -50,3 +52,4 @@ kotlinx-serialization-json = { group = "org.jetbrains.kotlinx", name = "kotlinx-
 kotlinx-coroutines-android = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-android", version.ref = "kotlinxCoroutines" }
 lifecycle-runtime-compose = { group = "androidx.lifecycle", name = "lifecycle-runtime-compose", version.ref = "lifecycle" }
 core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
+coil = { group = "io.coil-kt.coil3", name = "coil", version.ref = "coil" }

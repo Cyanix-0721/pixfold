@@ -47,7 +47,8 @@ import com.cyanix.pixfold.domain.organize.organizeStateOf
 import com.cyanix.pixfold.data.SharedPrefsSettingsStore
 import com.cyanix.pixfold.data.saf.AndroidSafSource
 import com.cyanix.pixfold.domain.source.WorkspaceSource
-import com.cyanix.pixfold.data.saf.AndroidThumbnailSource
+import com.cyanix.pixfold.data.coil.CoilThumbnailSource
+import com.cyanix.pixfold.data.coil.ImageLoaderCoilImageFetcher
 import com.cyanix.pixfold.data.saf.FilesystemSpaceSource
 import com.cyanix.pixfold.data.saf.SafExistingComicInfoProbe
 import com.cyanix.pixfold.data.saf.SafOutputExistsProbe
@@ -171,8 +172,18 @@ fun PixFoldApp(
     // 注入优先：测试用假源绕过真实 SAF（见参数 KDoc）。
     val source: WorkspaceSource = workspaceSource ?: remember { AndroidSafSource(context) }
     // 平台实现只管读；缓存与并发闸门在装饰器里（详见 CachingThumbnailSource 的 KDoc）。
+    // 解码交给 Coil 3（阶段二）：Coil 自己的内存/磁盘缓存都关掉，避免与外层
+    // CachingThumbnailSource 的 LRU 重复占内存，也避免把 SAF 盘上字节复制进 cacheDir。
+    val coilImageLoader = remember(context) {
+        coil3.ImageLoader.Builder(context)
+            .memoryCachePolicy(coil3.request.CachePolicy.DISABLED)
+            .diskCachePolicy(coil3.request.CachePolicy.DISABLED)
+            .build()
+    }
     val thumbnailSource = remember {
-        CachingThumbnailSource(AndroidThumbnailSource(context))
+        CachingThumbnailSource(
+            CoilThumbnailSource(ImageLoaderCoilImageFetcher(context, coilImageLoader)),
+        )
     }
     val workspaceScope = rememberCoroutineScope()
     val workspaceController = remember(source, workspaceScope) {

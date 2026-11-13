@@ -130,6 +130,8 @@ dependencies {
     // 当前虽经 lifecycle 传递解析到 1.19.0,但**必须显式声明** —— 否则将来 lifecycle
     // 版本变动会把传递依赖拉低,编译期才报错,回归成本高。
     implementation(libs.core.ktx)
+    // 缩略图加载改用 Coil 3(core artifact,不引网络栈);SAF 的 content:// URI 由其内置解码处理。
+    implementation(libs.coil)
 
     testImplementation(composeBom)
     testImplementation(kotlin("test"))
