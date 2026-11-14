@@ -175,7 +175,7 @@ Nav3 1.2.1 较新,自定义预测性返回转场 API 可能与现版不同;nesti
 - **T3.2: complete(真机逐帧)**。`transitionSpec = ContentTransform(None, None)`(前进瞬切);`popTransitionSpec = ContentTransform(None, Page? scaleOut(0.90)+fadeOut() : fadeOut())`。录像 10fps 抽帧:Page 档手势中 B 页缩小+淡出、露出 A 页;Step 档 B 页只淡出不缩放、A 页原样露出 —— 两档观感与现版规格一致。
 - **T3.3: complete(真机)**。`predictivePopTransitionSpec` 内按开关返回 `ExitTransition.None`:关时手势拖动全过程中 B 页保持不透明原尺寸(帧 f022 无可视变化),松手后正常 pop;开时跟手。
 - **T3.4: 结论**。Nav3 **没有 nested graph 概念**,返回栈是一个扁平 `NavBackStack<NavKey>`。现版两个工作流的 3 步嵌套图不能原样映射:要么每工作流一个独立 `NavDisplay`(各自 back stack),要么单栈 + 按步骤分段(重写 `StepNavigation` 的 pop 逻辑)。
-- **T3.5: 差异表/工作量**见 spec §4.4。关键:13 个 route 改 `NavKey`(机械)、3 个 NavHost → 1 根 NavDisplay + 工作流子 NavDisplay、`StepNavigation.kt` 重写、15 条返回测试重跑(多为 UI 行为测试,理论不改语义)。
+- **T3.5: 差异表/工作量**见 spec §4.4。关键:12 个 route 改 `NavKey`(机械)、3 个 NavHost → 1 根 NavDisplay + 工作流子 NavDisplay、`StepNavigation.kt` 重写、15 条返回测试重跑(多为 UI 行为测试,理论不改语义)。
 - **闸门**:四道闸门 BUILD SUCCESSFUL 1m16s;app 896 / domain 986 测试 0 失败;lint 零告警。spike 只在 debug 源集,主代码零改动。
 - **真机读数**(PJX110/Android16/1264×2780/560dpi):A→B→C→D→E→F 逐级 push,栈深文本 1→2→3→4→5→6;连按 5 次返回回到 `栈深 = 1 / A · Home`。收尾:`/data/local/tmp` xml/png/mp4 计数 0、`stayon false`、`am force-stop`。
 - **裁决**:spike **通过**(根导航 6 目的地可迁、两档预测性返回可复刻、开关有效)⇒ Nav3 具备收编条件。但**全量迁移不在本阶段范围**,需另开计划(嵌套步骤图是主要设计点)。spike 代码保留在 debug 源集作参考,全量迁移落地时删除。
@@ -183,11 +183,11 @@ Nav3 1.2.1 较新,自定义预测性返回转场 API 可能与现版不同;nesti
 
 - **触发**：用户「全量迁移后提交」⇒ 目标从「spike 受限范围」升级为**全量迁移完成后再提交**；spike 代码保留在 `android/app/src/debug/`，不随 release 打包。
 - **实现**：
-  - `android/app/src/main/kotlin/com/cyanix/pixfold/nav/PixFoldRoutes.kt`：13 个 route 全部实现 `NavKey`（11 个 `data object` + `PreviewRoute(val index: Int)`）。
+  - `android/app/src/main/kotlin/com/cyanix/pixfold/nav/PixFoldRoutes.kt`：12 个 route 全部实现 `NavKey`（11 个 `data object` + `PreviewRoute(val index: Int)`）。
   - `android/app/src/main/kotlin/com/cyanix/pixfold/nav/PixFoldNav.kt`：`PixFoldNavHost` 改为接收 `NavBackStack<NavKey>`，内部直接使用 `NavDisplay`；保留 `NavTransitionStyle{Step,Page}`、`PREDICTIVE_MIN_SCALE=0.90f`、`DestinationSurface`；新增轻量 `PixFoldNavGraphBuilder.composable<T>` 注册表，调用点仍保持 `composable<X> {}` 形状。
   - `android/app/src/main/kotlin/com/cyanix/pixfold/nav/StepNavigation.kt`：全部改为 `NavBackStack<NavKey>` 扩展（`organizeStepIndex` / `libraryStepIndex` / `popWorkflowStep` / `popOne` / `popTo` / `goToOrganizeStep` / `goToLibraryStep`），不再依赖 `NavController` 与 `NavDestination.hasRoute`。
   - `android/app/src/main/kotlin/com/cyanix/pixfold/PixFoldApp.kt`：`rememberNavController()` → `rememberNavBackStack(HomeRoute)`；`navigate`/`popBackStack` → `backStack.add`/`popOne`；通知启动 `openPackOnStart` 用 `backStack.add(LibraryRoute)`。
   - `android/app/src/main/kotlin/com/cyanix/pixfold/ui/organize/OrganizeSteps.kt`、`android/app/src/main/kotlin/com/cyanix/pixfold/ui/library/LibrarySteps.kt`：各自 `rememberNavBackStack(...)`；当前步骤从 `backStack.lastOrNull()` 派生；Tab/重置/报告完成全部改用新扩展。
 - **关键缺陷与修复（实测）**：Nav3 的 `NavDisplay` 用 `backStack` 的 equals 作为 NavEntry 缓存 key，`entryProvider` 不参与 key ⇒ entryProvider 仅在栈变化时调用一次。原实现在首次组合时把 `workspaceState=None` 捕获进 content lambda；工作区后来变 Ready、根层重组，Home 目的地仍不重组，首页两张卡一直是 `[Disabled]`，导致 31 条导航/工作区测试红。修法：`val latestBuilder = rememberUpdatedState(builder)`，entryProvider 每次重组时 `PixFoldNavGraphBuilder().also { latestBuilder.value(it) }` 重新 apply，取当下状态。已用临时 `Nav3DebugTest` 验证 `[WCDBG] home entry compose state=Ready`，清理后完整套件全绿。
 - **测试**：`:app:testDebugUnitTest` **896 / 0 failed**，`:domain:test` **986 / 0 failed**。四道闸门 `--rerun-tasks` 全量 **62 executed**，BUILD SUCCESSFUL 1m14s，lint rc=0 零告警。
-- **状态**：代码与闸门完成，已提交（不推送，提交号 `d240f53`）。**真机核对顺延到 2026-11-15**（用户 2026-11-14 裁决「真机明天再看吧，处理好后先提交，明天确认后 push」）；真机通过后回填 `docs/INDEX.md` 提交列并 push。
+- **状态**：代码与闸门完成，已提交（不推送，提交号 `d240f53`）。**真机核对通过（2026-11-14，用户授权「开始真机吧，小鲸鲸」）**：PJX110 / Android 16 / 1264×2780 / 560dpi 验证 Home 两卡入口、Settings↔Home、Licenses↔Settings、Organize 三步骤前进/返回、Library 三步骤前进/返回、Preview 开/关全部正常；预测性返回开时设置页按住手势缩小+淡出露出首页、关时按住不动松手后 pop；工作流内手势只退一档。PSS 138 MB（流程后 183 MB），logcat 无 FATAL/AndroidRuntime/OOM。收尾 `/data/local/tmp` xml/png/mp4 计数 0、`stayon false`、`am force-stop`。真机通过后回填 `docs/INDEX.md` 提交列并 push。

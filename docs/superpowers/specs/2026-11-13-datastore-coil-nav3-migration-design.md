@@ -119,7 +119,7 @@
 
 #### 全量迁移工作量与风险
 
-1. 13 个 route 改 `NavKey`(机械)。
+1. 12 个 route 改 `NavKey`(机械)。
 2. 3 个 `NavHost`(根 + 工作流 A/B)→ 建议 1 根 `NavDisplay` + 每个工作流一个子 `NavDisplay`(各自 back stack);这是**主要设计点**,需用户确认工作流内转场/返回语义如何映射。
 3. `nav/StepNavigation.kt`(104 行,步骤序号由返回栈派生、双击 pop 防护、Tab 线性跳转)整段重写。
 4. 15 条返回测试重跑;两条直接断言 nav 行为的测试(`StepBackGuardTest`、`BackNavigationTest`)需按新 API 改写。
@@ -128,9 +128,9 @@
 
 ### 4.5 全量迁移落地（2026-11-14，用户升级范围）
 
-**结论：全量迁移完成，代码与四道闸门已绿并已提交（不推送，提交号 `d240f53`）；真机核对顺延到 2026-11-15（用户 2026-11-14 裁决先提交、明天确认后再 push）。**
+**结论：全量迁移完成，代码与四道闸门已绿并已提交（不推送，提交号 `d240f53`）；真机核对通过（2026-11-14，用户授权「开始真机吧，小鲸鲸」），确认后 push。**
 
-- **范围**：13 个 route 全部实现 `NavKey`；3 个 `NavHost` 全部换成 `NavDisplay`——根导航一个、工作流 A/B 各一个，各自持 `NavBackStack<NavKey>`（不再有 nested graph）。
+- **范围**：12 个 route 全部实现 `NavKey`（11 个 `data object` + `PreviewRoute(val index: Int)`）；3 个 `NavHost` 全部换成 `NavDisplay`——根导航一个、工作流 A/B 各一个，各自持 `NavBackStack<NavKey>`（不再有 nested graph）。
 - **依赖**：`androidx.navigation3:navigation3-runtime:1.2.1` + `navigation3-ui:1.2.1` 进入生产依赖；旧 `navigation-compose:2.10.2` 已从依赖与 catalog 移除（全仓无 `androidx.navigation.*` 旧 API 引用）。
 - **`nav/PixFoldNav.kt`**：`PixFoldNavHost(backStack: NavBackStack<NavKey>, predictiveBackAnimation, style, modifier, builder)`；`NavDisplay(onBack={ backStack.popOne() }, entryDecorators=listOf(rememberSaveableStateHolderNavEntryDecorator()), transitionSpec=ContentTransform(None,None), popTransitionSpec=ContentTransform(None, style.exitTransition()), predictivePopTransitionSpec={ _ -> ContentTransform(None, if (predictiveBackAnimation) style.exitTransition() else None) })`；保留 `PREDICTIVE_MIN_SCALE=0.90f` 与 `DestinationSurface`。
 - **`nav/StepNavigation.kt`**：从 `NavController` 扩展改成 `NavBackStack<NavKey>` 扩展；`organizeStepIndex` / `libraryStepIndex` 用 `when (key)`；`popWorkflowStep` = `if (size <= 1) false else removeAt(lastIndex)`；`popOne` = `if (size > 1) removeAt`；`popTo(key)` 弹到指定 key；`goToOrganizeStep` / `goToLibraryStep` 往回 `popTo`、往前逐级 `add`。
