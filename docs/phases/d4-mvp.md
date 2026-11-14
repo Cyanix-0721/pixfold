@@ -731,6 +731,13 @@
 >
 > **「色彩标准」的形态是 `ChoiceRow`（弹对话框单选），不是按钮切换 —— 用户 2026-11-08 裁决「那先不管」**。历史：2026-09-21 定形时它与「强调色 / 色彩风格 / 语言」同一套 `ChoiceRow`，KDoc 理由（选项多、窄屏不挤、便于断言）本是给 9 种色彩风格写的，被色彩标准顺手沿用。改成 `SingleChoiceSegmentedButtonRow` 的技术代价已盘清：两个标签「Material 3 (2021)」/「Material 3 Expressive (2025)」在 361dp 减边距后各只有约 164dp，而第二个标签文字就超 190dp，**必须缩成 `2021` / `2025` 两个数字**、全名进 `contentDescription`；现成用法见 `ui/organize/SortAndPreviewPage.kt:629` 的 `ModeToggle`。另有连带问题：该行在 5/9 个色彩风格下**整行置灰**（`COLOR_SPEC_SENSITIVE_STYLES`），置灰的分段按钮在 M3 里观感比置灰的行更奇怪，改形态时须一并处理。**本轮不做，登记为待办。**
 
+> **十四、全屏预览模糊修复（2026-11-14，分支 `dsh-379836b6-a929`）**：
+> 用户真机反馈「刚才预览好模糊啊」。根因三层：① `ImagePreview.kt` 调 `ItemThumb` 时未传 `requestPx`，落到默认 512；② `CachingThumbnailSource.kt` 的 `minOf(widthPx,heightPx,budget.requestPx)` 把请求硬夹到 512，且缓存 key 只含 uri（同一 uri 的网格图与预览图共用 512 缓存）；③ `CoilThumbnailSource` 最终按 512×512 解码，1264×2780 全屏放大必然糊。
+> 修法：`ImagePreview` 外层改 `BoxWithConstraints`，按 `constraints.maxWidth/maxHeight` 计算 `requestWidthPx/requestHeightPx`（上限 `MAX_PREVIEW_REQUEST_PX = 4096`）；`ItemThumb` 增 `requestHeightPx`（默认等于 `requestPx`）、`contentScale`、`source` 三个参数（网格默认值不变）；`PixFoldApp.kt` 新增 `previewImageSource = remember(coilImageLoader) { CoilThumbnailSource(ImageLoaderCoilImageFetcher(context, coilImageLoader)) }`，预览直接用它绕过 `CachingThumbnailSource` 的 512 上限与 uri-only 缓存；预览显示改 `ContentScale.Fit`，整图不裁边。
+> 守卫：`ImagePreviewTest.kt` 新增「preview requests the image at the display size instead of the 512 thumbnail size」，用 `CopyOnWriteArrayList` 记录请求尺寸，`Box(Modifier.requiredSize(400.dp,1000.dp))` 撑出大于 512 的显示区；变异把 `requestPx`/`requestHeightPx` 改回 512 ⇒ 测试在 `ImagePreviewTest.kt:101` 抛 `AssertionError`、BUILD FAILED、RC=1。
+> 闸门：`:app:testDebugUnitTest` 897 / 0，`:domain:test` 986 / 0，lint 零告警，四道闸门 `--rerun-tasks` 62 tasks executed / BUILD SUCCESSFUL / `gate-last.rc=0`。
+> 真机：PJX110 / Android 16 / 1264×2780 / 560dpi，`android/artifacts/preview-fix.png` / `preview-fix-p2.png` / `preview-fix-p3.png` / `preview-fix-zoom.png` 逐张核对清晰；PSS 111,954 KB，logcat 918 行无 FATAL/OOM；收尾删除 `/data/local/tmp/preview-fix*`、`stayon false`、`am force-stop`。
+
 优先交付（**GUI 仅 Android**，2026-09-10 变更）：
 
 - Android：单目录/单系列，图片预览与人工排序，逐卷元数据，CBZ 生成；

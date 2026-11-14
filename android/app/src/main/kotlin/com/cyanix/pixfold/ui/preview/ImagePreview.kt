@@ -5,6 +5,7 @@ import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.gestures.detectTransformGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.WindowInsets
@@ -27,6 +28,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
@@ -37,6 +39,8 @@ import androidx.compose.ui.unit.dp
 import com.cyanix.pixfold.R
 import com.cyanix.pixfold.domain.model.SourceItem
 import com.cyanix.pixfold.ui.components.ItemThumb
+import com.cyanix.pixfold.ui.workspace.LocalThumbnailSource
+import com.cyanix.pixfold.ui.workspace.ThumbnailSource
 
 const val TAG_PREVIEW = "preview-root"
 const val TAG_PREVIEW_IMAGE = "preview-image"
@@ -61,6 +65,15 @@ fun zoomAmount(scale: Float): String = String.format(java.util.Locale.ROOT, "%.2
 private const val DOUBLE_TAP_SCALE = 2f
 
 /**
+ * 预览请求解码尺寸的上限（px）。
+ *
+ * 手机屏幕的物理长边目前最多 4K 级；把 1264×2780 的整屏内容塞进 512×512 的缩略图
+ * 会被放大成 5 倍以上，肉眼可见发糊（2026-11-14 真机回归）。
+ * 4096 足够覆盖 4K，同时又给极端无界约束兜底，避免 Constraints.Infinity 直接当尺寸。
+ */
+private const val MAX_PREVIEW_REQUEST_PX = 4096
+
+/**
  * 大图预览(验收第 2 项):自适应窗口、可缩放、可拖动平移、可翻页。
  *
  * 实现要点:
@@ -72,6 +85,8 @@ private const val DOUBLE_TAP_SCALE = 2f
  * @param rename 重命名接线;**为 null 即本页不提供改名**(默认),
  *   [ImagePreviewTest] 等单独使用场景无需构造它。
  *   传值后顶部出现「重命名」按钮,写回的是**命名页同一份**覆盖表。
+ * @param imageSource 预览专用图片来源。App 传入**不走 512px 缩略图缓存**的全尺寸解码源;
+ *   为 null 时退回 [LocalThumbnailSource],既有测试与演示路径行为不变。
  */
 @Composable
 fun ImagePreview(
@@ -80,7 +95,11 @@ fun ImagePreview(
     onClose: () -> Unit,
     modifier: Modifier = Modifier,
     rename: PreviewRename? = null,
+    imageSource: ThumbnailSource? = null,
 ) {
+    // 预览专用的图片来源（App 传入不走 512px 缩略图缓存的全尺寸解码源）。
+    // 为 null 时退回全局缩略图源：既有 UI 测试与 D1 演示路径行为不变。
+    val source = imageSource ?: LocalThumbnailSource.current
     if (items.isEmpty()) {
         Box(modifier.fillMaxSize().background(Color.Black), contentAlignment = Alignment.Center) {
             Text(stringResource(R.string.preview_no_images), color = Color.White)
@@ -104,18 +123,27 @@ fun ImagePreview(
     val prevCd = stringResource(R.string.preview_previous)
     val nextCd = stringResource(R.string.preview_next)
 
-    Box(
+    BoxWithConstraints(
         modifier = modifier
             .fillMaxSize()
             .testTag(TAG_PREVIEW)
             .background(Color.Black),
     ) {
+        // 取图尺寸跟随**实际显示区域**，而不是网格缩略图的 512px。
+        // 长边足够覆盖整屏，ContentScale.Fit 再保证整张图都看得见（不裁边）。
+        val requestWidthPx = constraints.maxWidth.coerceIn(1, MAX_PREVIEW_REQUEST_PX)
+        val requestHeightPx = constraints.maxHeight.coerceIn(1, MAX_PREVIEW_REQUEST_PX)
+
         // 图片区:占满可用空间 = 自适应窗口;手势自研。
         // 预览显示文件名(去掉扩展名),便于确认"当前看的是哪一张"。
         ItemThumb(
             item = current,
             showIndex = true,
             captionMaxChars = 28,
+            source = source,
+            requestPx = requestWidthPx,
+            requestHeightPx = requestHeightPx,
+            contentScale = ContentScale.Fit,
             modifier = Modifier
                 .fillMaxSize()
                 .testTag(TAG_PREVIEW_IMAGE)

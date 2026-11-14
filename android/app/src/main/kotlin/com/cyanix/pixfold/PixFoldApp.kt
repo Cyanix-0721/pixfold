@@ -188,6 +188,12 @@ fun PixFoldApp(
             CoilThumbnailSource(ImageLoaderCoilImageFetcher(context, coilImageLoader)),
         )
     }
+    // 预览专用：**不经过** CachingThumbnailSource 的 512px 上限与“按 uri 只存一份”的缓存。
+    // 全屏预览要按实际显示尺寸解码（1264×2780 的屏长边），网格缩略图尺寸不够。
+    // Coil 自己的两级缓存同样关闭；一张图在屏时只保留当前这一份，翻页即换。
+    val previewImageSource = remember(coilImageLoader) {
+        CoilThumbnailSource(ImageLoaderCoilImageFetcher(context, coilImageLoader))
+    }
     val workspaceScope = rememberCoroutineScope()
     val workspaceController = remember(source, workspaceScope) {
         WorkspaceController(
@@ -737,6 +743,7 @@ fun PixFoldApp(
                             items = pageOrder,
                             initialIndex = route.index,
                             onClose = { backStack.popOne() },
+                            imageSource = previewImageSource,
                             // 重命名写回**命名页同一个** `namingState.overrides`
                             // (键 = SourceItem.id,值 = 完整文件名,空值即撤销覆盖),
                             // 故两处改名互相同步 —— 不是两份状态。

@@ -15,6 +15,7 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.testTag
 import com.cyanix.pixfold.domain.model.SourceItem
 import com.cyanix.pixfold.ui.workspace.LocalThumbnailSource
+import com.cyanix.pixfold.ui.workspace.ThumbnailSource
 
 /**
  * [ItemThumb] 的根节点标签。
@@ -47,8 +48,12 @@ const val TAG_ITEM_THUMB = "item-thumb"
  *
  * @param item 来源项。`item.uri` 为 `null`（mock 数据）时直接用程序化缩略图，
  *   连一次 suspend 调用都不发。
- * @param requestPx 向平台请求的缩略图边长（px）。网格卡约 180dp × 3x ≈ 540px，
+ * @param requestPx 向平台请求的缩略图宽度（px）。网格卡约 180dp × 3x ≈ 540px，
  *   故默认 512 够用；列表行 44dp 可传更小的值省内存。
+ * @param requestHeightPx 向平台请求的缩略图高度（px），默认等于 [requestPx]。
+ *   全屏预览是竖长区域，传实际宽高可避免按方形边长解码造成的浪费。
+ * @param contentScale 图片填充方式。网格用默认 [ContentScale.Crop]；
+ *   全屏预览应传 [ContentScale.Fit]，保证整张图可见、不裁边。
  */
 @Composable
 fun ItemThumb(
@@ -57,15 +62,17 @@ fun ItemThumb(
     showIndex: Boolean = true,
     captionMaxChars: Int = 22,
     requestPx: Int = 512,
+    requestHeightPx: Int = requestPx,
+    source: ThumbnailSource? = LocalThumbnailSource.current,
+    contentScale: ContentScale = ContentScale.Crop,
 ) {
-    val source = LocalThumbnailSource.current
     val uri = item.uri
-    var bitmap by remember(uri, source, requestPx) { mutableStateOf<ImageBitmap?>(null) }
+    var bitmap by remember(uri, source, requestPx, requestHeightPx) { mutableStateOf<ImageBitmap?>(null) }
 
-    LaunchedEffect(uri, source, requestPx) {
+    LaunchedEffect(uri, source, requestPx, requestHeightPx) {
         // mock 数据（uri == null）与测试环境（source == null）都不发请求。
         bitmap = if (uri != null && source != null) {
-            source.thumbnail(uri, requestPx, requestPx)
+            source.thumbnail(uri, requestPx, requestHeightPx)
         } else {
             null
         }
@@ -77,7 +84,7 @@ fun ItemThumb(
             Image(
                 bitmap = loaded,
                 contentDescription = null,
-                contentScale = ContentScale.Crop,
+                contentScale = contentScale,
                 modifier = Modifier.fillMaxSize(),
             )
         } else {

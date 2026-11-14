@@ -1,6 +1,9 @@
 package com.cyanix.pixfold.ui.preview
 
 import android.content.Context
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.requiredSize
+import androidx.compose.ui.Modifier
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.semantics.getOrNull
 import androidx.compose.ui.test.assertCountEquals
@@ -19,11 +22,13 @@ import androidx.compose.ui.unit.dp
 import com.cyanix.pixfold.R
 import com.cyanix.pixfold.TestText
 import com.cyanix.pixfold.domain.model.SourceItem
+import com.cyanix.pixfold.ui.workspace.ThumbnailSource
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
+import java.util.concurrent.CopyOnWriteArrayList
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
@@ -67,6 +72,37 @@ class ImagePreviewTest {
     fun `shows one based page label on open`() {
         rule.setContent { ImagePreview(items, initialIndex = 0, onClose = {}) }
         rule.onNodeWithTag(TAG_PREVIEW_PAGE_LABEL).assertTextEquals(pageLabel(1, 3))
+    }
+
+    /**
+     * 预览要按“实际显示尺寸”取图，不能沿用网格的 512px 缩略图。
+     *
+     * 真机回归（2026-11-14）：全屏预览明显糊。根因是 ImagePreview 调 ItemThumb 时
+     * 没传尺寸 ⇒ 默认 512，512×512 被拉伸到 1264×2780；源图本身是 2800×4200 级。
+     * 这条测试把“请求尺寸 ≥ 显示边长”钉死，避免以后又悄悄退回缩略图尺寸。
+     */
+    @Test
+    fun `preview requests the image at the display size instead of the 512 thumbnail size`() {
+        val requested = CopyOnWriteArrayList<Pair<Int, Int>>()
+        val source = ThumbnailSource { _, widthPx, heightPx ->
+            requested += widthPx to heightPx
+            null
+        }
+        val withUri = items.map { it.copy(uri = "content://doc/${it.id}") }
+        rule.setContent {
+            Box(Modifier.requiredSize(width = 400.dp, height = 1000.dp)) {
+                ImagePreview(withUri, initialIndex = 0, onClose = {}, imageSource = source)
+            }
+        }
+        rule.waitForIdle()
+
+        val node = rule.onNodeWithTag(TAG_PREVIEW_IMAGE).fetchSemanticsNode()
+        val (widthPx, heightPx) = requested.last()
+        assertTrue(
+            widthPx >= node.size.width && heightPx >= node.size.height,
+            "预览应按显示尺寸取图（显示 ${node.size.width}x${node.size.height}px），" +
+                "实际请求 ${widthPx}x${heightPx}px；沿用 512px 缩略图放大到整屏就会模糊",
+        )
     }
 
     @Test
