@@ -33,6 +33,8 @@ class MainActivity : ComponentActivity() {
         setContent {
             PixFoldApp(
                 openPackOnStart = openPackOnStart,
+                // 正常冷启动只恢复上次目录的句柄，不预扫描；点进工作流才加载。
+                lazyWorkspaceStart = true,
                 // 导航完成后回清 —— 热启动时 `onNewIntent` 才能**再次**置 true 并
                 // 触发 `LaunchedEffect(openPackOnStart)` 的 key 变化。
                 // 不清零的话第二次点通知静默失效（真机第二轮实测）。

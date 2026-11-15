@@ -737,6 +737,47 @@
 > 守卫：`ImagePreviewTest.kt` 新增「preview requests the image at the display size instead of the 512 thumbnail size」，用 `CopyOnWriteArrayList` 记录请求尺寸，`Box(Modifier.requiredSize(400.dp,1000.dp))` 撑出大于 512 的显示区；变异把 `requestPx`/`requestHeightPx` 改回 512 ⇒ 测试在 `ImagePreviewTest.kt:101` 抛 `AssertionError`、BUILD FAILED、RC=1。
 > 闸门：`:app:testDebugUnitTest` 897 / 0，`:domain:test` 986 / 0，lint 零告警，四道闸门 `--rerun-tasks` 62 tasks executed / BUILD SUCCESSFUL / `gate-last.rc=0`。
 > 真机：PJX110 / Android 16 / 1264×2780 / 560dpi，`android/artifacts/preview-fix.png` / `preview-fix-p2.png` / `preview-fix-p3.png` / `preview-fix-zoom.png` 逐张核对清晰；PSS 111,954 KB，logcat 918 行无 FATAL/OOM；收尾删除 `/data/local/tmp/preview-fix*`、`stayon false`、`am force-stop`。
+>
+> **补强（2026-11-15）：双击 2× 后仍糊。** 只按显示尺寸解码时，双击 2× 后每个屏幕像素只剩半个源像素。`ImagePreview.kt` 新增 `PREVIEW_DECODE_SCALE = 2L` 与 `previewRequestPx(displayPx)`，按显示边长的 2 倍请求并以 `MAX_PREVIEW_REQUEST_PX = 4096` 封顶；`ImagePreviewTest.kt` 新增「preview requests extra pixels for double tap zoom」守卫。闸门 app **901/0**、domain **986/0**、lint 零告警。真机（2026-11-15，PJX110/Android16/1264×2780/560dpi）：p1 普通 1× 与双击 2× 均清晰；预览态 PSS 159,693 KB；PixFold 进程 34 行日志无 FATAL/OOM。
+
+> **十五、根级返回转场改判（2026-11-15，分支 `dsh-379836b6-a929`）**：
+> 用户否掉初版「设置只滑不淡 / 工作流迷你页一直缩小」（m03390「设置到主页失去了淡化。工作流到主页在缩小到一定程度应该显示的是首页按钮的样式」），并问「可以根据滑动方向决定动画方向吗」（m03402）。新配方：
+> ① 设置→首页：`settingsSlidePop(swipeEdge)`，320ms，设置页沿滑动方向整页滑出并淡出，首页从反侧 `-fullWidth/5` 回位并淡入；`swipeEdge=0`（左边缘）设置右出/首页左回，`=1`（右边缘）设置左出/首页右回，普通返回键固定按右出。
+> ② 工作流→首页：`workflowShrinkPop(cardBounds,hostSize)`，以首页「整理图片 / 打包漫画」卡中心为 `TransformOrigin` `scaleOut(0f)` 320ms，但 `fadeOut` 只 128ms（40%），半程工作流页已淡完，露出真实首页卡片；工作流内部 Step、许可、预览保持原样。（2026-11-15 后续改判：见「十七」，改为 shrink/fade 同一条 380ms 线性时间轴，缩到 1/3 时 alpha=0，全程同步淡化；旧 128ms 末段淡出已废弃）
+> ③ 路由识别：`popTransition` 的 `initialState/targetState` 取 `entries.last().metadata[ROUTE_CLASS_METADATA]`，因为 Nav3 `Scene.key` 是场景标识而非路由 NavKey。
+> 守卫：`TransitionStyleTest` 新增设置早期亮度（Dark+pureBlack，`gestureTo(0.25f)` 左侧 15% 亮度 < 落地 80%）、右边缘方向、工作流半程 `changedPixels(homeBefore,contentDuring)<5000`；变异去掉设置 fade、工作流 fade 改 320 ⇒ 3 failed，cp 还原 `RESTORED_OK`。
+> 闸门：app **901/0**、domain **986/0**、lint 零告警、`--rerun-tasks` BUILD SUCCESSFUL、`gate-last.rc=0`。
+> 真机核对（2026-11-15，PJX110/Android16/1264×2780/560dpi）：左边缘返回设置页右出+首页左回并淡化，右边缘方向相反；工作流返回在 1.20 仍为缩小中的工作流页、1.30 已露出真实首页卡片；PSS 159,693 KB（预览态），PixFold 进程 34 行日志无 FATAL/OOM，收尾无残留。证据：`android/artifacts/new-left-labeled.png`、`new-right-labeled.png`、`new-wf-labeled.png`、`preview-new.png`、`preview-new-zoom.png`。
+
+> **十六、启动懒加载（2026-11-15，分支 `dsh-379836b6-a929`）**：
+> 用户原话「启动时改懒加载？不然打开就扫描工作区，要是想要切换工作区就有点浪费时间了」⇒ 冷启动只恢复上次工作区句柄，不递归扫描。
+> 实现：`WorkspaceState` 新增 `data class Idle(val handle: WorkspaceHandle)`（collectionsOr 回退 mock、canOrganize=true、showsWorkspaceBar=false、handleOrNull=handle）；`WorkspaceController.prime()` 只取 `source.workspaces().firstOrNull()?.handle`、取消旧 job/watcher 后落 `None` 或 `Idle(handle)`，不 `load`；`refresh()` 对 `Idle` 直接 return，防回前台偷扫；`HomeScreen.canStartWorkflow` 对 `Idle` 返回 true；`WorkspaceBar` 对 Idle 与 Ready 一样显示目录名并可打开工作区列表。`PixFoldApp` 新增 `lazyWorkspaceStart: Boolean = false`（既有 24+ 导航测试仍走冷启动立即 Ready），`MainActivity` 显式 true；`pendingWorkflow` 记录用户点击去向，等 `Ready` 且集合非空才 `backStack.add`，`Denied/Failed` 清空并留首页；从打包通知冷启动 `openPackOnStart=true` 时退回 `restore()` 立即扫描。`WorkspaceStateTest` / `WorkspaceControllerTest` 新增 Idle 语义与「懒启动只预留不扫描 / 无上次保持 None / Idle 刷新不偷扫 / prime 后 load 才 Ready」；`HomeWorkspaceTest` 新增 Idle 两卡可点、工作区条显示上次目录名、整装测试「懒启动冷启动不扫描 点整理卡才加载并进入工作流」。
+> 闸门：`--rerun-tasks` 62 executed，app **909/0/0/0**、domain **986/0/0/0**、lint 零告警、BUILD SUCCESSFUL。变异：删 `if (state is WorkspaceState.Idle) return` ⇒ `WorkspaceControllerTest > Idle 状态下刷新不得偷偷扫描` FAILED（909 中 1 failed）；`HomeScreen` Idle canStart 改 false ⇒ `HomeWorkspaceTest` 两条 FAILED（2 failed）；均 cp 还原并 grep 确认。
+> 真机核对（2026-11-15，PJX110/Android16/1264×2780/560dpi）：冷启动 `am start -W` COLD TotalTime **646ms**，0.35s 时首页已显示「当前工作区:test」、两卡 enabled、无「正在扫描文件夹…」；点击整理卡后 1s 截图显示「正在扫描文件夹…」，3s 仍扫，约 11s 后进入步骤1并列出 `[测试作者] 测试系列 (9)` / `[青水庵 (にやすけ 青水庵)] 子産み島 (1599)` 等；按 HOME 后 `am start -W` HOT TotalTime **37ms**，0.35s 与 2s 后 dump 都无扫描文案；从工作区列表选 Music（只记路径、无持久授权）⇒ 首页显示「重试后仍无法访问 Music,请重新选择该文件夹。」且未进工作流。返回转场同步复验：screenrecord 3.67s 抽 30fps 110 帧，工作流页完整→缩小仍可见→露出首页，无空闪。证据：`android/artifacts/lazy-cold.png`、`lazy-tap-1s.png`、`lazy-organize-done.png`、`lazy-resume.png`、`lazy-empty-home.png`、`lazy-back-contact.png`、`lazy-back.mp4`；收尾 `/data/local/tmp` 的 xml/png/mp4 计数 0、`stayon false`、`am force-stop`。
+
+> **十七、工作流→首页转场改为全程同步淡化（2026-11-15，分支 `dsh-379836b6-a929`）**：
+> ⚠️ **该方案随后被用户否定**：整页缩放+淡化缩小时内容仍是工作流页，不是首页整理卡；曾改向「十八」共享元素，又被用户否定，最终见「十九」。
+> 用户改判（m04525）「工作流返回主页应该全程都有淡化而不是只有后半段有……缩小到1/3的时候变成首页的整理图片这样的卡片，也就是缩小和淡出要同步进行，到 1/3 时无缝衔接成首页那张整理卡片」。
+> 实现：`PixFoldNav.kt` 抽出 `WorkflowShrinkMotion(targetScale=1f/3f, durationMillis=380, fadeDelayMillis=0, fadeDurationMillis=380)` + `frameAt(progress)`，`scaleOut` 与 `fadeOut` 共用同一条 `LinearEasing` 380ms 时间轴；从手势起点 alpha 就 1→0，缩到原尺寸 1/3 时 alpha 恰为 0，首页真实卡片无缝接手。旧配方 `fadeDelay=280 / fadeDuration=100` 只在末段淡出，已删除。
+> 守卫：`TransitionStyleTest` 新增 `workflow shrink and fade share one linear timeline`（targetScale=1/3、fadeDelay=0、fadeDuration=shrinkDuration、1/4 进度 alpha=0.75、终点 alpha=0）；既有两条工作流几何/像素测试仍绿。变异把 fadeDelay 改 280、fadeDuration 改 100 ⇒ 该条 1 failed（期望 0 实际 280），cp 还原后恢复。
+> 闸门：`--rerun-tasks` 62 executed，app **910/0**、domain **986/0**、lint 零告警、BUILD SUCCESSFUL。
+> 真机核对（2026-11-15，主人授权「可以」；PJX110/Android16/1264×2780/560dpi）：安装 app-debug.apk 后进入步骤1，左边缘返回录屏 `wf-new-back.mp4`；抽帧 0.82 / 0.94 / 1.06 / 1.18 / 1.30 显示页面边缩小边均匀变淡，对首页参考的 RMSE **0.183 → 0.110 → 0.074 → 0.021 → 0.006** 单调下降，1.18 仍见半透明页叠在首页卡上、1.30 已是干净首页，无空闪；PSS 117,662 KB，crash buffer 0 条；收尾 `/data/local/tmp` 计数 0、`stayon false`、`am force-stop`。证据：`android/artifacts/wf-new-back.mp4`、`wf-new-alpha.png`、`wf-new-contact.png`、`wf-back-home.png`。
+> **但用户随后判定仍不合格**（m04765 逐字）：「仍然不行，我的意思是缩小到一定程度就变成首页的整理图片那样子的卡片，而不仍然是工作流内部的内容」。原因：整页 `scaleOut + fadeOut` 缩小的始终是工作流内部页面，容器内容从未换成首页卡片。
+
+> **十八、工作流→首页改用 Nav3 共享元素 `sharedBounds`（2026-11-15，分支 `dsh-379836b6-a929`）**：
+> 用户要求（逐字）：「仍然不行，我的意思是缩小到一定程度就变成首页的整理图片那样子的卡片，而不仍然是工作流内部的内容」。核心不是缩放曲线，而是**容器内容交接**：容器缩小时里面必须是首页真实的「整理图片 / 打包漫画」卡，而不是工作流页。
+> 实现：`PixFoldNav.kt` 用 `SharedTransitionLayout` 包住 `NavDisplay`，入口 `NavEntry` 内 `CompositionLocalProvider(LocalWorkflowSharedScopes provides WorkflowSharedScopes(shared=this@SharedTransitionLayout, animatedVisibilityScope=LocalNavAnimatedContentScope.current))`；新增 `@Composable fun Modifier.workflowSharedBounds(key: String)`，内部 `sharedBounds(rememberSharedContentState(key), animatedVisibilityScope, resizeMode = ResizeMode.scaleToBounds(ContentScale.FillBounds, Alignment.Center))`。首页两张卡（`TAG_WORKFLOW_ORGANIZE_CARD="home-workflow-organize"` / `TAG_WORKFLOW_LIBRARY_CARD="home-workflow-library"`）与工作流 `OrganizeRoute` / `LibraryRoute` 的 `DestinationSurface` 用同一个 key 配对。删除旧 `WorkflowShrinkMotion / WORKFLOW_SHRINK_MOTION / workflowShrinkPop`（整页 scaleOut+fadeOut）；根 pop 对两条工作流退化为 `rootFadePop()`，真正形态由共享元素驱动。
+> 守卫：`TransitionStyleTest` 删除旧的「线性时间轴」单测；`assertWorkflowShrinksIntoCard` 新增半程/四分之三程「离首页画面更近、离工作流内部画面更远」的像素对照。探针（workflow A）：半程 homeResidual=**58,300** vs workflowResidual=**305,918**；四分之三程 home=**12,388** vs workflow=**277,430**，且断言 `home*4 < workflow`。workflow B：半程 78,651 vs 145,752；四分之三程 12,382 vs 90,245，同样通过。变异：让 `workflowSharedBounds` 直接 `return this`（等于没有共享元素，只剩 rootFadePop）⇒ 两条工作流测试均 FAILED at `TransitionStyleTest.kt:415`（四分之三程仍是工作流内部内容），cp 还原。
+> 闸门：`--rerun-tasks` 62 executed，app **909/0**、domain **986/0**、lint 零告警、BUILD SUCCESSFUL。
+> 真机核对：**待主人授权后进行**（本轮尚未连设备，不宣称通过）。
+> ⚠️ **该方案随后被用户否定**（逐字）：「现在的拉伸效果更难看了，还是之前那种缩放淡化，字体别拉伸，改成整体等比缩放，文字保持清晰不变形」。根因：`ResizeMode.scaleToBounds(ContentScale.FillBounds)` 按轴独立拉伸，窗口与首页卡片宽高比不一致时文字被横向拉宽。最终改回整页等比缩放+淡化，见「十九」。
+
+> **十九、工作流→首页恢复整页等比缩放+淡化（2026-11-15，分支 `dsh-379836b6-a929`）**：
+> 用户改判（m05224 逐字）：「现在的拉伸效果更难看了，还是之前那种缩放淡化，字体别拉伸，改成整体等比缩放，文字保持清晰不变形」。⇒ 撤销「十八」的 Nav3 共享元素：`ResizeMode.scaleToBounds(ContentScale.FillBounds)` 在窗口与首页卡片宽高比不一致时按轴独立拉伸，文字随之横向拉宽，正是「字体被拉伸」的根因。
+> 实现（`PixFoldNav.kt` / `HomeScreen.kt` / `PixFoldApp.kt`）：删除 `SharedTransitionLayout` 与 `Modifier.workflowSharedBounds`，恢复整页 `scaleOut + fadeOut`；`WorkflowShrinkMotion(targetScale=1f/3f, durationMillis=380, fadeDelayMillis=0, fadeDurationMillis=380)`，`frameAt()` 返回 `scale=1+(targetScale-1)*p`、`alpha=1-p`；`workflowShrinkPop(cardBounds,hostSize)` 以首页卡片中心为 `TransformOrigin` 等比缩放，`scaleOut` 与 `fadeOut` 同 `LinearEasing` 380ms。首页两张卡用 `onGloballyPositioned { onBoundsChange(it.boundsInRoot()) }` 回传 bounds，`PixFoldApp` 按 `OrganizeRoute`/`LibraryRoute` 选对应 bounds。**等比由统一缩放因子保证，宽高比不变，文字不拉伸。**
+> 守卫：`TransitionStyleTest` 新增单测 `workflow shrink and fade share one uniform linear timeline`（起点 scale=1/alpha=1，1/4 时 alpha=.75，1/2 时 alpha=.5，终点 scale=1/3/alpha=0，`fadeDelay=0`、`fadeDuration=duration`）与 UI 等比断言 `workflow return keeps uniform aspect ratio without stretching`（半程宽<前宽 95%，宽高比差<0.02）。探针 `before=400.0x920.0 during=266.6667x613.3334`，`ratioBefore=0.4347826 / ratioDuring=0.43478262`。变异 `fadeDelay=280 / fadeDuration=100` ⇒ 单测 FAILED，cp 还原。
+> 闸门：`--rerun-tasks` 62 executed，app **909/0/0/0**、domain **986/0/0/0**、lint 零告警、BUILD SUCCESSFUL、`gate-last.rc=0`。
+> 真机核对（PJX110/Android16/1264×2780/560dpi）：已安装 worktree APK 并重进工作流步骤1，返回转场录屏已取 `android/artifacts/wf-final-back2.mp4`；用户 14:18 决定「先这样吧，之后D4A再说」，观感判定顺延 D4A，**本轮未作最终判定**。
 
 优先交付（**GUI 仅 Android**，2026-09-10 变更）：
 

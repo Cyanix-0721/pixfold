@@ -20,6 +20,15 @@ sealed interface WorkspaceState {
     /** 从未选过目录（或用户「忘记」了它）。界面按 mock 数据演示。 */
     data object None : WorkspaceState
 
+    /**
+     * 冷启动已恢复上次工作区的句柄，但**还没有扫描**（2026-11-15 懒启动）。
+     *
+     * 与 [None] 的区别只在「知不知道上次是哪个目录」：首页要能显示目录名、
+     * 点两张大卡时要能直接开始加载。真正递归遍历留到用户点进工作流，
+     * 免得每次冷启动都替一个可能马上要换掉的目录付扫描时间。
+     */
+    data class Idle(val handle: WorkspaceHandle) : WorkspaceState
+
     /** 正在扫描目录（递归遍历可能要几秒，千级文件更久）。 */
     data object Loading : WorkspaceState
 
@@ -103,6 +112,7 @@ fun WorkspaceState.collectionsOr(mock: List<ImageCollection>): List<ImageCollect
 val WorkspaceState.canOrganize: Boolean
     get() = when (this) {
         WorkspaceState.None -> true
+        is WorkspaceState.Idle -> true
         WorkspaceState.Loading -> false
         is WorkspaceState.Ready -> collections.isNotEmpty()
         is WorkspaceState.Denied -> true
@@ -117,6 +127,7 @@ val WorkspaceState.canOrganize: Boolean
  * | 状态 | 显示 | 理由 |
  * | --- | --- | --- |
  * | [None] | ❌ | 选目录的入口已经搬到首页；工作流里再放一条「当前显示演示数据 + 选择文件夹」是同一个功能摆两处 |
+ * | [Idle] | ❌ | 只是暂未扫描，属于正常态；这条在首页已经承担了「我在哪个目录」 |
  * | [Loading] | ✅ | 扫描可能几秒（千级文件更久），不说明的话用户只会觉得点不动 |
  * | [Ready] | ❌ | 一切正常时这条是纯噪声 —— 首页那一条已经承担了「我在哪个目录」 |
  * | [Denied] | ✅ | **必须**。见下面那条真正的理由 |
@@ -136,6 +147,7 @@ val WorkspaceState.canOrganize: Boolean
 val WorkspaceState.showsWorkspaceBar: Boolean
     get() = when (this) {
         WorkspaceState.None -> false
+        is WorkspaceState.Idle -> false
         WorkspaceState.Loading -> true
         is WorkspaceState.Ready -> false
         is WorkspaceState.Denied -> true
@@ -156,6 +168,7 @@ val WorkspaceState.showsWorkspaceBar: Boolean
  * 临时 IO（SD 卡抖动、别的应用占着文件），重扫一次就好。
  */
 fun WorkspaceState.handleOrNull(): WorkspaceHandle? = when (this) {
+    is WorkspaceState.Idle -> handle
     is WorkspaceState.Ready -> handle
     is WorkspaceState.Denied -> handle
     is WorkspaceState.Failed -> handle

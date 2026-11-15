@@ -134,8 +134,25 @@ class WorkspaceController(
     private var generation: Int = 0
 
     /**
-     * 冷启动恢复：上次授权过的工作区就重新扫描一次。
+     * 冷启动**只预置上次工作区的句柄，不扫描**（2026-11-15 懒启动）。
      *
+     * 用户的原话是「打开就扫描工作区，要是想要切换工作区就有点浪费时间」。
+     * 所以这里只把目录名恢复出来让首页有东西可显示，真正遍历推迟到用户点进工作流
+     * （[load]）或明确刷新（[refresh] 对 [WorkspaceState.Idle] 同样不动作）。
+     *
+     * 没有上次工作区时保持 [WorkspaceState.None]。旧行为仍保留在 [restore]。
+     */
+    fun prime() {
+        val handle = source.workspaces().firstOrNull()?.handle
+        cancelJob()
+        closeWatcher()
+        state = if (handle == null) WorkspaceState.None else WorkspaceState.Idle(handle)
+    }
+
+    /**
+     * 冷启动恢复：上次授权过的工作区就**立即重新扫描一次**。
+     *
+     * 懒启动改走 [prime]；保留本方法给显式「马上要内容」的入口与既有测试。
      * **不缓存上次的扫描结果**：目录内容随时会变（用户可能刚删了图），
      * 显示一份过期列表比重新扫一遍更糟。
      */
@@ -357,6 +374,10 @@ class WorkspaceController(
      *   原本是 `Ready` 时降级，避免把「暂时读不到」误报成失效。
      */
     fun refresh() {
+        // Idle 明确表示「还没为这个目录扫过」：回前台绝不能在这里偷偷补扫，
+        // 否则懒启动就白做了（用户只是切出去再回来，目录就又被遍历一遍）。
+        if (state is WorkspaceState.Idle) return
+
         // `Loading` 时 currentHandle() 返回 null：此时 load() 的协程还没落状态，
         // 插一轮刷新会与它抢同一个 job 字段，故直接跳过（load 结束后自然会带上新内容）。
         if (currentHandle() == null) return

@@ -105,6 +105,37 @@ class ImagePreviewTest {
         )
     }
 
+    /**
+     * 双击放大 2× 后仍然要清晰，所以取图不能只等于显示尺寸。
+     *
+     * 真机回归（2026-11-15）：普通视图已经清晰，但双击放大后明显发糊——因为只按
+     * 1264×2780 的显示尺寸解码，2× 后每屏只剩约 632 个源像素。预览页最大可放大 5×，
+     * 至少要为双击倍率预留真实像素；长边仍由 `MAX_PREVIEW_REQUEST_PX` 兜底。
+     */
+    @Test
+    fun `preview requests extra pixels for double tap zoom`() {
+        val requested = CopyOnWriteArrayList<Pair<Int, Int>>()
+        val source = ThumbnailSource { _, widthPx, heightPx ->
+            requested += widthPx to heightPx
+            null
+        }
+        val withUri = items.map { it.copy(uri = "content://doc/${it.id}") }
+        rule.setContent {
+            Box(Modifier.requiredSize(width = 400.dp, height = 1000.dp)) {
+                ImagePreview(withUri, initialIndex = 0, onClose = {}, imageSource = source)
+            }
+        }
+        rule.waitForIdle()
+
+        val node = rule.onNodeWithTag(TAG_PREVIEW_IMAGE).fetchSemanticsNode()
+        val (widthPx, heightPx) = requested.last()
+        assertTrue(
+            widthPx >= node.size.width * 2 && heightPx >= node.size.height * 2,
+            "双击放大后要清晰，取图应至少为显示尺寸的 2 倍（显示 ${node.size.width}x${node.size.height}px），" +
+                "实际请求 ${widthPx}x${heightPx}px；只按显示尺寸解码，放大后必然发糊",
+        )
+    }
+
     @Test
     fun `next button actually updates the visible label`() {
         rule.setContent { ImagePreview(items, initialIndex = 0, onClose = {}) }

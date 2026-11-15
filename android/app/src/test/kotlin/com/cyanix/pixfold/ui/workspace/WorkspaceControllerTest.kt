@@ -226,6 +226,53 @@ class WorkspaceControllerTest {
     }
 
     @Test
+    fun `懒启动只预留上次工作区句柄不扫描`() = runTest {
+        val source = ScriptedSource(LoadResult.Success(collections()), last = handle)
+        val controller = WorkspaceController(source, testScope(), ioDispatcher = testDispatcher())
+
+        controller.prime()
+
+        val idle = assertIs<WorkspaceState.Idle>(controller.state)
+        assertEquals(handle, idle.handle)
+        assertTrue(source.loadCalls.isEmpty(), "冷启动只恢复句柄；真正扫描留到用户点进工作流")
+    }
+
+    @Test
+    fun `懒启动没有上次工作区时保持 None 不扫描`() = runTest {
+        val source = ScriptedSource(LoadResult.Success(collections()), last = null)
+        val controller = WorkspaceController(source, testScope(), ioDispatcher = testDispatcher())
+
+        controller.prime()
+
+        assertEquals(WorkspaceState.None, controller.state)
+        assertTrue(source.loadCalls.isEmpty())
+    }
+
+    @Test
+    fun `Idle 状态下刷新不得偷偷扫描`() = runTest {
+        val source = ScriptedSource(LoadResult.Success(collections()), last = handle)
+        val controller = WorkspaceController(source, testScope(), ioDispatcher = testDispatcher())
+        controller.prime()
+
+        controller.refresh()
+
+        assertIs<WorkspaceState.Idle>(controller.state)
+        assertTrue(source.loadCalls.isEmpty(), "没进工作流前回前台不能把目录扫一遍")
+    }
+
+    @Test
+    fun `懒启动预留后点工作流才真正加载`() = runTest {
+        val source = ScriptedSource(LoadResult.Success(collections()), last = handle)
+        val controller = WorkspaceController(source, testScope(), ioDispatcher = testDispatcher())
+        controller.prime()
+
+        controller.load(handle)
+
+        assertIs<WorkspaceState.Ready>(controller.state)
+        assertEquals(1, source.loadCalls.size)
+    }
+
+    @Test
     fun `授权失效会自动重试一次而不是直接报失效`() = runTest {
         // 冷启动时 takePersistableUriPermission 可能尚未就绪，表现同样是 SecurityException。
         // 不重试的话用户每次开机都要看到一次「授权已失效」。

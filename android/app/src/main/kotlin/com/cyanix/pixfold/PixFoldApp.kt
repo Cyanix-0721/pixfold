@@ -18,12 +18,14 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Rect
 import androidx.core.net.toUri
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalResources
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
+import androidx.navigation3.runtime.NavKey
 import androidx.navigation3.runtime.rememberNavBackStack
 import com.cyanix.pixfold.domain.mock.MockData
 import com.cyanix.pixfold.domain.mock.MockDataB
@@ -69,7 +71,11 @@ import com.cyanix.pixfold.nav.HomeRoute
 import com.cyanix.pixfold.nav.LicensesRoute
 import com.cyanix.pixfold.nav.NavTransitionStyle
 import com.cyanix.pixfold.nav.PixFoldNavHost
+import com.cyanix.pixfold.nav.ROUTE_CLASS_METADATA
 import com.cyanix.pixfold.nav.popOne
+import com.cyanix.pixfold.nav.rootFadePop
+import com.cyanix.pixfold.nav.settingsSlidePop
+import com.cyanix.pixfold.nav.workflowShrinkPop
 import com.cyanix.pixfold.nav.PreviewRoute
 import com.cyanix.pixfold.nav.SettingsRoute
 import com.cyanix.pixfold.nav.OrganizeRoute
@@ -83,6 +89,7 @@ import com.cyanix.pixfold.ui.theme.PixFoldTheme
 import com.cyanix.pixfold.ui.workspace.LocalThumbnailSource
 import com.cyanix.pixfold.ui.workspace.WorkspaceController
 import com.cyanix.pixfold.ui.workspace.WorkspaceListDialog
+import com.cyanix.pixfold.ui.workspace.WorkspaceState
 import com.cyanix.pixfold.ui.workspace.rejectAllPinnedHint
 import com.cyanix.pixfold.ui.workspace.collectionsOr
 import com.cyanix.pixfold.ui.workspace.handleOrNull
@@ -135,6 +142,14 @@ fun PixFoldApp(
      * 同一套思路（domain 定接口 + app 层实现 + 测试注入内存实现）。
      */
     workspaceSource: WorkspaceSource? = null,
+    /**
+     * 冷启动是否走懒加载：只恢复上次工作区的句柄，不扫描；点进工作流时才真正加载。
+     *
+     * **默认 `false` 是刻意的**：既有 24+ 处导航测试都依赖「冷启动立即 Ready」，
+     * 在生产入口（[MainActivity]）显式传 `true`，测试不改一行就能继续验返回栈等旧主题。
+     * 这也让本参数成为「行为开关」：出问题时可以一键退回旧的立即扫描。
+     */
+    lazyWorkspaceStart: Boolean = false,
     /**
      * 工作流 C 的平台层（就地更新已有 CBZ 的元数据）。默认 `null` = 生产路径
      * 在内部用 SafMetaUpdater 构造（**需要工作区**，没有工作区时它也构造不出来 ⇒
@@ -220,9 +235,23 @@ fun PixFoldApp(
         workspaceController.openList()
         showWorkspaceList = true
     }
-    // 冷启动恢复：上次授权过的目录自动重扫。**不缓存上次结果** ——
-    // 目录内容随时会变，显示过期列表比重新扫一遍更糟。
-    LaunchedEffect(Unit) { workspaceController.restore() }
+    // 首页两张大卡在根坐标系里的位置;工作流返回时以对应卡片中心作为缩放轴。
+    var organizeCardBounds by remember { mutableStateOf<Rect?>(null) }
+    var libraryCardBounds by remember { mutableStateOf<Rect?>(null) }
+    // 懒启动下等待「加载完成后再跳」的目标工作流。用户点首页大卡时先记下要去哪，
+    // 等扫到非空内容才真正导航；失败/空目录就留在首页，用户能直接换目录。
+    var pendingWorkflow by remember { mutableStateOf<NavKey?>(null) }
+    // 冷启动：生产走懒启动（只恢复句柄，扫描推迟到用户点进工作流）。
+    // 默认仍走旧的立即重扫，保证既有测试与「马上要内容」的入口行为不变。
+    LaunchedEffect(Unit) {
+        // 从「打包进度」通知进来的启动**不是休息态**：用户马上要看结果，
+        // 这时懒加载会把工作流 B 搭在 mock 上。此时退回立即重扫。
+        if (lazyWorkspaceStart && !openPackOnStart) {
+            workspaceController.prime()
+        } else {
+            workspaceController.restore()
+        }
+    }
     val workspaceState = workspaceController.state
     // 「当前打开的是哪个工作区目录」的稳定标识。**下游凡是「该不该重置」的判断
     // 都用它，而不是 `collections`**：`collections` 会在同一个目录里随文件增删
@@ -375,7 +404,15 @@ fun PixFoldApp(
             LaunchedEffect(openPackOnStart) {
                 if (!openPackOnStart) return@LaunchedEffect
                 startAtPack = true
-                if (backStack.lastOrNull() != LibraryRoute) backStack.add(LibraryRoute)
+                val idle = workspaceState as? WorkspaceState.Idle
+                if (idle != null) {
+                    // 热启动时应用可能还停在懒启动的 Idle 态；先加载，等扫描成功后
+                    // 由下方 pendingWorkflow 的统一出口补导航，别拿 mock 进打包页。
+                    pendingWorkflow = LibraryRoute
+                    workspaceController.load(idle.handle)
+                } else if (backStack.lastOrNull() != LibraryRoute) {
+                    backStack.add(LibraryRoute)
+                }
                 onPackRouteHandled()
             }
 
@@ -390,6 +427,34 @@ fun PixFoldApp(
             //     「批次默认 + 本组独立」（验收第 7 项），cn 是中文数字自然序的可证伪样例。
             val collections = remember(workspaceState) {
                 workspaceState.collectionsOr(MockData.workspaceA.collections)
+            }
+
+            // 懒启动：用户已经在首页点了工作流，等这次加载真正成功后补上导航。
+            // 失败 / 空目录一律清掉 pending —— 留在首页并让大卡继续禁用，
+            // 那才是用户能做决定的界面（换目录 / 重选授权）。
+            LaunchedEffect(workspaceState, pendingWorkflow) {
+                val target = pendingWorkflow ?: return@LaunchedEffect
+                // 用户点完卡片又立刻去了设置/别处：别在扫描结束后从背后把他弹进工作流。
+                // 通知路径（LibraryRoute）例外，它本来就是要把人带到打包页。
+                if (target != LibraryRoute && backStack.lastOrNull() != HomeRoute) {
+                    pendingWorkflow = null
+                    return@LaunchedEffect
+                }
+                when (val s = workspaceState) {
+                    is WorkspaceState.Ready -> {
+                        pendingWorkflow = null
+                        if (s.collections.isNotEmpty()) {
+                            backStack.add(target)
+                        } else if (target == LibraryRoute) {
+                            startAtPack = false
+                        }
+                    }
+                    is WorkspaceState.Denied, is WorkspaceState.Failed -> {
+                        pendingWorkflow = null
+                        if (target == LibraryRoute) startAtPack = false
+                    }
+                    else -> Unit
+                }
             }
             // ---- 工作流 B 的真实数据源(D2b,用户 2026-10-19 裁决「复用工作区」)----
             //
@@ -575,10 +640,39 @@ fun PixFoldApp(
             PixFoldNavHost(
                 backStack = backStack,
                 predictiveBackAnimation = settings.predictiveBackAnimation,
-                // 根级 = 大页面切换:虚化 + 缩小
                 style = NavTransitionStyle.Page,
+                popTransition = { hostSize, swipeEdge ->
+                    // Nav3 不同实现里 initialState/targetState 的方向不一定顺读,
+                    // 两侧都查,避免返回配方落到 fallback 淡出。
+                    // Scene.key 是场景标识,不是路由键;路由类由 NavEntry.metadata 带出来。
+                    val involvedKeys = setOf(
+                        initialState.entries.last().metadata[ROUTE_CLASS_METADATA],
+                        targetState.entries.last().metadata[ROUTE_CLASS_METADATA],
+                    )
+                    when {
+                        SettingsRoute::class in involvedKeys -> settingsSlidePop(swipeEdge)
+                        OrganizeRoute::class in involvedKeys ->
+                            workflowShrinkPop(organizeCardBounds, hostSize)
+                        LibraryRoute::class in involvedKeys ->
+                            workflowShrinkPop(libraryCardBounds, hostSize)
+                        else -> rootFadePop()
+                    }
+                },
             ) {
                 composable<HomeRoute> {
+                    // 首页两支入口的统一处理：懒启动的 Idle 态（只恢复了句柄、还没扫）
+                    // 先触发加载并记下去向，扫描成功后由上面的 LaunchedEffect 补导航；
+                    // 其余状态（Ready / 旧路径）照旧立刻进入。
+                    val openWorkflow: (NavKey) -> Unit = { target ->
+                        val idle = workspaceState as? WorkspaceState.Idle
+                        if (idle != null) {
+                            pendingWorkflow = target
+                            workspaceController.load(idle.handle)
+                        } else {
+                            backStack.add(target)
+                        }
+                    }
+
                     // 用户 2026-10-14 裁决:「默认返回到主页改为触发重置。**只有工作流内部切换不会自动重置**」。
                     //
                     // **为什么复位挂在「回到主页」这一侧,而不是 `OrganizeRoute` 的 `DisposableEffect`**:
@@ -600,8 +694,10 @@ fun PixFoldApp(
                     }
                     DestinationSurface {
                         HomeScreen(
-                            onOpenOrganize = { backStack.add(OrganizeRoute) },
-                            onOpenLibrary = { backStack.add(LibraryRoute) },
+                            onOpenOrganize = { openWorkflow(OrganizeRoute) },
+                            onOpenLibrary = { openWorkflow(LibraryRoute) },
+                            onOrganizeCardBounds = { organizeCardBounds = it },
+                            onLibraryCardBounds = { libraryCardBounds = it },
                             onOpenSettings = { backStack.add(SettingsRoute) },
                             // 工作区条 + 入口准入（2026-10-24 用户裁决 乙/甲/乙）。
                             //

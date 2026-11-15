@@ -21,6 +21,7 @@ import com.cyanix.pixfold.TestText
 import com.cyanix.pixfold.TwoEntrySource
 import com.cyanix.pixfold.domain.mock.MockData
 import com.cyanix.pixfold.domain.source.WorkspaceHandle
+import com.cyanix.pixfold.ui.organize.TAG_SORT_PAGE
 import com.cyanix.pixfold.ui.theme.PixFoldTheme
 import com.cyanix.pixfold.ui.workspace.TAG_WORKSPACE_ACTION
 import com.cyanix.pixfold.ui.workspace.TAG_WORKSPACE_ADD
@@ -196,6 +197,30 @@ class HomeWorkspaceTest {
         assertEquals(1, library)
     }
 
+    /**
+     * 懒启动的 Idle 态：目录句柄已经恢复，但**还没扫描**。
+     *
+     * 用户要的正是这个：冷启动不扫工作区，切工作区才不必先替上一个目录付扫描时间。
+     * 两张大卡必须照常可点 —— 点下去才真正 load，扫到非空内容再进工作流。
+     */
+    @Test
+    fun `懒启动预留工作区时两张大卡直接可点`() {
+        var organize = 0
+        var library = 0
+        home(
+            state = WorkspaceState.Idle(handle),
+            onOrganize = { organize++ },
+            onLibrary = { library++ },
+        )
+
+        rule.onNodeWithText(organizeTitle).assertIsEnabled()
+        rule.onNodeWithText(libraryTitle).assertIsEnabled()
+        rule.onNodeWithText(organizeTitle).performClick()
+        rule.onNodeWithText(libraryTitle).performClick()
+        assertEquals(1, organize)
+        assertEquals(1, library)
+    }
+
     // ================= 3. 工作区条:位置与文案 =================
 
     @Test
@@ -218,6 +243,13 @@ class HomeWorkspaceTest {
     @Test
     fun `工作区条显示当前目录名`() {
         home(state = WorkspaceState.Ready(handle, MockData.workspaceA.collections))
+        rule.onNodeWithText(TestText.of(R.string.workspace_current, "照片库")).assertIsDisplayed()
+    }
+
+    @Test
+    fun `懒启动时工作区条也显示上次目录名`() {
+        // Idle 只是没扫，目录名是已知的；别让首页在这一刻看起来像「没选过工作区」。
+        home(state = WorkspaceState.Idle(handle))
         rule.onNodeWithText(TestText.of(R.string.workspace_current, "照片库")).assertIsDisplayed()
     }
 
@@ -299,7 +331,25 @@ class HomeWorkspaceTest {
         rule.onNodeWithTag(TAG_WORKSPACE_DIALOG).assertExists()
     }
 
-    // ============ 5. 两条 entry 的装配:拖拽上报 / 「使用中」唯一性 ============
+    // ================= 5. 懒启动整装:不预扫、点卡片才加载 =================
+
+    @Test
+    fun `懒启动冷启动不扫描 点整理卡才加载并进入工作流`() {
+        val source = ReadyWorkspaceSource()
+        rule.setContent { PixFoldApp(workspaceSource = source, lazyWorkspaceStart = true) }
+
+        // 冷启动后首页已能显示上次工作区,但一次目录扫描都没发生。
+        rule.onNodeWithTag(TAG_WORKSPACE_BAR).assertIsDisplayed()
+        assertEquals(0, source.loadCalls, "冷启动只能恢复句柄，扫描必须推迟到用户点进工作流")
+
+        rule.onNodeWithText(organizeTitle).performClick()
+        rule.waitForIdle()
+
+        assertEquals(1, source.loadCalls, "点整理卡后必须只加载一次当前工作区")
+        rule.onNodeWithTag(TAG_SORT_PAGE).assertIsDisplayed()
+    }
+
+    // ============ 6. 两条 entry 的装配:拖拽上报 / 「使用中」唯一性 ============
     //
     // 下面两条都换 [TwoEntrySource]:一条 entry 的假源在语义上**压不住**它们 ——
     // 拖拽时 from == to,错序与正确归到同一下标;「使用中」也没法挂到「另一行」上。

@@ -59,7 +59,8 @@ const val TAG_WORKSPACE_ACTION = "workspace-action"
  * @param onPick 用户要求选择/更换目录。**非 Ready 状态共用这一个回调** ——
  *   重选在 SAF 层面是同一个动作（再走一次 `ACTION_OPEN_DOCUMENT_TREE`），
  *   拆成两个回调只会让调用方多写一个无意义的转接。
- * @param onOpenList 用户要求查看已授权的工作区列表。**只有 [WorkspaceState.Ready] 会接到它** ——
+ * @param onOpenList 用户要求查看已授权的工作区列表。**[WorkspaceState.Ready] 与
+ *   [WorkspaceState.Idle] 会接到它** —— 两者都知道当前目录，列表里也有别的记录可选；
  *   其余状态下列表为空或全是失效项，点进去只会让人更困惑，那些状态的整条点击仍走 [onPick]。
  */
 @Composable
@@ -69,9 +70,12 @@ fun WorkspaceBar(
     modifier: Modifier = Modifier,
     onOpenList: () -> Unit = {},
 ) {
-    // 只有 Ready 有列表可开。其余态列表为空或全是失效项，点进去只会让人更困惑；
-    // 直接给系统选择器 —— 那是它们唯一的出路。
-    val rowAction = if (state is WorkspaceState.Ready) onOpenList else onPick
+    // Ready 与 Idle 都知道当前目录，也都该能打开工作区列表；其余态列表为空或
+    // 全是失效项，点进去只会让人更困惑，直接给系统选择器 —— 那是它们唯一的出路。
+    val rowAction = when (state) {
+        is WorkspaceState.Ready, is WorkspaceState.Idle -> onOpenList
+        else -> onPick
+    }
 
     // 文案在组合上下文里解析：semantics{} 的 lambda 不是 @Composable。
     val actionLabel: String
@@ -90,6 +94,14 @@ fun WorkspaceBar(
             actionCd = ""
             statusText = stringResource(R.string.workspace_loading)
             statusCd = null
+        }
+        is WorkspaceState.Idle -> {
+            // 还没扫，但目录名是已知的；展示成和 Ready 一样的「当前工作区」，
+            // 别让懒启动看起来像「没选过目录」。
+            actionLabel = stringResource(R.string.workspace_button)
+            actionCd = stringResource(R.string.workspace_button_cd)
+            statusText = stringResource(R.string.workspace_current, state.handle.displayName)
+            statusCd = stringResource(R.string.workspace_current_cd, state.handle.displayName)
         }
         is WorkspaceState.Ready -> {
             actionLabel = stringResource(R.string.workspace_button)

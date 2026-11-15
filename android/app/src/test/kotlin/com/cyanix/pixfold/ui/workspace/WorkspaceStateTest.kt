@@ -83,7 +83,8 @@ class WorkspaceStateTest {
     fun `只有 Ready 用真实集合 其余一律回退 mock`() {
         assertEquals(realCollections, WorkspaceState.Ready(handle, realCollections).collectionsOr(mockCollections))
 
-        // 这四条是 D1 既有测试的生存条件：默认无授权时界面必须照旧显示 mock。
+        // 这几条是既有测试的生存条件：未扫描 / 无授权时界面必须照旧显示 mock。
+        assertEquals(mockCollections, WorkspaceState.Idle(handle).collectionsOr(mockCollections))
         assertEquals(mockCollections, WorkspaceState.None.collectionsOr(mockCollections))
         assertEquals(mockCollections, WorkspaceState.Loading.collectionsOr(mockCollections))
         assertEquals(mockCollections, WorkspaceState.Denied(handle).collectionsOr(mockCollections))
@@ -107,6 +108,7 @@ class WorkspaceStateTest {
 
     @Test
     fun `无授权或扫描失败时仍可整理 走 mock 演示`() {
+        assertTrue(WorkspaceState.Idle(handle).canOrganize, "Idle 只是还没扫，与 None 同样可演示")
         assertTrue(WorkspaceState.None.canOrganize)
         assertTrue(WorkspaceState.Denied(handle).canOrganize)
         assertTrue(WorkspaceState.Failed("x").canOrganize)
@@ -114,12 +116,18 @@ class WorkspaceStateTest {
     }
 
     @Test
-    fun `只有 Ready 与 Denied 能取出授权`() {
+    fun `Idle 在工作流页不挂工作区条 正常态不占位置`() {
+        assertFalse(WorkspaceState.Idle(handle).showsWorkspaceBar)
+    }
+
+    @Test
+    fun `只有 Ready Denied 与 Idle 能取出授权`() {
         // 刷新（WorkspaceController.refresh）与「是否换了工作区」的判断全靠它。
         // 判错的形态：某个状态下刷新静默失效（用户改完文件回来看不到变化），
         // 或者换工作区时把旧状态当成同一个工作区而对账到错误的集合上。
         assertEquals(handle, WorkspaceState.Ready(handle, realCollections).handleOrNull())
         assertEquals(handle, WorkspaceState.Denied(handle).handleOrNull())
+        assertEquals(handle, WorkspaceState.Idle(handle).handleOrNull(), "Idle 必须认得出上次的目录名")
 
         assertNull(WorkspaceState.None.handleOrNull())
         assertNull(WorkspaceState.Loading.handleOrNull())

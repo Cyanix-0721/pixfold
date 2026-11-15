@@ -19,6 +19,9 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.layout.boundsInRoot
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
@@ -57,6 +60,10 @@ fun HomeScreen(
     onOpenLibrary: () -> Unit,
     // Modifier 必须是**第一个可选参数**(Compose 约定,lint ModifierParameter 强制)。
     modifier: Modifier = Modifier,
+    /** 整理卡在根坐标系中的位置;返回时以它的中心作为缩放轴。 */
+    onOrganizeCardBounds: (Rect?) -> Unit = {},
+    /** 打包卡在根坐标系中的位置;返回时以它的中心作为缩放轴。 */
+    onLibraryCardBounds: (Rect?) -> Unit = {},
     onOpenSettings: () -> Unit = {},
     contentInsets: WindowInsets = WindowInsets.safeDrawing,
     /**
@@ -120,8 +127,20 @@ fun HomeScreen(
             }
         }
         val canStart = canStartWorkflow(workspaceState)
-        WorkflowEntry(organizeTitle, organizeSubtitle, onOpenOrganize, enabled = canStart)
-        WorkflowEntry(libraryTitle, librarySubtitle, onOpenLibrary, enabled = canStart)
+        WorkflowEntry(
+            organizeTitle,
+            organizeSubtitle,
+            onOpenOrganize,
+            enabled = canStart,
+            onBoundsChange = onOrganizeCardBounds,
+        )
+        WorkflowEntry(
+            libraryTitle,
+            librarySubtitle,
+            onOpenLibrary,
+            enabled = canStart,
+            onBoundsChange = onLibraryCardBounds,
+        )
 
         // 两张卡都点不动时必须**说明为什么**,否则首屏就是一堵死墙。
         // 只在真的被挡住时才出现,工作区就绪时这一行不存在。
@@ -165,6 +184,9 @@ fun HomeScreen(
  * `Ready` 但**空列表**同样不可进:用户选了个没有图片的文件夹,进去只会看到空态,
  * 真正的下一步是换一个文件夹(条上就有「选择文件夹」)。
  *
+ * `Idle`（懒启动只恢复了句柄）**可进**：点下去才真正扫目录，扫到非空内容才进工作流；
+ * 扫到空/失败就留在首页。入口不能因为「还没扫」就禁用，否则用户永远点不动。
+ *
  * ## 判据为什么不对 `null` 生效
  *
  * `null` = 宿主**没接**工作区(既有测试与 D1 演示路径),此时本组件无权假定制它有,
@@ -173,6 +195,7 @@ fun HomeScreen(
 internal fun canStartWorkflow(state: WorkspaceState?): Boolean = when (state) {
     null -> true
     WorkspaceState.None -> false
+    is WorkspaceState.Idle -> true
     WorkspaceState.Loading -> false
     is WorkspaceState.Ready -> state.collections.isNotEmpty()
     is WorkspaceState.Denied -> false
@@ -224,6 +247,7 @@ private fun WorkflowEntry(
     subtitle: String,
     onClick: () -> Unit,
     enabled: Boolean = true,
+    onBoundsChange: (Rect?) -> Unit = {},
 ) {
     // enabled = false 走 clickable 的 enabled 参数，不是把 onClick 换成空 lambda：
     // 只有前者会往语义树写 Disabled，读屏才知道「这个入口现在用不了」；
@@ -232,6 +256,7 @@ private fun WorkflowEntry(
     Card(
         modifier = Modifier
             .fillMaxWidth()
+            .onGloballyPositioned { onBoundsChange(it.boundsInRoot()) }
             .clickable(enabled = enabled, onClick = onClick)
             .semantics { contentDescription = title },
         border = BorderStroke(

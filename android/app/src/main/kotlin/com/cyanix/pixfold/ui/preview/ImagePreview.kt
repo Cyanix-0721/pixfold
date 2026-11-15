@@ -65,13 +65,26 @@ fun zoomAmount(scale: Float): String = String.format(java.util.Locale.ROOT, "%.2
 private const val DOUBLE_TAP_SCALE = 2f
 
 /**
+ * 预览解码尺寸相对显示尺寸的倍数（至少覆盖双击放大）。
+ *
+ * 只按显示尺寸解码时，双击放大 2× 后每个屏幕像素只摊到半个源像素，必然发糊
+ * （2026-11-15 真机回归）。按 2× 显示尺寸请求，双击后接近 1:1。
+ */
+private const val PREVIEW_DECODE_SCALE = 2L
+
+/**
  * 预览请求解码尺寸的上限（px）。
  *
- * 手机屏幕的物理长边目前最多 4K 级；把 1264×2780 的整屏内容塞进 512×512 的缩略图
- * 会被放大成 5 倍以上，肉眼可见发糊（2026-11-14 真机回归）。
- * 4096 足够覆盖 4K，同时又给极端无界约束兜底，避免 Constraints.Infinity 直接当尺寸。
+ * 手机屏幕的物理长边目前最多 4K 级；即使按 2× 显示尺寸请求，长边也以 4096 兜底，
+ * 避免大屏或极端无界约束（Constraints.Infinity）把位图撑爆。
  */
 private const val MAX_PREVIEW_REQUEST_PX = 4096
+
+/** 显示边长 → 解码边长；按 [PREVIEW_DECODE_SCALE] 预留放大像素，并以 [MAX_PREVIEW_REQUEST_PX] 封顶。 */
+private fun previewRequestPx(displayPx: Int): Int =
+    (displayPx.toLong() * PREVIEW_DECODE_SCALE)
+        .coerceIn(1L, MAX_PREVIEW_REQUEST_PX.toLong())
+        .toInt()
 
 /**
  * 大图预览(验收第 2 项):自适应窗口、可缩放、可拖动平移、可翻页。
@@ -129,10 +142,10 @@ fun ImagePreview(
             .testTag(TAG_PREVIEW)
             .background(Color.Black),
     ) {
-        // 取图尺寸跟随**实际显示区域**，而不是网格缩略图的 512px。
-        // 长边足够覆盖整屏，ContentScale.Fit 再保证整张图都看得见（不裁边）。
-        val requestWidthPx = constraints.maxWidth.coerceIn(1, MAX_PREVIEW_REQUEST_PX)
-        val requestHeightPx = constraints.maxHeight.coerceIn(1, MAX_PREVIEW_REQUEST_PX)
+        // 取图尺寸至少是显示区域的 2 倍，双击放大后才不会发糊；
+        // 长边由 MAX_PREVIEW_REQUEST_PX 封顶，ContentScale.Fit 再保证整张图都看得见（不裁边）。
+        val requestWidthPx = previewRequestPx(constraints.maxWidth)
+        val requestHeightPx = previewRequestPx(constraints.maxHeight)
 
         // 图片区:占满可用空间 = 自适应窗口;手势自研。
         // 预览显示文件名(去掉扩展名),便于确认"当前看的是哪一张"。

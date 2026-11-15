@@ -45,6 +45,10 @@ class ReadyWorkspaceSource(
     /** 就绪状态 = 列表里本来就有这一条，且它排在最前（= 上次用过的）。 */
     private val entries = mutableListOf(WorkspaceEntry(handle, pinned = false))
 
+    /** 真正遍历目录的次数。懒启动测试靠它证明冷启动没有预扫。 */
+    var loadCalls: Int = 0
+        private set
+
     override fun workspaces(): List<WorkspaceEntry> = entries.toList()
 
     override fun rememberWorkspace(handle: WorkspaceHandle): RememberResult = RememberResult.Added
@@ -58,8 +62,10 @@ class ReadyWorkspaceSource(
     /** 「就绪」= 这条确实持有系统授权（否则界面会把它画进「只记住了路径」下区）。 */
     override fun persistentGrants(): Set<String> = setOf(handle.treeUri)
 
-    override fun loadCollections(handle: WorkspaceHandle): LoadResult =
-        LoadResult.Success(collections)
+    override fun loadCollections(handle: WorkspaceHandle): LoadResult {
+        loadCalls++
+        return LoadResult.Success(collections)
+    }
 
     override fun readBytes(item: SourceItem): ByteArray? = null
 }

@@ -75,6 +75,7 @@ import com.cyanix.pixfold.ui.components.isPortraitOrientation
 import com.cyanix.pixfold.ui.components.orientationWidth
 import com.cyanix.pixfold.ui.text.textOf
 
+const val TAG_SORT_PAGE = "sort-page"
 const val TAG_GRID = "view-grid"
 const val TAG_LIST = "view-list"
 const val TAG_MODE_TOGGLE = "view-mode-toggle"
@@ -318,7 +319,8 @@ fun SortAndPreviewPage(
     Column(
         modifier = modifier
             .fillMaxSize()
-            .windowInsetsPadding(contentInsets),
+            .windowInsetsPadding(contentInsets)
+            .testTag(TAG_SORT_PAGE),
     ) {
         // 集合切换:让"批次统一 + 逐项例外"在界面上可操作(验收第 7 项)
         //

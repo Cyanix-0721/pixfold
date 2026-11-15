@@ -7,6 +7,7 @@ import androidx.activity.BackEventCompat
 import androidx.activity.ComponentActivity
 import androidx.compose.ui.graphics.asAndroidBitmap
 import androidx.compose.ui.test.captureToImage
+import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
@@ -14,8 +15,11 @@ import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
 import com.cyanix.pixfold.domain.settings.InMemorySettingsStore
 import com.cyanix.pixfold.domain.settings.PixFoldSettings
+import com.cyanix.pixfold.domain.settings.ThemeMode
 import com.cyanix.pixfold.ui.TAG_SETTINGS_BUTTON
 import com.cyanix.pixfold.ui.settings.TAG_SETTINGS_PAGE
+import com.cyanix.pixfold.ui.organize.TAG_SORT_PAGE
+import com.cyanix.pixfold.nav.WORKFLOW_SHRINK_MOTION
 import com.cyanix.pixfold.ui.organize.TAG_STEP_BACK
 import com.cyanix.pixfold.ui.organize.TAG_STEP_NAMING
 import com.cyanix.pixfold.ui.organize.TAG_STEP_TABS
@@ -26,6 +30,7 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 import kotlin.math.abs
+import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
 /**
@@ -34,29 +39,34 @@ import kotlin.test.assertTrue
  * ## 守护的规格(用户逐字给出)
  *
  * - 工作流内部(带步骤的容器):「拖动越多当前页越透明然后显示上级页面」→ 只淡出,**不缩放**;
- * - 大页面切换(根级):「当前页面虚化缩小」→ 淡出 **+** 缩小到 `PREDICTIVE_MIN_SCALE`。
+ * - 设置/许可→首页:设置页沿**滑动方向滑出并淡出**,首页从反侧滑入并淡入;
+ *   方向由预测性返回的 `swipeEdge` 决定(左边缘→右出,右边缘→左出,普通返回键按右出);
+ * - 工作流→首页:整页以首页对应卡片中心为轴**等比缩小并全程淡出**,不拉伸文字
+ *   (2026-11-15 用户裁决:「还是之前那种缩放淡化,字体别拉伸,改成整体等比缩放,
+ *   文字保持清晰不变形」)。
  *
- * 两档由 `NavTransitionStyle.Step` / `.Page` 区分,配方在
- * `android/app/src/main/kotlin/com/cyanix/pixfold/nav/PixFoldNav.kt`。
+ * 配方在 `android/app/src/main/kotlin/com/cyanix/pixfold/nav/PixFoldNav.kt`;
+ * 工作流返回用 `WORKFLOW_SHRINK_MOTION` 的整页 `scaleOut + fadeOut`,两者同一条
+ * `LinearEasing`,时长与延迟完全一致。
  *
  * ## 为什么必须**同时**看几何和像素
  *
- * `boundsInRoot` 只看得到缩放/位移,**看不到 alpha**;而步骤级恰恰只剩 alpha 这一维。
- * 反过来只看像素又分不清「淡出」和「淡出+缩小」。两档的判别式因此是:
+ * `boundsInRoot` 对缩放可见,但对**滑出视口**的节点会被裁成 0 宽 —— 设置页因此改用
+ * `getUnclippedBoundsInRoot()` 读真实位移;它看不到 alpha,步骤级(无缩放无位移)只能靠像素。
+ * 反过来只看像素又分不清「淡出」和「瞬切」。三者的判别式因此是:
  *
- * | | 宽度(几何) | 画面(像素) |
+ * | | 几何 | 画面(像素) |
  * |---|---|---|
- * | 步骤级 | 不变 | 必须变化(上级页露出来) |
- * | 根级 | 必须变小 | 必须变化 |
+ * | 步骤级 | 宽度不变 | 必须变化(上级页露出来) |
+ * | 设置返回 | 宽度不变、left 增大 | 必须变化,半程左侧亮度低于落地首页(淡入) |
+ * | 工作流返回 | 宽度等比缩小、中心向卡片移动 | 必须变化(淡出) |
  * | 开关关闭 | 不变 | **逐字节不变** |
  *
  * ## 第三个判别式:手势拉满时必须已经"长成"目标页
  *
- * 只有上面两条时**根级仍有漏洞**:把 `scaleOut(0.90) + fadeOut()` 削弱成
- * `scaleOut(0.90)`(丢掉虚化),宽度照样变小、像素照样变化,两条断言**全过**。
+ * 只靠几何 + 像素变化仍可能把动画换成别的无关变化。
  * 故补一条:手势拉到 `progress = 1f` 时,画面必须已经等于**真的退回去之后**的画面
- * (彼时 alpha 恰好为 0,上层页彻底消失,屏幕上只剩目标页)。缩放单独存在时,
- * 缩小中的设置页仍然盖在首页上,这一条必然失败。步骤级同样用这一条兜底。
+ * (彼时上层页彻底消失,屏幕上只剩目标页)。三档都用这一条兜底。
  *
  * ## 比对范围:只比内容区,不比整屏
  *
@@ -78,20 +88,32 @@ class TransitionStyleTest {
     @get:Rule
     val rule = createAndroidComposeRule<ComponentActivity>()
 
-    private fun event(progress: Float) = BackEventCompat(0f, 0f, progress, BackEventCompat.EDGE_LEFT)
+    private fun event(
+        progress: Float,
+        edge: Int = BackEventCompat.EDGE_LEFT,
+    ) = BackEventCompat(0f, 0f, progress, edge)
 
-    /** 手势进行中(不松手),推进到 [progress]。 */
-    private fun gestureTo(progress: Float) {
+    private var gestureStarted = false
+
+    /** 手势进行中(不松手),推进到 [progress]。可多次调用以取不同进度。 */
+    private fun gestureTo(
+        progress: Float,
+        edge: Int = BackEventCompat.EDGE_LEFT,
+    ) {
         rule.activityRule.scenario.onActivity { activity ->
             val dispatcher = activity.onBackPressedDispatcher
-            dispatcher.dispatchOnBackStarted(event(0f))
-            dispatcher.dispatchOnBackProgressed(event(progress))
+            if (!gestureStarted) {
+                dispatcher.dispatchOnBackStarted(event(0f, edge))
+                gestureStarted = true
+            }
+            dispatcher.dispatchOnBackProgressed(event(progress, edge))
         }
         rule.waitForIdle()
     }
 
     /** 松手完成手势,落到目标页。 */
     private fun release() {
+        gestureStarted = false
         rule.activityRule.scenario.onActivity { it.onBackPressedDispatcher.onBackPressed() }
         rule.waitForIdle()
     }
@@ -117,8 +139,37 @@ class TransitionStyleTest {
         return Bitmap.createBitmap(full, 0, tabsBottom, full.width, full.height - tabsBottom)
     }
 
-    private fun width(tag: String): Float =
-        rule.onNodeWithTag(tag).fetchSemanticsNode().boundsInRoot.width
+    private fun width(tag: String): Float = bounds(tag).width
+
+    private fun bounds(tag: String) =
+        rule.onNodeWithTag(tag).fetchSemanticsNode().boundsInRoot
+
+    /** 被滑出视口的节点 boundsInRoot 会被裁成 0 宽,取未裁剪边界看真实位移。 */
+    private fun unclippedBounds(tag: String) =
+        rule.onNodeWithTag(tag).getUnclippedBoundsInRoot()
+
+    /** 位图左侧 [fraction] 区域的平均亮度(0..255),用于判定淡入/淡出。 */
+    private fun meanLuminance(
+        bitmap: Bitmap,
+        fraction: Float = 0.25f,
+    ): Double {
+        val w = (bitmap.width * fraction).toInt().coerceAtLeast(1)
+        val y0 = (bitmap.height * 0.1f).toInt()
+        val y1 = (bitmap.height * 0.9f).toInt()
+        var sum = 0.0
+        var n = 0
+        for (y in y0 until y1) {
+            for (x in 0 until w) {
+                val c = bitmap.getPixel(x, y)
+                val r = (c ushr 16) and 0xFF
+                val g = (c ushr 8) and 0xFF
+                val b = c and 0xFF
+                sum += (r * 299 + g * 587 + b * 114) / 1000.0
+                n++
+            }
+        }
+        return sum / n
+    }
 
     /** 两张同尺寸位图之间**逐像素**不同的个数。 */
     private fun changedPixels(a: Bitmap, b: Bitmap): Int {
@@ -195,48 +246,168 @@ class TransitionStyleTest {
         )
     }
 
-    // --- 根级:淡出 + 缩小 ---
+    // --- 设置→首页:整页横向滑出 ---
 
     @Test
-    fun `the page level back gesture both fades and scales`() {
+    fun `the settings return gesture slides horizontally without scaling`() {
         rule.setContent {
-            PixFoldApp(store = InMemorySettingsStore(PixFoldSettings(predictiveBackAnimation = true)), workspaceSource = ReadyWorkspaceSource())
+            // 深色纯黑底:首页淡入时亮度单调上升,亮度差可稳定判定「只滑不淡」。
+            PixFoldApp(
+                store = InMemorySettingsStore(
+                    PixFoldSettings(
+                        predictiveBackAnimation = true,
+                        themeMode = ThemeMode.Dark,
+                        pureBlack = true,
+                    ),
+                ),
+                workspaceSource = ReadyWorkspaceSource(),
+            )
         }
         openSettingsPage()
 
         val before = rootBitmap()
-        val widthBefore = width(TAG_SETTINGS_PAGE)
+        val beforeBounds = unclippedBounds(TAG_SETTINGS_PAGE)
+        val widthBefore = beforeBounds.right.value - beforeBounds.left.value
+        val leftBefore = beforeBounds.left.value
 
+        gestureTo(0.25f)
+        val early = rootBitmap()
+        gestureTo(0.5f)
+        val half = rootBitmap()
         gestureTo(1f)
 
         val during = rootBitmap()
-        val widthDuring = width(TAG_SETTINGS_PAGE)
+        val duringBounds = unclippedBounds(TAG_SETTINGS_PAGE)
+        val widthDuring = duringBounds.right.value - duringBounds.left.value
+        val leftDuring = duringBounds.left.value
         val changed = changedPixels(before, during)
 
         release()
         val after = rootBitmap()
         val settled = changedPixels(after, during)
+        val earlyLeftLuminance = meanLuminance(early, fraction = 0.15f)
+        val halfLeftLuminance = meanLuminance(half)
+        val afterLeftLuminance = meanLuminance(after)
         println(
-            "PageStyle probe: widthBefore=$widthBefore widthDuring=$widthDuring " +
-                "changedPixels=$changed settledDiff=$settled",
+            "SettingsSlide probe: earlyLeftLuminance=$earlyLeftLuminance " +
+                "halfLeftLuminance=$halfLeftLuminance afterLeftLuminance=$afterLeftLuminance",
         )
 
-        // 几何:根级**必须**缩小 —— 这正是「大页面切换」区别于步骤级的那一维。
+        // 几何:设置页整页右移,但不缩放。
         assertTrue(
-            widthDuring < widthBefore - 1f,
-            "根级转场应缩小:widthBefore=$widthBefore widthDuring=$widthDuring",
+            abs(widthDuring - widthBefore) < 1f,
+            "设置返回不应缩放:widthBefore=$widthBefore widthDuring=$widthDuring",
         )
-        // 像素:虚化确实发生(`scaleOut` 只含 scale,「虚化」靠 `fadeOut` 补,必须单独验)。
+        assertTrue(
+            leftDuring > leftBefore + widthBefore * 0.5f,
+            "设置返回应向右滑出:leftBefore=$leftBefore leftDuring=$leftDuring",
+        )
+        // 像素:必须真的动起来露出首页。
         assertTrue(
             changed > settledTolerance,
-            "根级转场应随进度淡出,实际仅 $changed 个像素变化",
+            "设置返回应产生横向滑动,实际仅 $changed 个像素变化",
         )
-        // **关键一条**:满进度时必须已经只剩首页 —— 把 `fadeOut()` 从根级配方里拿掉,
-        // 宽度断言与上一条都仍然通过,只有这一条会失败。
+        // 早期(1/4 进度)左侧是刚淡入的首页:必须明显比落地后的首页暗,证明不是「只滑不淡」。
+        assertTrue(
+            earlyLeftLuminance < afterLeftLuminance * 0.8,
+            "设置返回应同时淡入首页:早期左侧亮度=$earlyLeftLuminance,落地后=$afterLeftLuminance",
+        )
+        // 满进度时必须已经只剩首页。
         assertTrue(
             settled < settledTolerance,
-            "手势拉满时应已完全退到首页(上层页 alpha 归零),实际与落地画面差 $settled 个像素",
+            "手势拉满时应已完全退到首页,实际与落地画面差 $settled 个像素",
         )
+    }
+
+    @Test
+    fun `the settings return follows the swipe edge direction`() {
+        rule.setContent {
+            PixFoldApp(store = InMemorySettingsStore(PixFoldSettings(predictiveBackAnimation = true)), workspaceSource = ReadyWorkspaceSource())
+        }
+        openSettingsPage()
+
+        val beforeBounds = unclippedBounds(TAG_SETTINGS_PAGE)
+        val widthBefore = beforeBounds.right.value - beforeBounds.left.value
+        val leftBefore = beforeBounds.left.value
+
+        gestureTo(0.5f, BackEventCompat.EDGE_RIGHT)
+
+        val duringBounds = unclippedBounds(TAG_SETTINGS_PAGE)
+        val widthDuring = duringBounds.right.value - duringBounds.left.value
+        val leftDuring = duringBounds.left.value
+        release()
+
+        assertTrue(
+            abs(widthDuring - widthBefore) < 1f,
+            "右边缘返回也不应缩放:widthBefore=$widthBefore widthDuring=$widthDuring",
+        )
+        assertTrue(
+            leftDuring < leftBefore - widthBefore * 0.2f,
+            "右边缘返回应向左滑出:leftBefore=$leftBefore leftDuring=$leftDuring",
+        )
+    }
+
+    // --- 工作流→首页:整页等比缩放 + 同步线性淡出 ---
+
+    @Test
+    fun `workflow shrink and fade share one uniform linear timeline`() {
+        val motion = WORKFLOW_SHRINK_MOTION
+        val start = motion.frameAt(0f)
+        val quarter = motion.frameAt(0.25f)
+        val half = motion.frameAt(0.5f)
+        val end = motion.frameAt(1f)
+
+        // 起点:原尺寸、完全不透明。
+        assertEquals(1f, start.scale, 0.0001f)
+        assertEquals(1f, start.alpha, 0.0001f)
+        // 缩放与透明度沿同一条进度线性推进,半程正好各走一半。
+        assertEquals(1f + (motion.targetScale - 1f) * 0.25f, quarter.scale, 0.0001f)
+        assertEquals(0.75f, quarter.alpha, 0.0001f)
+        assertEquals(1f + (motion.targetScale - 1f) * 0.5f, half.scale, 0.0001f)
+        assertEquals(0.5f, half.alpha, 0.0001f)
+        // 终点:缩到目标比例、完全透明。
+        assertEquals(motion.targetScale, end.scale, 0.0001f)
+        assertEquals(0f, end.alpha, 0.0001f)
+        // 淡出不得晚于缩放:延迟为 0 且两者时长一致,否则会「缩完了还在、或淡完了还在缩」。
+        assertEquals(0, motion.fadeDelayMillis)
+        assertEquals(motion.durationMillis, motion.fadeDurationMillis)
+    }
+
+    @Test
+    fun `workflow return keeps uniform aspect ratio without stretching`() {
+        rule.setContent {
+            PixFoldApp(store = InMemorySettingsStore(PixFoldSettings(predictiveBackAnimation = true)), workspaceSource = ReadyWorkspaceSource())
+        }
+        rule.waitForIdle()
+        rule.onNodeWithText(TestText.of(R.string.home_workflow_a)).performClick()
+        rule.waitForIdle()
+        rule.onNodeWithTag(TAG_SORT_PAGE).assertExists()
+
+        val before = bounds(TAG_SORT_PAGE)
+        val ratioBefore = before.width / before.height
+
+        gestureTo(0.5f)
+
+        val during = bounds(TAG_SORT_PAGE)
+        val ratioDuring = during.width / during.height
+        println(
+            "WorkflowAspect probe: before=${before.width}x${before.height} " +
+                "during=${during.width}x${during.height} ratioBefore=$ratioBefore ratioDuring=$ratioDuring",
+        )
+
+        assertTrue(
+            during.width < before.width * 0.95f,
+            "工作流返回应缩小:before=${before.width} during=${during.width}",
+        )
+        // 等比缩放:宽高比在全程保持不变;FillBounds 之类把内容拉满目标 bounds 会让比例漂移。
+        assertEquals(
+            ratioBefore,
+            ratioDuring,
+            0.02f,
+            "工作流返回必须整体等比缩放,不能横向拉伸:" +
+                "ratioBefore=$ratioBefore ratioDuring=$ratioDuring",
+        )
+        release()
     }
 
     // --- 开关关闭:两级都纹丝不动 ---
