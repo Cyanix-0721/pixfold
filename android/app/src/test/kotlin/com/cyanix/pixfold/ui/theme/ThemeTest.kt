@@ -11,7 +11,7 @@ import kotlin.test.assertNotEquals
 import kotlin.test.assertTrue
 
 /**
- * M3 合规断言(HANGOFF §6.5 / 规格 §2 约束 13)。
+ * M3 合规断言(HANDBOOK §6.5 / 规格 §2 约束 13)。
  *
  * 钉死两件事:
  *  1. 主题确实经 material3 语义角色提供颜色/排版/形状(组件才能不硬编码);

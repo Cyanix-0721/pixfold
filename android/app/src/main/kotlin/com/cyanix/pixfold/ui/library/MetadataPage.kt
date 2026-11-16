@@ -152,7 +152,7 @@ const val TAG_VOLUME_ALL = "metadata-volume-all"
  * 不在这里算默认名、不在这里判语言合不合法。
  *
  * 四件事必须在界面上可见,否则对应的验收项就是空谈:
- *  1. 每个字段的**建议值 + 来源**(建议 ≠ 事实,HANGOFF §6.1);
+ *  1. 每个字段的**建议值 + 来源**(建议 ≠ 事实,HANDBOOK §6.1);
  *  2. 每个字段的**逐字段"恢复建议值"**入口;
  *  3. 语言为 [LangChoice.Unset] 时的 `errorText: 语言默认未设置，需人工确认`;
  *  4. 批量设置的**实际生效卷数**(`已设置到 N 卷 (跳过 M 卷逐项例外)`),
@@ -714,7 +714,7 @@ private fun VolumeNumberRow(
  * 且"不写入标签"是**独立选项**。
  *
  * `Unset` 时用 `isError` + `supportingText` 明确提示 —— 语言不是可以放心自动推断的字段
- * (HANGOFF §4 工作流 B 原文)。
+ * (HANDBOOK §4 工作流 B 原文)。
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable

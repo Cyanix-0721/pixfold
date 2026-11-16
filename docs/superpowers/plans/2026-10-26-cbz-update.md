@@ -704,7 +704,7 @@ git commit -m "feat(ui): 工作流 C 接线（确认 → 进度 → 结果 + 成
 ### Task 8: 四道闸门 + 变异验证 + 文档回写 + 关机
 
 **Files:**
-- Modify: `HANGOFF.md`、`docs/phases/d4-mvp.md`、`docs/INDEX.md`、`README.md`、`AGENTS.md`（头部当前阶段一句话）
+- Modify: `docs/product/HANDBOOK.md`、`docs/phases/d4-mvp.md`、`docs/INDEX.md`、`README.md`、`AGENTS.md`（头部当前阶段一句话）
 - Create: `.superpowers/sdd/2026-10-26-cbz-update/progress.md`（gitignore）
 
 - [ ] **Step 1: 四道闸门**
@@ -721,7 +721,7 @@ cd android && ./gate.sh
 
 - [ ] **Step 3: 文档回写五处**
 
-- `HANGOFF.md`：§9.7 追加「工作流 C：就地更新元数据」节（决策 + 已实现 + 只能真机断清单）。
+- `docs/product/HANDBOOK.md`：§9.7 追加「工作流 C：就地更新元数据」节（决策 + 已实现 + 只能真机断清单）。
 - `docs/phases/d4-mvp.md`：工作流 C 的实现留痕。
 - `docs/INDEX.md`：登记新 spec 与新 plan 两行。
 - `README.md`：能力清单加一条。

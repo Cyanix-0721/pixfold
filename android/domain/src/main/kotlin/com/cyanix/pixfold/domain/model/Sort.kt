@@ -5,7 +5,7 @@ import com.cyanix.pixfold.domain.text.TextKey
 /**
  * 排序键。
  *
- * 枚举声明顺序 = UI 下拉顺序(HANGOFF §4 排序键定位,2026-09-10 用户定序),不得重排。
+ * 枚举声明顺序 = UI 下拉顺序(HANDBOOK §4 排序键定位,2026-09-10 用户定序),不得重排。
  *
  * [textKey] 指向 app 侧资源表的键 —— 领域层不持有译文,故语言不会在建计划时被冻住。
  */

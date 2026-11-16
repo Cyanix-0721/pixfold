@@ -1,7 +1,7 @@
 package com.cyanix.pixfold.domain.pack
 
 /**
- * Zip64 需求判定与中断半成品识别（D2b，HANGOFF §9 D2b「大归档写入 Zip64」）。
+ * Zip64 需求判定与中断半成品识别（D2b，HANDBOOK §9 D2b「大归档写入 Zip64」）。
  *
  * ## 归责边界
  *

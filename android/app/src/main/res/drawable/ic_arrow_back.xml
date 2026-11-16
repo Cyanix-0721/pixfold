@@ -5,7 +5,7 @@
   License: Apache License 2.0
 
   与 ic_arrow_drop_* / ic_push_pin_* 同策略:官方矢量几何数据 + painterResource,
-  不引入 material-icons 依赖(项目约定,见 HANGOFF §12.5)。
+  不引入 material-icons 依赖(项目约定,见 docs/notes/environment.md §12.5)。
 -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="24dp"

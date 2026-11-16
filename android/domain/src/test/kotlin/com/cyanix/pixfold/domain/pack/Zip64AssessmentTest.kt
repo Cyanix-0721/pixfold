@@ -7,7 +7,7 @@ import kotlin.test.assertIs
 import kotlin.test.assertTrue
 
 /**
- * D2b Zip64 写入领域层单测（HANGOFF §9 D2b「大归档写入 Zip64」）。
+ * D2b Zip64 写入领域层单测（HANDBOOK §9 D2b「大归档写入 Zip64」）。
  *
  * 覆盖：Zip64 需求判定（条目数 / 条目大小 / 中央目录偏移三阈值）+ 中断半成品识别。
  * 纯 JVM，不连真机。

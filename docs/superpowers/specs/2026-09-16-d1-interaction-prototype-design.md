@@ -2,10 +2,10 @@
 
 > **面向 Agent 执行者**:本规格是 D1 实施计划的论证依据。执行前请同时阅读本规格与对应阶段计划
 > (`docs/superpowers/plans/`),并遵守文末《全局约束》。
-> **产品决策权威仍是 `HANGOFF.md`**;本规格只承载 D1 阶段的实现级设计,与 HANGOFF 冲突时以 HANGOFF 为准。
+> **产品决策权威仍是 `docs/product/HANDBOOK.md`**;本规格只承载 D1 阶段的实现级设计,与 HANDBOOK 冲突时以 HANDBOOK 为准。
 
 **目标**:用 Kotlin + Jetpack Compose 在 Android 上重建 D1 交互原型——不连真实文件系统、用确定性 mock 数据,
-让用户完整走通「图片整理与命名」(工作流 A)与「CBZ 制作」(工作流 B)两条流程,并使 HANGOFF §9《D1 验收清单》20 项可逐条验证。
+让用户完整走通「图片整理与命名」(工作流 A)与「CBZ 制作」(工作流 B)两条流程,并使 HANDBOOK §9《D1 验收清单》20 项可逐条验证。
 
 **架构**:两模块 Gradle 工程。`domain/` 是**零 Android 依赖的纯 Kotlin JVM 模块**,承载全部领域逻辑
 (排序、命名、元数据、ComicInfo.xml、计划),以**不可变状态 + 纯函数**表达;`app/` 是 Compose UI 层,
@@ -22,7 +22,7 @@ JDK 17(temurin-17);测试用 JUnit4 + Robolectric 4.17。**零三方依赖**(除
 
 ### 1.1 做
 
-D1 六项交付(HANGOFF §9 D1):图片列表/缩略图预览、拖拽排序、命名结构编辑器、CBZ 元数据编辑器、
+D1 六项交付(HANDBOOK §9 D1):图片列表/缩略图预览、拖拽排序、命名结构编辑器、CBZ 元数据编辑器、
 执行计划预览、冲突和警告展示。外加排序规则编辑器与危险动作二次确认(验收清单第 5/6/7/16 项要求)。
 
 ### 1.2 不做(明确排除)
@@ -41,37 +41,37 @@ D1 六项交付(HANGOFF §9 D1):图片列表/缩略图预览、拖拽排序、�
 
 以下约束对所有阶段计划默认生效,数值与措辞不得擅改。
 
-1. **验收判据不可调整**:HANGOFF §9《D1 验收清单》20 项是 D1 唯一出口;任一条不通过即记为待修项,
+1. **验收判据不可调整**:HANDBOOK §9《D1 验收清单》20 项是 D1 唯一出口;任一条不通过即记为待修项,
    **不得改判据以迁就现状**。清单条目变更须用户确认。
 2. **修复自证三层**:凡交互或数据改动,依次过「领域单测 → UI 层断言 → 真机实证」;不得只凭"测试通过"交付。
    第 1、2 层必须能**离线**跑通(已实证,见 `d1-toolchain-evidence.md`)。
 3. **零三方依赖**:实现只用 Kotlin 标准库、AndroidX/Compose、JUnit4、Robolectric。
-   **不引入**任何拖拽/排序/日期/序列化三方库。拖拽自研(HANGOFF §12.5 用户决策)。
+   **不引入**任何拖拽/排序/日期/序列化三方库。拖拽自研(docs/notes/environment.md §12.5 用户决策)。
 4. **不应用 `kotlin-android` 插件**:AGP 9 内置 Kotlin。Compose 编译器插件
    (`org.jetbrains.kotlin.plugin.compose`)**必须单独应用且版本锁 2.2.10**(= AGP 9.4.0 内置 KGP 版本)。
    子模块声明插件**不带版本号**(版本在根 `build.gradle.kts` 以 `apply false` 声明)。
-5. **构建走 Windows 原生**:经 `cmd.exe /c gradlew.bat` 调用,不在 WSL 内跑 Gradle(HANGOFF §12.5 实测 159× I/O 差异)。
+5. **构建走 Windows 原生**:经 `cmd.exe /c gradlew.bat` 调用,不在 WSL 内跑 Gradle(docs/notes/environment.md §12.5 实测 159× I/O 差异)。
 6. **compileSdk / minSdk / targetSdk = 36 / 24 / 36**;`namespace`/`applicationId` = `com.pixfold.d1`。
    > **⚠️ 2026-09-22 更新**:本行记录的是 09-16 的取值。`compileSdk` 于 09-20 升到 **37**,
    > **`minSdk` 于 09-22 由 24 提到 30**(用户裁决,理由与实测见
-   > `docs/notes/d1-toolchain-evidence.md` §9 与 `HANGOFF.md` §12.6);**2026-09-25 又由 30 提到
+   > `docs/notes/d1-toolchain-evidence.md` §9 与 `docs/notes/environment.md` §12.6);**2026-09-25 又由 30 提到
    > `34`**(见 §9.8)。当前版本锚点 = **37 / 34 / 36**,以 `docs/notes/d1-toolchain-evidence.md`
-   > 与 `HANGOFF.md` §12.6 为准;保留原文作为当时的设计记录。
+   > 与 `docs/notes/environment.md` §12.6 为准;保留原文作为当时的设计记录。
 7. **`local.properties` 不入库**(含机器相关 `sdk.dir`);`build/`、`.gradle/`、`.kotlin/` 不入库。
 8. **领域层不依赖 Android**:`domain/` 不得 import 任何 `android.*` / `androidx.*`;违反即架构缺陷。
 9. **不可变状态 + 纯函数**:领域状态一律用 `data class` 表达,变更经纯函数返回新实例;
    **不用**可变 `ChangeNotifier` 式通知链(归档原型"数据对了但界面不动"的根因类别)。
-10. **UI 文案用中文**,与 HANGOFF 及归档原型的措辞保持一致(下拉标签、按钮文案、警告 message)。
+10. **UI 文案用中文**,与 HANDBOOK 及归档原型的措辞保持一致(下拉标签、按钮文案、警告 message)。
 11. **单位与阈值取自归档语义,不得臆造**:超长阈值 **180**、非法字符集 `\ / : * ? " < > |` + 控制字符、
     多级排序上限 **4**、至少 **1** 级、页码补零 `>=100 ? 4 : 3` 位、默认 `indexStart=1`/`indexPadding=3`。
 12. **提交粒度**:每阶段完成即提交(只 commit,**push 由用户处理**);阶段分支完成即合回 `dev` 并回写文档。
-13. **UI 须符合最新 Material Design**(HANGOFF §6.5):用 material3 组件的**语义角色**而非硬编码值——
+13. **UI 须符合最新 Material Design**(HANDBOOK §6.5):用 material3 组件的**语义角色**而非硬编码值——
     颜色走 `MaterialTheme.colorScheme`(支持深色模式;Android 12+ 动态取色,低版本回退静态 scheme)、
     排版走 `MaterialTheme.typography` 语义层级(不手写 `fontSize`)、圆角走 `MaterialTheme.shapes`;
     触控目标 ≥ 48dp、正文 ≥ 14sp、纯图标按钮须有 `contentDescription`。
     **本阶段基准 = material3 `1.4.0`(stable)**;**M3E(Material 3 Expressive)不在本阶段范围**——
     其公开 API 仅存在于 `1.5.0-alpha28`,stable 与最新 BOM 均为 1.4.0 且 M3E 类型为 `internal`
-    (实测见 `docs/notes/d1-toolchain-evidence.md`)。M3E 留到 P7 走查后评估(HANGOFF §6.5)。
+    (实测见 `docs/notes/d1-toolchain-evidence.md`)。M3E 留到 P7 走查后评估(HANDBOOK §6.5)。
 
 ---
 
@@ -110,7 +110,7 @@ pixfold-d1/
 一律调用 `domain/`)。UI 只负责"把状态画出来"与"把用户操作翻译成纯函数调用"。
 
 **为什么独立模块**:① 让第 1 层单测秒级反馈、不启 Android 运行时;② 用 Gradle 依赖边界**强制**
-"领域逻辑不依赖 UI 与平台层"(HANGOFF §5 关键原则 3、§9 D3),而非靠自觉。
+"领域逻辑不依赖 UI 与平台层"(HANDBOOK §5 关键原则 3、§9 D3),而非靠自觉。
 
 ---
 
@@ -167,7 +167,7 @@ data class SortKey(val field: SortField, val ascending: Boolean)
 data class SortRule(val keys: List<SortKey>)   // keys.size in 1..4
 ```
 
-**枚举声明顺序 = UI 下拉顺序**(HANGOFF §4 排序键定位,用户 2026-09-10 定序),不得重排。
+**枚举声明顺序 = UI 下拉顺序**(HANDBOOK §4 排序键定位,用户 2026-09-10 定序),不得重排。
 默认规则 = `SortRule([SortKey(DirName, true), SortKey(NaturalName, true)])`。
 
 ### 4.4 命名相关
@@ -418,11 +418,11 @@ data class WorkflowAState(
   **2026-09-17 用户决定覆盖**:改为**变动即自动应用**——去掉"应用排序"按钮与草稿态
   (换字段 / 翻转方向 / 增删级均立即重排)。同时升降序交互改为:
   **再次点击已选中的字段**即翻转升/降序,方向用**实心三角**显示在选中字段名之后
-  (原独立"升序/降序"切换按钮已移除)。详见 HANGOFF §9.1 走查项 W3。
+  (原独立"升序/降序"切换按钮已移除)。详见 HANDBOOK §9.1 走查项 W3。
 - 命名结构与逐项覆盖是**批次级**(不属于某个集合),`overrides: Map<String, String>` 全局一份。
   **2026-09-18 用户补充**:**根目录名例外** —— 它默认**跟随当前集合**的
   `ImageCollection.rootDirName`,用户显式改过则记为逐项例外(切集合不被冲掉)。
-  即 HANGOFF §2 约束 4「批次统一 + 逐项例外」:组件/分隔符/补零/扩展名仍是批次级,
+  即 HANDBOOK §2 约束 4「批次统一 + 逐项例外」:组件/分隔符/补零/扩展名仍是批次级,
   只有根目录名有逐集合的天然来源。实现见 `NamingState.rootDirNameOverride` 与
   `effectiveScheme(state, collection)`。
 
@@ -650,7 +650,7 @@ order.mapIndexed { i, item -> item to "${(i + 1).toString().padStart(padding, '0
 | **P2** | 缩略图网格/列表双视图、大图预览(自适应/缩放/平移/翻页) | 1, 2 |
 | **P3** | 拖拽排序(网格+列表,松手落地)、图钉入口、排序规则编辑器 | 3, 4, 5, 6, 7 |
 | **P4** | 命名结构编辑器、建议表、逐项覆盖、冲突与警告(§6/§7) | 8, 9, 10 |
-| **P5** | 元数据编辑器、ComicInfo.xml 预览、页码预览(§8) ✅ **完成(2026-09-19)**,三层自证齐备(见 HANGOFF §9.1「P5 收口记录」) | 11, 12, 13, 14 |
+| **P5** | 元数据编辑器、ComicInfo.xml 预览、页码预览(§8) ✅ **完成(2026-09-19)**,三层自证齐备(见 HANDBOOK §9.1「P5 收口记录」) | 11, 12, 13, 14 |
 | **P6** | 执行计划预览、危险动作二次确认、报告 + 撤销入口(§9) ✅ **完成(2026-09-19)** | 15, 16, 17 |
 | **P7** | 真机走查 20 项 + 两条工作流端到端 | 18, 19, 20 |
 
@@ -659,7 +659,7 @@ order.mapIndexed { i, item -> item to "${(i + 1).toString().padStart(padding, '0
 
 ### 10.3 UI 约定
 
-- **Material Design**:全部遵循 §2 约束 13(HANGOFF §6.5)。颜色/排版/形状一律取 material3 语义角色,
+- **Material Design**:全部遵循 §2 约束 13(HANDBOOK §6.5)。颜色/排版/形状一律取 material3 语义角色,
   不硬编码色值与字号;支持深色模式;Android 12+ 动态取色。
 - **触摸目标 ≥ 48dp**;正文 ≥ 14sp(归档的"UI 字号下限"设计意图)。
 - Android 系统字体天然支持中文,**无需自定义 CJK 字体**(归档的"中文发虚"是桌面 Flutter 问题,不适用)。
@@ -742,7 +742,7 @@ class WorkflowAStateHolder(initial: WorkflowAState) {
 
 ### 12.3 第 3 层:真机实证(P7)
 
-- 在 Android 真机逐条勾选 HANGOFF §9《D1 验收清单》20 项;
+- 在 Android 真机逐条勾选 HANDBOOK §9《D1 验收清单》20 项;
 - 手段:埋点日志 → 模拟输入(`adb shell input`)→ 像素/快照对比;
 - **当前 `adb devices` 为空**,故该层**挂起**;不得以离线通过冒充 D1 完成。
 
@@ -772,12 +772,12 @@ class WorkflowAStateHolder(initial: WorkflowAState) {
 | **Kotlin `Regex.split` 陷阱** | 自然排序静默失效 | P1 必修 + L3 单测钉死 |
 | Robolectric 首跑较慢(~65s/次) | 反馈循环变慢 | 领域层用第 1 层快速迭代;UI 层按阶段批量跑 |
 
-**未决**(需用户后续确认,不阻塞 P1):~~HANGOFF §11 第 9/10/14 条~~
+**未决**(需用户后续确认,不阻塞 P1):~~docs/notes/decisions-archive.md §11 第 9/10/14 条~~
 
 > **第 9/10/14 条已于 2026-09-25 全部落定**:第 9 条**维持"松手落地"**并补「跟手浮层」;
 > 第 10 条**加一行被动披露**(摘要栏显示「含 N 处手工调整」);
 > 第 14 条**维持现状**(序号 = 第 1 步整理后的页序,"沿用原文件名解析出的原始序号"在两代原型中
-> 都没有先例)。详见 HANGOFF §11 第 9/10/14 条与
+> 都没有先例)。详见 docs/notes/decisions-archive.md §11 第 9/10/14 条与
 > `docs/notes/d1-ui-friction-inventory.md` §13。
 > **同轮新发现第 18 条**(拖拽无法跨视口,30 张图时第 1 张拖不到第 30 张)已登记,排 P1
 > —— **✅ 已于 2026-09-25 修复、2026-09-26 真机核对通过**(用户逐字「效果可以」)。
@@ -785,14 +785,14 @@ class WorkflowAStateHolder(initial: WorkflowAState) {
 > 而是**手势挂在 Lazy 的子项(卡片)上**,源卡滚出视口被销毁 ⇒ `pointerInput` 取消 ⇒
 > `onDragEnd` 永不触发。修法 = 手势上移到不滚动的容器 + 拖动期间
 > `userScrollEnabled = draggingIndex == null` + 新建 `EdgeAutoScroll.kt` 按 `onDrag` 事件驱动
-> `scrollBy`。详见 HANGOFF §11 第 18 条与 `docs/notes/d1-ui-friction-inventory.md` §14。
+> `scrollBy`。详见 docs/notes/decisions-archive.md §11 第 18 条与 `docs/notes/d1-ui-friction-inventory.md` §14。
 
 > **第 13 条(中文数字自然排序)已于 2026-09-25 落定**:范围限定 `一`~`九` 与 `十`
 > (`百`/`千`/`万`/`〇` 不归一化),归一化落在**分词阶段**(`compareNaturalTokens` 也会被
 > 预计算记号序列的调用方用到,分词是唯一共同入口)。
 > ⚠️ 落定时**发现原条目对症状的描述是错的** —— 实测 `第二话` 本就已排在 `第十话` 之前,
 > 真实缺陷是**整段顺序被汉字码点搅乱**(`第十一话` 排到了 `第十话` 前),
-> 详见 HANGOFF §11 第 13 条与 §9.1「§11 第 13/15 条」轮。
+> 详见 docs/notes/decisions-archive.md §11 第 13 条与 §9.1「§11 第 13/15 条」轮。
 
 ---
 

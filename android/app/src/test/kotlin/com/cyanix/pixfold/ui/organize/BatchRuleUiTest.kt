@@ -71,7 +71,7 @@ class BatchRuleUiTest {
     // (实测 trip/scan/misc/cn 依次 34.9/34.6/34.3/34.3dp,塞进第 5 个 20 字中文名也才 40dp),
     // 于是「宽度够不够」在单元测试里恒为「够」。
     // 该风险(芯片行是 horizontalScroll,集合变多会滚出视口)只能在**真机**上用 uiautomator
-    // 量真实坐标核对,已随本轮真机核对一并确认(详见 HANGOFF §9.1 本轮记录)。
+    // 量真实坐标核对,已随本轮真机核对一并确认(详见 HANDBOOK §9.1 本轮记录)。
 
     @Test
     fun `switching collection changes which items are shown`() {

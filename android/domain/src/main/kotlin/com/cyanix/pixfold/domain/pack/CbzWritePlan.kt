@@ -26,7 +26,7 @@ import java.io.OutputStream
  * 「`domain/` 零 Android 依赖」在这里同样成立。
  */
 data class CbzWritePlan(
-    /** 来源卷的 id,供执行报告与撤销记录追溯(HANGOFF §5 关键原则 5)。 */
+    /** 来源卷的 id,供执行报告与撤销记录追溯(HANDBOOK §5 关键原则 5)。 */
     val volumeId: String,
     /** 已生成的 ComicInfo.xml 文本,将成为归档的第 0 个条目。 */
     val comicInfoXml: String,

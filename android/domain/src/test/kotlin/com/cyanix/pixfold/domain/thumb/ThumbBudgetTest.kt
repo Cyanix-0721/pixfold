@@ -6,7 +6,7 @@ import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 /**
- * D2b 千级缩略图策略单测（HANGOFF §9 D2b 退出条件 ①）。
+ * D2b 千级缩略图策略单测（HANDBOOK §9 D2b 退出条件 ①）。
  *
  * 每条断言都对应一条**会被真机证伪**的数字，而不是「看起来合理」。
  * 关键规模来自实测：样本库 851 张、单张 3.4MB JPEG；真机 PJX110 的

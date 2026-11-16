@@ -7,7 +7,7 @@ import kotlin.test.assertIs
 import kotlin.test.assertTrue
 
 /**
- * D2b 存储空间预检领域层单测（HANGOFF §11 第 12 条）。
+ * D2b 存储空间预检领域层单测（docs/notes/decisions-archive.md §11 第 12 条）。
  *
  * "提前预检 → 明确拒绝 → 引导到电脑"的纯领域逻辑。
  * 阈值参数化，具体值待 D2b 真机验证后定。

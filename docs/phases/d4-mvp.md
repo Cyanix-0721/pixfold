@@ -1,11 +1,11 @@
 # D4 · MVP 闭环
 
-> **来源**：`HANGOFF.md` 原有 §9 内容，原行号 L3329–L3900（2026-10-23 迁出）。
+> **来源**：`docs/product/HANDBOOK.md` 原有 §9 内容，原行号 L3329–L3900（2026-10-23 迁出）。
 > **内容**：D4a/D4b MVP 闭环：真实文件闭环、预检、通知、元数据、Series 等。
-> **性质**：实现期逐轮留痕，只查不常读。**产品决策仍以 `HANGOFF.md` 为唯一权威**，本文件是其详版。
+> **性质**：实现期逐轮留痕，只查不常读。**产品决策仍以 `docs/product/HANDBOOK.md` 为唯一权威**，本文件是其详版。
 > **索引**：见 [`docs/INDEX.md`](../INDEX.md)。
 
-<!-- 原 HANGOFF.md L3329–L3900 -->
+<!-- 原 docs/product/HANDBOOK.md L3329–L3900 -->
 
 ## D4：MVP 闭环
 
@@ -588,7 +588,7 @@
 
 > **▶ 工作区选取搬到首页 (2026-10-24)** —— 用户原话「把工作区选取改到首页？写功能里感觉意义不大,要么是首页点进去,要么是外部直接分享文件夹或者大量图片进去（这功能D5再做）」。
 >
-> **一、落地的不是新设计,而是 HANGOFF §4 里 2026-10-15 就写成目标形态的那一版** —— 当时原文是「标题行 + 设置齿轮 → 两张工作流大卡(不变) → 其下从属层一行『当前工作区: … [更换]』」,执行时机标为「属 D2b/D4b,本轮(D1 收尾)不碰首页」。本轮把它从「将来」落到现在,**入口仍然不是第三张大卡**(Workspace 是范围、工作流是任务,摆成三张等权卡会误导用户以为「选工作区」也是一件能做完的事)。
+> **一、落地的不是新设计,而是 HANDBOOK §4 里 2026-10-15 就写成目标形态的那一版** —— 当时原文是「标题行 + 设置齿轮 → 两张工作流大卡(不变) → 其下从属层一行『当前工作区: … [更换]』」,执行时机标为「属 D2b/D4b,本轮(D1 收尾)不碰首页」。本轮把它从「将来」落到现在,**入口仍然不是第三张大卡**(Workspace 是范围、工作流是任务,摆成三张等权卡会误导用户以为「选工作区」也是一件能做完的事)。
 >
 > **二、三条裁决(用户原话「乙甲乙」)** —— ①工作流内那两处 `WorkspaceBar` 怎么办:**乙** = 只在正忙/出问题时显示;②选完工作区停首页还是自动跳:**甲** = 停首页;③未选工作区时两张大卡禁用吗:**乙** = 禁用,首页变成「先选文件夹」引导页。
 >
@@ -717,7 +717,7 @@
 > **十三、material3 升到 1.5.0-rc01 + 启用 M3E 主题（2026-11-08，分支 `d4/expressive`）**：
 > 用户原话「对了我想要官方 MD expressive，现在有升级到测试版依赖吗」⇒ 裁决**乙**：不换 BOM，单独给 `compose-material3` 指定 `version.ref = "material3" = "1.5.0-rc01"`（显式版本优先于 BOM 约束），并在 `Theme.kt` 把 `MaterialTheme` 换成 `MaterialExpressiveTheme(motionScheme = MotionScheme.expressive())`。
 >
-> **⚠️ 本轮证伪了一条写进三处文档的旧结论**：`HANGOFF.md` §6.5 / `AGENTS.md` 约束 7 / `README.md` 第 9 条都写着「M3E 的公开 API 只在 `1.5.0-alpha28`，stable `1.4.0` 里 M3E 类型全部 internal、应用层无法调用」。**javap 1.4.0 的 `MaterialThemeKt` 有 `public static final void MaterialExpressiveTheme(...)`**，`MotionScheme` 接口与 `MotionScheme$Companion.standard()/expressive()` 也全 public ⇒ **1.4.0 就能用主题与动效**；真正缺的只是**expressive 组件**（`FloatingToolbarKt` / `LoadingIndicatorKt` / `ButtonGroupKt` / `SplitButtonKt` / `ToggleButtonKt` / `MaterialShapes` / `FloatingActionButtonMenuKt`，1.4.0 全无、1.5.0-rc01 全有）。三处已按新结论改写。
+> **⚠️ 本轮证伪了一条写进三处文档的旧结论**：`docs/product/HANDBOOK.md` §6.5 / `AGENTS.md` 约束 7 / `README.md` 第 9 条都写着「M3E 的公开 API 只在 `1.5.0-alpha28`，stable `1.4.0` 里 M3E 类型全部 internal、应用层无法调用」。**javap 1.4.0 的 `MaterialThemeKt` 有 `public static final void MaterialExpressiveTheme(...)`**，`MotionScheme` 接口与 `MotionScheme$Companion.standard()/expressive()` 也全 public ⇒ **1.4.0 就能用主题与动效**；真正缺的只是**expressive 组件**（`FloatingToolbarKt` / `LoadingIndicatorKt` / `ButtonGroupKt` / `SplitButtonKt` / `ToggleButtonKt` / `MaterialShapes` / `FloatingActionButtonMenuKt`，1.4.0 全无、1.5.0-rc01 全有）。三处已按新结论改写。
 >
 > **运行期 vs 构建期（用户追问「我手机安卓16可以用吧」）**：解 `material3-android-1.5.0-rc01.aar` 的 `AndroidManifest.xml` 得 `<uses-sdk android:minSdkVersion="24" />` ⇒ **运行期门槛 24，安卓 16（API 36）能跑**。门槛在构建期：`META-INF/com/android/build/gradle/aar-metadata.properties` 要求 `minCompileSdk=37` / `minAndroidGradlePluginVersion=9.1.0`，本项目 `compileSdk = 37`（`android/app/build.gradle.kts:14`）、AGP 9.4.1 已满足。
 >

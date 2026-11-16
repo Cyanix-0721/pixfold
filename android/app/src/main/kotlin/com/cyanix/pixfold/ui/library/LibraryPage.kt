@@ -100,7 +100,7 @@ fun volumeSuggestionTag(id: String) = "library-suggestion-$id"
  *    切步骤不会丢)。
  *
  * **为什么"待确认"在列表、卷头、计划页三处都要出现**:只在一处显示时,
- * 用户滚到别处就会忘记还有未确认的卷(HANGOFF §6.2 预览是主工作区)。
+ * 用户滚到别处就会忘记还有未确认的卷(HANDBOOK §6.2 预览是主工作区)。
  */
 @Composable
 fun LibraryPage(
@@ -153,7 +153,7 @@ fun LibraryPage(
             .testTag(TAG_LIBRARY_PAGE),
     ) {
         // 工作区条常驻在标题行**之前**：它决定下面整个列表的来源，
-        // 放在列表里会随滚动消失（与工作流 A 的落点一致，见 HANGOFF §4「从属层」）。
+        // 放在列表里会随滚动消失（与工作流 A 的落点一致，见 HANDBOOK §4「从属层」）。
         //
         // **2026-10-24 用户裁决(乙)：常态不再显示**(理由见工作流 A 同处注释与
         // WorkspaceState.showsWorkspaceBar)。两处必须同时改 —— 只改一处的话,
@@ -188,7 +188,7 @@ fun LibraryPage(
         )
 
         // 结构警告条:常驻在摘要与列表之间 —— 它说的是「这个工作区的目录层级有问题」,
-        // 卷列表再长也不能把警告滚没(与工作区条同一理由,见 HANGOFF §4「从属层」)。
+        // 卷列表再长也不能把警告滚没(与工作区条同一理由,见 HANDBOOK §4「从属层」)。
         workspaceWarnings.forEachIndexed { index, warning ->
             Text(
                 text = textOf(warning),

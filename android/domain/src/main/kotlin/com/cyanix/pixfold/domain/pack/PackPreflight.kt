@@ -13,7 +13,7 @@ import com.cyanix.pixfold.domain.storage.estimateTotalSize
  * ## 为什么需要这一层
  *
  * `SpaceCheck` 与 `Zip64Assessment` 各自是纯函数，早就单测通过，但**从来没有被组合使用过**。
- * 而 HANGOFF §10《平台》把「Android 真机完成 1GB 级归档的写入验证……更大归档的验收口径为
+ * 而 HANDBOOK §10《平台》把「Android 真机完成 1GB 级归档的写入验证……更大归档的验收口径为
  * 『空间预检 + 明确拒绝 + 引导到电脑』」列为验收标准 —— 组合它们不是相加，有三个只在
  * 「放在一起」时才存在的问题：
  *

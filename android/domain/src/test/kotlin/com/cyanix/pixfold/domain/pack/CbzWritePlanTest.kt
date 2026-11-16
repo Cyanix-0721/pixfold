@@ -119,7 +119,7 @@ class CbzWritePlanTest {
 
     @Test
     fun `the plan records the volume id and page count for traceability`() {
-        // HANGOFF §5 关键原则 5「结果可追溯」:报告要能说清"这是哪一卷、计划写多少页"。
+        // HANDBOOK §5 关键原则 5「结果可追溯」:报告要能说清"这是哪一卷、计划写多少页"。
         val plan = buildCbzWritePlan(aot1)
         assertEquals("aot-1", plan.volumeId)
         assertEquals(aot1.pageOrder.order.size, plan.pageCount)

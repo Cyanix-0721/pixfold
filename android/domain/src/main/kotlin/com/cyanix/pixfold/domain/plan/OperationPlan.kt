@@ -5,7 +5,7 @@ import com.cyanix.pixfold.domain.text.Msg
 import com.cyanix.pixfold.domain.text.TextKey
 
 /**
- * 统一操作词汇(HANGOFF §5 的 `OperationPlan`)。
+ * 统一操作词汇(HANDBOOK §5 的 `OperationPlan`)。
  *
  * ## 为什么要有这一层
  *
@@ -130,7 +130,7 @@ data class OperationPlan(
     /**
      * 整份计划的**可解释**文案,按 [ops] 顺序拼接。
      *
-     * 这是"计划必须可解释"(HANGOFF §5 关键原则 4)的统一入口:
+     * 这是"计划必须可解释"(HANDBOOK §5 关键原则 4)的统一入口:
      * 打包侧沿用既有 5 条契约,改名侧给出每行状态,两者同序,于是
      * 「计划第 N 行 ↔ 报告第 N 行」在两类操作上都成立。
      */

@@ -34,7 +34,7 @@ import kotlin.test.assertTrue
  *
  * ## 为什么「失败项不进撤销记录」值得单独钉
  *
- * 「撤销 N 项」这个数字会显示给用户(HANGOFF §5 关键原则 5「结果可追溯」)。
+ * 「撤销 N 项」这个数字会显示给用户(HANDBOOK §5 关键原则 5「结果可追溯」)。
  * 失败项**没有产生任何副作用**,把它算进去会让数字虚高,用户据此以为"多做了几件事
  * 需要回滚" —— 那是在骗人。跳过项同理。
  */
@@ -180,7 +180,7 @@ class UndoAlignmentTest {
         //
         // 为什么 D1 一直没暴露：`performUndo` 恒返回 `applied = false`（原型不触碰
         // 真实文件系统），UI 只显示「已记录 N 项」，从不消费 `from`/`to`。
-        // 真机核对（HANGOFF:540 第 17 项）看到的也是同一句话。
+        // 真机核对（HANDBOOK:540 第 17 项）看到的也是同一句话。
         //
         // 修复分两步：① `ExecEntry` 补 `originalPath`（本项动手前该位置原本的名字），
         // 由 `executeRenameOp` 从 `op.proposal.image.fileName` 填；② `undoOpsOf` 的

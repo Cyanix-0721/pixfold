@@ -1,17 +1,17 @@
 # D1 交互原型 · 阶段复盘（Review）
 
 > **记录时间**：2026-10-13 起草；2026-10-15/16 复核订正（行号、三处实质错误），并补入 §5.4「D1 收尾轮」；
-> 2026-10-16 逐节过审 §6–§10（把全文 70 个 `HANGOFF.md` 行号引用逐条对回原文，改掉 7 行引用 + 2 处口径表述）。
+> 2026-10-16 逐节过审 §6–§10（把全文 70 个 `docs/product/HANDBOOK.md` 行号引用逐条对回原文，改掉 7 行引用 + 2 处口径表述）。
 > **状态**：**阶段已交付并验收（20/20），本文为交付后的复盘**；本文不改变任何产品决策，
-> 产品决策仍以 `HANGOFF.md` 为唯一权威。
+> 产品决策仍以 `docs/product/HANDBOOK.md` 为唯一权威。
 > **工作分支**：`dev`（D1 弧已在 `dev` 上完成并收口；**未 push**，push 一律由用户处理）。
 > **相关**：
-> - `HANGOFF.md:486`（阶段门槛表 D1 行）、`HANGOFF.md:494-499`（决策门重述）、
->   `HANGOFF.md:500-541`（D1 执行注 + 六项交付）、
->   `HANGOFF.md:547-581`（验收清单 20 项）、`HANGOFF.md:583-603`（修复自证三层 + 第 4 层）、
->   `HANGOFF.md:627-677`（§9.1 分支拓扑与七阶段切片）、
->   `HANGOFF.md:3012` + `HANGOFF.md:3046`（**D1 收尾轮**两轮记录，见 §5.4）；
->   ⚠️ 以上行号已按 2026-10-15 的 `HANGOFF.md` 复核订正（原为 review 入库前的旧行号），
+> - `docs/product/HANDBOOK.md`（阶段门槛表 D1 行）、`docs/product/HANDBOOK.md`（决策门重述）、
+>   `docs/product/HANDBOOK.md`（D1 执行注 + 六项交付）、
+>   `docs/product/HANDBOOK.md`（验收清单 20 项）、`docs/product/HANDBOOK.md`（修复自证三层 + 第 4 层）、
+>   `docs/product/HANDBOOK.md`（§9.1 分支拓扑与七阶段切片）、
+>   `docs/product/HANDBOOK.md` + `docs/product/HANDBOOK.md`（**D1 收尾轮**两轮记录，见 §5.4）；
+>   ⚠️ 以上行号已按 2026-10-15 的 `docs/product/HANDBOOK.md` 复核订正（原为 review 入库前的旧行号），
 >   2026-10-16 过审 §6–§10 时又改掉 7 行含引用的表述 + 2 处口径表述（详见各节内联标注）。
 > - `docs/notes/d1-ui-friction-inventory.md`（**操作逻辑符合性走查台账**，D1 第 4 层的落盘处）；
 > - `docs/notes/d1-navigation-compose-migration.md`（导航迁移专项记录）；
@@ -24,7 +24,7 @@
 
 - **性质**：调研笔记（非产品权威），与 `docs/notes/d1-ui-friction-inventory.md` 并列。
 - **回答的问题**：D1 这一阶段**做了什么、凭什么算完成、过程中暴露了什么、留下了什么**。
-- **不回答的问题**：D4 该怎么做（那是 `HANGOFF.md` §9 D4 节与后续规格的事）。
+- **不回答的问题**：D4 该怎么做（那是 `docs/product/HANDBOOK.md` §9 D4 节与后续规格的事）。
 - **口径纪律**（沿用摩擦台账）：每条结论标注来源 = **实测读数** / **代码核实** / **文档记录**；
   不用推测充数，凡推测必标「待实测」。**量化读数一律给出可复现的命令或文件行号。**
 - **本文的服务对象**：① 用户复核 D1 是否真的做完了；② 下一步「逐屏走查 + 小幅调整 UI 逻辑」
@@ -47,7 +47,7 @@
 
 ## 2. 判据与达成情况
 
-### 2.1 D1 的六项交付（`HANGOFF.md:500-541`）
+### 2.1 D1 的六项交付（`docs/product/HANDBOOK.md`）
 
 | # | 交付项 | 落地位置 | 状态 |
 | --- | --- | --- | --- |
@@ -61,24 +61,24 @@
 **验收标准（逐字）**：「用户可以完整走完两个工作流，并且每个必须人工输入的字段都有明确入口」——
 两条均已在真机逐条核对（第 19、18 项）。
 
-### 2.2 退出条件（`HANGOFF.md:486`）
+### 2.2 退出条件（`docs/product/HANDBOOK.md`）
 
 > 《D1 验收清单》20 项**全部勾满** = D1 退出条件达成。
 
 **2026-09-19 达成，20/20。** 其中 P5 的元数据/XML/页码预览（第 11–14 项）当日仅完成前两层，
-如实记为 🟡、进度 15/20；**第 3 层真机实证于同日补齐**后转 ✅（沿革见 `HANGOFF.md:547-557`）。
+如实记为 🟡、进度 15/20；**第 3 层真机实证于同日补齐**后转 ✅（沿革见 `docs/product/HANDBOOK.md`）。
 
 ### 2.3 实际交付**超出**六项的部分（如实登记）
 
 六项交付之外，D1 弧内还落了以下能力 —— 其中前两项**属于六项交付的可操作性前提**，
-后三项属 **D4 提前启动**（`HANGOFF.md:3129-3140`，**不计入 D1 六项交付**）：
+后三项属 **D4 提前启动**（`docs/product/HANDBOOK.md`，**不计入 D1 六项交付**）：
 
 | 项 | 归属 | 依据 |
 | --- | --- | --- |
-| 排序规则编辑器（多级 ≤4 + 批次/本组独立） | 六项交付的支撑（覆盖验收 5/6/7） | `HANGOFF.md:659` |
-| 危险动作默认关闭 + 独立二次确认 | 六项交付的支撑（覆盖验收 16） | `HANGOFF.md:662` |
-| 设置页 + 主题体系（含 2021/2025 色彩标准） | **D4 提前启动** | `HANGOFF.md:1310-1680` |
-| 全量 i18n（领域层文案键 + 英文兜底） | **D4 提前启动** | `HANGOFF.md:1683-2031` |
+| 排序规则编辑器（多级 ≤4 + 批次/本组独立） | 六项交付的支撑（覆盖验收 5/6/7） | `docs/product/HANDBOOK.md` |
+| 危险动作默认关闭 + 独立二次确认 | 六项交付的支撑（覆盖验收 16） | `docs/product/HANDBOOK.md` |
+| 设置页 + 主题体系（含 2021/2025 色彩标准） | **D4 提前启动** | `docs/product/HANDBOOK.md` |
+| 全量 i18n（领域层文案键 + 英文兜底） | **D4 提前启动** | `docs/product/HANDBOOK.md` |
 | 导航迁移 Navigation Compose + 分层返回转场 | 实现级重构（用户 2026-09-22 裁决） | `docs/notes/d1-navigation-compose-migration.md` |
 
 > ✅ 2026-10-16 已与用户确认口径：上表三项（设置页/主题、全量 i18n、导航迁移）**记为 D4 提前启动，
@@ -146,7 +146,7 @@ git diff --shortstat 4144415 9a20002      → 190 files changed, 39920 insertion
 故改标「分支基线」；若改用真 HEAD，实测为 `app/src/main` **44 文件 / 10,645 行**、
 `app/src/test` **55 文件 / 477 `@Test`**，`domain` 两项不变。
 
-**测试数增长曲线**（每阶段收口实况，`HANGOFF.md:678-964`）：
+**测试数增长曲线**（每阶段收口实况，`docs/product/HANDBOOK.md`）：
 ⚠️ 2026-10-15 复核订正：原引 `:641-923` 不覆盖 P7 —— `641` 现为阶段表图箭头、`923` 落在 P6 变异表中间；
 P7 读数现于 `:963`。曲线数字本身逐条复核**全部对得上**（30/6、30/42、48/110、108/150、143/205、212/226、219/241）。
 
@@ -195,11 +195,11 @@ P7 读数现于 `:963`。曲线数字本身逐条复核**全部对得上**（30/
 | D1 收尾轮 | 10-14 → 10-15 | 5 条 UI 调整（首页大卡/纯黑描边/删假文案/重置全部按钮/回主页重置）+ 1 缺陷修复（连点清空栈）+ 拖拽语义改判 | 见 §5.4 | 1+2+**4** |
 | 收尾轮 · 第二轮 | 10-15 → 10-16 | 拖拽让位过渡动效 + 边缘抽搐修复 | 见 §5.4 | 1+2+**4** |
 
-\* 2026-10-15 复核补注：P6 / P7 的**日期沿 `HANGOFF.md` §9 记为 09-19**（该表即如此写），
+\* 2026-10-15 复核补注：P6 / P7 的**日期沿 `docs/product/HANDBOOK.md` §9 记为 09-19**（该表即如此写），
 但两者的**阶段合并提交实际落在 09-20** —— `git log -1 --format=%ci` 得
 `247358e` = 2026-09-20 01:24、`fc230df` = 2026-09-20 13:37。故 §3.1 的按日统计里
 「09-20 的 18 笔含 P7 收口与摩擦台账建账」与本节并不矛盾 —— 一日之差来自**收口判定与合并时机**，
-不是记录错误。本节保留 09-19 是为与 HANGOFF §9 逐字一致。
+不是记录错误。本节保留 09-19 是为与 HANDBOOK §9 逐字一致。
 
 **P7 收口 = D1 退出条件达成点（2026-09-19）**。
 此后 09-20 起进入用户指定的「**先把基础 UI 调一下，再开始看功能**」阶段
@@ -212,9 +212,9 @@ P7 读数现于 `:963`。曲线数字本身逐条复核**全部对得上**（30/
 ## 5. 真实缺陷台账（分阶段）
 
 > 口径：只收**产品缺陷**（用户可见的错误行为/不可用），不含测试问题与代码风格。
-> 全部为文档明确记录者，逐条可回溯到 `HANGOFF.md` 行号。
-> ⚠️ 2026-10-15 复核订正：本表行号原为 review **入库前**的 `HANGOFF.md`（3,194 行）版本；
-> review 首次入库的提交 `1dea313` 自身把 HANGOFF 推到 3,685 行，故**全部行号已系统性漂移**，
+> 全部为文档明确记录者，逐条可回溯到 `docs/product/HANDBOOK.md` 行号。
+> ⚠️ 2026-10-15 复核订正：本表行号原为 review **入库前**的 `docs/product/HANDBOOK.md`（3,194 行）版本；
+> review 首次入库的提交 `1dea313` 自身把 HANDBOOK 推到 3,685 行，故**全部行号已系统性漂移**，
 > 现按**逐条内容比对**后的新行号订正（非机械加偏移）。
 
 ### 5.1 P1–P7 主链（21 条，含走查增补项）
@@ -243,7 +243,7 @@ P7 读数现于 `:963`。曲线数字本身逐条复核**全部对得上**（30/
 | 底栏化轮 | `:1098-1100` | 列表末尾的终局动作要连滑 **8–12 次**才够得到（`LazyColumn` 只组合可见项）；且同样是「推进下一步」，`NamingPage` 按钮固定底栏、`RenamePlanPage` 的却要滚到底 —— **无意的行为分裂** |
 | P7 收口 | `:981-1004` | `NamingScheme.replacement`（清洗替换字符）**UI 无入口** | 领域层有、界面没接 | 入口放「自动清洗」ⓘ 对话框内（+6 UI 断言，变异 3 组全捕获） |
 
-### 5.2 走查调整轮（09-20 起，按 `HANGOFF.md` 行号）
+### 5.2 走查调整轮（09-20 起，按 `docs/product/HANDBOOK.md` 行号）
 
 | 轮次 | 行号 | 缺陷 |
 | --- | --- | --- |
@@ -274,7 +274,7 @@ P7 读数现于 `:963`。曲线数字本身逐条复核**全部对得上**（30/
 
 > 口径说明：本节条目**不属于 P1–P7 主链**，属 D1 收口后的「逐屏走查 + 小幅调整 UI 逻辑」
 > 收尾工作（用户 2026-10-14 起提出），故单列成节，不改 §5.1 的「主链 21 条」口径。
-> 逐条来源：`HANGOFF.md:3012`（首轮）/ `HANGOFF.md:3046`（第二轮）。
+> 逐条来源：`docs/product/HANDBOOK.md`（首轮）/ `docs/product/HANDBOOK.md`（第二轮）。
 
 | 轮次 | 行号 | 缺陷 | 根因 | 修法 |
 | --- | --- | --- | --- | --- |
@@ -303,14 +303,14 @@ P7 读数现于 `:963`。曲线数字本身逐条复核**全部对得上**（30/
 
 ## 6. 自证方法论的演进（D1 最重要的产出之一）
 
-**三层（`HANGOFF.md:583-586`，2026-09-10 固化）**：
+**三层（`docs/product/HANDBOOK.md`，2026-09-10 固化）**：
 
 1. **逻辑层**：领域逻辑改动用单元测试钉死语义；
 2. **UI 层**：涉及界面的改动必须断言「界面真的变了」——只断言数据的测试会放过整类 bug
    （拖拽 4 轮根因就是**数据对、界面不动**）；
 3. **真机层**：GUI 问题不靠猜，用「埋点日志 → 模拟输入 → 像素/快照对比」实证。
 
-**第 4 层：操作逻辑符合性（`HANGOFF.md:589-603`，2026-09-21 用户追加）**：
+**第 4 层：操作逻辑符合性（`docs/product/HANDBOOK.md`，2026-09-21 用户追加）**：
 
 前三层回答「**实现是否正确**」，第 4 层回答「**设计是否正确**」（该干的是不是这件事）。
 以用户视角逐屏走完，判五问：操作顺序是否符合真实做事顺序 / 该出现的东西是否在首屏 /
@@ -334,41 +334,41 @@ D1 弧内逐节显式记录的变异组数（**文档未做统一汇总，下表
 
 | 轮次 | 组数 | 出处 |
 | --- | --- | --- |
-| P2 双视图 | 2 | `HANGOFF.md:699` |
-| P3 首轮（悬停重排/松手不上报/换字段不回默认） | 3 + 2 + 2 | `HANGOFF.md:711` |
-| P4 命名结构 | 未单列组数（仅记 `ExclamationIconRenderTest` 覆盖） | `HANGOFF.md:799` |
-| P5 元数据 | 4 | `HANGOFF.md:848` |
-| P6 计划/确认/报告 | 7 | `HANGOFF.md:917` |
-| P7 收口（替换字符入口） | 3 | `HANGOFF.md:1016` |
-| W3/W4 排序规则交互 | 3 + 1 + 1 | `HANGOFF.md:1882` |
-| i18n 解析层 | 5 | `HANGOFF.md:1762-1766` |
-| 应用内语言 | 3 轮 | `HANGOFF.md:1362` |
-| P0 命名页头部 | 3 | `HANGOFF.md:1085` |
-| 底栏化 | 6 | `HANGOFF.md:1125` |
-| §2b 底栏分槽 | 8 | `HANGOFF.md:1172` |
-| §2c 底栏视觉规格 | 5 | `HANGOFF.md:1238` |
-| §2d 撤销危险色 | 2 | `HANGOFF.md:1299` |
-| 2021 ≠ 2025 | 3 | `HANGOFF.md:1400` |
-| 预测性返回 | 5 | `HANGOFF.md:1528` |
-| 导航迁移 | 6 | `HANGOFF.md:1565` |
-| 分层返回转场 | 6 | `HANGOFF.md:1581` |
-| 启动图标主题化 | 2 | `HANGOFF.md:1626` |
-| 中文数字自然排序 + 批量非例外 | 8 | `HANGOFF.md:2077` |
+| P2 双视图 | 2 | `docs/product/HANDBOOK.md` |
+| P3 首轮（悬停重排/松手不上报/换字段不回默认） | 3 + 2 + 2 | `docs/product/HANDBOOK.md` |
+| P4 命名结构 | 未单列组数（仅记 `ExclamationIconRenderTest` 覆盖） | `docs/product/HANDBOOK.md` |
+| P5 元数据 | 4 | `docs/product/HANDBOOK.md` |
+| P6 计划/确认/报告 | 7 | `docs/product/HANDBOOK.md` |
+| P7 收口（替换字符入口） | 3 | `docs/product/HANDBOOK.md` |
+| W3/W4 排序规则交互 | 3 + 1 + 1 | `docs/product/HANDBOOK.md` |
+| i18n 解析层 | 5 | `docs/product/HANDBOOK.md` |
+| 应用内语言 | 3 轮 | `docs/product/HANDBOOK.md` |
+| P0 命名页头部 | 3 | `docs/product/HANDBOOK.md` |
+| 底栏化 | 6 | `docs/product/HANDBOOK.md` |
+| §2b 底栏分槽 | 8 | `docs/product/HANDBOOK.md` |
+| §2c 底栏视觉规格 | 5 | `docs/product/HANDBOOK.md` |
+| §2d 撤销危险色 | 2 | `docs/product/HANDBOOK.md` |
+| 2021 ≠ 2025 | 3 | `docs/product/HANDBOOK.md` |
+| 预测性返回 | 5 | `docs/product/HANDBOOK.md` |
+| 导航迁移 | 6 | `docs/product/HANDBOOK.md` |
+| 分层返回转场 | 6 | `docs/product/HANDBOOK.md` |
+| 启动图标主题化 | 2 | `docs/product/HANDBOOK.md` |
+| 中文数字自然排序 + 批量非例外 | 8 | `docs/product/HANDBOOK.md` |
 | §10 色彩角色映射 | 4 | 台账 `:895` |
 | §11 色彩标准 | 2 | 台账 `:944` |
 | §12 芯片行 | 2 | 台账 `:998` |
-| §13 幽灵浮层 + 摘要披露 | 9 | `HANGOFF.md:2186` |
-| §14 跨视口边缘滚动 | 11 | `HANGOFF.md:2232` |
-| §15 预览三缺陷 | 16 | `HANGOFF.md:2316` |
-| §3 筛选推广 | 11 | `HANGOFF.md:2368` |
-| §16 五项交互修订 | 23 | `HANGOFF.md:2457` |
-| §16b 列数控件第二轮 | 16 | `HANGOFF.md:2516` |
+| §13 幽灵浮层 + 摘要披露 | 9 | `docs/product/HANDBOOK.md` |
+| §14 跨视口边缘滚动 | 11 | `docs/product/HANDBOOK.md` |
+| §15 预览三缺陷 | 16 | `docs/product/HANDBOOK.md` |
+| §3 筛选推广 | 11 | `docs/product/HANDBOOK.md` |
+| §16 五项交互修订 | 23 | `docs/product/HANDBOOK.md` |
+| §16b 列数控件第二轮 | 16 | `docs/product/HANDBOOK.md` |
 | §16c 列数控件**高亮轮** | 6（M0–M6，M0 为基线 ⇒ 有效变异 6 组；台账对 §16c 的整体口径为 15 组全捕获） | 台账 `:1683-1693` |
-| 收尾轮 ① 首页大卡 | 2（M1 删 `BorderStroke` / M2 删副标题 `Text`） | `HANGOFF.md:3012` |
-| 收尾轮 ④ 重置全部（含 ⑤ 回主页） | 9（M1–M9；**M8 曾存活 ⇒ 查出真缺陷**，修 `remember(initialCollectionId)` 后回填捕获） | `HANGOFF.md:3012` |
-| 收尾轮 ⑥ 拖拽实时让位 | 8（M10–M17；**M15「浮层尺寸改实时取」存活** ⇒ 按 §7.4 删掉该断言口径并写明） | `HANGOFF.md:3012` |
-| 收尾轮 ⑥b 动效规格 | 2（A1/A3） | `HANGOFF.md:3046` |
-| 收尾轮 ⑥b-2 命中几何 | 6（M1–M6；M6 删空表早返回属**等价变异**，已证明等价、不补假断言） | `HANGOFF.md:3046` |
+| 收尾轮 ① 首页大卡 | 2（M1 删 `BorderStroke` / M2 删副标题 `Text`） | `docs/product/HANDBOOK.md` |
+| 收尾轮 ④ 重置全部（含 ⑤ 回主页） | 9（M1–M9；**M8 曾存活 ⇒ 查出真缺陷**，修 `remember(initialCollectionId)` 后回填捕获） | `docs/product/HANDBOOK.md` |
+| 收尾轮 ⑥ 拖拽实时让位 | 8（M10–M17；**M15「浮层尺寸改实时取」存活** ⇒ 按 §7.4 删掉该断言口径并写明） | `docs/product/HANDBOOK.md` |
+| 收尾轮 ⑥b 动效规格 | 2（A1/A3） | `docs/product/HANDBOOK.md` |
+| 收尾轮 ⑥b-2 命中几何 | 6（M1–M6；M6 删空表早返回属**等价变异**，已证明等价、不补假断言） | `docs/product/HANDBOOK.md` |
 
 **合计 217 组**（上表逐项相加 = 190 + 收尾轮 27；P4 未单列、部分节以「被 N 项捕获」表述者亦未计入，
 故为**下界**）。⚠️ 收尾轮的「连点清空栈」护栏（`StepBackGuardTest` 2 用例）**未记变异组数** ——
@@ -377,11 +377,11 @@ D1 弧内逐节显式记录的变异组数（**文档未做统一汇总，下表
 **变异纪律（踩坑固化，全部有实测来源）**：
 
 - 变异「没失败」时**先确认变异真的写进去了** —— 曾用 `indexOf(".")`（双引号）替换源码
-  `lastIndexOf('.')`（单引号），源码原封未动，「没失败」是假象（`HANGOFF.md:943-953`）。
-- 变异还原**一律 `cp` 备份，绝不用 `git checkout --`** —— 后者会连未提交改动一起丢掉（`HANGOFF.md:1305-1307`）。
-- **等价变异要证明等价**，不能只写说明绕过（`fillType="evenOdd"` 那组，`HANGOFF.md:796-797` / `:2854`）。
+  `lastIndexOf('.')`（单引号），源码原封未动，「没失败」是假象（`docs/product/HANDBOOK.md`）。
+- 变异还原**一律 `cp` 备份，绝不用 `git checkout --`** —— 后者会连未提交改动一起丢掉（`docs/product/HANDBOOK.md`）。
+- **等价变异要证明等价**，不能只写说明绕过（`fillType="evenOdd"` 那组，`docs/product/HANDBOOK.md` / `:2854`）。
 - 变异若整体互换两个槽位，必须**整段替换**，只改关键字会得到编译错误（`tests=0` 的 NO-XML），
-  那不是有效变异证据（`HANGOFF.md:1176-1177`）。
+  那不是有效变异证据（`docs/product/HANDBOOK.md`）。
 
 ### 6.2 真机核对（第 3 层）的规约
 
@@ -409,24 +409,24 @@ D1 弧内逐节显式记录的变异组数（**文档未做统一汇总，下表
 **已知坑（固化为规约）**：
 
 - **边缘 x 不可用于应用内滑动**：`input swipe 1200 …` 落在手势导航边缘区 → 被系统当返回手势、
-  **直接退出应用**；应用内滑动用 **x ≤ 1000**（⚠️ 2026-10-15 复核订正：该规约**不在 HANGOFF** —— `git log -S 'x ≤ 1000' -- HANGOFF.md` 为空，实际出处是项目 `AGENTS.md:146`（§7.3）；原引 `HANGOFF.md:1514` 现为 `PredictiveBackContainer.kt` 段落，完全无关）。
+  **直接退出应用**；应用内滑动用 **x ≤ 1000**（⚠️ 2026-10-15 复核订正：该规约**不在 HANDBOOK** —— `git log -S 'x ≤ 1000' -- docs/product/HANDBOOK.md` 为空，实际出处是项目 `AGENTS.md:146`（§7.3）；原引 `docs/product/HANDBOOK.md` 现为 `PredictiveBackContainer.kt` 段落，完全无关）。
 - **中文 IME 下 `input text` 无效或抛异常**（`NullPointerException: Attempt to get length of null array`，
   `InputShellCommand.sendText:410`）⇒ 只能输入 ASCII；键盘弹出会把页面内容整体上移，
   **点按钮前必须先收键盘（ESC = `keyevent 111`，`KEYCODE_BACK` 会退出应用）**
-  （`HANGOFF.md:2103-2105`；ESC/BACK 的差异另见 `HANGOFF.md:3577-3579`）。
+  （`docs/product/HANDBOOK.md`；ESC/BACK 的差异另见 `docs/product/HANDBOOK.md`）。
 - **`uiautomator dump` 的坐标会过期** ⇒ 每次点击前必须重新 dump，且 `bounds` 的 `y1` 是顶边不是中心
-  （`HANGOFF.md:2477` 与 `HANGOFF.md:3581`）。
+  （`docs/product/HANDBOOK.md` 与 `docs/product/HANDBOOK.md`）。
 - `input swipe` 触发不了长按 → 用 `input draganddrop`。
 - **设备休眠会伪装成「应用出问题」**：dump 到 `mCurrentFocus=NotificationShade`、
-  `mWakefulness=Dozing` 是屏幕熄灭，不是崩溃 ⇒ 走查前 `svc power stayon true`（`HANGOFF.md:1029-1035`）。
+  `mWakefulness=Dozing` 是屏幕熄灭，不是崩溃 ⇒ 走查前 `svc power stayon true`（`docs/product/HANDBOOK.md`）。
 - **dump 里没有 ≠ 界面没有**：语义树只含**已组合**节点，`LazyColumn` 尤其如此，要找就**边滚边找**
-  （`HANGOFF.md:1036-1038`）。
+  （`docs/product/HANDBOOK.md`）。
 - **点击要用「可点击节点」的坐标**：`text` 节点 bounds 与承载点击的父节点可能不同
-  （`HANGOFF.md:1039-1041`）。
+  （`docs/product/HANDBOOK.md`）。
 - **调试产物绝不写 `/sdcard` / `/storage/emulated`**，只走 `/data/local/tmp`
-  （`HANGOFF.md:3619-3625`；`/sdcard` 就是用户内部存储根目录，在文件管理器与 USB 里直接可见）。
+  （`docs/product/HANDBOOK.md`；`/sdcard` 就是用户内部存储根目录，在文件管理器与 USB 里直接可见）。
 - **`cmd.exe` 下禁用 `--tests`**：过滤会被吞掉 ⇒ 静默假绿 0 测试。测试数**只认 JUnit XML**
-  （`HANGOFF.md:951`）。
+  （`docs/product/HANDBOOK.md`）。
 
 ---
 
@@ -436,25 +436,25 @@ D1 弧内逐节显式记录的变异组数（**文档未做统一汇总，下表
 
 | # | 局限 | 范围 | 依据 |
 | --- | --- | --- | --- |
-| 1 | **原型不触碰真实文件系统** | 撤销只提示「已记录 56 项逆向操作」，**不谎称已撤销**；执行报告是模拟产物 | `HANGOFF.md:578`（第 17 项） |
-| 2 | 第 10 项「**超长**」一类**仅领域层证据**，未在真机复现 | 领域阈值 `> 180`（恰好 180 不算） | `HANGOFF.md:554` |
-| 3 | 第 13 项**混合态**（4 生效 / 1 跳过）仅领域单测钉死 | 真机只取到 `5/0` 与 `0/5` 两个端点 | `HANGOFF.md:558` |
-| 4 | W4「规则变更后自动回顶」**无本地回归护栏** | Robolectric 下 `requestScrollToItem` 与 `LaunchedEffect+scrollToItem` 行为**一致**（实测都 25 帧到顶），变异退回旧实现**不会失败** ⇒ 只有真机证据 | `HANGOFF.md:1958-1965` |
-| 5 | 「虚化」只能是**透明度近似，不是模糊** | 该 compose 版本 `grep renderEffect\|BlurEffect` 零命中，`ExitTransition` 无模糊原语 | `HANGOFF.md:1576-1577` |
-| 6 | 转场 **16dp 圆角丢失** | 同上，真机落差已登记 | `HANGOFF.md:1583` |
-| 7 | 导航迁移后 `PredictiveBackTest` 由 7 条减为 4 条 | 原 3 条断言「步骤内容变窄」，与新规格（步骤级不缩放）**直接相反**，属**规格变更**而非覆盖退化 | `HANGOFF.md:1579-1580` |
+| 1 | **原型不触碰真实文件系统** | 撤销只提示「已记录 56 项逆向操作」，**不谎称已撤销**；执行报告是模拟产物 | `docs/product/HANDBOOK.md`（第 17 项） |
+| 2 | 第 10 项「**超长**」一类**仅领域层证据**，未在真机复现 | 领域阈值 `> 180`（恰好 180 不算） | `docs/product/HANDBOOK.md` |
+| 3 | 第 13 项**混合态**（4 生效 / 1 跳过）仅领域单测钉死 | 真机只取到 `5/0` 与 `0/5` 两个端点 | `docs/product/HANDBOOK.md` |
+| 4 | W4「规则变更后自动回顶」**无本地回归护栏** | Robolectric 下 `requestScrollToItem` 与 `LaunchedEffect+scrollToItem` 行为**一致**（实测都 25 帧到顶），变异退回旧实现**不会失败** ⇒ 只有真机证据 | `docs/product/HANDBOOK.md` |
+| 5 | 「虚化」只能是**透明度近似，不是模糊** | 该 compose 版本 `grep renderEffect\|BlurEffect` 零命中，`ExitTransition` 无模糊原语 | `docs/product/HANDBOOK.md` |
+| 6 | 转场 **16dp 圆角丢失** | 同上，真机落差已登记 | `docs/product/HANDBOOK.md` |
+| 7 | 导航迁移后 `PredictiveBackTest` 由 7 条减为 4 条 | 原 3 条断言「步骤内容变窄」，与新规格（步骤级不缩放）**直接相反**，属**规格变更**而非覆盖退化 | `docs/product/HANDBOOK.md` |
 | 8 | Robolectric **不做真实文本测量与真实布局** | 芯片宽度一律算成 ~0（实测 trip 34.9dp / scan 34.6 / misc 34.3 / cn 34.3）⇒ 「放得下 / 是否挤出视口」**只能真机** | 芯片宽度读数 `docs/notes/d1-ui-friction-inventory.md:1109` |
 | 9 | 视觉规格（底色、高度、危险红）**需 `@GraphicsMode(NATIVE)` + `captureToImage()`** | LEGACY 后端画不出真实颜色 | `docs/notes/d1-ui-friction-inventory.md:385`（§2c） |
-| 10 | 动画观感「是否生硬」**只能真机（用户判定）** | 用户观感判定才算定稿 | `HANGOFF.md:1567`（用户看真机录像后判定「动画有点长且生硬」） |
-| 11 | **`animateItem` 到底有没有挂上，无离线判据** | 把拖动期的 `animateItem` 整段去掉，全仓 **478 项测试全绿**；`DragReorderAnimationSpecTest` 只能钉住**规格**（`SpringSpec` + 三个参数），钉不住**挂载** ⇒ 该点由真机覆盖 | `HANGOFF.md:3046`；`DragReorderAnimationSpecTest` KDoc |
-| 12 | 拖拽浮层尺寸「起拖定格 vs 实时取」**离线等价** | 实时让位下被拖项全程留在组合树里，两种取法读数相同 ⇒ 变异 M15 存活，按 §7.4 **删掉该断言口径**并写明（真机是否仍等价未验证） | `HANGOFF.md:3012`（⑥ 的 M15） |
-| 13 | M3 `TooltipBox` 的 tooltip 是 **popup，不在 `uiautomator dump` 语义树里** | 长按类提示只能靠「基线截图 vs 按住截图」像素 diff 取证；且**判据必须同位置同时比对基线与样本**（只比样本会把暗底计入文字像素，曾据此误判「文字被裁」） | `HANGOFF.md:3012`（④ 真机核对） |
+| 10 | 动画观感「是否生硬」**只能真机（用户判定）** | 用户观感判定才算定稿 | `docs/product/HANDBOOK.md`（用户看真机录像后判定「动画有点长且生硬」） |
+| 11 | **`animateItem` 到底有没有挂上，无离线判据** | 把拖动期的 `animateItem` 整段去掉，全仓 **478 项测试全绿**；`DragReorderAnimationSpecTest` 只能钉住**规格**（`SpringSpec` + 三个参数），钉不住**挂载** ⇒ 该点由真机覆盖 | `docs/product/HANDBOOK.md`；`DragReorderAnimationSpecTest` KDoc |
+| 12 | 拖拽浮层尺寸「起拖定格 vs 实时取」**离线等价** | 实时让位下被拖项全程留在组合树里，两种取法读数相同 ⇒ 变异 M15 存活，按 §7.4 **删掉该断言口径**并写明（真机是否仍等价未验证） | `docs/product/HANDBOOK.md`（⑥ 的 M15） |
+| 13 | M3 `TooltipBox` 的 tooltip 是 **popup，不在 `uiautomator dump` 语义树里** | 长按类提示只能靠「基线截图 vs 按住截图」像素 diff 取证；且**判据必须同位置同时比对基线与样本**（只比样本会把暗底计入文字像素，曾据此误判「文字被裁」） | `docs/product/HANDBOOK.md`（④ 真机核对） |
 
 **另有两处「曾被推翻的技术判断」如实保留**（教训：「反编译未见到某 API」≠「该能力不存在」）：
 
-- 「预测性返回开关不做 —— 无运行时 API」→ **❌ 错**（`HANGOFF.md:1662`；`activity-compose 1.13.0` 提供
+- 「预测性返回开关不做 —— 无运行时 API」→ **❌ 错**（`docs/product/HANDBOOK.md`；`activity-compose 1.13.0` 提供
   `PredictiveBackHandler` + `BackEventCompat.progress`，开关已实现 `cc34a98`）。
-- 「2021/2025 色彩标准暂不做 —— 零依赖下不可行」→ **❌ 已推翻**（`HANGOFF.md:1668`）（引入算法子库，开关已交付）。
+- 「2021/2025 色彩标准暂不做 —— 零依赖下不可行」→ **❌ 已推翻**（`docs/product/HANDBOOK.md`）（引入算法子库，开关已交付）。
 
 ---
 
@@ -485,7 +485,7 @@ D1 弧内逐节显式记录的变异组数（**文档未做统一汇总，下表
 ⇒ **两三千张的领域成本是个位数毫秒，无需分页或虚拟化**；真正的规模风险在**平台层**
 （缩略图生成、SAF 遍历），属 D2b。
 
-### 8.2 `HANGOFF.md:3212-3472` §11 待确认问题**仍未定**的 1–8 条
+### 8.2 `docs/product/HANDBOOK.md` §11 待确认问题**仍未定**的 1–8 条
 
 1. 图片排序是否需要「每组一套排序规则」，还是一个批次统一规则？
 2. 手工拖拽后的顺序是否要自动写入文件名序号？
@@ -496,8 +496,8 @@ D1 弧内逐节显式记录的变异组数（**文档未做统一汇总，下表
 7. 是否需要把一次完整工作流保存为项目文件，以便稍后继续？
 8. Android 首版是否先限制为单一授权目录，暂不支持跨目录批处理？
 
-（§11 第 9–11、13–18 条**均已裁决**，裁决内容与依据见 `HANGOFF.md:3222-3472` 对应条目；
-**第 12 条「空间不足的提示阈值与引导方式」仍待 D2b 真机验证后定**，`HANGOFF.md:3303`。）
+（§11 第 9–11、13–18 条**均已裁决**，裁决内容与依据见 `docs/product/HANDBOOK.md` 对应条目；
+**第 12 条「空间不足的提示阈值与引导方式」仍待 D2b 真机验证后定**，`docs/product/HANDBOOK.md`。）
 
 ### 8.3 文档一致性（**已闭环**）
 
@@ -511,10 +511,10 @@ D1 弧内逐节显式记录的变异组数（**文档未做统一汇总，下表
 ## 9. 对 D4 的承接关系
 
 - **用户 2026-09-21 定调**：`pixfold-d1/` 的 UI **即 D4 MVP 的基座**，**不是一次性原型** ⇒
-  MVP 能力**就地演进**，不新建工程、不推倒重写（`HANGOFF.md:523-528`）。
-- **`pixfold-d1/` 的定位**已由「D1 原型」升级为「**MVP 代码基座**」（`HANGOFF.md:494-499` 决策门① 重述）。
+  MVP 能力**就地演进**，不新建工程、不推倒重写（`docs/product/HANDBOOK.md`）。
+- **`pixfold-d1/` 的定位**已由「D1 原型」升级为「**MVP 代码基座**」（`docs/product/HANDBOOK.md` 决策门① 重述）。
 - **D4 拆分**：D4a（UI 层真实功能，2026-09-20 起进行中，**无前置依赖**）/ D4b（真实文件闭环，硬依赖 D2b + D3）。
-  ⚠️ 该「硬依赖」表述出自 `HANGOFF.md:491`（门槛表原文，写于 D3 交付前）；**D3 已于 2026-10-05 交付**，
+  ⚠️ 该「硬依赖」表述出自 `docs/product/HANDBOOK.md`（门槛表原文，写于 D3 交付前）；**D3 已于 2026-10-05 交付**，
   故按现行状态 D4b 的**剩余前置只有 D2b**（`AGENTS.md` 头部同此口径）。
 - **边界（必须守住）**：D1 的**六项交付范围不变**；设置页/主题体系/全量 i18n 属 **D4 提前启动**，
   **不计入** D1；**打包不属 D1 六项交付**（用户 2026-09-21 确认「对了一半」：用 mock 数据正确、
@@ -549,7 +549,7 @@ git ls-tree -r --name-only 3ca85b0 pixfold-d1/app/src/main | grep '\.kt$' | wc -
 cmd.exe /c "D:\Programing\Personal\pixfold\pixfold-d1\run-gradle.bat :app:lintDebug :app:testDebugUnitTest :domain:test :app:assembleDebug"
 ```
 
-**关键行号索引**（2026-10-15 复核按现行 `HANGOFF.md` 逐条订正）：`HANGOFF.md:486`（门槛表 D1）/
+**关键行号索引**（2026-10-15 复核按现行 `docs/product/HANDBOOK.md` 逐条订正）：`docs/product/HANDBOOK.md`（门槛表 D1）/
 `:500-541`（执行注 + 六项交付）/ `:547-581`（验收清单 20 项）/ `:583-603`（修复自证三层 + 第 4 层）/ `:627-677`（§9.1 拓扑与切片）/
 `:678-1056`（P1–P7 收口记录）/ `:1058-2650`（走查调整轮逐节记录）/
 `:3012`（**D1 收尾轮**首轮：5 条调整 + 1 缺陷 + 拖拽语义改判）/ `:3046`（**收尾轮 · 第二轮**：让位动效 + 边缘抽搐）/

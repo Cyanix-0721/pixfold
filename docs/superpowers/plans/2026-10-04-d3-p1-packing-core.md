@@ -3,8 +3,8 @@
 > **面向 Agent 执行者**：本文件同时是**实施计划**与**夜间台账**。每轮开工先读本节 §0「行车规则」，
 > 收工前更新 §3「轮次台账」并提交。上下文被压缩后，**本文件是唯一能自证进度的载体**。
 
-**目标：** 补上 HANGOFF §9 D3 退出条件 1 的实测缺口 —— 全仓 `OperationPlan` 目前**零命中**
-（只在 `HANGOFF.md:196` 与 `HANGOFF.md:2655` 出现），CBZ 打包在门槛表上仍标「⬜ 未交付」。
+**目标：** 补上 HANDBOOK §9 D3 退出条件 1 的实测缺口 —— 全仓 `OperationPlan` 目前**零命中**
+（只在 `docs/product/HANDBOOK.md` 与 `docs/product/HANDBOOK.md` 出现），CBZ 打包在门槛表上仍标「⬜ 未交付」。
 本轮把「计划词汇统一 + CBZ 字节生成」落成**可在正式工程承接的领域核心**，并单测通过。
 
 **架构：** 只在 `pixfold-d1/domain/` 内演进（纯 Kotlin/JVM，零新增依赖）。ZIP 用 JDK 自带
@@ -15,7 +15,7 @@ ZIP 结构全部归领域层**。既有公开契约（`VolumePackPlan`/`Executio
 **技术栈：** 同 D1（Kotlin 2.4.20 / AGP 9.4.1 / JDK 17 / Gradle wrapper 9.8.0 / Robolectric 4.17）。
 `domain` 模块零生产依赖（`domain/build.gradle.kts` 只有 `kotlin("test")`）。
 
-**规格：** `HANGOFF.md` §5（统一领域模型 + 5 条关键原则）、§9 D3 节（重定义后的三条退出条件与其
+**规格：** `docs/product/HANDBOOK.md` §5（统一领域模型 + 5 条关键原则）、§9 D3 节（重定义后的三条退出条件与其
 归属澄清）、`docs/notes/d1-archive-domain-semantics.md`（§6.4/§6.5/§6.6 归档语义契约）、
 `docs/notes/scripts-behavior-matrix.md`（§6.2/§6.3 参考脚本的 ZIP 与 XML 事实）。
 
@@ -50,9 +50,9 @@ ZIP 结构全部归领域层**。既有公开契约（`VolumePackPlan`/`Executio
 5. **不做产品决策**：任何歧义（阈值、文案、交互取舍）不自行裁决。
 6. **不改用户环境**：不碰 Codex / WSL / chezmoi / 电源设置 / 系统配置；不装任何东西。
 7. **不启用** Auto review、Agent Teams、`teams`、`workflow`（本轮只有一个写者，并行只会引入写冲突）。
-8. **不宣称**「D3 已完成」；**不改三处阶段快照**（`HANGOFF.md` §9.1 门槛表 / 项目
+8. **不宣称**「D3 已完成」；**不改三处阶段快照**（`docs/product/HANDBOOK.md` §9.1 门槛表 / 项目
    `AGENTS.md` 头部 / `README.md` 状态行）。阶段未变，三处一致规则不触发 —— 本轮只在
-   `HANGOFF.md` §9.1 **追加**小节。
+   `docs/product/HANDBOOK.md` §9.1 **追加**小节。
 
 ### 0.3 四道闸门（Gradle 只能在 Windows 侧；绝不在 WSL 里跑 Gradle）
 
@@ -106,7 +106,7 @@ cmd.exe /c "D:\Programing\Personal\pixfold\pixfold-d1\run-gradle.bat :app:lintDe
 
 ## 1. 全局约束（沿用 D1 P2《全局约束》，本阶段相关要点）
 
-1. **验收判据不可调整**：本轮覆盖 HANGOFF §9 D3 退出条件 1；不通过即记待修项。
+1. **验收判据不可调整**：本轮覆盖 HANDBOOK §9 D3 退出条件 1；不通过即记待修项。
 2. **零三方依赖**：ZIP 用 JDK `java.util.zip`，测试用 `kotlin("test")` + JDK 标准库。
 3. **领域层只产出「键 + 参数」**：`domain/` **不持有文案**。用户可见文本一律
    `Msg(TextKey, args)`；`domain/src/main/kotlin/com/pixfold/d1/domain/text/TextKey.kt`
@@ -166,7 +166,7 @@ cmd.exe /c "D:\Programing\Personal\pixfold\pixfold-d1\run-gradle.bat :app:lintDe
 | `pixfold-d1/domain/src/test/kotlin/com/pixfold/d1/domain/naming/NamingEvalTest.kt` | 改：W16 补 `clearOverride` 只清一个 id 的用例（+1） | W16 |
 | `pixfold-d1/domain/src/test/kotlin/com/pixfold/d1/domain/comic/ComicMetadataTest.kt` | 改：W16 补 `includedVolumes` 只留勾选卷的用例（+1） | W16 |
 | `pixfold-d1/artifacts/mutate_w16.py` + `artifacts/w16bak/`（复核用 `mutate_w16b.py`） | 变异脚本与备份（同样**不入库**） | W16 |
-| `HANGOFF.md` | 改：§9.1 追加「D3 打包核心轮」小节（**只追加**） | W9 |
+| `docs/product/HANDBOOK.md` | 改：§9.1 追加「D3 打包核心轮」小节（**只追加**） | W9 |
 | `docs/superpowers/plans/2026-10-04-d3-p1-packing-core.md` | 本文件（台账） | 全程 |
 
 **不动的文件**：`pixfold-d1/app/**`、任何 `res/values*/**.xml`、`domain/build.gradle.kts`、
@@ -190,7 +190,7 @@ cmd.exe /c "D:\Programing\Personal\pixfold\pixfold-d1\run-gradle.bat :app:lintDe
 | W6 | `UndoRecord` / `ExecutionReport` 与新词汇对齐的全路径覆盖 | 单测：Package→`DeleteCreated`、Rename→`RestoreRenamed`、Skipped/Failed 不产生撤销项、`canUndo=false → null` | ✅ 完成（`UndoAlignmentTest` 16 用例，轮 3） |
 | W7 | 变异清扫（W1–W6 合计 ≥ 20 组） | 0 逃逸；存活变异按 §0.4 处理并记录 | ✅ 完成：**23 个不同变异体 / 30 次运行，逃逸 0**；W7 自身等价变异仅 **P5 一个**（见 R1）。**曾存活 9 个（M5/M6/N5/P5/P14/P16/P17/P18/P20），其中等价 2、真正经「补断言」由存活转为捕获 7 个**（口径详见轮 3 小节加的 ⚠️ 校正） |
 | W8 | 边界与不变式加固（空卷 / 单页 / 重名跳过 / `isBlank` 输出目录 / 冲突策略矩阵） | 新增断言 + 变异验证 | ✅ 完成（`PackingPipelineTest` 17 用例，轮 4；**16 组变异全捕获**，其中 4 组只可能由本轮新增用例捕获 ⇒ 补的是真缺口） |
-| W9 | 文档回写：`HANGOFF.md` §9.1 追加「D3 打包核心轮」+ 本文件写「早间复核清单」 | **只追加**，不改阶段快照 | ✅ 完成（轮 5：`HANGOFF.md:2611` 起追加；台账 §5 早间复核清单同步补写） |
+| W9 | 文档回写：`docs/product/HANDBOOK.md` §9.1 追加「D3 打包核心轮」+ 本文件写「早间复核清单」 | **只追加**，不改阶段快照 | ✅ 完成（轮 5：`docs/product/HANDBOOK.md` 起追加；台账 §5 早间复核清单同步补写） |
 | W10 | 终验：干净工作树重跑四道闸门 + 计数比对 + `git log --oneline dev..d3/p1` 汇总 | 本文件写最终读数 | ✅ 完成（轮 6：**带 `clean` 的全量重建**，64/64 executed，exit 0；读数见 §6） |
 | W11 | 余量加固（§3 余量政策）：条目名与元数据条目撞名守卫 + 新缺陷登记 | 先实测确认漏洞存在，再红→绿；新缺陷只登记不自行修复 | ✅ 完成（轮 7：`CbzWritePlan` 拒 `ComicInfo.xml` 撞名 + 2 用例；**7 组变异全捕获**；**登记 R3**） |
 | W12 | 余量加固（§3 余量政策）：**广扫荡找缺口**——在 W7/W8/W11 未变异过的表达面上投 23 组变异，针对存活者补断言 | 存活变异必须补到全捕获，或按 §0.4 归为等价并写文档说明 | ✅ 完成（轮 8：23 组 → **21 捕获 / 2 存活 / 0 锚点缺失**，2 个存活者补断言后**各自成为该变异的唯一捕获者**；+2 用例 ⇒ domain **350** 项；生产代码零改动） |
@@ -205,11 +205,11 @@ cmd.exe /c "D:\Programing\Personal\pixfold\pixfold-d1\run-gradle.bat :app:lintDe
 | W21 | **i18n 自动化（用户 `m04079` 第⑤项）**：补「键 → 译文」的结构契约测试，并复查既有 i18n 是否要调整 —— 新增 `app/src/test/…/ui/text/TranslationCoverageTest.kt`（5 条契约，**不经 `resId()`**，改按命名约定 `TextKey.FooBar → domain_foo_bar` 独立反查资源，同进程内中英对拍：①逐键覆盖 ②占位符下标+类型+顺序逐位对等 ③渲染逐字相等 ④复数档由数量参数选中 + **各档占位符同形** ⑤跨语言可辨 + 键间不撞句，两个白名单逐字写死）；另有只读审计脚本（`artifacts/i18n_audit.py` + `i18n_table.tsv` + `i18n_render.tsv`，107 键 × 两语言） | 红→绿；**必须证明新测试有杀伤力** —— 专门复活 W20 曾存活的 4 类变异（占位符删/对调/中英抄错），且必须全捕获 | ✅ 完成（轮 17：**16 组变异两遍** —— 第一遍 **15 捕获 / 1 存活**（M14 复数 `one` 档占位符被删：期望值与实际值**同源**，是 W20 记录的同源期望值盲区**第三次命中**），补一条「复数各档占位符同形」契约后第二遍 **16 捕获 / 0 存活 / 0 锚点缺失 / 0 编译失败**，3 个文件还原**逐字节一致**；app **425 → 430**（+5，新建 1 个测试文件）；**生产代码零改动**） |
 | W22 | **第⑥项：警告图标去 emoji，改用矢量图标（用户 `m00673`）**：把 `⚠️ `/`⛔ ` 两类**警示前缀**从文案里彻底移除（13 个键：5 个 `TextKey` + 6 个纯资源键 + 1 个 `<plurals>` + **2 个去前缀后只剩裸 `%1$s` 的退化键，直接删除**），改由**矢量图标**承担视觉警示 —— 新建 2 个 `vector` drawable（`ic_warning_triangle` 实心警告 / `ic_forbidden` 空心禁止，**靠形状不靠颜色**区分）+ `app/src/main/kotlin/com/pixfold/d1/ui/text/WarnIcon.kt`（`WARN_ICONS: Map<Int, Int>` **按资源 id 索引** —— 13 键横跨 `TextKey`/纯资源键/plurals 三种命名空间，只有资源 id 全覆盖；`TextKey` 那半经 `resId()` 折入同一张表，避免两处漂移；另有 `@Composable WarnLine`）+ 调用点 7 处接线（`PlanComponents` / `ExecutionReportPage` / `NamingPage` / `RenamePlanPage` / `PackPreviewPage` / `ProposalTable`）；**`· `/`→ `/`← ` 符号前缀按仓库既有裁决不动** | 红→绿；**必须证明守卫有杀伤力** —— ①新建 `EmojiFreeSourceTest`（扫 `res/` 29 个 XML + `app/src/main/kotlin` 43 个文件）在改前必须真红、改后必须绿；②图标**长得对**不能只断言"节点存在"（像素级渲染断言）；③变异含**图标几何退化**（子路径缺失 ⇒ 退化成实心块）且必须全捕获 | ✅ 完成（轮 18：**21 组变异两遍 / 0 逃逸** —— 第一遍 8 捕获 / 2 存活，存活者 M6/M7 = 删 `fillType="evenOdd"`，**已证等价**（`grid_base.txt` 与 `grid_mut.txt` 整幅 24×24 网格 `cmp` **逐字节 IDENTICAL**：三角与感叹号绕向相反 ⇒ `nonZero`/`evenOdd` 同值），第二遍改测 KDoc 写明的**真正失败模式**（子路径缺失 ⇒ 退化成实心块）4 捕获 / 0 存活；9 个备份文件与工作树**逐文件 sha256 SAME**；domain **434**（不变）、app **430 → 456**（+23 新用例 +3 既有）；**真机 10 个警示面 + i18n 中英对照全部通过**；**新发现 R2 键在生产路径不可达 ⇒ §4 新增 R5**） |
 | W23 | **R4 真机取证 + R5 裁决落账（用户 `m02554`「这2个应该怎么办」）**：R5 —— 用户在三个选项里选 ①**保持现状**（键 / 双语资源 / `resId()` 映射 / 相关测试**一律不动**，台账记为「无生产出口，刻意」）；R4 —— 打包页那条 `page_issues` 告警在真机上**从未出现过**（`grep -l '页码与页序不一致' artifacts/*.xml` 零命中），为取证**临时注入分叉卷探针**（只改 mock 数据 `domain/…/mock/MockLibraryBData.kt`：让 `aot-1` 的 `pages` 比 `pageOrder.order` 少 1 项）→ 构建 → 装机 → **真机截到告警**（中/英各一次）→ 换回干净包做**反向对照**（告警 0 命中、页码行精确上移 56 px = 图标行高度被回收）→ **完整还原源码**（sha256 与备份一致）→ 重建 → 重装 → 设备回基线 | ①探针**只动 mock 数据**，不得碰生产判据；②取证后源码必须**逐字节还原**（sha256 比对 + `R4_PROBE` 残留计数 0）；③反向对照必须证明**告警消失且布局回流**，而非仅"没看到"；④R5 是产品决策，只按用户选择记录，**不接通也不删除** | ✅ 完成（轮 19：中文告警逐字 `页码与页序不一致：页码项数与页序长度不一致（15 ≠ 16）`、英文 `Page numbers do not match the page order: Page item count does not match the page order (15 ≠ 16)`，两次都带 16dp 矢量图标节点；干净包反证 **0 命中** + `text="1"` 行 `[42,2199]` → `[42,2143]` 上移 **56 px**；`R4_PROBE` 残留 **0** 处、`MockLibraryBData.kt` sha256 `0e558ce028918759…` = 干净值；重建 APK **33,437,589 字节 / sha256 `1a2164ea74a29857…`** 与基线**逐字节相同**；四闸门 domain 32/434、app 50/456、lint 0/0/4、`RC=0`；**生产可达性不变** —— 仍无 UI 入口能把 `pages` 与 `pageOrder` 弄分叉 ⇒ 本轮验的是**渲染链**，不是"生产可见性"；**R5 ✅ 已裁决、§4 已无待裁决项**） |
-| W24 | **`HANGOFF.md` §9.1 订正 + 追记（用户 `m03250`「文档都回写了吗」）**：唯一权威文档的 D3 小节仍是轮 5（W9，2026-10-04）写的，此后 **34 个提交一行未进** ⇒ 就地加注订正 **6 处失真**（标题「未合并、未推送」/「共 8 个提交」「只在 `domain/**`」/「真机核对…判定不需要真机」/「`app/**` 一行未改」/ lint 诚实例外整段 /「是否并回由用户决定」）+ **追加追记小节**（R1–R5 五项裁决、i18n 契约、警示图标矢量化、真机 2 轮、变异 401 组 / 0 逃逸、合回 `dev`、未做/不宣称）。**不改写历史数字，只就地加注** | `git diff --numstat` = `131 0` 且无删除行；两 hunk 均在 §9.1 内；`AGENTS.md` / `README.md` unchanged；阶段快照三处逐字未动 | ✅ 完成（`768bec7`；闸门 `62/62 executed`、domain 434 / app 456 / 0F 0E / lint 0-0-4） |
-| W25 | **D3 退出条件 ② 的可执行检查 + 三处阶段快照同步（用户 `m04274` 授权「选项 ①」）**：把「`domain/` 零 Android 依赖」从**自觉**变成**随 `:domain:test` 每轮常跑**的测试（`AdapterBoundaryTest`，四层判据 + 一层自检，5 个 `@Test`）；三处阶段快照同步（`HANGOFF.md` ×5 处 + `AGENTS.md` 头部 + `README.md` 状态行）；`HANGOFF.md` 4 处**自相矛盾就地订正**（原写「留待用户裁决」等） | 四层判据在**真实注入**下**全部可红**（4 次注入 / 0 逃逸；其中**注入 A 查出第 2 层曾假绿**并修复 + 补 4 条回归自检）；`app/**` 一行未改、无新增依赖（`domain/build.gradle.kts` 收工 sha256 复原基线）；三处快照旧串彻底消失（`🔄 部分已由 D1 提前交付` = 0 等） | ✅ 完成（`0da4e19` + `2f80794`；闸门 `62/62 executed`、domain **439** / app 456 / 0F 0E / lint 0-0-4、APK 逐字节与干净基线相同） |
+| W24 | **`docs/product/HANDBOOK.md` §9.1 订正 + 追记（用户 `m03250`「文档都回写了吗」）**：唯一权威文档的 D3 小节仍是轮 5（W9，2026-10-04）写的，此后 **34 个提交一行未进** ⇒ 就地加注订正 **6 处失真**（标题「未合并、未推送」/「共 8 个提交」「只在 `domain/**`」/「真机核对…判定不需要真机」/「`app/**` 一行未改」/ lint 诚实例外整段 /「是否并回由用户决定」）+ **追加追记小节**（R1–R5 五项裁决、i18n 契约、警示图标矢量化、真机 2 轮、变异 401 组 / 0 逃逸、合回 `dev`、未做/不宣称）。**不改写历史数字，只就地加注** | `git diff --numstat` = `131 0` 且无删除行；两 hunk 均在 §9.1 内；`AGENTS.md` / `README.md` unchanged；阶段快照三处逐字未动 | ✅ 完成（`768bec7`；闸门 `62/62 executed`、domain 434 / app 456 / 0F 0E / lint 0-0-4） |
+| W25 | **D3 退出条件 ② 的可执行检查 + 三处阶段快照同步（用户 `m04274` 授权「选项 ①」）**：把「`domain/` 零 Android 依赖」从**自觉**变成**随 `:domain:test` 每轮常跑**的测试（`AdapterBoundaryTest`，四层判据 + 一层自检，5 个 `@Test`）；三处阶段快照同步（`docs/product/HANDBOOK.md` ×5 处 + `AGENTS.md` 头部 + `README.md` 状态行）；`docs/product/HANDBOOK.md` 4 处**自相矛盾就地订正**（原写「留待用户裁决」等） | 四层判据在**真实注入**下**全部可红**（4 次注入 / 0 逃逸；其中**注入 A 查出第 2 层曾假绿**并修复 + 补 4 条回归自检）；`app/**` 一行未改、无新增依赖（`domain/build.gradle.kts` 收工 sha256 复原基线）；三处快照旧串彻底消失（`🔄 部分已由 D1 提前交付` = 0 等） | ✅ 完成（`0da4e19` + `2f80794`；闸门 `62/62 executed`、domain **439** / app 456 / 0F 0E / lint 0-0-4、APK 逐字节与干净基线相同） |
 | W26 | **真机补验（用户 `m04808`「adb连上了，继续」）**：真机核对**三项此前从未在真机上验过的判据** —— (a) **放大字体是否挤出视口**（§7.4 判「❌ 只能真机」）、(b) **深色模式危险色阶**（轮 15 只有 Robolectric 像素预测）、(c) **撤销三档真点分叉**（取消/安全档/危险档的真机行为差异）。**零源码改动**（收工 `git status --porcelain` 为空），只产出取证 dump + 截图（`artifacts/` 被 `.gitignore` 忽略） | ①三项都必须**真点、真读数**（bounds / 像素 / 消息条数），不接受"看着没溢出"；②色阶须与源码判据**逐位对照**（说得出是哪个 token）；③三档分叉必须给出**可核对的数值差**且与领域层设计吻合；④设备必须回基线（`stay_on_while_plugged_in`=0 / `font_scale`=1.0 / `am force-stop` 生效 / `/data/local/tmp` 内 `.xml`+`.png` 计数 0）；⑤**不宣称"生产可见"**—— `performUndo` 仍不碰文件系统 | ✅ 完成（(a) **1.0x / 1.5x / 2.0x 三档**对话框 `[72,802][1192,2118]` / `[72,569][1192,2350]` / `[72,352][1192,2568]`，**三底边 2118/2350/2568 均 < 屏高 2780** ⇒ 未溢出，按钮宽度恒 952、高度 168→186 ⇒ 无截断；(b) 按钮 `(140,29,24)`=`#8C1D18`=`errorContainer`、文字 `(249,222,220)`=`onErrorContainer`，与 `ui/theme/Theme.kt` `dangerActionButtonColors()` 逐位吻合，而**取消键 `(0,0,0)` 与轮 15 的 Robolectric 预测 `#FF29292F` 不符** ⇒ 又一例"像素断言不能替代真机"；(c) 取消=**0 条**消息 / 安全档=**4 项** / 危险档=**5 项**，差值恰 **1** = 被覆盖的 CBZ ⇒ **R3 在真机上证明已修好**；设备回基线已确认；闸门 `62/62 executed`、domain 439 / app 456 / 0F 0E / lint 0-0-4、APK 逐字节与干净基线相同） |
 | W27 | **真机覆盖度审计 + 三个漏验警示面补验（用户「机器还连着的，补验吧」）**：先做**可核验的覆盖度审计**取代口头保证 —— 发现「dump 的 `resource-id` 衡量 tag 覆盖度」**是无效口径**（全树未设 `testTagsAsResourceId`，158 个 `TAG_*` 命中 0），改用**整串文案匹配**（切词匹配会产生假阳性，首版口径已废弃）；审计结论：`WARN_ICONS` 11 键的真机覆盖 **中文 8/11、英文 4/11**，尚有 **3 个警示面从未出现在任何 dump**（全库 266 份）⇒ 本轮逐一补验：(i) `a_naming_conflicts`、(ii) `pack_excluded_warning`、(iii) `domain_summary_clean_empty_dirs_warning`。**零源码改动**（收工 `git status --porcelain` 为空） | ①覆盖度口径必须**先自证有效**（无效口径的读数一律作废）；②三个面都必须**真机上真触发**（造出触发条件，而非"能找到代码"）；③必须给出**结构级 + 像素级**双重证据，且能解释与 emoji 时代的**形态差异**；④设备上造成的临时改动**必须全部回滚**并逐项复核；⑤设备回基线（`stay_on_while_plugged_in`=0 / `font_scale`=1.0 / `am force-stop` 生效 / `/data/local/tmp` 内 `.xml`+`.png` 计数 **0**） | ✅ 完成（三面全部在真机上触发并取证：**(i)** 用 A 线两行「新名称」覆盖框填同名制造 `Duplicate` ⇒ `skipped=2`，文案 `有 2 项存在冲突，执行时将跳过（见下表红字）` `[112,662][1040,718]`、图标节点 `View [42,662][98,718]` = **56×56 px = 16dp**、像素 `(0,0,0) x1986` + `(242,184,181) x984`；**(ii)** 取消勾选 `aot-1` ⇒ 文案 `[112,882][1222,994]`、图标 `View [42,910][98,966]`、像素同签名；**(iii)** 开「清理空目录」⇒ 第 1/2 步确认框内文案 `[226,1425][1108,1537]`、图标 `View [156,1453][212,1509]`、像素 `(0,0,0) x1990` + `(187,166,167) x983`。**决定性对照**：emoji 时代旧 dump `a_naming_dup2.xml` 该行只有**一个** `TextView [42,662][1031,718]`（`⚠️` 内联在文案里），新包同一行是 **`View` 图标节点 + 从 `x=112` 起排的文案** ⇒ 从 dump 结构上证明「图标已从文案里剥离为独立矢量节点」；临时改动三处**全部回滚并复核**（`已勾选 5 卷` / `清理空目录：关（默认）` / 冲突 0 警告 0）；闸门 `62/62 executed`、domain 439 / app 456 / 0F 0E / lint 0-0-4、APK 逐字节与干净基线相同；本行业务面之外**另登记 3 项**（§4.1 的 O1/O2/O3）） |
-| W28 | **O1 撤销范围对话框两档视觉分级 + O2 阶段快照同步（用户 `m06826`「o1o2都要」）**：O1 —— 撤销范围对话框的安全档与危险档原先取到**同一个** `dangerActionButtonColors()`（深色 `#8C1D18` = `errorContainer`），真机像素逐位相同、**只有文案不同** ⇒ 改为**视觉重量三级递减**（危险档深红填充 / 安全档 1dp `error` 色描边无底色 / 取消无底色无描边）；O2 —— 把轮 23 的覆盖度读数（`WARN_ICONS` 中文 **8/11 → 11/11**、真机账目 3 轮 → **4 轮**）写进四处阶段快照（`HANGOFF.md` ×2 + `AGENTS.md` 头部 + `README.md` 状态行），并把 §4.1 的 O1/O2 由「⬜ 待裁决」改为「✅ 已落地」。⚠️ **本轮按用户当回合指令 `m06838` 跳过真机核对** | O1：①两档必须**可区分且判据有牙** —— 原先的「都偏红」断言在缺陷态下**照样成立**，故必须补「两档取样点通道差 ≥ 40」；②**不取**台账举例的「危险档 `error` / 安全档 `errorContainer`」（error 族按模式反转 ⇒ 分级会随模式互换，且每模式下总有一档是淡粉 `#F9DEDC`/`#F2B8B5`）；③tag 与文本**一字不动**（`UndoScopeDialogTest` 三条文案/次序用例不受影响）；④变异必须证明新牙有效。O2：四处快照的插入片段各命中恰 1 次、旧串独立出现 0 次；`app/**` 只动 2 个生产文件、**零新增资源/依赖** | ✅ 完成（轮 24：`Theme.kt` `+44/−0` 新增 `dangerOutlineButtonColors()` + `dangerOutlineBorder()`、`ExecutionReportPage.kt` `+18/−5` 安全档 `Button` → `OutlinedButton`、`UndoScopeDialogStyleTest.kt` `+88/−15` 补五条判据（第 ⑤ 条 = O1 核心牙）；闸门 `RC=0` / `62/62 executed`、domain **439** / app **456** / 0F 0E、lint **0 issues**；探针读数 浅色 `safe=#FFE9E7EF danger=#FFB3261E cancel=#FFE9E7EF surface=#FFE9E7EF safeEdge=#FFB3261E`、深色 `safe=#FF29292F danger=#FF8C1D18 safeEdge=#FFF2B8B5`；**变异 2 条全捕获**（安全档改回填充 ⇒ 报错逐字 `安全档应是**透明底**的描边按钮(取样点应等于对话框表面色);实测安全档=#FFB3261E 表面=#FFE9E7EF`），`cp` 还原 `RESTORE-IDENTICAL`；⚠️ **真机未复核**（用户当回合指令跳过），像素读数仅 Robolectric 探针级） |
+| W28 | **O1 撤销范围对话框两档视觉分级 + O2 阶段快照同步（用户 `m06826`「o1o2都要」）**：O1 —— 撤销范围对话框的安全档与危险档原先取到**同一个** `dangerActionButtonColors()`（深色 `#8C1D18` = `errorContainer`），真机像素逐位相同、**只有文案不同** ⇒ 改为**视觉重量三级递减**（危险档深红填充 / 安全档 1dp `error` 色描边无底色 / 取消无底色无描边）；O2 —— 把轮 23 的覆盖度读数（`WARN_ICONS` 中文 **8/11 → 11/11**、真机账目 3 轮 → **4 轮**）写进四处阶段快照（`docs/product/HANDBOOK.md` ×2 + `AGENTS.md` 头部 + `README.md` 状态行），并把 §4.1 的 O1/O2 由「⬜ 待裁决」改为「✅ 已落地」。⚠️ **本轮按用户当回合指令 `m06838` 跳过真机核对** | O1：①两档必须**可区分且判据有牙** —— 原先的「都偏红」断言在缺陷态下**照样成立**，故必须补「两档取样点通道差 ≥ 40」；②**不取**台账举例的「危险档 `error` / 安全档 `errorContainer`」（error 族按模式反转 ⇒ 分级会随模式互换，且每模式下总有一档是淡粉 `#F9DEDC`/`#F2B8B5`）；③tag 与文本**一字不动**（`UndoScopeDialogTest` 三条文案/次序用例不受影响）；④变异必须证明新牙有效。O2：四处快照的插入片段各命中恰 1 次、旧串独立出现 0 次；`app/**` 只动 2 个生产文件、**零新增资源/依赖** | ✅ 完成（轮 24：`Theme.kt` `+44/−0` 新增 `dangerOutlineButtonColors()` + `dangerOutlineBorder()`、`ExecutionReportPage.kt` `+18/−5` 安全档 `Button` → `OutlinedButton`、`UndoScopeDialogStyleTest.kt` `+88/−15` 补五条判据（第 ⑤ 条 = O1 核心牙）；闸门 `RC=0` / `62/62 executed`、domain **439** / app **456** / 0F 0E、lint **0 issues**；探针读数 浅色 `safe=#FFE9E7EF danger=#FFB3261E cancel=#FFE9E7EF surface=#FFE9E7EF safeEdge=#FFB3261E`、深色 `safe=#FF29292F danger=#FF8C1D18 safeEdge=#FFF2B8B5`；**变异 2 条全捕获**（安全档改回填充 ⇒ 报错逐字 `安全档应是**透明底**的描边按钮(取样点应等于对话框表面色);实测安全档=#FFB3261E 表面=#FFE9E7EF`），`cp` 还原 `RESTORE-IDENTICAL`；⚠️ **真机未复核**（用户当回合指令跳过），像素读数仅 Robolectric 探针级） |
 | W29 | **O1 两档视觉分级真机复核（用户「真机测试吧」）**：轮 24 落地 O1 时按用户 `m06838` **跳过了真机**（只有 Robolectric 探针）；本轮把设备接上后**逐位复核**该改动。手法上踩到一个**必须先解的坑**：B 线「输出冲突策略」默认是「自动重命名（加序号）」，于是第 102 卷输出成 `海贼王 第102卷 (1).cbz` ⇒ `overwrittenCount = 0` ⇒ `needsUndoWarning` 为假 ⇒ **撤销范围对话框根本不弹**（第一次取证就撞上，`w29_undo1.xml` 里只有一条「已记录 5 项」消息、没有对话框）⇒ 必须先把策略改成**「覆盖已有文件」**、再走两步危险确认。**零源码改动**（收工 `git status --porcelain` 只余两个文档） | ①两档必须给出**逐位对照源码判据**的像素读数（说得出取到哪个色号、为什么）；②必须解释**浅色下两档同色**（都 `#B3261E`）却仍可区分 —— 靠**形态**（描边 vs 填充）而非色号；③三档真点分叉要在**两种模式下各走一遍**且读数一致；④设备必须回基线（`stay_on_while_plugged_in`=0 / `font_scale`=1.0 / `Night mode` 复原为进场值 `yes` / `am force-stop` 生效 / `/data/local/tmp` 内 `.xml`+`.png` 计数 0） | ✅ 完成（**浅色**：安全档底色 `(249,227,228)`=表面色、**上边缘** `(179,38,30)`=`#B3261E`；危险档 `(179,38,30)` 填充；取消 `(249,227,228)` 且上边缘无红。**深色**：安全档底色 `(0,0,0)`=表面色、上边缘 `(242,184,181)`=`#F2B8B5`；危险档 `(140,29,24)`=`#8C1D18`；取消 `(0,0,0)` 且无红边。描边厚度实测 **4 px**（`y=1460..1463`，560dpi ⇒ ≈1.14dp，与 `BorderStroke(1.dp, …)` 一致）。三档真点**两种模式各一遍、读数一致**：取消 **0 条** / 安全档 **4 项** / 危险档 **5 项**，差值恰 **1** = 被覆盖的 CBZ。设备回基线全部实测通过） |
 
 **余量处理**：W1–W10 全部完成且仍有轮次 ⇒ **继续加固核心**（更多边界 / 更多变异 / 更多不变式），
@@ -275,7 +275,7 @@ cmd.exe /c "D:\Programing\Personal\pixfold\pixfold-d1\run-gradle.bat :app:lintDe
   > 与下方的逐条枚举对不上 —— 逐条数出来是 6+7+10+2 = **25 次运行**，其中 M6 与 N5
   > 各重跑一次用于验证补断言是否生效，故**不同变异体 = 23 个**。
   > 差额来自"轮次"与"变异体"两个口径混用（第一轮 + 第二轮合计并不等于 20）。
-  > HANGOFF 的 D3 小节已按下面这套逐条枚举为准重述，此处保留原始记录并加注。
+  > HANDBOOK 的 D3 小节已按下面这套逐条枚举为准重述，此处保留原始记录并加注。
   - W4 第一轮 6 组：M1 排序 ✓、M2 改 DEFLATED ✓、M3 忽略 timeMillis ✓、
     M4 去掉 require ✓、**M5 `toByteArray()` 平台默认编码 —— 存活**、
     **M6 `close()` 替 `finish()` —— 存活**
@@ -331,7 +331,7 @@ cmd.exe /c "D:\Programing\Personal\pixfold\pixfold-d1\run-gradle.bat :app:lintDe
   > （P5 第一批存活→第二批复测仍存活；P11 第一批锚点未命中→第二批修锚点后捕获），
   > 故**不同变异体 = 23 个**（P1–P20 + P16b + P20b + P20c）。②"2 等价"里的第二个其实是
   > 表内那一行 **M5，属 W4 遗留项的复验**，不是 W7 的变异体。③因此 W7 的等价变异只有 **P5 一个**。
-  > HANGOFF 的 D3 小节已按下面这套逐条枚举为准重述，此处保留原始记录并加注。
+  > HANDBOOK 的 D3 小节已按下面这套逐条枚举为准重述，此处保留原始记录并加注。
   - 第一批 20 组（`/tmp/mutate_w7.py`）：13 捕获 / 6 存活 / 1 锚点缺失
     （P11 因换行缩进不匹配未命中，已在第二批修正锚点后捕获）
   - 第二批 10 组（`/tmp/mutate_w7b.py`）：9 捕获 / 1 存活
@@ -377,7 +377,7 @@ cmd.exe /c "D:\Programing\Personal\pixfold\pixfold-d1\run-gradle.bat :app:lintDe
     （`label = op.finalName` + `createdPath = op.finalName`），本轮的"零行为变化"要求
     恰好把它**原样保留**下来。
   - **为什么一直没暴露**：`performUndo` 恒返回 `applied = false`（D1 不触碰真实文件系统），
-    UI 只显示「已记录 N 项」，从不消费 `from`/`to`；真机核对（HANGOFF:540 第 17 项）
+    UI 只显示「已记录 N 项」，从不消费 `from`/`to`；真机核对（HANDBOOK:540 第 17 项）
     看到的也是同一句话。
   - **为什么不自作主张修**：正确取值要产品决策 —— 撤销记录该携带"原文件名"
     （需扩 `ExecEntry` 字段，或让 `undoRecordFrom` 从计划取
@@ -467,15 +467,15 @@ cmd.exe /c "D:\Programing\Personal\pixfold\pixfold-d1\run-gradle.bat :app:lintDe
 
 ---
 
-#### 轮 5（2026-10-04 17:3x）— W9 文档回写（`HANGOFF.md` 只追加）
+#### 轮 5（2026-10-04 17:3x）— W9 文档回写（`docs/product/HANDBOOK.md` 只追加）
 
-- 提交：`ea78b3c` docs(d3): 回写 HANGOFF §9.1「D3 打包核心轮」+ 校正变异计数口径（W9）
-- 改动：`HANGOFF.md`（**仅追加一个小节**，插在 `### D1.1` 末尾 `**已提交** `3ca85b0`…` 之后、
-  `### D2：平台能力验证`（`:2688` 附近）之前 —— 即 `HANGOFF.md:2611` 起的
+- 提交：`ea78b3c` docs(d3): 回写 HANDBOOK §9.1「D3 打包核心轮」+ 校正变异计数口径（W9）
+- 改动：`docs/product/HANDBOOK.md`（**仅追加一个小节**，插在 `### D1.1` 末尾 `**已提交** `3ca85b0`…` 之后、
+  `### D2：平台能力验证`（`:2688` 附近）之前 —— 即 `docs/product/HANDBOOK.md` 起的
   `#### ✅ D3 打包核心轮:统一操作词汇 + CBZ 字节生成(2026-10-04 分支 `d3/p1`,**未合并、未推送**)`）
   + 本台账（W9 状态、本轮记录、§6 自检结果、§3 口径校正）。
 - **只追加的证据**：`git diff --numstat` 应为纯新增（`+N −0`），且 `git diff` 中**不得出现**
-  `> 进度(` 行、门槛表 `| D3 |` 行、`## 9` 顶部任何行的改动。**阶段快照三处同步（`HANGOFF.md` §9 顶
+  `> 进度(` 行、门槛表 `| D3 |` 行、`## 9` 顶部任何行的改动。**阶段快照三处同步（`docs/product/HANDBOOK.md` §9 顶
   + `AGENTS.md` 头 + `README.md`）本轮一律不做** —— 那是"宣布阶段状态"的产品决策，超出授权。
 - 小节内容（7 块）：性质声明（**只是 D3 退出条件 1 的领域层交付,不是 D3 阶段完成**）、动因
   （2026-09-19 重定义后打包是四类核心唯一未交付项）、交付面表（5 行）、**6 条关键设计决定**、
@@ -492,14 +492,14 @@ cmd.exe /c "D:\Programing\Personal\pixfold\pixfold-d1\run-gradle.bat :app:lintDe
      （工具缺陷，非存活变异体）混了进来 ⇒ 真相：**曾存活 9 个**（M5/M6/N5/P5/P14/P16/P17/P18/P20），
      其中等价 2（M5/P5），**真正"存活→补断言→捕获" = 7 个**（M6/N5/P14/P16/P17/P18/P20）。
   - 三处均已就地加 ⚠️ 注（**原始记录保留、不改写历史；提交标题里的历史数字也不改写**），
-    并同步进 `HANGOFF.md` 的小节，口径统一为「**逐条枚举为准**」。
+    并同步进 `docs/product/HANDBOOK.md` 的小节，口径统一为「**逐条枚举为准**」。
   - 累计口径（以逐条枚举为准）：**71 次运行 / 62 个不同变异体，逃逸 0**；其中 **2 个等价变异**
     ⇒ **60 个被断言捕获**。
 - 闸门：文档轮，**未改任何 Kotlin**；仍按 §0.3 跑一次四道闸门确认未受影响（读数见 §6）。
 - 设计决定（**后续勿推翻**）：
   1. **不改写历史数字**。已提交的 commit message 与既往轮次记录一律保留原样、就地加注 ——
      改写会让"当时的读数"消失，那正是最需要留痕的东西。
-  2. `HANGOFF.md` 采用 `#### ✅ <主题>（日期）` 的既有格式，**不新造标题层级**。
+  2. `docs/product/HANDBOOK.md` 采用 `#### ✅ <主题>（日期）` 的既有格式，**不新造标题层级**。
   3. 小节里显式写「**不是 D3 阶段完成**」与「**未做/不宣称**」清单：文档回写最容易变成
      无声的阶段宣称，必须把边界写在同一个小节里，读者才不会误读。
 - 结论 / 阻塞 / 待裁决：无新增待裁决项（R1/R2 仍未决，不阻塞）。
@@ -510,7 +510,7 @@ cmd.exe /c "D:\Programing\Personal\pixfold\pixfold-d1\run-gradle.bat :app:lintDe
 
 - 提交：`6682986` docs(d3): W10 终验读数（带 clean 的全量重建 64/64 + 越界逐条核对）
 - 改动：**仅本台账**（§3 W10 状态、本轮记录、`## 6. 自检结果` 全部填写）。
-  **未改任何 Kotlin、未改 `HANGOFF.md`** ⇒ 本轮不可能影响闸门读数。
+  **未改任何 Kotlin、未改 `docs/product/HANDBOOK.md`** ⇒ 本轮不可能影响闸门读数。
 - 做法：前置条件 = 工作树干净（`git status --porcelain` 空、`git stash list` 空），
   然后跑 **`clean` + 四道闸门**，而不是直接跑四道闸门。
   > **为什么加 `clean`**：前几轮的闸门读数大量命中 `up-to-date`，尤其 `:app:lintDebug`
@@ -1218,7 +1218,7 @@ R1 按"扩 `ExecEntry` 加原名字段"这条修法落地（即 §4 表格 R1 �
 根因：`ExecEntry` 里**没有任何字段**能装原文件名。
 
 为什么 D1 一直没暴露：`performUndo` 恒返回 `applied = false`（原型不触碰真实文件系统），
-UI 只显示「已记录 N 项」，**从不消费 `from`/`to`**；真机核对（`HANGOFF.md:540` 第 17 项）看到的
+UI 只显示「已记录 N 项」，**从不消费 `from`/`to`**；真机核对（`docs/product/HANDBOOK.md` 第 17 项）看到的
 也是同一句话。⇒ 这是一个**只在撤销记录内部、对用户暂时不可见**的语义缺陷。
 
 ##### 修复（三处生产改动）
@@ -1312,7 +1312,7 @@ BUILD FAILED in 6s
   本次 `:app:lintDebug` 执行了，但 `lintAnalyzeDebug` / `lintReportDebug` 为 `UP-TO-DATE`。
   可判定正确（`app/**` 仍未改），但**不得当作新鲜读数引用**。
 - ⚠️ `ExecutionReportTest > rename undo maps to restoring the original name` 此前**只断言 `from`**，
-  本轮补上 `to` —— 这正是 HANGOFF 所记"测试数量不等于测试强度"的一个实例。
+  本轮补上 `to` —— 这正是 HANDBOOK 所记"测试数量不等于测试强度"的一个实例。
 
 #### 轮 14（2026-10-04 22:2x）— W18 **R2 补齐**：改名侧逐项句子契约（**首次改 `app/**`**）
 
@@ -1334,7 +1334,7 @@ BUILD FAILED in 6s
 
 ##### 缺陷逐字回顾（修之前）
 
-`HANGOFF.md:2690-2693`：「**R2(非缺陷)**:`RenamePlannedOp.describe()` 在无原因时只能给一句状态词
+`docs/product/HANDBOOK.md`：「**R2(非缺陷)**:`RenamePlannedOp.describe()` 在无原因时只能给一句状态词
 (`Msg(TextKey.OpStatusRename)`)—— 改名侧没有逐项句子契约(计划页渲染的是"原名 → 新名"两列)。
 补齐需**新增 `TextKey`**,而本轮明令禁止新增键(会牵动 `PixFoldText.kt` 的穷尽 `when` 与双语资源,
 把 lint 风险引入无人值守窗口)。」
@@ -1448,7 +1448,7 @@ R2 的授权是"补齐契约 + i18n"，不是重做计划页。
 - **未新增待裁决项**；R3/R4 仍未决，均不阻塞。
 - 本轮**按用户授权**新增了 1 个 `TextKey` 并**首次改动 `app/**`**（2 个资源 + 1 个映射 + 1 个测试），
   但 `RenamePlanPage.kt` 等 UI 布局文件**一行未动**；**未改构建脚本**；**未新增依赖**。
-  `HANGOFF.md` **本轮一字未改**（与轮 13 同款处置）：`HANGOFF.md:2690-2693` 记的是**轮 9 当时**
+  `docs/product/HANDBOOK.md` **本轮一字未改**（与轮 13 同款处置）：`docs/product/HANDBOOK.md` 记的是**轮 9 当时**
   "明令禁止新增键"这件事，属历史记录；**R2 的当前状态以本台账 §4 表格为准**（已改 ✅）。
 - 闸门读数（本轮四道闸门后**单独重跑**了 `:app:lintDebug --rerun-tasks` 与
   `:app:assembleDebug --rerun-tasks` 以免沿用缓存）：`:app:lintDebug` ⇒
@@ -1495,7 +1495,7 @@ R2 的授权是"补齐契约 + i18n"，不是重做计划页。
 
 ##### 缺陷逐字回顾（修之前）
 
-`HANGOFF.md:2686-2689`（轮 7 / W11 登记）：「**R3(缺陷)**:`OutputConflictPolicy.Overwrite` +
+`docs/product/HANDBOOK.md`（轮 7 / W11 登记）：「**R3(缺陷)**:`OutputConflictPolicy.Overwrite` +
 输出已存在时,报告报 `Succeeded`、`createdPath` = **被替换的那个旧文件**路径,撤销据此推导
 `DeleteCreated(该路径)` ⇒ 真执行会**删掉用户原有的 CBZ**,且被覆盖的内容无法恢复。」
 
@@ -1617,8 +1617,8 @@ CHANGED M31: ★存活★ -> 捕获      其余 26 组两遍均为"捕获"
 - 本轮**按用户授权改动 `app/**`**：新增 UI 组件（`UndoScopeDialog`）、改 UI 布局（撤销按钮 +
   页面尾部）、新增 4 条双语字符串 + 1 个 `<plurals>`。**未改构建脚本**（`build.gradle.kts` /
   `libs.versions.toml` / `.mise.toml` 逐条 `git diff --quiet` 确认未动）；**未新增依赖**
-  （`androidx.compose.ui.window.Dialog` 随 compose-ui 发布）；**未改 `HANGOFF.md`**
-  （`HANGOFF.md:2686-2689` 记的是**轮 7 当时**的登记，属历史记录；R3 当前状态以本台账 §4 为准）。
+  （`androidx.compose.ui.window.Dialog` 随 compose-ui 发布）；**未改 `docs/product/HANDBOOK.md`**
+  （`docs/product/HANDBOOK.md` 记的是**轮 7 当时**的登记，属历史记录；R3 当前状态以本台账 §4 为准）。
 - 测试计数口径：`domain` 源码 `@Test` = **431** = XML **431**；`app` 源码 `@Test` = **421**，
   XML = **420**，差 1 仍是 `NegativeControlTest`（被 `unitTests.all { exclude(...) }` 排除）。
   `app` 从 402 → 420（+18：`UndoScopeDialogTest` 14 + `UndoScopeDialogStyleTest` 2 + `PlanWiringTest` 2）。
@@ -1729,9 +1729,9 @@ CHANGED M31: ★存活★ -> 捕获      其余 26 组两遍均为"捕获"
     另加 `domain_page_issue_count_mismatch` 中英各一条。
 - **边界核对**：`pixfold-d1/domain/build.gradle.kts`、`pixfold-d1/app/build.gradle.kts`、
   `pixfold-d1/build.gradle.kts`、`pixfold-d1/settings.gradle.kts`、
-  `pixfold-d1/gradle/libs.versions.toml`、`.mise.toml`、`AGENTS.md`、`README.md`、`HANGOFF.md`
+  `pixfold-d1/gradle/libs.versions.toml`、`.mise.toml`、`AGENTS.md`、`README.md`、`docs/product/HANDBOOK.md`
   逐条 `git diff --quiet HEAD -- <f>` ⇒ **全部 unchanged**。
-  未新增依赖、未改构建脚本、未改 `HANGOFF.md`、未连真机、未 push。
+  未新增依赖、未改构建脚本、未改 `docs/product/HANDBOOK.md`、未连真机、未 push。
   本轮改动面 **9 files, +223 / −8**（生产 3 文件：`ComicInfoXml.kt` / `TextKey.kt` /
   `PixFoldText.kt` + 2 个双语资源；其余为测试与本轮新增的测试助手 `TestText.raw`）。
 - **R4 关闭**。§4 表格 R4 行状态改为「✅ 已修复（轮 16 / W20）」。
@@ -1841,10 +1841,10 @@ CHANGED M31: ★存活★ -> 捕获      其余 26 组两遍均为"捕获"
     `find app/src/main domain/src/main -newer <apk>` 为空 ⇒ 比所有源文件新。
 - **边界核对**：`domain/build.gradle.kts`、`app/build.gradle.kts`、`build.gradle.kts`、
   `settings.gradle.kts`、`gradle/libs.versions.toml`、`.mise.toml`、`AGENTS.md`、`README.md`、
-  `HANGOFF.md` 逐条 `git diff --quiet HEAD -- <f>` ⇒ **全部 unchanged**。
+  `docs/product/HANDBOOK.md` 逐条 `git diff --quiet HEAD -- <f>` ⇒ **全部 unchanged**。
   `git diff --stat HEAD -- domain/src/main app/src/main` ⇒ **空**（生产代码零改动）。
   本轮改动面 = **1 个新测试文件**（`TranslationCoverageTest.kt`，313 行），未新增依赖、
-  未改构建脚本、未改 `HANGOFF.md`、未连真机、未 push。
+  未改构建脚本、未改 `docs/product/HANDBOOK.md`、未连真机、未 push。
 - ⚠️ **临时探针已删除**：`app/src/test/kotlin/com/pixfold/d1/_ProbeLocale.kt`（locale 机制验证 +
   107 键 × 两语言渲染全量对拍用的探针）已 `rm -f`，确认不存在。它**从未入库**。
 - **i18n 一项关闭**。§4 表格新增 i18n 行并标记 ✅（见下）。
@@ -2014,7 +2014,7 @@ CHANGED M31: ★存活★ -> 捕获      其余 26 组两遍均为"捕获"
   ② 两个退化键的**删除**是「去前缀后无文案」的直接后果，不是产品决策；
   ③ 真机上**未验证** R2 的逐项句子（不可达，见 R5）与 R4 的页码告警
   （mock 数据自身一致，需专门造分叉卷才能触发）；
-  ④ 未改构建脚本、未新增依赖、未改 `HANGOFF.md`/`AGENTS.md`/`README.md`
+  ④ 未改构建脚本、未新增依赖、未改 `docs/product/HANDBOOK.md`/`AGENTS.md`/`README.md`
   （三处阶段快照仍不同步，属产品决策）。
 
 #### 轮 19（2026-10-05 17:4x）— W23 **R4 真机取证 + R5 裁决落账**（用户 `m02554`）
@@ -2078,21 +2078,21 @@ CHANGED M31: ★存活★ -> 捕获      其余 26 组两遍均为"捕获"
   这一条与 §4 R4 状态列里已有的"防御性"诚实声明一致，互为佐证。
 - **未做 / 不宣称**：① **未改**任何生产代码、**未改**构建脚本、**未新增**依赖；
   ② 边界文件（`app/build.gradle.kts`、`domain/build.gradle.kts`、`build.gradle.kts`、`settings.gradle.kts`、
-  `gradle/libs.versions.toml`、`.mise.toml`、`AGENTS.md`、`README.md`、`HANGOFF.md`）逐条 `git diff --quiet HEAD`
-  全部 unchanged；③ 未推送、未并入 `dev`；④ 未改三处阶段快照（`HANGOFF.md` §9 顶 + `AGENTS.md` 头 + `README.md`）。
+  `gradle/libs.versions.toml`、`.mise.toml`、`AGENTS.md`、`README.md`、`docs/product/HANDBOOK.md`）逐条 `git diff --quiet HEAD`
+  全部 unchanged；③ 未推送、未并入 `dev`；④ 未改三处阶段快照（`docs/product/HANDBOOK.md` §9 顶 + `AGENTS.md` 头 + `README.md`）。
 - **结论 / 阻塞 / 待裁决**：无新增待裁决项；**§4 R5 已裁决关闭 ⇒ §4 已无待裁决项**。
   真机上仅剩的未验证项 R2 已由用户裁决为**刻意保留**（设计如此，非待办）。
 
 ---
 
-#### 轮 20（2026-10-05 18:2x）— W24 **`HANGOFF.md` §9.1「D3 打包核心轮」订正 + 追记**（用户 `m03250`）
+#### 轮 20（2026-10-05 18:2x）— W24 **`docs/product/HANDBOOK.md` §9.1「D3 打包核心轮」订正 + 追记**（用户 `m03250`）
 
-- 提交：`768bec7` docs(d3): 订正 HANGOFF §9.1「D3 打包核心轮」6 处失真，并追记 R1–R5/i18n/图标/合回 dev
+- 提交：`768bec7` docs(d3): 订正 HANDBOOK §9.1「D3 打包核心轮」6 处失真，并追记 R1–R5/i18n/图标/合回 dev
 
 - **用户原话**（`m03250`，逐字）：「先合回dev吧，**文档都回写了吗**」。后半问是触发点：
-  台账（本文件）已逐轮回写，但**唯一权威文档 `HANGOFF.md` 一行都没回写** ——
+  台账（本文件）已逐轮回写，但**唯一权威文档 `docs/product/HANDBOOK.md` 一行都没回写** ——
   它的 §9.1「D3 打包核心轮」小节仍停在轮 5（W9，2026-10-04）写的状态，此后 34 个提交未进。
-  这正是 `AGENTS.md:49` 变更路由要求的"先回写 `HANGOFF.md` 对应章节(唯一权威)"那一环。
+  这正是 `AGENTS.md:49` 变更路由要求的"先回写 `docs/product/HANDBOOK.md` 对应章节(唯一权威)"那一环。
 - **本轮定位**：**文档订正轮，零源码改动**（收工时 `git status --porcelain` 为空）。故本轮无变异清扫。
 - **决策：不改写历史数字，只"就地加注 + 追加追记"**。沿用轮 5（`:493-498`）已定的三条纪律：
   ① 已写下的历史读数一律保留原样、就地加 `> ⚠️` 注 —— 改写会让"当时的读数"消失，那正是最该留痕的东西；
@@ -2114,18 +2114,18 @@ CHANGED M31: ★存活★ -> 捕获      其余 26 组两遍均为"捕获"
   **R1–R5 五项裁决表**、i18n 契约、警示图标矢量化、真机 2 轮、变异累计 **401 组 / 0 逃逸**、
   合回 `dev`（`--ff-only`、无 merge commit、**分支已于 2026-10-07 删除**）、未做/不宣称。
 - **写盘方式**：`artifacts/ledger_w26.py`（两遍制：默认干跑，`--apply` 才写盘；备份
-  `artifacts/w26bak/HANGOFF.md`）。两条编辑**均为 grow 型**（锚点串保留在结果里），
+  `artifacts/w26bak/docs/product/HANDBOOK.md`）。两条编辑**均为 grow 型**（锚点串保留在结果里），
   每条带 `count == 1` 锚点断言，以及新增块首行 `count == 0` 的**防二次写入** precheck。
 - **干跑 → 写盘**：`BEFORE` = **3295 行 / 180,484 字符 / sha256 `343720ff102b…`**；
   首次干跑 `+7743` 字符，**复核所引数字时发现三处将要写错的事实**并修正、重跑得 `+7994`；
   `--apply` 后 = **3426 行 / 319,671 字节 / 188,478 字符**、sha256 **`c8fd0a404221…`**、
   CRLF 0 / bare CR 0 / 以换行结尾；三个关键串（D3 原标题 / 订正块首行 / 追记块标题）各 `count == 1`。
-- **纯新增已验证（本轮最关键的闸门）**：`git diff --numstat -- HANGOFF.md` = **`131 0`**；
+- **纯新增已验证（本轮最关键的闸门）**：`git diff --numstat -- docs/product/HANDBOOK.md` = **`131 0`**；
   `git diff -U0 | grep '^-'` 去掉 `---` 后**零行** ⇒ **未删除任何一行**；
   两个 hunk = `@@ -2612,0 +2613,19 @@`（订正块）与 `@@ -2711,0 +2731,112 @@`（追记块）。
-- **阶段快照三处仍未动**（本轮最要紧的边界）：`HANGOFF.md:451` 门槛表
+- **阶段快照三处仍未动**（本轮最要紧的边界）：`docs/product/HANDBOOK.md` 门槛表
   `| D3 领域核心与适配层 | 🔄 部分已由 D1 提前交付(2026-09-19 校正)`、
-  `HANGOFF.md:2881` 现状对照表 `| **打包** | ⬜ **未交付** |`、§9 顶部 `> 进度(` 行 ——
+  `docs/product/HANDBOOK.md` 现状对照表 `| **打包** | ⬜ **未交付** |`、§9 顶部 `> 进度(` 行 ——
   **三者逐字未改**；`AGENTS.md`（注意：**在仓库根**，`pixfold-d1/AGENTS.md` **不存在**）与
   `README.md` 的 `git diff --quiet HEAD` 均 **unchanged**。
   追记里**如实标注**"这几处仍是旧值、本轮不自改"（`:2835` 与 `:2881` 附近）。
@@ -2146,26 +2146,26 @@ CHANGED M31: ★存活★ -> 捕获      其余 26 组两遍均为"捕获"
   剩下的三处阶段快照同步仍是**产品决策**，本轮**未做**（见 §6.5 第 3 项）。
 
 - **追记后的收尾（同轮补记，2026-10-05 18:3x–18:4x）**：追记落盘后自查发现**两处"写下即过期"的失真** ——
-  追记里写的是「合回 `dev` 那一刻」的读数（`HANGOFF.md:2753` 交付面表「分支归宿」格
-  `dev == d3/p1`、`HANGOFF.md:2826-2827` 正文 `[ahead 42]`），而**同一轮随后又落了 docs 提交**
+  追记里写的是「合回 `dev` 那一刻」的读数（`docs/product/HANDBOOK.md` 交付面表「分支归宿」格
+  `dev == d3/p1`、`docs/product/HANDBOOK.md` 正文 `[ahead 42]`），而**同一轮随后又落了 docs 提交**
   （都在 `dev` 上、`d3/p1` 未动）⇒ 两个断言当场失效。
-  - **修法**：新建 `artifacts/fix_w24_hangoff_stale.py`（两遍制），**沿用轮 5 纪律不改写历史数字**，
-    只就地追加 `> ⚠️` 注（`HANGOFF.md:2755` 与 `:2836`）说明"那是合并时点的快照"。
+  - **修法**：新建 `artifacts/fix_w24_HANDBOOK_stale.py`（两遍制），**沿用轮 5 纪律不改写历史数字**，
+    只就地追加 `> ⚠️` 注（`docs/product/HANDBOOK.md` 与 `:2836`）说明"那是合并时点的快照"。
     `git diff --numstat` = **`11 0`**（纯追加）。
   - **⚠️ 订正注自己又过期了一次（本轮最该记住的教训）**：第一版注里写死
     「本轮又落 **3 个** docs 提交 ⇒ `dev` = `d3/p1` **+3**、`[ahead 45]`」——
     但**写下它的那个提交本身又让 `dev` 前进一格** ⇒ 实测立刻变成 `+4` / `[ahead 46]`。
-    **任何写死提交数的注都会自我过期**。故新建 `artifacts/fix_w24_hangoff_stale2.py`
+    **任何写死提交数的注都会自我过期**。故新建 `artifacts/fix_w24_HANDBOOK_stale2.py`
     把两处改为**时间无关表述**：只保留"合并时点读数（`[ahead 42]`）"这一不变的历史事实，
     把"此后领先多少"改为指向 `git status -sb` / `git rev-list --count d3/p1..dev` 的**实时输出**。
     脚本内加了反向断言（正文不得再出现 `**+3**` / `[ahead 45]`）。
   - 该订正**把 `5f5b233` 改写成 `3ff135e`**（`git commit --amend`）：改前已核实
     ① 全仓无任何文件引用 `5f5b233`、② 它是 `dev` 的 tip 且**未推送** ⇒ amend 不破坏任何记录；
     改写后 `git show --numstat` = **`12 0`**（仍为纯追加，零删除行）。
-- **结论 / 阻塞 / 待裁决（补记）**：无新增待裁决项；订正只动 `HANGOFF.md`，**未改任何 Kotlin**。
+- **结论 / 阻塞 / 待裁决（补记）**：无新增待裁决项；订正只动 `docs/product/HANDBOOK.md`，**未改任何 Kotlin**。
 
 - **终笔（同轮第三笔，2026-10-05 18:4x–18:5x）**：核对提交时间轴时发现 §6.2 补记① 存在**时点误标** ——
-  它把 `artifacts/gates_w24b_fix.log`（mtime **18:29:19**）称作「订正 `HANGOFF.md` 两处时间性失真
+  它把 `artifacts/gates_w24b_fix.log`（mtime **18:29:19**）称作「订正 `docs/product/HANDBOOK.md` 两处时间性失真
   **之后**的复跑」，但首次订正提交 `3ff135e` = **18:40:25** ⇒ 那次复跑实际在订正**之前**。
   - **修法**：新建 `artifacts/ledger_w24_supp2.py`（两遍制；干跑 `chars 167883 → 168754`、
     两锚点各 `count == 1`、两 precheck 各 `0`）。① 把误标行就地改为
@@ -2190,8 +2190,8 @@ CHANGED M31: ★存活★ -> 捕获      其余 26 组两遍均为"捕获"
 - 提交：`0da4e19` test(d3): D3 退出条件 ② 加可执行检查（domain 零 Android 依赖）；
   `2f80794` docs(d3): 三处阶段快照同步 —— D3 交付状态落地
 - 改动：新增 `domain/src/test/kotlin/com/pixfold/d1/domain/boundary/AdapterBoundaryTest.kt`（19,285 字节 /
-  5 个测试）；三处阶段快照同步（`HANGOFF.md` ×3 处 + `AGENTS.md` 头 + `README.md` 状态行）；
-  `HANGOFF.md` 4 处就地订正。**`pixfold-d1/app/**` 一行未改**。
+  5 个测试）；三处阶段快照同步（`docs/product/HANDBOOK.md` ×3 处 + `AGENTS.md` 头 + `README.md` 状态行）；
+  `docs/product/HANDBOOK.md` 4 处就地订正。**`pixfold-d1/app/**` 一行未改**。
 - 闸门：app 456 tests / domain 439 tests / 0F 0E / lint `0 errors, 0 warnings, 4 hints` / assembleDebug OK
   （`62 actionable tasks: 62 executed`，APK 与干净基线**逐字节相同**）
 - 变异：4 次**真实注入**（3 次违规注入 + 1 次带探针的取证复跑），四层全部可红，0 逃逸
@@ -2201,7 +2201,7 @@ CHANGED M31: ★存活★ -> 捕获      其余 26 组两遍均为"捕获"
 **授权来源**：用户 `m04274`（逐字两项）「① 先补 D3 退出条件的可执行检查」「② 再改那五处阶段快照」。
 触发点是 `m04360` 的质疑（逐字）「你好像一直没真机校验啊，这么就已完成了」—— 查证后确认
 **真机校验确实做过、但只覆盖 2 轮**（轮 18 / 轮 19），且**打包核心从未真机端到端跑过**
-（原型不连真实文件系统）⇒ 该质疑**部分成立**，本轮把这条边界写进 §6.5 与 `HANGOFF.md` D3 节。
+（原型不连真实文件系统）⇒ 该质疑**部分成立**，本轮把这条边界写进 §6.5 与 `docs/product/HANDBOOK.md` D3 节。
 本轮定位 = **收口轮**：补上 D3 最后一项缺失的退出条件证据，并把三项条件的达成同步到阶段快照。
 
 ##### ① 退出条件 ② 的可执行检查（新增测试文件，非文档承诺）
@@ -2279,14 +2279,14 @@ CHANGED M31: ★存活★ -> 捕获      其余 26 组两遍均为"捕获"
 
 ##### ④ 三处阶段快照同步（用户 `m04274` 授权「选项 ①」）
 
-- **五处改动**：`HANGOFF.md:432`（§9 顶部新增 `> 进度(2026-10-05)` 行）、`:452`（门槛表 D3 行
+- **五处改动**：`docs/product/HANDBOOK.md`（§9 顶部新增 `> 进度(2026-10-05)` 行）、`:452`（门槛表 D3 行
   `🔄 部分已由 D1 提前交付` ⇒ `✅ **完成**(2026-10-05)`）、`:2912`（§9 D3「现状对照」打包行
   `⬜ **未交付**` ⇒ `✅ **已交付**(2026-10-05)`）、`AGENTS.md:5`（头部快照
   `当前阶段(2026-09-27)` ⇒ `(2026-10-05)`）、`README.md:5`（状态行前缀）。
-- **并在 `HANGOFF.md` 追加**：§9 D3 退出条件后新增「**✅ 三项退出条件达成(2026-10-05)**」取证块；
+- **并在 `docs/product/HANDBOOK.md` 追加**：§9 D3 退出条件后新增「**✅ 三项退出条件达成(2026-10-05)**」取证块；
   原「**未做 / 不宣称**」块（`:2842-2853`）就地改为「**边界与后续**」，把原第 1、2 条标为**已完成**、
   并保留仍然成立的边界（D2b 五项、未推送、**真机验证层级**）。
-- **订正两小节的自我矛盾（同轮补记）**：`HANGOFF.md` 里 2026-10-04 小节与 2026-10-05 追记小节
+- **订正两小节的自我矛盾（同轮补记）**：`docs/product/HANDBOOK.md` 里 2026-10-04 小节与 2026-10-05 追记小节
   都写着「三项退出条件的正式判定与门槛表/阶段快照的状态改动**留待用户裁决**」「退出条件 2 仍未落地」
   —— 裁决已落地后这些句子**自相矛盾**。按本仓「保留原文 + 就地加 `> ⚠️` 订正」惯例处理：
   新增 2 处「**⚠️ 2026-10-05 再订正**」块（`:2637`、`:2750`）、2 处 `~~删除线~~` 就地订正
@@ -2295,9 +2295,9 @@ CHANGED M31: ★存活★ -> 捕获      其余 26 组两遍均为"捕获"
   **全部位于订正注自身之内**。Markdown 结构完整（`` ``` `` 计数偶数、CRLF 0 / bare CR 0）。
 - **旧串彻底消失已验**：`🔄 部分已由 D1 提前交付` = 0、`| ⬜ **未交付** | D1 是交互原型` = 0、
   `当前阶段(2026-09-27)` = 0。
-- **写盘方式**：`artifacts/ledger_w25_snapshots.py` 与 `artifacts/ledger_w25_hangoff_fix.py`（均两遍制；
-  干跑 + `--apply`；锚点 `count == 1` 断言；备份 `artifacts/w25bak/`；`HANGOFF.md` 自下而上编辑以免行号漂移）。
-- **文件规模变化**：`HANGOFF.md` 3438→3492 行 / 320,687→327,328 字节 / sha256
+- **写盘方式**：`artifacts/ledger_w25_snapshots.py` 与 `artifacts/ledger_w25_HANDBOOK_fix.py`（均两遍制；
+  干跑 + `--apply`；锚点 `count == 1` 断言；备份 `artifacts/w25bak/`；`docs/product/HANDBOOK.md` 自下而上编辑以免行号漂移）。
+- **文件规模变化**：`docs/product/HANDBOOK.md` 3438→3492 行 / 320,687→327,328 字节 / sha256
   `30ed30d25117`→`e10ea2c090ab`；`AGENTS.md` 166 行 / 23,341 字节 / `dd1a2c249a92`；
   `README.md` 132 行 / 71,933 字节 / `908847f926c6`。
 - **脚本踩坑（教训）**：`ledger_w25_snapshots.py` 首版有 ① 一处 Python 字符串漏写收尾引号
@@ -2333,7 +2333,7 @@ CHANGED M31: ★存活★ -> 捕获      其余 26 组两遍均为"捕获"
 
 #### 轮 22（2026-10-05 23:1x–23:5x）— W26 真机补验：大字体未溢出 + 深色色阶 + 撤销三档真点分叉
 
-- 提交：`6deb809` docs(d3): 回写轮 22（真机补验）读数：HANGOFF 真机账目 2 轮 → 3 轮；
+- 提交：`6deb809` docs(d3): 回写轮 22（真机补验）读数：HANDBOOK 真机账目 2 轮 → 3 轮；
   `f17ef42` docs(d3): 轮 22 补记 —— 新增「回写自查」工序，并登记 5 处失真与 4 条教训
 - 改动：**零源码改动** —— `git status --porcelain` 在收工态为**空**（本轮唯一产物是
   `pixfold-d1/artifacts/` 下的取证 dump 与截图，而 `artifacts/` 自 `pixfold-d1/.gitignore:9`
@@ -2394,7 +2394,7 @@ CHANGED M31: ★存活★ -> 捕获      其余 26 组两遍均为"捕获"
 - ⚠️ **发现一处 Robolectric 预测与真机不符**：轮 15 的 `UndoScopeDialogStyleTest` 预测
   `dark cancel = #FF29292F surface`，而真机取消键是 **`(0,0,0)`** —— 因为真机走的是
   `ui/theme/ColorSchemes.kt:182 ColorScheme.withPureBlack()` + `Theme.kt:70-71` 的纯黑路径。
-  ⇒ **又一例「像素断言不能替代真机」**，已记入 `HANGOFF.md` 轮 22 条目。
+  ⇒ **又一例「像素断言不能替代真机」**，已记入 `docs/product/HANDBOOK.md` 轮 22 条目。
 - 容器 bounds `[72,802][1192,2118]` **未溢出**；标题图标 `[156,1012][240,1096]` = **84×84 px = 24dp**
   （与轮 18 的 `bundo2.xml` **逐位相同** —— 两轮同值，**不存在"取整差值"**）。
 
@@ -2474,7 +2474,7 @@ CHANGED M31: ★存活★ -> 捕获      其余 26 组两遍均为"捕获"
 
 - 本轮**是**真机轮（整条 `d3/p1` 分支的**第 3 轮**），且**只验了这三项**。
   仍**未**在真机上验证的：
-  - **D3 打包核心的端到端** —— 原型**不连真实文件系统**（`HANGOFF.md` §9 D3 执行注），
+  - **D3 打包核心的端到端** —— 原型**不连真实文件系统**（`docs/product/HANDBOOK.md` §9 D3 执行注），
     B 线走 mock 数据 ⇒ 本轮验的是**渲染链与三档语义在真机上的外观/分叉**，**不是**端到端；
     真实文件端到端属 **D4b**（依赖 D2b）。
   - **R2 的逐项句子** —— 已由用户 `m02554` 裁决为**刻意保留**（键不可达），**非待办**。
@@ -2511,14 +2511,14 @@ CHANGED M31: ★存活★ -> 捕获      其余 26 组两遍均为"捕获"
 
 #### 轮 23（2026-10-06 00:0x–01:0x）— W27 真机覆盖度审计 + 三个漏验警示面补验
 
-- 提交：`e83f215` docs(d3): 回写轮 23（W27 真机覆盖度审计）读数：HANGOFF 真机账目 3 轮 → 4 轮；
+- 提交：`e83f215` docs(d3): 回写轮 23（W27 真机覆盖度审计）读数：HANDBOOK 真机账目 3 轮 → 4 轮；
   `27ab1e7` docs(d3): 订正轮 23 回写里的台账规模读数（首次把"开工前 → 回写后"记成了回写过程中的中间态）；
   `d356d46` docs(d3): 台账 §6.4 收口（补登轮 23 的三笔提交）；
   `9b10d06` docs(d3): 登记轮 23 的三项开放项（§4.1 的 O1 配色分级 / O2 快照策略 / O3 D2b 依赖阻塞，
   用户本回合「问题都做记录」）
 - 改动：**零源码改动** —— 设备侧收工（文档回写前）`git status --porcelain` 为**空**（本轮全部产物是
   `pixfold-d1/artifacts/` 下的审计脚本、取证 dump 与截图；`artifacts/` 自
-  `pixfold-d1/.gitignore:9` 起就被忽略 ⇒ **不进 git**）；回写文档后工作树**只余 `HANGOFF.md` 与本台账两个文档**
+  `pixfold-d1/.gitignore:9` 起就被忽略 ⇒ **不进 git**）；回写文档后工作树**只余 `docs/product/HANDBOOK.md` 与本台账两个文档**
   （详见 §6.3）。无新增依赖、无边界文件改动。
 - 闸门：app 456 tests / domain 439 tests / 0F 0E / lint `0 errors, 0 warnings, 4 hints` / assembleDebug OK
   （`62 actionable tasks: 62 executed`，APK 与干净基线**逐字节相同**）
@@ -2760,8 +2760,8 @@ distinct `text` 值 **519** 条。**`WARN_ICONS`（11 键）的真机覆盖 = �
 
 | 文件 | 锚点（旧串） | 插入读数 |
 | --- | --- | --- |
-| `HANGOFF.md` §9 顶门槛表 D3 行 | `不以重写替代)。详见下方 D3 节 \|` | 阶段分支共 **4 轮**真机核对（轮 23 覆盖度审计：`WARN_ICONS` 中文 **8/11 → 11/11**）；**打包核心仍未端到端** |
-| `HANGOFF.md` §9 D3「现状对照」打包行 | `仍属 **D4b** —— 见本节「归属澄清」 \|` | 同上（真机 4 轮 + 中文 11/11） |
+| `docs/product/HANDBOOK.md` §9 顶门槛表 D3 行 | `不以重写替代)。详见下方 D3 节 \|` | 阶段分支共 **4 轮**真机核对（轮 23 覆盖度审计：`WARN_ICONS` 中文 **8/11 → 11/11**）；**打包核心仍未端到端** |
+| `docs/product/HANDBOOK.md` §9 D3「现状对照」打包行 | `仍属 **D4b** —— 见本节「归属澄清」 \|` | 同上（真机 4 轮 + 中文 11/11） |
 | `AGENTS.md` 头部「当前阶段」段 | `下一步 = **D2b(缩略图生成策略 / 后台任务与进度 / 授权失效恢复)**。` | 同上 |
 | `README.md` 状态行 | `；2026-09-10 技术栈重审换栈为 Kotlin + Jetpack Compose；` | 同上（全角标点版） |
 
@@ -2770,7 +2770,7 @@ distinct `text` 值 **519** 条。**`WARN_ICONS`（11 键）的真机覆盖 = �
   于是「旧串出现 0 次」这条断言必然失败。**文件本身是对的**。
   改为检查「新插入片段各命中恰 1 次」后 **4/4 OK**。
   **教训：自查脚本的判据要针对"插入的增量"，不要针对"旧串消失"——当替换串包含旧串时会误报。**
-- 规模：`HANGOFF.md` 3540 → **3541 行 / 332,692 → 333,081 字节**（`c9b1e4a137a8`）；
+- 规模：`docs/product/HANDBOOK.md` 3540 → **3541 行 / 332,692 → 333,081 字节**（`c9b1e4a137a8`）；
   `AGENTS.md` 166 → **167 行 / 23,341 → 23,549 字节**（`49e9c7b0bd1a`）；
   `README.md` 132 → **133 行 / 71,933 → 72,159 字节**（`b715cf7686dc`）。
 - §4.1 的 O1/O2 两行状态由 `⬜ **待裁决**` 改为 `✅ **已落地**`，并把小节前言
@@ -2936,7 +2936,7 @@ sha256 **`8aa83081e3feb12582cd5a219f0a0d3ed9ea064cbde2521c74a61d93b66bbd22`**
 
 ##### ⑧ 本轮明确"未做"（不得高估）
 
-- **零源码改动**：收工 `git status --porcelain` 只余 `HANGOFF.md` 与本台账两个文档。
+- **零源码改动**：收工 `git status --porcelain` 只余 `docs/product/HANDBOOK.md` 与本台账两个文档。
   ⇒ **本轮不投变异**（变异对象是新写的代码；同轮 19/22/23 先例）。本轮的可红性由**反向对照**承担：
   取消档必须 **0 条**（若接线错到恒发消息，取消档就会出消息）、三档数字必须**严格递增且差 1**
   （若安全档误推覆盖项，安全档会变 5 ⇒ 分叉消失）、安全档**上边缘必须有红**且**底色必须等于表面色**
@@ -2970,7 +2970,7 @@ sha256 **`8aa83081e3feb12582cd5a219f0a0d3ed9ea064cbde2521c74a61d93b66bbd22`**
   `62 actionable tasks: 62 executed`、`RC=0`。
 - ✅ **设备收尾读数**：`stay_on_while_plugged_in` = 0、`font_scale` = 1.0、`Night mode: yes`、
   `pidof` 空、`ps -A | grep -c pixfold` = 0、`/data/local/tmp` 内 `.xml`/`.png` 计数 0。
-- ✅ **HANGOFF 五处锚点**：`真机核对:5 轮`（§9 D3 真机账目头）/ `有 5 轮`（§9 D3 验证层级）/
+- ✅ **HANDBOOK 五处锚点**：`真机核对:5 轮`（§9 D3 真机账目头）/ `有 5 轮`（§9 D3 验证层级）/
   `上有 **5 轮**`（§9 D3 追记）/ §9 顶门槛表 D3 行的 `**5 轮**真机核对` / §9「现状对照」打包行的
   `**5 轮**真机核对` —— 各 **1**；全文件 `'**4 轮**真机核对'` 残留 **0**
   （其余 3 处 `4 轮` 字样是历史轮次叙述，与本计数无关）。
@@ -3009,7 +3009,7 @@ sha256 **`8aa83081e3feb12582cd5a219f0a0d3ed9ea064cbde2521c74a61d93b66bbd22`**
 
 > 出现下列任一情况，**停止该项**并在此登记，然后继续**下一项**工作：
 > 需要新产品决策、需要新增 `TextKey`/资源、需要改 `app/**`、需要真机结论、
-> 需要新增依赖、需要产品阈值（如 HANGOFF §11 第 12 条的空间不足阈值）。
+> 需要新增依赖、需要产品阈值（如 docs/notes/decisions-archive.md §11 第 12 条的空间不足阈值）。
 
 | # | 轮次 | 事项 | 为什么不能自行决定 | 状态 |
 | --- | --- | --- | --- | --- |
@@ -3027,11 +3027,11 @@ sha256 **`8aa83081e3feb12582cd5a219f0a0d3ed9ea064cbde2521c74a61d93b66bbd22`**
 | # | 事项 | 为什么不能自行决定 | 状态 |
 | --- | --- | --- | --- |
 | O1 | **撤销范围对话框的两个执行按钮配色完全相同** —— 安全档「仅撤销本次生成的」与危险档「全部删除（含被覆盖的）」都从 `app/…/ui/theme/Theme.kt:114-128 dangerActionButtonColors()` 取到**同一个** `(140,29,24)` = `#8C1D18` = `errorContainer`，真机实测两者按钮中心像素**逐位相同**（轮 22 读数）；**只有文案不同** | 用户 `m04079` 第③项的原话是「记得**按钮颜色要区分开**，把取消放到最后边」。取消键已按裁决无底色且排最后（已落实）；但**两个执行档是否也要分级**（例如危险档用 `error`、安全档用 `errorContainer`，或加一个「危险」图标）属**视觉产品决策**，且会改已通过轮 22 真机像素取证的现状 ⇒ 只登记 | ✅ **已落地**（轮 24 / W28：用户 `m06826`「o1o2都要」裁决 ⇒ 取**视觉重量分级**（危险档深红填充 / 安全档 1dp `error` 色描边无底色 / 取消无底色无描边），**不取**本行举例的「危险档 `error` / 安全档 `errorContainer`」—— error 族按模式反转，取两角色会让分级随模式互换、且每模式下总有一档是淡粉 `#F9DEDC`/`#F2B8B5`；落地 = `Theme.kt` 新增 `dangerOutlineButtonColors()` + `dangerOutlineBorder()`、`ExecutionReportPage` 安全档改 `OutlinedButton`；测试补第 ⑤ 条「两档取样点通道差 ≥ 40」—— 原先「两档都偏红」的断言**在缺陷态下照样成立**；变异 2 条全捕获；⚠️ **本轮按用户指令 `m06838` 跳过真机**，像素读数仅 Robolectric 探针级、**真机未复核**） |
-| O2 | **三处阶段快照是否要写进轮 23 的真机覆盖度** —— `HANGOFF.md` §9 顶门槛表 D3 行 / §9 D3「现状对照」打包行 + `AGENTS.md` 头部 + `README.md` 状态行，上一次同步是轮 21（`2f80794`）；轮 23 把 `WARN_ICONS` 中文覆盖从 8/11 提到 11/11、真机账目从 3 轮提到 4 轮，**本轮未动这三处**（理由：本轮是已交付状态的小节内取证补记，**不改变"当前阶段/状态"**） | 「快照要不要随取证轮一起动」是**文档策略**问题：若每轮都同步，快照会频繁漂移；若只在阶段/状态变化时同步，则覆盖度这类"加固读数"不进快照。两种都自洽 ⇒ 由用户定 | ✅ **已落地**（轮 24 / W28：用户 `m06826`「o1o2都要」裁决 ⇒ **取「同步」**：把轮 23 的覆盖度读数写进四处 —— `HANGOFF.md` §9 顶门槛表 D3 行 + §9 D3「现状对照」打包行 + `AGENTS.md` 头部 + `README.md` 状态行，各插入一句「真机验证层级：阶段分支共 **4 轮**真机核对（轮 23 覆盖度审计：`WARN_ICONS` 中文覆盖 8/11 → **11/11**）；打包核心仍未端到端」；用两遍制脚本 `artifacts/o2_writeback.py` 落地并逐条 verify；⚠️ 写后自查首跑报 2 个假 `BAD`（替换串包含旧串导致「旧串消失」判据失效），已改为检查插入增量） |
+| O2 | **三处阶段快照是否要写进轮 23 的真机覆盖度** —— `docs/product/HANDBOOK.md` §9 顶门槛表 D3 行 / §9 D3「现状对照」打包行 + `AGENTS.md` 头部 + `README.md` 状态行，上一次同步是轮 21（`2f80794`）；轮 23 把 `WARN_ICONS` 中文覆盖从 8/11 提到 11/11、真机账目从 3 轮提到 4 轮，**本轮未动这三处**（理由：本轮是已交付状态的小节内取证补记，**不改变"当前阶段/状态"**） | 「快照要不要随取证轮一起动」是**文档策略**问题：若每轮都同步，快照会频繁漂移；若只在阶段/状态变化时同步，则覆盖度这类"加固读数"不进快照。两种都自洽 ⇒ 由用户定 | ✅ **已落地**（轮 24 / W28：用户 `m06826`「o1o2都要」裁决 ⇒ **取「同步」**：把轮 23 的覆盖度读数写进四处 —— `docs/product/HANDBOOK.md` §9 顶门槛表 D3 行 + §9 D3「现状对照」打包行 + `AGENTS.md` 头部 + `README.md` 状态行，各插入一句「真机验证层级：阶段分支共 **4 轮**真机核对（轮 23 覆盖度审计：`WARN_ICONS` 中文覆盖 8/11 → **11/11**）；打包核心仍未端到端」；用两遍制脚本 `artifacts/o2_writeback.py` 落地并逐条 verify；⚠️ 写后自查首跑报 2 个假 `BAD`（替换串包含旧串导致「旧串消失」判据失效），已改为检查插入增量） |
 | O3 | **D3 打包核心无法直接进入真机端到端测试（依赖阻塞，非缺陷）** —— 用户 2026-10-06 逐字：「**前面阶段的还没实现所以无法直接进入真机测试打包**」。具体：端到端要真扫 → 真排 → 真写 CBZ，依赖 **D2b 平台能力**（缩略图生成策略 / 后台任务与进度 / 授权失效恢复 / 存储空间预检与不足退路 / 大归档写入 Zip64）与 **D4b 真实文件闭环**；而 D3 原型**不连真实文件系统**（B 线走 mock 数据、`performUndo` 恒 `applied=false`） | **不是**待我修的东西，而是路线顺序：D3 已交付的部分（领域核心 + 适配层边界 + 渲染链真机取证）**已是当前能验的全部**；再往下的端到端**卡在前置阶段**。任何"绕过前置直接跑真实打包"的做法都会越界（改 `app/**` 接 SAF、引入 Zip64 依赖、动 D2b 工作面） | 🚧 **阻塞**（等 D2b） |
 
 **已知的、明确不碰的开放项**（不要在本轮"顺手"处理）：
-- HANGOFF §11 第 12 条：Android 端存储不足的**阈值与提示形态**，明写「待 D2b 真机验证后定」。
+- docs/notes/decisions-archive.md §11 第 12 条：Android 端存储不足的**阈值与提示形态**，明写「待 D2b 真机验证后定」。
 - D3 退出条件 2（`domain/` 零 Android 依赖的**可执行检查**）：用户本轮**未选中**，属未授权工作面。
 - 摩擦清单 §4（B 侧 `PackPreviewPage.kt:243-332` 策略选择与计划行的因果距离）、
   §7（`MetadataPage.kt` 754 行）—— 都属 UI 层，本轮禁区。
@@ -3054,7 +3054,7 @@ sha256 **`8aa83081e3feb12582cd5a219f0a0d3ed9ea064cbde2521c74a61d93b66bbd22`**
 ### 5.2 早间复核清单
 
 1. `git log --oneline dev..d3/p1` —— 与 §3.1 每轮记录交叉核对。
-2. `git diff dev...d3/p1 --stat` —— 确认改动面**只在 `domain/**` + `HANGOFF.md` + 本文件**。
+2. `git diff dev...d3/p1 --stat` —— 确认改动面**只在 `domain/**` + `docs/product/HANDBOOK.md` + 本文件**。
    **若出现 `app/**` 或 `res/values*/**.xml` ⇒ 越界，需逐条查。**
 3. `git status --porcelain` / `git stash list` —— 确认无遗留未提交。
 4. 亲自跑一次四道闸门（§0.3）。
@@ -3118,7 +3118,7 @@ cmd.exe /c "D:\Programing\Personal\pixfold\pixfold-d1\run-gradle.bat clean \
 - 读数：**`BUILD SUCCESSFUL in 56s`**，**`64 actionable tasks: 64 executed`**，**exit 0**。
   > ⚠️ 这次刻意加了 `clean`：此前几轮的闸门多为 `up-to-date` 命中，
   > 且 `:app:lintDebug` 的报告文件长期停留在 **2026-09-29 的旧产物**
-  > （详见 §3.1 轮 5 与 HANGOFF 的"lint 诚实例外"）。`clean` 后 **64/64 全部真实执行**，
+  > （详见 §3.1 轮 5 与 HANDBOOK 的"lint 诚实例外"）。`clean` 后 **64/64 全部真实执行**，
   > 读数不再是缓存命中 ⇒ 这是整套验证里**唯一一次"全新鲜"的读数**。
 - lint：`0 errors, 0 warnings, 4 hints`（XML 逐条复核：4 条 **全为 `Hint`** 级
   `AutoboxingStateCreation`，位置 `app/src/main/kotlin/…/ui/components/DragReorderGrid.kt:175,176`
@@ -3205,8 +3205,8 @@ cmd.exe /c "D:\Programing\Personal\pixfold\pixfold-d1\run-gradle.bat clean \
 > （`find app/src/main app/src/test domain/src/main domain/src/test -type f -newer artifacts/gates_w25_restore.log` = **0**）。
 > 真机：PJX110 / Android 16；本轮新增 **R4 页码自检告警的真机取证**（中文 + 英文各一次 + 干净包反向对照），
 > 设备已回到与基线一致的安装，逐面取证见 §3.1 轮 19。
-> 轮 20 读数（**文档订正轮**：只改 `HANGOFF.md`，未改任何 Kotlin；`--rerun-tasks` 全量、
-> 先删两个 `test-results`；日志 `artifacts/gates_w24_hangoff.log`，mtime 2026-10-05 18:2x）：
+> 轮 20 读数（**文档订正轮**：只改 `docs/product/HANDBOOK.md`，未改任何 Kotlin；`--rerun-tasks` 全量、
+> 先删两个 `test-results`；日志 `artifacts/gates_w24_HANDBOOK.log`，mtime 2026-10-05 18:2x）：
 > `RC=0` / `BUILD SUCCESSFUL in 42s` / **`62 actionable tasks: 62 executed`**（无 `up-to-date`）；
 > `domain:test` = **32 files / 434 tests / 0 failures / 0 errors / 0 skipped**；
 > `app:testDebugUnitTest` = **50 files / 456 tests / 0F / 0E / 0S**；
@@ -3214,7 +3214,7 @@ cmd.exe /c "D:\Programing\Personal\pixfold\pixfold-d1\run-gradle.bat clean \
 > `:app:assembleDebug` ⇒ APK **33,437,589 字节**、mtime **2026-10-05 18:21** ——
 > 与干净基线 `artifacts/w24bak/app-debug.clean.apk` **逐字节相同**；
 > 新鲜度：`find app/src/main app/src/test domain/src/main domain/src/test -type f -newer
-> artifacts/gates_w24_hangoff.log` = **0**。
+> artifacts/gates_w24_HANDBOOK.log` = **0**。
 > ⇒ 文档订正对构建与测试**零影响**；读数与轮 19 完全一致（domain 434 / app 456 / lint 0-0-4）。
 > 轮 20 补记（⚠️ **时点更正**：这一次复跑发生在首次订正**之前**、非「订正之后」—— 见下方第二次复跑）：
 > `--rerun-tasks` 全量、先删两个 `test-results`；日志 `artifacts/gates_w24b_fix.log`，mtime 2026-10-05 18:3x）：
@@ -3226,7 +3226,7 @@ cmd.exe /c "D:\Programing\Personal\pixfold\pixfold-d1\run-gradle.bat clean \
 > 与干净基线 `artifacts/w24bak/app-debug.clean.apk` **逐字节相同**；
 > 新鲜度：`find app/src domain/src -type f -newer artifacts/gates_w24b_fix.log` = **0**。
 > ⇒ 与轮 19/20 读数**三次完全一致**（domain 434 / app 456 / lint 0-0-4）—— 文档改动对构建与测试**零影响**。
-> 轮 20 补记②（**两次 `HANGOFF.md` 订正都落盘之后**的复跑：只改 `HANGOFF.md`、未改任何 Kotlin；
+> 轮 20 补记②（**两次 `docs/product/HANDBOOK.md` 订正都落盘之后**的复跑：只改 `docs/product/HANDBOOK.md`、未改任何 Kotlin；
 > `--rerun-tasks` 全量、先删两个 `test-results`；日志 `artifacts/gates_w24c_final.log`，mtime 2026-10-05 18:44:59）：
 > `RC=0` / `BUILD SUCCESSFUL in 43s` / **`62 actionable tasks: 62 executed`**（无 `up-to-date`）；
 > `domain:test` = **32 files / 434 tests / 0F / 0E / 0S**；
@@ -3324,7 +3324,7 @@ cmd.exe /c "D:\Programing\Personal\pixfold\pixfold-d1\run-gradle.bat clean \
 ### 6.3 改动面与越界核对
 
 - `git diff --stat dev...d3/p1` = **11 files changed, 2678 insertions(+), 74 deletions(-)**。
-- 路径白名单逐条核对（**11 条全在允许面内**）：`HANGOFF.md`、本台账、
+- 路径白名单逐条核对（**11 条全在允许面内**）：`docs/product/HANDBOOK.md`、本台账、
   `domain/…/plan/OperationPlan.kt`、`domain/…/pack/CbzWriter.kt`、`domain/…/pack/CbzWritePlan.kt`、
   `domain/…/plan/Execution.kt`，以及 5 个 domain 测试文件。
 - **越界检查全部通过**：
@@ -3354,7 +3354,7 @@ cmd.exe /c "D:\Programing\Personal\pixfold\pixfold-d1\run-gradle.bat clean \
 > ⚠️ `app/**` 的"0 条"结论**从本轮起不再成立**，是**授权范围内**的改动（资源 + 映射 + 测试），
 > UI 布局文件（如 `ui/workflowa/RenamePlanPage.kt`）仍**一行未动**。
 > 当前实时读数以 `git diff --stat dev...d3/p1` 为准；改动面 = `domain/**` + `app/src/main/res/values*/`
-> （2 个文件）+ `app/…/ui/text/PixFoldText.kt` + `app/src/test/**`（1 个文件）+ `HANGOFF.md` + 本台账。
+> （2 个文件）+ `app/…/ui/text/PixFoldText.kt` + `app/src/test/**`（1 个文件）+ `docs/product/HANDBOOK.md` + 本台账。
 > 轮 15（W19 / R3 修复）**+16 files / +483 / −58** —— 生产 7 个文件
 > （`domain/plan/Execution.kt` +112/−9、`domain/plan/PackagePlan.kt` +17、`domain/plan/OperationPlan.kt` +9、
 > `domain/plan/DangerAction.kt` ±1、`app/…/ui/plan/ExecutionReportPage.kt` +134/−2 —— **首次改 UI 布局**、
@@ -3364,7 +3364,7 @@ cmd.exe /c "D:\Programing\Personal\pixfold\pixfold-d1\run-gradle.bat clean \
 > `UndoScopeDialogStyleTest.kt` 2 用例，另 5 个既有文件共 +187/−42）。
 > ⚠️ 与轮 14 不同：轮 14 只动"资源 + 映射"，**本轮真的动了 UI 布局与交互**（撤销按钮改为
 > "有覆盖项先弹框"、新增 `UndoScopeDialog` 组件、新增 4 条双语字符串 + 1 个 `<plurals>`），
-> 但**未改构建脚本、未新增依赖、未改 `HANGOFF.md`**。
+> 但**未改构建脚本、未新增依赖、未改 `docs/product/HANDBOOK.md`**。
 > ⚠️ `app/**` 的"0 条"结论**从轮 14 起不再成立**，本轮进一步扩大；两条都属**用户授权范围**
 > （`m04081` 授权 R2、`m04079` 第③项授权 R3）。
 > 轮 16（W20 / R4 修复）**+9 files / +223 / −8** —— 生产 5 个文件
@@ -3383,7 +3383,7 @@ cmd.exe /c "D:\Programing\Personal\pixfold\pixfold-d1\run-gradle.bat clean \
 > （`app/src/test/kotlin/com/pixfold/d1/ui/text/TranslationCoverageTest.kt`，313 行 5 用例）。
 > `git diff --stat HEAD -- domain/src/main app/src/main` ⇒ **空** ⇒ **生产代码零改动**，
 > 这是本分支自轮 13 以来**改动面最小的一轮**；既未新增依赖、未改构建脚本，
-> 也未改 `HANGOFF.md`（本轮的授权面是「补自动化 + 复查既有 i18n」，不涉及阶段快照）。
+> 也未改 `docs/product/HANDBOOK.md`（本轮的授权面是「补自动化 + 复查既有 i18n」，不涉及阶段快照）。
 > 只读审计产物（`artifacts/i18n_audit.py` / `i18n_table.tsv` / `i18n_render.tsv`）与
 > 变异脚本 `artifacts/mutate_w21.py` 均在 `pixfold-d1/.gitignore:9` 忽略的 `artifacts/` 下，**未入库**。
 
@@ -3410,7 +3410,7 @@ cmd.exe /c "D:\Programing\Personal\pixfold\pixfold-d1\run-gradle.bat clean \
 > 且这 5 个的前缀删除对"渲染逐字相等"是**同步**的 ⇒ 不触发白名单漂移）。
 > ⚠️ **边界文件逐条 `git diff --quiet HEAD` 全部 unchanged**：`app/build.gradle.kts`、
 > `domain/build.gradle.kts`、`build.gradle.kts`、`settings.gradle.kts`、`gradle/libs.versions.toml`、
-> `.mise.toml`、`AGENTS.md`、`README.md`、`HANGOFF.md` ⇒ **未改构建脚本、未新增依赖、未动阶段快照**。
+> `.mise.toml`、`AGENTS.md`、`README.md`、`docs/product/HANDBOOK.md` ⇒ **未改构建脚本、未新增依赖、未动阶段快照**。
 > ⚠️ 变异脚本与备份（`artifacts/mutate_w22.py`、`mutate_w22b.py`、`w22bak/`、`w22bak2/`、`w22cbak/`、
 > `w22mutbak/`、`w22mutbak2/`、`grid_base.txt`、`grid_mut.txt`、`pngprobe.py`、`adbx.sh` 等）
 > 均在 `pixfold-d1/.gitignore:9` 忽略的 `artifacts/` 下，**未入库**。
@@ -3426,42 +3426,42 @@ cmd.exe /c "D:\Programing\Personal\pixfold\pixfold-d1\run-gradle.bat clean \
 > ⇒ **内容等价、非回归**；权威复跑（`--rerun-tasks` 全量）后与基线**逐字节相同** ⇒ 该疑点关闭。
 > ⚠️ 本轮**未改**任何生产代码、**未改**构建脚本、**未新增**依赖；边界文件（`app/build.gradle.kts`、
 > `domain/build.gradle.kts`、`build.gradle.kts`、`settings.gradle.kts`、`gradle/libs.versions.toml`、`.mise.toml`、
-> `AGENTS.md`、`README.md`、`HANGOFF.md`）逐条 `git diff --quiet HEAD` **全部 unchanged**。
+> `AGENTS.md`、`README.md`、`docs/product/HANDBOOK.md`）逐条 `git diff --quiet HEAD` **全部 unchanged**。
 > ⚠️ 真机取证的产物（`artifacts/r4a.xml`、`r4b.xml`、`r4en1.xml`、`r4c_pack.xml`、`r4c_home.xml`、`r4restore.xml`、
 > `r4_probe_build.log`、`w24_r4_warning.png`、`w24_r4_en.png`、`w24bak/`）均在
 > `pixfold-d1/.gitignore:9` 忽略的 `artifacts/` 下，**未入库**。
 
-> 轮 20 改动面：**仅 `HANGOFF.md`**（纯追加 **+131 / −0**；两个 hunk 都在 §9.1 D3 小节内 ——
+> 轮 20 改动面：**仅 `docs/product/HANDBOOK.md`**（纯追加 **+131 / −0**；两个 hunk 都在 §9.1 D3 小节内 ——
 > 标题后 **19 行**、小节末尾 **112 行**）⇒ **未改任何 Kotlin**、**未改构建脚本**、**未新增依赖**。
-> ⚠️ 与前几轮不同：**本轮 `HANGOFF.md` 不再是"逐条 unchanged"的边界文件**（这是有意的，
+> ⚠️ 与前几轮不同：**本轮 `docs/product/HANDBOOK.md` 不再是"逐条 unchanged"的边界文件**（这是有意的，
 > 且正是 `AGENTS.md:49` 变更路由要求的那一步 —— 回写唯一权威文档）；但
 > **阶段快照三处（§9 顶 `> 进度(` 行、门槛表 `| D3 |` 行、`| **打包** | ⬜ **未交付** |` 行）
 > 与 `AGENTS.md` / `README.md` 仍逐条 `git diff --quiet HEAD` unchanged**。
 > 文件级：3295 → **3426 行**、306,426 → **319,671 字节**、
 > sha256 `343720ff102b…` → **`c8fd0a404221…`**（CRLF 0 / bare CR 0 维持不变）。
-> 轮 20 补记（**订正两处时间性失真之后**）：`HANGOFF.md` 再由 `3426` → **`3437` 行**、
+> 轮 20 补记（**订正两处时间性失真之后**）：`docs/product/HANDBOOK.md` 再由 `3426` → **`3437` 行**、
 > 319,671 → **320,594 字节**、sha256 `c8fd0a404221…` → **`07e640a3df3b…`**；
 > 随后把两条注改为**时间无关表述**（见 §3.1 轮 20 补记）⇒ **`3438` 行**、**320,687 字节**、
 > sha256 **`30ed30d25117…`**（CRLF 0 / bare CR 0 维持不变）。
 > 两次改动均为**纯追加**（`git diff --numstat` = `11 0`；amend 后 `git show --numstat` = `12 0`），
-> **零删除行**；**除 `HANGOFF.md` 外本轮未动任何文件**，`AGENTS.md` / `README.md`
+> **零删除行**；**除 `docs/product/HANDBOOK.md` 外本轮未动任何文件**，`AGENTS.md` / `README.md`
 > 与阶段快照三处**仍逐条 unchanged**。
 
 > 轮 21 补记（用户 `m04274` 授权的收口轮）的改动面：`git diff --numstat HEAD` =
-> `AGENTS.md` **2 / 1**、`HANGOFF.md` **73 / 20**、`README.md` **1 / 1**、
+> `AGENTS.md` **2 / 1**、`docs/product/HANDBOOK.md` **73 / 20**、`README.md` **1 / 1**、
 > 本台账 **167 / 5**；另有**新增文件**（未跟踪）
 > `pixfold-d1/domain/src/test/kotlin/com/pixfold/d1/domain/boundary/AdapterBoundaryTest.kt`
 > （402 行 / 19,285 字节 / sha256 `7e447bbe4f63…`）。
 > ⚠️ 与轮 20 不同：**本轮 `AGENTS.md` 与 `README.md` 不再是"逐条 unchanged"的边界文件**
 > —— 这是**有意为之**，且正是 `AGENTS.md:49` 变更路由要求的（阶段/状态变化须三处一致）。
 > **`pixfold-d1/app/**` 一行未改**；**未改任何构建脚本**；**未新增依赖**。
-> 改动面读数：`git status --porcelain` = ` M AGENTS.md` / ` M HANGOFF.md` / ` M README.md` /
+> 改动面读数：`git status --porcelain` = ` M AGENTS.md` / ` M docs/product/HANDBOOK.md` / ` M README.md` /
 > ` M docs/superpowers/plans/2026-10-04-d3-p1-packing-core.md` /
 > `?? pixfold-d1/domain/src/test/kotlin/com/pixfold/d1/domain/boundary/`。
 > 边界文件逐条 `git diff --quiet HEAD` **全部 unchanged**：`pixfold-d1/app/build.gradle.kts`、
 > `pixfold-d1/domain/build.gradle.kts`、`pixfold-d1/gradle/libs.versions.toml`、
 > `pixfold-d1/settings.gradle.kts`、`pixfold-d1/build.gradle.kts`、`pixfold-d1/gradle.properties`、`.mise.toml`。
-> 文件规模（HEAD → 收工态）：`HANGOFF.md` 3438 → **3491 行** / 320,687 → **327,328 字节** /
+> 文件规模（HEAD → 收工态）：`docs/product/HANDBOOK.md` 3438 → **3491 行** / 320,687 → **327,328 字节** /
 > sha256 `30ed30d25117…` → **`e10ea2c090ab…`**；`AGENTS.md` 165 → **166 行** / 22,444 → **23,341 字节** /
 > `e96d61ba002c…` → **`dd1a2c249a92…`**；`README.md` 132 行（不变）/ 71,322 → **71,933 字节** /
 > `d817461bbb7d…` → **`908847f926c6…`**；本台账 2781 → **2943 行** / 270,055 → **286,205 字节** /
@@ -3473,11 +3473,11 @@ cmd.exe /c "D:\Programing\Personal\pixfold\pixfold-d1\run-gradle.bat clean \
 > 本轮唯一产物是 `pixfold-d1/artifacts/` 下的取证 dump 与截图，而 `artifacts/`（`pixfold-d1/.gitignore:9`）
 > **自始被忽略** ⇒ 既无越界、也无"未提交的取证产物"遗留。
 > 边界文件逐条 `git diff --quiet HEAD` **仍全部 unchanged**（同上一段那 7 条）。
-> 回写后文件规模（`eca6545` → 本提交前）：`HANGOFF.md` 3491 → **3510 行** / 327,328 → **329,506 字节** /
+> 回写后文件规模（`eca6545` → 本提交前）：`docs/product/HANDBOOK.md` 3491 → **3510 行** / 327,328 → **329,506 字节** /
 > sha256 `e10ea2c090ab…` → **`9c80c6853b66…`**（`git diff --numstat` = `+24 / −5`，纯追加为主）；
 > 本台账 2983 → **3157 行** / 291,349 → **307,732 字节** / `91d83d090339…` → **`73b1baeaf58f…`**；
 > `AGENTS.md` 166 行 / 23,341 字节 / `dd1a2c249a92…` **未动**，`README.md` 132 行 / 71,933 字节 /
-> `908847f926c6…` **未动**（本轮 `HANGOFF.md` 的改动是**已交付状态的小节内取证补记**，
+> `908847f926c6…` **未动**（本轮 `docs/product/HANDBOOK.md` 的改动是**已交付状态的小节内取证补记**，
 > **不改变"当前阶段/状态"** ⇒ 按变更路由**不需要**动另外两处，`git diff --quiet` 可复核）。
 > CRLF 0 / bare CR 0 均维持。
 > ⚠️ **本轮唯一的设备侧状态变更已全部复原**（详据见 §3.1 轮 22 ⑥）：
@@ -3486,17 +3486,17 @@ cmd.exe /c "D:\Programing\Personal\pixfold\pixfold-d1\run-gradle.bat clean \
 > `am force-stop` 已生效（`pidof` 空）、`/data/local/tmp` 内 `.xml`/`.png` 计数 **0**。
 > ⇒ **设备回基线**，无残留。
 >
-> **轮 23 补记（真机轮 / 零源码改动）**：`git status --porcelain` 收工态**只有 `HANGOFF.md` 与本台账两个文档**
+> **轮 23 补记（真机轮 / 零源码改动）**：`git status --porcelain` 收工态**只有 `docs/product/HANDBOOK.md` 与本台账两个文档**
 > （其余产物全在 `pixfold-d1/artifacts/`，而 `artifacts/`（`pixfold-d1/.gitignore:9`）**自始被忽略**）
 > ⇒ **无源码改动、无越界、无"未提交的取证产物"遗留**。
-> 回写后文件规模（`0184e55` → 本提交前）：`HANGOFF.md` 3514 → **3532 行** / 329,850 → **331,704 字节** /
+> 回写后文件规模（`0184e55` → 本提交前）：`docs/product/HANDBOOK.md` 3514 → **3532 行** / 329,850 → **331,704 字节** /
 > sha256 `d342b937d57d…` → **`3da5fd12205c…`**（`git diff --numstat` = **`+23 / −5`**
 > = 改 3 处"轮数"行 + 追加轮 23 子 bullet 18 行）；本台账 3223 → **3443 行** / 314,630 → **336,296 字节** /
 > sha256 `95a09f696ccf…` → **`f57e582ba398…`**（`git diff --numstat` = **`+220 / −0`** = 纯追加）；
 > ⚠️ 以上两组读数均可由 `git show <rev>:<path> | wc -l -c` 与 `| sha256sum` 复核，
 > 取的是 **`0184e55`（本轮开工前）→ `e83f215`（回写提交）** 两个不可变对象；
 > `AGENTS.md` 166 行 / 23,341 字节 / `dd1a2c249a92` **未动**，`README.md` 132 行 / 71,933 字节 /
-> `908847f926c6` **未动**（本轮 `HANGOFF.md` 的改动是**已交付状态的小节内取证补记，不改变"当前阶段/状态"**
+> `908847f926c6` **未动**（本轮 `docs/product/HANDBOOK.md` 的改动是**已交付状态的小节内取证补记，不改变"当前阶段/状态"**
 > ⇒ 按变更路由**不需要**动另外两处，`git diff --quiet` 可复核）；CRLF 0 / bare CR 0 均维持。
 > 边界文件逐条 `git diff --quiet HEAD` **仍全部 unchanged**（本轮实测 `app/build.gradle.kts` /
 > `domain/build.gradle.kts` / `gradle/libs.versions.toml` / `.mise.toml` / `AGENTS.md` / `README.md` 六条）。
@@ -3517,7 +3517,7 @@ cmd.exe /c "D:\Programing\Personal\pixfold\pixfold-d1\run-gradle.bat clean \
 
 > **轮 25 改动面（真机复核轮）**：**零源码改动** —— 设备侧取证阶段 `git status --porcelain` 为**空**；
 > 回写文档后 = **4 个文件全为 ` M`**（无新增、无删除、无重命名）：
-> - `HANGOFF.md`（真机账目 **4 轮 → 5 轮**，**五处**锚点 + D3 节新增轮 25 条目）；
+> - `docs/product/HANDBOOK.md`（真机账目 **4 轮 → 5 轮**，**五处**锚点 + D3 节新增轮 25 条目）；
 > - `AGENTS.md`（头部「当前阶段」段的真机验证层级 4 轮 → 5 轮）；
 > - `README.md`（状态行的真机验证层级 4 轮 → 5 轮）；
 > - 本台账（§3 W29 行 / §3.1 轮 25 小节 / §6.2 第十次读数 / §6.3 / §6.4 / §6.5）。
@@ -3537,7 +3537,7 @@ cmd.exe /c "D:\Programing\Personal\pixfold\pixfold-d1\run-gradle.bat clean \
 > - **O1 生产 2** —— `pixfold-d1/app/src/main/kotlin/com/pixfold/d1/ui/theme/Theme.kt`（`+44/−0`）、
 >   `pixfold-d1/app/src/main/kotlin/com/pixfold/d1/ui/plan/ExecutionReportPage.kt`（`+18/−5`）；
 > - **O1 测试 1** —— `pixfold-d1/app/src/test/kotlin/com/pixfold/d1/ui/plan/UndoScopeDialogStyleTest.kt`（`+88/−15`）；
-> - **O2 文档快照 3** —— `HANGOFF.md`（`+2/−2`）、`AGENTS.md`（`+1/−1`）、`README.md`（`+1/−1`）；
+> - **O2 文档快照 3** —— `docs/product/HANDBOOK.md`（`+2/−2`）、`AGENTS.md`（`+1/−1`）、`README.md`（`+1/−1`）；
 >   ⇒ **代码+文档 = 6 files / +154 / −24**；
 > - **台账自身 1** —— `docs/superpowers/plans/2026-10-04-d3-p1-packing-core.md`（本轮回写）。
 > ⇒ 合计 `git status --porcelain` = **7 个文件**（代码+文档 6 + 台账 1）。
@@ -3599,27 +3599,27 @@ cmd.exe /c "D:\Programing\Personal\pixfold\pixfold-d1\run-gradle.bat clean \
 | `4591931` | `docs(d3)` | 轮 25 W29 台账回写：§3 新增 W29 行、§3.1 新增轮 25 小节（①–⑩）、§6.2 第十次读数、§6.3 改动面 + 设备回基线、§6.4 本行占位、§6.5 轮 25 段；**并修复轮 24 回写脚本引入的 3 处台账结构回归**（`## 4.` 标题被吞 / §6.2 轮 23 段两行错位 / §6.3 口径教训行丢失）（1 file） |
 | `a09be6b` || 提交 | 类型 | 内容 |
 | `a09be6b` | `docs(d3)` | 轮 24 W28 台账回写：§3 新增 W28 行、§3.1 新增轮 24 小节（①–⑨）、§4.1 的 O1/O2 状态由「⬜ 待裁决」改「✅ 已落地」并订正小节前言、§6.2 第九次读数、§6.3 改动面 + 越界核对、§6.4 本行占位、§6.5 轮 24 段（⚠️ 真机按用户指令跳过） |
-| `ceaf447` | `docs(d3)` | 轮 24 W28 / O2：四处阶段快照同步 —— `HANGOFF.md` §9 顶门槛表 D3 行 + §9 D3「现状对照」打包行、`AGENTS.md` 头部、`README.md` 状态行，各插入一句「真机验证层级：阶段分支共 4 轮真机核对（轮 23 覆盖度审计：`WARN_ICONS` 中文覆盖 8/11 → 11/11）；打包核心仍未端到端」（3 files / +4 / −4） |
+| `ceaf447` | `docs(d3)` | 轮 24 W28 / O2：四处阶段快照同步 —— `docs/product/HANDBOOK.md` §9 顶门槛表 D3 行 + §9 D3「现状对照」打包行、`AGENTS.md` 头部、`README.md` 状态行，各插入一句「真机验证层级：阶段分支共 4 轮真机核对（轮 23 覆盖度审计：`WARN_ICONS` 中文覆盖 8/11 → 11/11）；打包核心仍未端到端」（3 files / +4 / −4） |
 | `a6cfe26` | `feat(d3)` | 轮 24 W28 / O1：撤销范围对话框两档视觉分级 —— `pixfold-d1/app/src/main/kotlin/com/pixfold/d1/ui/theme/Theme.kt` 新增 `dangerOutlineButtonColors()` + `dangerOutlineBorder()`、`pixfold-d1/app/src/main/kotlin/com/pixfold/d1/ui/plan/ExecutionReportPage.kt` 安全档 `Button` → `OutlinedButton`、`pixfold-d1/app/src/test/kotlin/com/pixfold/d1/ui/plan/UndoScopeDialogStyleTest.kt` 补五条判据（第 ⑤ 条「两档取样点通道差 ≥ 40」为核心牙）；变异 2 条全捕获；闸门 `RC=0` / `62/62 executed`、domain 439 / app 456 / lint 0 issues；⚠️ 真机按用户指令跳过（3 files / +150 / −20） |
 | `9b10d06` | `docs(d3)` | 轮 23 登记三项开放项：新增 §4.1 (`O1` 撤销范围对话框两个执行档配色完全相同、`O2` 三处阶段快照是否写进覆盖度读数、`O3` D3 端到端卡在前置 `D2b` 的依赖阻塞)，并在 §3 的 W27 行与 §3.1 轮 23 的「结论 / 阻塞 / 待裁决」处补指向 §4.1 的引用（订正原「无新增待裁决项」）（1 file / +16 / −2） |
 | `d356d46` | `docs(d3)` | 轮 23 §6.4 收口：补登轮 23 的三笔提交（`27ab1e7` / `f9510aa` / `e83f215`），§3.1 补 `27ab1e7` 标题（1 file / +4 / −1） |
-| `27ab1e7` | `docs(d3)` | 轮 23 订正：上一笔把本台账的"开工前 → 回写后"记成了**回写过程中的中间态**（3372 → 3440 行 / 328,136 → 336,003 字节）；订正为可从 git 对象复核的一对 `0184e55` 3223 行 / 314,630 字节 / `95a09f696ccf…` → `e83f215` 3443 行 / 336,296 字节 / `f57e582ba398…`（`+220 / −0`），并同步补上 `HANGOFF.md` 的 sha256 一对（`d342b937d57d…` → `3da5fd12205c…`）（1 file / +4 / −3） |
+| `27ab1e7` | `docs(d3)` | 轮 23 订正：上一笔把本台账的"开工前 → 回写后"记成了**回写过程中的中间态**（3372 → 3440 行 / 328,136 → 336,003 字节）；订正为可从 git 对象复核的一对 `0184e55` 3223 行 / 314,630 字节 / `95a09f696ccf…` → `e83f215` 3443 行 / 336,296 字节 / `f57e582ba398…`（`+220 / −0`），并同步补上 `docs/product/HANDBOOK.md` 的 sha256 一对（`d342b937d57d…` → `3da5fd12205c…`）（1 file / +4 / −3） |
 | `f9510aa` | `docs(d3)` | 轮 23 回填：§3.1 的「（见下方回填行）」填为 `e83f215`；§6.4 的「（轮 23 回填 = 本次提交）」占位行填为 `e83f215` 并补改动规模 `2 files / +243 / −5`；§6.3 同步台账 numstat `+220 / −0`（1 file / +3 / −3） |
-| `e83f215` | `docs(d3)` | 轮 23 W27 回写：`HANGOFF.md` 真机账目 **3 轮 → 4 轮**（三处锚点 `:2834`/`:2912`/`:2976`）+ D3 节新增轮 23 子 bullet（三面取证读数 + emoji/矢量 dump 结构对照 + 三处临时改动回滚表）；台账 §3 新增 W27 行、§3.1 新增轮 23 小节（①–⑩）、§6.2 第八次读数、§6.3 改动面与设备回基线 + 口径订正、§6.4 本行占位、§6.5 真机账目由 3 轮更新为 4 轮（2 files / +243 / −5） |
+| `e83f215` | `docs(d3)` | 轮 23 W27 回写：`docs/product/HANDBOOK.md` 真机账目 **3 轮 → 4 轮**（三处锚点 `:2834`/`:2912`/`:2976`）+ D3 节新增轮 23 子 bullet（三面取证读数 + emoji/矢量 dump 结构对照 + 三处临时改动回滚表）；台账 §3 新增 W27 行、§3.1 新增轮 23 小节（①–⑩）、§6.2 第八次读数、§6.3 改动面与设备回基线 + 口径订正、§6.4 本行占位、§6.5 真机账目由 3 轮更新为 4 轮（2 files / +243 / −5） |
 | `f17ef42` | `docs(d3)` | 轮 22 补记：新增 §3.1 ⑨「回写自查」小节 —— 把文档里每一条 bounds / 像素 / 消息条数逐一对回 `artifacts/w26_*.xml` 原始 dump，登记 5 处失真（笔误 / 无据且算术不可能 / 口径歧义 / 过度概括 / 取证序列污染）与 4 条教训；并给 §3.1 ⑤ 补「取证序列卫生」规则、④ 底部按钮改逐节点对照表（1 file / +25 / −0） |
-| `6deb809` | `docs(d3)` | 轮 22 W26 回写：`HANGOFF.md` 真机账目 **2 轮 → 3 轮**（三处锚点 `:2834`/`:2908`/`:2972`）+ D3 节新增轮 22 条目（三项真机读数）；台账 §3 新增 W26 行、§3.1 新增轮 22 小节、§6.2 第七次读数、§6.3 设备回基线核对、§6.4 本行占位、§6.5 真机账目补记与扫荡口径订正（2 files / +244 / −8） |
+| `6deb809` | `docs(d3)` | 轮 22 W26 回写：`docs/product/HANDBOOK.md` 真机账目 **2 轮 → 3 轮**（三处锚点 `:2834`/`:2908`/`:2972`）+ D3 节新增轮 22 条目（三项真机读数）；台账 §3 新增 W26 行、§3.1 新增轮 22 小节、§6.2 第七次读数、§6.3 设备回基线核对、§6.4 本行占位、§6.5 真机账目补记与扫荡口径订正（2 files / +244 / −8） |
 | `9a846b2` | `docs(d3)` | 轮 21 W25 台账回写：§3.1 新增轮 21 小节、§3 新增 W25 行（本提交补）、§6.4 两行占位、§6.5 真机账目补记与 4 处就地订正、§6.2 闸门读数、§6.3 改动面（1 file / +204 / −5）；同轮订正首稿写错的变异账目（3 组 ⇒ 4 次注入） |
-| `2f80794` | `docs(d3)` | 轮 21 W25：三处阶段快照同步 —— `HANGOFF.md` §9 进度行/门槛表 D3 行/打包行 + 退出条件取证块 + 「边界与后续」改写，`AGENTS.md` 头部，`README.md` 状态行；`HANGOFF.md` 4 处自相矛盾就地订正（3 files / +76 / −22） |
+| `2f80794` | `docs(d3)` | 轮 21 W25：三处阶段快照同步 —— `docs/product/HANDBOOK.md` §9 进度行/门槛表 D3 行/打包行 + 退出条件取证块 + 「边界与后续」改写，`AGENTS.md` 头部，`README.md` 状态行；`docs/product/HANDBOOK.md` 4 处自相矛盾就地订正（3 files / +76 / −22） |
 | `0da4e19` | `test(d3)` | 轮 21 W25：D3 退出条件 ② 的可执行检查 `AdapterBoundaryTest.kt`（四层判据 + 一层自检，5 个 `@Test`）+ 4 次真实注入变异验证四层皆可红（注入 A 查出第 2 层假绿并修复）；domain 434 → 439，生产代码零改动（1 file / +402 / −0） |
 | `74928f3` | docs | 台账 §6.4 收口：填实 `（轮 19/20 回填 = 本次提交）` 两个残留占位行，订正「历史占位**已清零**」这句已失真的表述与 `ad4cca0` 行描述（1 file / +8 / −4） |
 | `1767739` | docs | 轮 20 终笔：更正 §6.2 补记① 对闸门复跑**时点**的误标（`gates_w24b_fix.log` mtime 18:29:19 早于首次订正提交 `3ff135e` 18:40:25）并补记两次订正之后的权威复跑 `gates_w24d_final.log`（**1 file / +13 / −1**，唯一删除行即旧误标行） |
 | `ad4cca0` | docs | 轮 20 终笔台账回写：§3.1「终笔」段 + §6.2 终态闸门第五次读数 + §6.4 `1767739` 行（1 file / +33 / −0） |
-| `3ff135e` | docs | 轮 20 补记：订正 `HANGOFF.md` 追记里两处"写下即过期"的分支读数（`dev == d3/p1` / `[ahead 42]`）；⚠️ 第一版注写死了提交数又自我过期 ⇒ 改为时间无关表述（**纯追加 +12 / −0**；amend 自 `5f5b233`，改前已核实全仓无引用且未推送） |
-| `63a33b9` | docs | 轮 20 补记：追记后收尾 —— 时间性失真订正（`HANGOFF.md:2755`/`:2836`）+ 闸门复跑读数 + §6.4 命令失效注（1 file / +49 / −0） |
+| `3ff135e` | docs | 轮 20 补记：订正 `docs/product/HANDBOOK.md` 追记里两处"写下即过期"的分支读数（`dev == d3/p1` / `[ahead 42]`）；⚠️ 第一版注写死了提交数又自我过期 ⇒ 改为时间无关表述（**纯追加 +12 / −0**；amend 自 `5f5b233`，改前已核实全仓无引用且未推送） |
+| `63a33b9` | docs | 轮 20 补记：追记后收尾 —— 时间性失真订正（`docs/product/HANDBOOK.md`/`:2836`）+ 闸门复跑读数 + §6.4 命令失效注（1 file / +49 / −0） |
 | `3458d29` | docs | 台账回填轮 20 补记（追记后收尾）的提交号 —— 即上一行 `63a33b9`（1 file / +1 / −1） |
 | `c5f6610` | docs | 轮 20 / W24 台账回写：§3 新增 W24 行、§3.1 新增轮 20 小节（触发/决策/订正 6 处/追记/写盘两遍制/纯新增验证/阶段快照未动/三次事实复核）、§6.2 追加闸门读数、§6.3 追加改动面、§6.4 新增 `768bec7` 行、§6.5 第 3 项补注（1 file / +88 / −0） |
-| `4577aed` | docs | 台账回填轮 20（W24：`HANGOFF.md` §9.1 订正 + 追记）提交号 |
-| `768bec7` | docs | 轮 20 / W24：`HANGOFF.md` §9.1「D3 打包核心轮」订正 6 处失真 + 追记 R1–R5/i18n/图标/合回 `dev`（**纯追加 +131 / −0**、两个 hunk；阶段快照三处与 `AGENTS.md`/`README.md` 未动） |
+| `4577aed` | docs | 台账回填轮 20（W24：`docs/product/HANDBOOK.md` §9.1 订正 + 追记）提交号 |
+| `768bec7` | docs | 轮 20 / W24：`docs/product/HANDBOOK.md` §9.1「D3 打包核心轮」订正 6 处失真 + 追记 R1–R5/i18n/图标/合回 `dev`（**纯追加 +131 / −0**、两个 hunk；阶段快照三处与 `AGENTS.md`/`README.md` 未动） |
 | `b154b52` | docs | 轮 19 / W23 台账回写：§3 新增 W23 行、§3.1 新增轮 19 小节（R4 真机取证逐面读数 + R5 裁决）、§4 R5 状态列改 ✅、§6.2 追加轮 19 读数、§6.3 追加改动面与 APK 字节差定性、§6.5 收尾（1 file / +106 / −5） |
 | `09fc863` | docs | 台账回填轮 19（W23：R4 真机取证 + R5 裁决）提交号与读数 |
 | `02503be` | docs | 轮 18 补记：修正报告页 KDoc 里已证伪的「标题带 ⚠️」措辞（第 6 处注释腐化；纯注释 1 file / +1 / −1） |
@@ -3650,7 +3650,7 @@ cmd.exe /c "D:\Programing\Personal\pixfold\pixfold-d1\run-gradle.bat clean \
 | `2fe36ce` | fix | W11：条目名撞名守卫 + R3 诚实记录 |
 | `901baf1` | docs | 台账回填 W9/W10 提交号 |
 | `6682986` | docs | W10：终验读数（带 `clean` 的全量重建 64/64 + 越界逐条核对） |
-| `ea78b3c` | docs | W9：`HANGOFF.md` §9.1 追加「D3 打包核心轮」+ 变异计数口径校正 |
+| `ea78b3c` | docs | W9：`docs/product/HANDBOOK.md` §9.1 追加「D3 打包核心轮」+ 变异计数口径校正 |
 | `4359761` | docs | 台账回填轮 4 |
 | `a22a12a` | test | W8 跨层不变式（17 用例 / 16 变异全捕获） |
 | `9e1fd41` | docs | 台账回填轮 3 |
@@ -3681,7 +3681,7 @@ cmd.exe /c "D:\Programing\Personal\pixfold\pixfold-d1\run-gradle.bat clean \
 ### 6.5 结论与明确的"未做"
 
 - **轮 24（W28）另加**：**O1** 撤销范围对话框两档视觉分级（危险档深红填充 `#B3261E`/`#8C1D18`、
-  安全档 1dp `error` 色描边 + 透明底、取消无底色无描边）+ **O2** 阶段快照同步（四处：`HANGOFF.md` ×2 +
+  安全档 1dp `error` 色描边 + 透明底、取消无底色无描边）+ **O2** 阶段快照同步（四处：`docs/product/HANDBOOK.md` ×2 +
   `AGENTS.md` 头部 + `README.md` 状态行，写入「真机 4 轮 / `WARN_ICONS` 中文 11/11」）；
   测试补五条判据，其中第 ⑤ 条「两档取样点通道差 ≥ 40」是 O1 的**核心牙**
   （原先「两档都偏红」在缺陷态下照样成立）；变异验证：把安全档改回填充 ⇒ `UndoScopeDialogStyleTest`
@@ -3776,7 +3776,7 @@ cmd.exe /c "D:\Programing\Personal\pixfold\pixfold-d1\run-gradle.bat clean \
   W24 只新增**测试文件**（`AdapterBoundaryTest`，其可红性由 4 次真实注入证明，见 §6.5 第 4 条）；
   W25 是**文档收口轮**（`AdapterBoundaryTest` 的 4 层注入验证）；W26 是**真机补验轮**（零源码改动）。
   ⇒ 「累计 12 次广扫荡」这个读数的**分母语义**是"生产源码被动过的轮次"，**不含**取证/文档/测试-only 轮。
-- **未做 / 不宣称**（**2026-10-05 订正**：`HANGOFF.md` 对应块已改为「**边界与后续**」；下列 1 条仍成立、2/3/4 条已就地划删除线并订正，保留原文备查）：
+- **未做 / 不宣称**（**2026-10-05 订正**：`docs/product/HANDBOOK.md` 对应块已改为「**边界与后续**」；下列 1 条仍成立、2/3/4 条已就地划删除线并订正，保留原文备查）：
   1. ⚠️ **真机核对** —— 领域核心工作面（W0–W21）按 §7.4 表第 1 行判定不需要；
      **轮 18（W22 / 第⑥项）是 UI 面改动，已在真机上核对完毕**（10 个警示面 + i18n 中英对照，
      逐面取证见 §3.1 轮 18）；**轮 19（W23）补上了 R4 页码自检告警的真机取证**（临时注入分叉卷探针 ⇒
@@ -3789,7 +3789,7 @@ cmd.exe /c "D:\Programing\Personal\pixfold\pixfold-d1\run-gradle.bat clean \
      轮 16/17 是领域层轮次（按 §7.4 表第 1 行**正当跳过**）；轮 14/15 当时未连设备，
      由轮 18 的清单**事后覆盖**（⑦ 撤销弹框、⑧ 改名计划页）。
      **仍然成立且不可高估**：**D3 打包核心从未在真机上端到端跑过** —— 原型不连真实文件系统
-     （`HANGOFF.md` §9 D3 执行注）、B 线走 mock 数据，故 D3 的验证层级是
+     （`docs/product/HANDBOOK.md` §9 D3 执行注）、B 线走 mock 数据，故 D3 的验证层级是
      「**领域单测 + UI 渲染链**」，**不是**端到端；真实文件端到端属 **D4b**（依赖 D2b）。
      ⚠️ **轮 22 补记（真机账目由 2 轮更新为 3 轮）**：用户 `m04808`「adb连上了，继续」授权后，
      真机补验了**三项此前从未在真机上验过的判据**（逐项读数与手法见 §3.1 轮 22）：
@@ -3806,7 +3806,7 @@ cmd.exe /c "D:\Programing\Personal\pixfold\pixfold-d1\run-gradle.bat clean \
      仅 `Everything` 推 `UndoOp.DeleteOverwritten`」逐条吻合 ⇒ **R3 在真机上被证明已修好**）。
      ⇒ 整条 `d3/p1` 分支的真机核对**共 3 轮**：轮 18（W22 图标 10 面 + i18n）、
      轮 19（W23 R4 探针取证 + 干净包反向对照）、**轮 22（W26 上述三项）**；
-     `HANGOFF.md` 三处账目锚点已同步（`2 轮` 全树零命中）。
+     `docs/product/HANDBOOK.md` 三处账目锚点已同步（`2 轮` 全树零命中）。
      （**轮 23 已把真机账目由 3 轮更新为 4 轮，见下方轮 23 补记**；本段保留当时的读数原文备查。）
      **不可高估这一条仍然不变**：轮 22 验的是**渲染链与三档语义在真机上的外观/分叉**，
      **仍然不是端到端** —— `performUndo` 不触碰真实文件系统（`UndoResult.applied` 恒 `false`，
@@ -3832,26 +3832,26 @@ cmd.exe /c "D:\Programing\Personal\pixfold\pixfold-d1\run-gradle.bat clean \
      由 dump **结构**直接证明，不靠"看着没 emoji"。
      ⇒ 整条 `d3/p1` 分支的真机核对**共 4 轮**：轮 18（W22 图标 10 面 + i18n）、
      轮 19（W23 R4 探针取证 + 干净包反向对照）、轮 22（W26 大字体未溢出 + 深色色阶 + 撤销三档分叉）、
-     **轮 23（W27 上述三面）**；`HANGOFF.md` 三处账目锚点已同步（`3 轮` 全树零命中）。
+     **轮 23（W27 上述三面）**；`docs/product/HANDBOOK.md` 三处账目锚点已同步（`3 轮` 全树零命中）。
      **不可高估这一条仍然不变**：本轮验的仍是**渲染链在真机上的形态**；`a_naming_conflicts` 的触发
      是**人工制造**的（两行填同名，不是既有数据里自然出现的），**不改变生产可见性**；
      `performUndo` 依旧不触碰真实文件系统（`UndoResult.applied` 恒 `false`），
      **D3 打包核心从未在真机上端到端跑过**这一结论**未被本轮改变**（真实文件端到端仍属 **D4b**）。
-  2. ~~❌ **D3 三项退出条件的正式宣布**~~（**2026-10-05 订正：已做** —— `HANGOFF.md` §9 D3 节新增「**✅ 三项退出条件达成(2026-10-05)**」取证块，含三项逐条证据与 ⚠️ 验证层级不可高估）；
-  3. ~~❌ **门槛表/阶段快照的同步改动**（需 `HANGOFF.md` §9 顶 + `AGENTS.md` 头 + `README.md` 三处
+  2. ~~❌ **D3 三项退出条件的正式宣布**~~（**2026-10-05 订正：已做** —— `docs/product/HANDBOOK.md` §9 D3 节新增「**✅ 三项退出条件达成(2026-10-05)**」取证块，含三项逐条证据与 ⚠️ 验证层级不可高估）；
+  3. ~~❌ **门槛表/阶段快照的同步改动**（需 `docs/product/HANDBOOK.md` §9 顶 + `AGENTS.md` 头 + `README.md` 三处
      一致修改，属产品决策）；本分支对 `AGENTS.md`/`README.md` **零改动**已核对；~~
-     （**2026-10-05 订正：已做五处** —— 用户 `m04274` 授权「选项 ①」后落地：`HANGOFF.md` §9 顶新增
+     （**2026-10-05 订正：已做五处** —— 用户 `m04274` 授权「选项 ①」后落地：`docs/product/HANDBOOK.md` §9 顶新增
      `> 进度(2026-10-05)` 行、门槛表 `| D3 |` 行 ⇒ `✅ **完成**(2026-10-05)`、
      `| **打包** |` 行 ⇒ `✅ **已交付**(2026-10-05)`；`AGENTS.md:5` 头部快照日期 ⇒ `(2026-10-05)`
      并记「D3 已不再是 D4b 的阻塞项，剩余的 D4b 前置只有 D2b」；`README.md:5` 状态行同步。
      **旧串已验彻底消失**：`🔄 部分已由 D1 提前交付` = 0、`| ⬜ **未交付** | D1 是交互原型` = 0、
      `当前阶段(2026-09-27)` = 0。下面两条轮 20 补充是**订正前的历史读数**，保留备查：）
-     ⚠️ **轮 20 补充**：`HANGOFF.md` §9.1 的 D3 小节**已回写**（就地订正 + 追记，纯追加 `+131 / −0`，
+     ⚠️ **轮 20 补充**：`docs/product/HANDBOOK.md` §9.1 的 D3 小节**已回写**（就地订正 + 追记，纯追加 `+131 / −0`，
      `768bec7`）—— 但那是**小节内的内容补记**，**不是阶段状态改动**：三处阶段快照
      （§9 顶 `> 进度(` 行 / 门槛表 `| D3 |` 行 / `| **打包** | ⬜ **未交付** |` 行）与
      `AGENTS.md` / `README.md` **仍然逐条未动**。
      ⚠️ **轮 20 再补充**：追记落盘后又发现其中两处分支读数**写下即过期**
-     （`dev == d3/p1` / `[ahead 42]`），已就地加注订正（`HANGOFF.md:2755` 与 `:2836`，
+     （`dev == d3/p1` / `[ahead 42]`），已就地加注订正（`docs/product/HANDBOOK.md` 与 `:2836`，
      纯追加 `11 0`）；订正注本身第一版写死了提交数、**又立刻自我过期**，
      已改为**时间无关表述**（`3ff135e`）。**三处阶段快照逐字未动的结论不变。**
   4. ~~❌ **退出条件 2 的"适配层零 Android 依赖"可执行检查**（如 Gradle 依赖断言）—— 未授权，未做；~~

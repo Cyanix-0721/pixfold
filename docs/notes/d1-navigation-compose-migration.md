@@ -11,7 +11,7 @@
 > `dev`** —— `7a6f678`,随后删除;此后提交均直接落在 `dev`)。
 > **⚠️ 迁移本体早已提交**,且**早于合分支**:`33c0507` 于 2026-09-24 提交在 `d1/settings-impl` 上,
 > 次日随 `7a6f678` 进入 `dev` 历史 —— 故本文档头原写的「未提交」自 2026-09-24 起即已失效。
-> **相关**:`HANGOFF.md:1246`(被本迁移取代的「第 3 步」原始描述)、
+> **相关**:`docs/product/HANDBOOK.md`(被本迁移取代的「第 3 步」原始描述)、
 > `docs/superpowers/specs/2026-09-20-d1-settings-theme-design.md`(设置规格)。
 
 ---
@@ -110,7 +110,7 @@
 | `pixfold-d1/app/src/test/kotlin/com/pixfold/d1/AppNavigationTest.kt` | 78 行 | 视 route 重构情况调整 |
 | `pixfold-d1/gradle/libs.versions.toml` | **无任何 navigation 条目** | 新增 `navigationCompose = "2.10.1"` + `navigation-compose` library |
 | `pixfold-d1/app/build.gradle.kts` | 依赖清单见下;lint `disable += setOf("OldTargetApi")`、`warningsAsErrors = true` | 加 `implementation(libs.navigation.compose)` |
-| `AGENTS.md` / `HANGOFF.md` / `README.md` / 设置规格 | 「零三方依赖」相关表述与「第 3 步」描述须随迁移改写 | 见 §5 |
+| `AGENTS.md` / `docs/product/HANDBOOK.md` / `README.md` / 设置规格 | 「零三方依赖」相关表述与「第 3 步」描述须随迁移改写 | 见 §5 |
 
 ---
 
@@ -167,8 +167,8 @@
      此刻顺手定 type-safe 的增量 ≈ 一个插件 + 一行依赖 + 6 个 route 加 `@Serializable`;
      将来单独再换 = 把同一批文件再翻一遍。省下的不是"未来参数数量",而是**第二遍重写**。
      (注:我前一版记录倾向 String route,基于"今天只有 1 个带参 route";把路线图摊开后结论翻转 ——
-     工作流 C 更新已有 CBZ `HANGOFF.md:171-180`、D5 多系列批处理 / 命名模板复用
-     `HANGOFF.md:1557-1565` 都会新增带参 route。)
+     工作流 C 更新已有 CBZ `docs/product/HANDBOOK.md`、D5 多系列批处理 / 命名模板复用
+     `docs/product/HANDBOOK.md` 都会新增带参 route。)
 2. **步骤容器 = 也换嵌套 NavHost**(用户选定)。步骤 2→1 同样拿到 nav 的两层渲染。
 3. **设置开关关闭语义 = "保留普通转场,只是不跟手"**(用户选定,即选项 b)。
    具体:`predictivePopEnterTransition`/`predictivePopExitTransition` 设 `None`,
@@ -195,9 +195,9 @@
 ## 5. 文档连带改动(迁移完成后必须做,现在未做)
 
 - `pixfold-d1/app/src/main/kotlin/com/pixfold/d1/PixFoldApp.kt:33-34` 的「不引入 Navigation 组件 / 零三方依赖」注释。
-- `HANGOFF.md:1246`「**第 3 步(大):让目标页显示在背后**」—— 该步**已被本迁移取代**
+- `docs/product/HANDBOOK.md`「**第 3 步(大):让目标页显示在背后**」—— 该步**已被本迁移取代**
   (不再是"手写两层渲染",而是"换成 NavHost,两层由导航库提供")。
-- `HANGOFF.md:1059`「后续三步 …… 第 1、2 步已完成,剩第 3 步」的标题。
+- `docs/product/HANDBOOK.md`「后续三步 …… 第 1、2 步已完成,剩第 3 步」的标题。
 - `AGENTS.md` 头部快照的「换机续接点」(分支提交数、待办项)。
   ⚠️ 原写作「`AGENTS.md:4`」—— **2026-09-26 头部已整体折叠成「当前阶段 + 历轮索引」表格**,
   该行号失效;续接点现为头部第 3 段(不再硬编码提交数)。
@@ -388,7 +388,7 @@
   以及 0.9 缩放的手感、前进瞬切是否自然。~~ → **已于 2026-09-22 完成并通过,见 §7.8.6**
   (转场形态当轮又被用户改成分层规格,最终配方的真机结论记在 §7.8.6)。
 - §5 的文档连带改动**已全部完成**(2026-09-22):`PixFoldApp.kt` 顶部注释随改写更新;
-  `HANGOFF.md:1059` / `HANGOFF.md:1246` / `AGENTS.md` 头部 / `README.md:5` /
+  `docs/product/HANDBOOK.md` / `docs/product/HANDBOOK.md` / `AGENTS.md` 头部 / `README.md:5` /
   `docs/superpowers/specs/2026-09-20-d1-settings-theme-design.md` §14 均已回写。
   ⚠️ 其中 `AGENTS.md` 头部已于 **2026-09-26 整体折叠**为「当前阶段 + 历轮索引」表格
   (原「`AGENTS.md:4`」行号失效),本迁移在该表里对应 2026-09-22 那一行。

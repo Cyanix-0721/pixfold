@@ -19,7 +19,7 @@ import com.cyanix.pixfold.domain.settings.PixFoldSettings
 import com.cyanix.pixfold.domain.settings.ThemeMode
 
 /**
- * PixFold 主题(HANGOFF §6.5「UI 须符合最新 Material Design」)。
+ * PixFold 主题(HANDBOOK §6.5「UI 须符合最新 Material Design」)。
  *
  * 配色来源按优先级:
  *  1. **动态取色**(强调色 = 跟随系统)→ 种子色取自系统壁纸(`dynamic*ColorScheme` 是

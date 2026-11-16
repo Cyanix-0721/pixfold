@@ -10,7 +10,7 @@
 
 **技术栈：** Kotlin 2.4.20 / AGP 9.4.1 / Compose BOM 2026.09.00（foundation-layout 1.12.1）/ material3 1.4.0 / Robolectric 4.17。**零新增三方依赖**（`PathEffect.dashPathEffect` 与 `Popup` 都来自 Compose 本体）。
 
-**规格：** `HANGOFF.md` §9.7 D4 段 + 用户裁决原文 m00047 / m00110 / m00185 / m01885（逐条见各任务「为什么」）。
+**规格：** `docs/product/HANDBOOK.md` §9.7 D4 段 + 用户裁决原文 m00047 / m00110 / m00185 / m01885（逐条见各任务「为什么」）。
 
 **前置：** D4b 已跑通；芯片行上一版为 `VISIBLE_SINGLE_SELECT_CHIPS = 5` + `TOP_CHIP_MAX_LINES = 2` + `AllItemsSheet`（`PixFoldBottomSheet`）。
 

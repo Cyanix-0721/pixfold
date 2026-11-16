@@ -8,7 +8,7 @@ import com.cyanix.pixfold.domain.text.TextKey
 /**
  * 工作流 B 的**打包计划**(规格 §9.1,验收第 15 项)。
  *
- * 这是"扫描 / 决策 / 执行分离"(HANGOFF §2 约束 1)的**决策**产物:
+ * 这是"扫描 / 决策 / 执行分离"(HANDBOOK §2 约束 1)的**决策**产物:
  * 只描述"将要做什么",**不产生任何副作用**。执行在 [executePackagePlans],
  * 且在执行前必须走 [ExecutionGate] 的确认流程(验收第 16 项)。
  */

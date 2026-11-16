@@ -17,7 +17,7 @@ import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
 /**
- * 「CBZ 可被漫画阅读器打开」(HANGOFF §10《数据正确性》)的可执行检查。
+ * 「CBZ 可被漫画阅读器打开」(HANDBOOK §10《数据正确性》)的可执行检查。
  *
  * ## 为什么单独一个文件,而不是加进 `CbzWriterTest`
  *

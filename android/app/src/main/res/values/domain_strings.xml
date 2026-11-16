@@ -207,7 +207,7 @@
         <item quantity="one">%1$s · %2$d component enabled</item>
         <item quantity="other">%1$s · %2$d components enabled</item>
     </plurals>
-    <!-- 手工调整披露段(HANGOFF §11 第 10 条)。段首自带分隔符,与上一键留白习惯一致。
+    <!-- 手工调整披露段(docs/notes/decisions-archive.md §11 第 10 条)。段首自带分隔符,与上一键留白习惯一致。
          ⚠️ 前导空格必须写成 `\u0020`:AAPT2 会 trim 资源字面量的首尾空白,
          `<item> · %1$d …</item>` 会编译成 `· %1$d …`(缺空格),拼接后读作 `enabled· 1 manual adjustment`。
          与 `domain_list_separator` 同一坑,已由 `NamingPageTest` 的逐字期望值守护。 -->

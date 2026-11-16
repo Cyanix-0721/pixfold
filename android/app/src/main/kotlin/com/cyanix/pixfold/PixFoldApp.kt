@@ -298,7 +298,7 @@ fun PixFoldApp(
     }
 
     // 选目录：ACTION_OPEN_DOCUMENT_TREE 是**唯一**能拿到可持久化 tree URI 的通道
-    // （HANGOFF §4：没有「以 SAF 树形式授权目录」的标准分享通道）。
+    // （HANDBOOK §4：没有「以 SAF 树形式授权目录」的标准分享通道）。
     val pickWorkspaceFolder = rememberLauncherForActivityResult(
         ActivityResultContracts.OpenDocumentTree(),
     ) { uri ->
@@ -768,7 +768,7 @@ fun PixFoldApp(
                             portraitDefaultColumns = settings.portraitDefaultColumns,
                             landscapeDefaultColumns = settings.landscapeDefaultColumns,
                             // 工作区条（D2a）：页签行上方的从属信息层。
-                            // HANGOFF §4（2026-10-15 用户裁决）把它定为「范围」而非「任务」，
+                            // HANDBOOK §4（2026-10-15 用户裁决）把它定为「范围」而非「任务」，
                             // 故不做成第 4 个页签；选目录入口也长在工作流内部，不进首页。
                             workspaceState = workspaceState,
                             onPickWorkspace = { pickWorkspaceFolder.launch(null) },

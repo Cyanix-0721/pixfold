@@ -17,7 +17,7 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 /**
- * 统一操作词汇(HANGOFF §5 的 `OperationPlan`,D3 退出条件 1)。
+ * 统一操作词汇(HANDBOOK §5 的 `OperationPlan`,D3 退出条件 1)。
  *
  * **为什么需要它**:在此之前,"一份计划有多少项、跳过几项""这次会触发哪些危险动作"
  * 有**两套互不相干的实现** —— 打包侧走 `planCountsOf` / `effectiveDangerActions(plans, …)`,

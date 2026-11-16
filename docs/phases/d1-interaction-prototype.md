@@ -1,11 +1,11 @@
 # D1 · 交互原型
 
-> **来源**：`HANGOFF.md` 原有 §9 内容，原行号 L522–L549, L550–L629, L1633–L1685, L2035–L2121, L2122–L2202, L2203–L2272, L2273–L2329, L2330–L2387, L2388–L2485, L2486–L2548, L2549–L2654, L3015–L3048, L3049–L3081, L3082–L3149（2026-10-23 迁出）。
+> **来源**：`docs/product/HANDBOOK.md` 原有 §9 内容，原行号 L522–L549, L550–L629, L1633–L1685, L2035–L2121, L2122–L2202, L2203–L2272, L2273–L2329, L2330–L2387, L2388–L2485, L2486–L2548, L2549–L2654, L3015–L3048, L3049–L3081, L3082–L3149（2026-10-23 迁出）。
 > **内容**：D1（含其全部轮次：验收清单、§11 各条、五项交互修订、列数控件两轮、收尾三轮）。
-> **性质**：实现期逐轮留痕，只查不常读。**产品决策仍以 `HANGOFF.md` 为唯一权威**，本文件是其详版。
+> **性质**：实现期逐轮留痕，只查不常读。**产品决策仍以 `docs/product/HANDBOOK.md` 为唯一权威**，本文件是其详版。
 > **索引**：见 [`docs/INDEX.md`](../INDEX.md)。
 
-<!-- 原 HANGOFF.md L522–L549 -->
+<!-- 原 docs/product/HANDBOOK.md L522–L549 -->
 
 ## D1：交互原型
 
@@ -36,7 +36,7 @@
 > **列变更(2026-09-10 用户确认)**：原「Windows | Android」双列已收敛为 **Android 单列**——GUI 只做 Android(§2/§7)，Windows 列没有走查对象。**20 个条目本身一字未改**，仅移除平台列与“双端”表述。
 
 
-<!-- 原 HANGOFF.md L550–L629 -->
+<!-- 原 docs/product/HANDBOOK.md L550–L629 -->
 
 ### D1 验收清单(2026-09-10 补,走查时逐条打勾;§9 判据的可执行化)
 
@@ -119,7 +119,7 @@
 > 教训依据:三轮走查共修 8 项(预览溢出/拖拽不落地/中文发虚/拖拽黑边/列表 0 高度/三方包弃用/字号/通知链断裂),其中"拖拽不改变顺序"反复 4 轮才定位——前 3 轮都停在"测试通过"的假象上。
 
 
-<!-- 原 HANGOFF.md L1633–L1685 -->
+<!-- 原 docs/product/HANDBOOK.md L1633–L1685 -->
 
 ### ✅ 已裁决:D1 范围 vs MVP(用户 2026-09-21 定调)
 
@@ -175,11 +175,11 @@
 ---
 
 
-<!-- 原 HANGOFF.md L2035–L2121 -->
+<!-- 原 docs/product/HANDBOOK.md L2035–L2121 -->
 
 ### ✅ §11 第 13/15 条:中文数字自然排序 + 批量不再是逐项例外(2026-09-25)
 
-用户指定修复 §11 遗留的第 13、15 条(`User said: 「> HANGOFF.md §11 第 13 条 —— 第十话 排在 第二话 前（自然排序不支持中文数字） / > HANGOFF.md §11 第 15 条 —— 同字段批量设两次，第二次 applied=0/skipped=5 / 修这2个」`)。
+用户指定修复 §11 遗留的第 13、15 条(`User said: 「> docs/notes/decisions-archive.md §11 第 13 条 —— 第十话 排在 第二话 前（自然排序不支持中文数字） / > docs/notes/decisions-archive.md §11 第 15 条 —— 同字段批量设两次，第二次 applied=0/skipped=5 / 修这2个」`)。
 分支 **`d1/friction-sort-batch`**(自 `dev` = `7a6f678` 开出),提交 **`27f3a13`**(23 files,+686/−64),
 **已 `--no-ff` 合回 `dev`**(`09f9b3f`;合后 `git rev-parse dev^{tree}` == 分支树,已校验),**未推送**。
 
@@ -265,7 +265,7 @@ APK **33,691,473 B**。
 lint `No issues found.`、APK **33,691,473 B**;真机 7 处逐一复核通过,设备已复位。
 
 
-<!-- 原 HANGOFF.md L2122–L2202 -->
+<!-- 原 docs/product/HANDBOOK.md L2122–L2202 -->
 
 ### ✅ §11 第 9/10/14 条:拖拽跟手浮层 + 命名摘要披露手工调整(2026-09-25)
 
@@ -349,7 +349,7 @@ G4 不屏蔽语义(文件名重复)/ S1 接线断开 / S2 永不产出段 / S3 �
 设备已复位(`/data/local/tmp` 内 `.png`/`.xml` 计数 = 0、`svc power stayon false`、`am force-stop`)。
 
 
-<!-- 原 HANGOFF.md L2203–L2272 -->
+<!-- 原 docs/product/HANDBOOK.md L2203–L2272 -->
 
 ### ✅ §11 第 18 条:拖拽跨视口滚动(2026-09-25 实现 / 2026-09-26 真机核对通过)
 
@@ -415,14 +415,14 @@ G-I 列表侧不交出滚动权 / G-J 列表侧不接线 / G-K 浮层尺寸改�
   漏订正,已由 **`b82ad30`** 补上(教训:`git diff`/`git grep` 默认只看已跟踪文件,
   订正类脚本须显式纳入 `git ls-files --others --exclude-standard`)。
 - **`a424971`** `docs(d1): 回写第 9/10/14 条 + 第 18 条两轮的提交号与落地结果`
-  —— 本段文字本身(`HANGOFF.md` +13、`AGENTS.md` +1、`README.md` +1)。
+  —— 本段文字本身(`docs/product/HANDBOOK.md` +13、`AGENTS.md` +1、`README.md` +1)。
 
 各提交均**直接提交到 `dev`**(经用户裁决;`dev` 从 `8baa367` 前进到 **`68e7720`**;其后另有若干维护性文档提交,均为订正记录漂移/同步头部快照/补流程条文/清除过期记录一类,不改变阶段与功能,故当前 `dev` tip = **`d8c188d`**(其后仅剩本段所在的提交);明细见 `git log 68e7720..HEAD`),
 **无独立分支、无需 merge**;**未推送** —— push 由用户处理。
 > 注:`b82ad30` 之后还有一次 **`68e7720`**(同步 `b82ad30` 到三处头部快照);此后各次文档提交皆为维护性质(订正记录漂移/同步头部快照/补流程条文/清除过期记录),不改变阶段与功能,故 `dev` tip = `d8c188d`,明细见 `git log 68e7720..HEAD`。
 
 
-<!-- 原 HANGOFF.md L2273–L2329 -->
+<!-- 原 docs/product/HANDBOOK.md L2273–L2329 -->
 
 ### ✅ 预览取错图 + 预览往返丢失所选集合 + 预览页改名入口(2026-09-26)
 
@@ -482,7 +482,7 @@ UI 不重新实现。
 调试产物已清理(`/data/local/tmp/t*.xml` 与本地 `artifacts/t*.xml` 均已删),`stayon` 已复位,应用已 force-stop。
 
 
-<!-- 原 HANGOFF.md L2330–L2387 -->
+<!-- 原 docs/product/HANDBOOK.md L2330–L2387 -->
 
 ### ✅ 「仅问题/全部」筛选推广到计划页与报告页 + 死代码 ThumbCard 清理(2026-09-26)
 
@@ -543,7 +543,7 @@ R1–R4(报告页同上)、S1(命名页 N 漏掉仅警告项)。
 调试产物已清理(`/data/local/tmp` 与 `/sdcard` 均复核无残留),`stayon` 已复位,应用已 force-stop。
 
 
-<!-- 原 HANGOFF.md L2388–L2485 -->
+<!-- 原 docs/product/HANDBOOK.md L2388–L2485 -->
 
 ### ✅ 五项交互修订（排序页滚动 / 图钉尺寸 / 去对勾 / 芯片文案 / 列数控件）(2026-09-27)
 
@@ -644,7 +644,7 @@ LazyList 实为按 **key** 解析 `updateScrollPositionIfTheFirstItemWasMoved`,�
 详见 `docs/notes/d1-ui-friction-inventory.md` §16。
 
 
-<!-- 原 HANGOFF.md L2486–L2548 -->
+<!-- 原 docs/product/HANDBOOK.md L2486–L2548 -->
 
 ## ✅ 列数控件第二轮（模式行内图标下拉 + 竖屏/横屏默认列数设置）—— 2026-09-27 已修,真机核对通过
 
@@ -710,7 +710,7 @@ LazyList 实为按 **key** 解析 `updateScrollPositionIfTheFirstItemWasMoved`,�
 **已提交** `f6dfaa9`(24 files,+1440/−168,**直接提交到 `dev`、无独立分支、未推送**)。
 
 
-<!-- 原 HANGOFF.md L2549–L2654 -->
+<!-- 原 docs/product/HANDBOOK.md L2549–L2654 -->
 
 ## ✅ 列数控件第三轮（下拉「当前档位」整行背景填充 + 行宽收窄 48dp + 数字居中）—— 2026-09-27 已修,真机核对通过
 
@@ -819,7 +819,7 @@ options.forEachIndexed { index, option ->
 **已提交** `3ca85b0`(8 files,+692/−86,**直接提交到 `dev`、无独立分支、未推送**)。
 
 
-<!-- 原 HANGOFF.md L3015–L3048 -->
+<!-- 原 docs/product/HANDBOOK.md L3015–L3048 -->
 
 ### ✅ D1 收尾轮(2026-10-14/15:5 条 UI 调整 + 1 缺陷修复 + 拖拽语义改判)
 
@@ -856,7 +856,7 @@ core+extended 11,398 class ⇒ `classes.dex` **3,272 B**),故 35.7 MB 是 **debu
 「**回主页重置正常,拖拽也可以但是缺少动效不够好看**」⇒ 功能达成,动效另开一轮(见下)。
 
 
-<!-- 原 HANGOFF.md L3049–L3081 -->
+<!-- 原 docs/product/HANDBOOK.md L3049–L3081 -->
 
 ### ✅ D1 收尾轮 · 第二轮(2026-10-15/16:拖拽让位动效 + 边缘抽搐修复)
 
@@ -892,7 +892,7 @@ core+extended 11,398 class ⇒ `classes.dex` **3,272 B**),故 35.7 MB 是 **debu
 > 用户 2026-10-16 已判定通过。
 
 
-<!-- 原 HANGOFF.md L3082–L3149 -->
+<!-- 原 docs/product/HANDBOOK.md L3082–L3149 -->
 
 ### ✅ D1 收尾轮 · 第三轮(2026-10-18:卷芯片行常驻 + 规模上限 + 「全部 N 卷」sheet + 抽共享组件修步骤 3 同源)
 

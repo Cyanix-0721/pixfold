@@ -114,7 +114,7 @@ fun HomeScreen(
             )
             IconButton(
                 onClick = onOpenSettings,
-                // M3 IconButton 默认触控目标已 ≥ 48dp(HANGOFF §6.5)。
+                // M3 IconButton 默认触控目标已 ≥ 48dp(HANDBOOK §6.5)。
                 modifier = Modifier
                     .testTag(TAG_SETTINGS_BUTTON)
                     .semantics { contentDescription = settingsCd },
@@ -155,11 +155,11 @@ fun HomeScreen(
             )
         }
 
-        // 工作区条:两张大卡**之下**的从属层(HANGOFF §4,2026-10-15 用户裁决:
+        // 工作区条:两张大卡**之下**的从属层(HANDBOOK §4,2026-10-15 用户裁决:
         // 「Workspace 是范围,两个工作流是任务,层级不同」;摆成第三张等权卡会误导用户
         // 以为「选工作区」也是一件能做完的事)。
         //
-        // 位置在卡之下、而不是标题行下方,是 `HANGOFF.md:211-212` 逐字定的形态。
+        // 位置在卡之下、而不是标题行下方,是 `docs/product/HANDBOOK.md` 逐字定的形态。
         if (workspaceState != null) {
             WorkspaceBar(
                 state = workspaceState,
@@ -238,7 +238,7 @@ const val TAG_WORKSPACE_GATE_HINT = "home-workspace-gate-hint"
  *
  * ## 触控与无障碍
  *
- * 整卡可点且高度远超 48dp 触控下限(HANGOFF §6.5);`contentDescription` 取**标题**
+ * 整卡可点且高度远超 48dp 触控下限(HANDBOOK §6.5);`contentDescription` 取**标题**
  * (副标题是补充说明,读屏时标题已足够标识这个入口)。
  */
 @Composable

@@ -53,7 +53,7 @@ private val ListContentPadding = PaddingValues(vertical = 4.dp)
  *    立刻让出位置,被拖的行落在新位置上(半透明占位)。界面实时变,**数据只在
  *    松手时提交一次**([onMoveTo] 在拖动中一次都不调)。
  *
- * **手势挂在容器上,不挂在行上**:理由与网格完全相同(HANGOFF §11 第 18 条)——
+ * **手势挂在容器上,不挂在行上**:理由与网格完全相同(docs/notes/decisions-archive.md §11 第 18 条)——
  * LazyColumn 会在行滚出视口时销毁它,挂在行上的手势随之被取消,跨视口拖拽失败;
  * 且拖动期间必须 `userScrollEnabled = false` 让 LazyColumn 不与容器争手势,
  * 滚动改由 [edgeAutoScrollStep] 程序化驱动。详情见 [DragReorderGrid] 的 KDoc。

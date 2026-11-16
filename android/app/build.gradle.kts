@@ -17,7 +17,7 @@ android {
         // 理由:应用内语言依赖的 `LocaleManager`/`LocaleConfig` 是 API 33+,
         // 而 33 与 34 的代码清理成本完全相同(都删那 3 处版本守卫),
         // 34 还能拿到 HDR gainmap(`Gainmap`/`Bitmap.getGainmap`)供 D3/D4 图片管线用。
-        // 取舍见 HANGOFF.md §12.6 与 docs/notes/d1-toolchain-evidence.md §9。
+        // 取舍见 docs/notes/environment.md §12.6 与 docs/notes/d1-toolchain-evidence.md §9。
         minSdk = 36
         targetSdk = 36
         versionCode = 1

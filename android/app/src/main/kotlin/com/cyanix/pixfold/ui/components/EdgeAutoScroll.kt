@@ -1,7 +1,7 @@
 package com.cyanix.pixfold.ui.components
 
 /**
- * 拖拽边缘自动滚动(HANGOFF §11 第 18 条,2026-09-25 用户指出):
+ * 拖拽边缘自动滚动(docs/notes/decisions-archive.md §11 第 18 条,2026-09-25 用户指出):
  * 「拖拽不会带动网格/列表滚动,极端点可能会有首页被自动排序到末尾的情况
  *   所以需要拖拽调整」—— 不能跨视口拖拽时,「把被规则排到末尾的首图拖回来」
  * **物理上不可能**。
@@ -22,7 +22,7 @@ package com.cyanix.pixfold.ui.components
  * 而**事件驱动**完全可测:每次 `onDrag` 事件若指针落在边缘带内,就按深度滚动一段,
  * 实测 5 次 `moveBy` ⇒ 列表下标 0 → 7、偏移 20px,确定性、无需操作测试时钟。
  *
- * 代价(已记入 [docs/notes/d1-ui-friction-inventory.md] 与 HANGOFF §11 第 18 条):
+ * 代价(已记入 [docs/notes/d1-ui-friction-inventory.md] 与 docs/notes/decisions-archive.md §11 第 18 条):
  * 指针在边缘**完全静止**时不会继续滚动(没有事件就没有推进);真机上手指自然抖动
  * 会产生事件,且 [EDGE_SCROLL_MAX_MULTIPLIER] 提供的加速让长距离调整可行。
  * 这是**为可测性做的有意取舍**,不是遗漏 —— 帧循环的实现方式无法离线断言,

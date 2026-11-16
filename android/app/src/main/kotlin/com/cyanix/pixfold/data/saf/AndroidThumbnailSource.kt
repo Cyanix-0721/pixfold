@@ -34,7 +34,7 @@ import kotlinx.coroutines.withContext
  * - 图片损坏、格式不认识（`IOException` / `OutOfMemoryError` 的常见来源）
  *
  * 把异常吞在这里**不是**掩盖问题：缩略图是**展示层**，取不到就该显示占位，
- * 而不是让整个列表崩掉（HANGOFF §9 D2b 退出条件 ③ 的精神：授权失效要能恢复）。
+ * 而不是让整个列表崩掉（HANDBOOK §9 D2b 退出条件 ③ 的精神：授权失效要能恢复）。
  *
  * ## 线程
  *

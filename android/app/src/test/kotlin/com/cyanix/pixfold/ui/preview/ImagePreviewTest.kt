@@ -312,7 +312,7 @@ class ImagePreviewTest {
     }
 
     /**
-     * 顶部两个按钮的触摸目标 ≥ 48dp(设计硬指标,规格 §10 / `HANGOFF.md` 验收走查)。
+     * 顶部两个按钮的触摸目标 ≥ 48dp(设计硬指标,规格 §10 / `docs/product/HANDBOOK.md` 验收走查)。
      *
      * ⚠️ 这条**曾经是空洞测试**:原先两个按钮带 `Modifier.heightIn(min = 48.dp)`,
      * 注释写「M3 `TextButton` 默认最小高度只有 40dp,不达标」。变异实测推翻了该说法 ——

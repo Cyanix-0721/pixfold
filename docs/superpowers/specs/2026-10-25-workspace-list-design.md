@@ -3,7 +3,7 @@
 > **状态**：**待用户审阅**（brainstorming 的 Architectural 路径硬门：spec 经审阅后才能进入 writing-plans）。
 > **日期**：2026-10-25
 > **产物类型**：实现级设计规格（`docs/superpowers/specs/`）
-> **产品权威**：`HANGOFF.md`。本文件只承载实现级设计与决策依据，不另立产品决策。
+> **产品权威**：`docs/product/HANDBOOK.md`。本文件只承载实现级设计与决策依据，不另立产品决策。
 > **关联**：设计稿源 `android/artifacts/ws-mock/ws4.html` / 成品 `ws4-final.png`（v4 定稿，用户已逐格确认）
 
 ## 1. 背景与范围
@@ -474,7 +474,7 @@ LibrarySteps
 1. 四道闸门 `cd android && ./gate.sh` → `build/gate-last.rc` 为 0，app / domain / lint / assembleDebug 全绿。
 2. 变异验证：至少 5 条 —— 去掉 8 上限、去掉 pinned 稳定排序、`open` 失败也移到最前、`remove` 默认撤销授权、去掉空分区跳过。全部 KILLED。
 3. 真机核对（**需用户当轮单独授权**）：① 8 条列表 + 两分区渲染 ② 点图钉后置顶 ③ 长按拖拽换位 ④ ✕ 移除一条后仍能切回 ⑤ 撤销系统授权后该条落到下区 ⑥ 首页条整条可点。
-4. 回写文档：`HANGOFF.md` §4（工作区入口分层）、`AGENTS.md` 头部（一句话）、`README.md`、`docs/INDEX.md` 历轮台账、`docs/phases/d4-mvp.md`。
+4. 回写文档：`docs/product/HANDBOOK.md` §4（工作区入口分层）、`AGENTS.md` 头部（一句话）、`README.md`、`docs/INDEX.md` 历轮台账、`docs/phases/d4-mvp.md`。
 
 ## 11. 已知边界（写在这里，不在实现时才发现）
 

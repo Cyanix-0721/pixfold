@@ -1,7 +1,7 @@
 package com.cyanix.pixfold.domain.thumb
 
 /**
- * D2b 千级缩略图**生成策略**（HANGOFF §9 D2b 退出条件 ①）。
+ * D2b 千级缩略图**生成策略**（HANDBOOK §9 D2b 退出条件 ①）。
  *
  * 「千级」不是形容词：实测样本库 851 张、单张 3.4MB JPEG。若把缩略图整张交给
  * `BitmapFactory.decodeStream`，851 张就是 2.9GB 的瞬时分配；即便用

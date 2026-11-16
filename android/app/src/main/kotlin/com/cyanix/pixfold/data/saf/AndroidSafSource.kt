@@ -28,7 +28,7 @@ import java.util.concurrent.atomic.AtomicBoolean
  *
  * 这是 `domain/source/WorkspaceSource` 端口的 Android 实现。**只做资源访问**：
  * 遍历、查询列、读字节。分组/命名/排序全部交给领域层的 `collectionsFrom`
- * （HANGOFF §9 D3 退出条件 ②：平台层只承担资源访问，判断逻辑留在 domain）。
+ * （HANDBOOK §9 D3 退出条件 ②：平台层只承担资源访问，判断逻辑留在 domain）。
  *
  * ## 从归档 spike 继承的三条经验（`origin/archive-flutter-verify` §8.3）
  *

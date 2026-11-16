@@ -22,7 +22,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
 /**
- * 拖拽边缘自动滚动(HANGOFF §11 第 18 条)的断言。
+ * 拖拽边缘自动滚动(docs/notes/decisions-archive.md §11 第 18 条)的断言。
  *
  * 分两层:
  *  1. **纯函数** [edgeAutoScrollStep] —— 方向、深度、加速、封顶、未布局;

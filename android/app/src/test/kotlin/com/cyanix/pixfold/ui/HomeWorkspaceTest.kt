@@ -52,7 +52,7 @@ import kotlin.test.assertTrue
  *
  * ## 为什么这**不是**新增设计
  *
- * `HANGOFF.md:184` 的 2026-10-15 裁决早就写明「首页不加第三个入口;工作区选取长在工作流
+ * `docs/product/HANDBOOK.md` 的 2026-10-15 裁决早就写明「首页不加第三个入口;工作区选取长在工作流
  * 内部,首页将来只加**从属层**显示」,并给出目标形态:`:211-212`「标题行 + 设置齿轮 →
  * 两张工作流大卡(不变) → 其下从属层一行『当前工作区: … [更换]』」。当时不碰首页只是
  * 因为还没接真实文件系统("执行时机:属 D2b/D4b,本轮(D1 收尾)不碰首页")。
@@ -231,7 +231,7 @@ class HomeWorkspaceTest {
         val bar = rule.onNodeWithTag(TAG_WORKSPACE_BAR).getBoundsInRoot()
         val cardB = rule.onNodeWithText(libraryTitle).getBoundsInRoot()
 
-        // HANGOFF.md:211-212 定的形态:标题行 → 两张卡 → 其下从属层。
+        // docs/product/HANDBOOK.md 定的形态:标题行 → 两张卡 → 其下从属层。
         // 条若跑到卡上面,就是「第三个入口与两个任务抢视觉重量」——正是 2026-10-15
         // 裁决要避免的那件事。
         assertTrue(

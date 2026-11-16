@@ -108,7 +108,7 @@ fun previewOf(volume: ComicVolume): ComicPreview = ComicPreview(
 )
 
 /**
- * 校验"页序、页表与页码编号彼此自洽"(HANGOFF §10 数据正确性)。
+ * 校验"页序、页表与页码编号彼此自洽"(HANDBOOK §10 数据正确性)。
  *
  * ## 两类检查,各自的两个来源
  *

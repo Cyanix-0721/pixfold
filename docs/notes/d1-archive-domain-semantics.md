@@ -270,7 +270,7 @@ return (a.length - i).compareTo(b.length - j)              # 短者在前
 > `百`/`千`/`万`/`〇` 与连续罗列(`一二`、`十十`)不归一化,原样回退按码点比。
 > **必须落在分词阶段**:`compareNaturalTokens` 还会被**预计算过记号序列**的调用方
 > (`SortItems.SortKeys.naturalTokens`)用到,分词是两边的唯一共同入口。
-> `第十话` 与 `第10话` 视为同值。详见 HANGOFF §11 第 13 条与 §9.1「§11 第 13/15 条」轮。
+> `第十话` 与 `第10话` 视为同值。详见 docs/notes/decisions-archive.md §11 第 13 条与 §9.1「§11 第 13/15 条」轮。
 >
 > ⚠️ PDF/脚本侧(`scripts/batch_pack_cbz.py:155 def natural_key`)仍是 `re.split(r"(\d+)", text)`,
 > **不认识中文数字** —— 与 GUI 的差异是当前已知落差,脚本不是最终规范。
@@ -443,7 +443,7 @@ buildProposals({ required List<MockImage> order, required NamingScheme scheme,
 - **只有这一种序号口径**：`imageIndex` 是全仓唯一的序号来源，取值链是
   `indexStart + 页序下标`；归档原型（Flutter）与新栈（`NamingEval.kt` 的 `componentText()`）
   **实现逐字一致**，都没有"沿用原文件名解析出的原始序号"这一模式。
-  ⇒ `HANGOFF.md` §11 第 14 条所列的备选方案（`IMG_1_xxx` 里的 `1`）在**两代原型中都没有先例**
+  ⇒ `docs/notes/decisions-archive.md` §11 第 14 条所列的备选方案（`IMG_1_xxx` 里的 `1`）在**两代原型中都没有先例**
   （与 `scripts/batch_rename_images.py` 的结论一致 —— 该脚本的命名阶段根本没有序号组件；
   见 `docs/notes/scripts-behavior-matrix.md` §12.1）。
 

@@ -3,7 +3,7 @@
 > **状态**：**已按用户授权自行裁决**（用户 `m07523`：「今天依旧做到真机就可以WINDOWS关机，明天再授权核对，在这之前怎么实现你来决定，写到任务里避免你又忘记关机？」）⇒ 三个方案问题已于 `m06900` 获批准，本规格的落地细节由我裁决并逐条写明理由。
 > **日期**：2026-10-26
 > **产物类型**：设计规格（brainstorming 的 Architectural 路径产物，spec 之后才进 `writing-plans`）
-> **产品权威**：`HANGOFF.md`（本文件只是实现级规格，与 HANGOFF 冲突时以 HANGOFF 为准）
+> **产品权威**：`docs/product/HANDBOOK.md`（本文件只是实现级规格，与 HANDBOOK 冲突时以 HANDBOOK 为准）
 > **关联**：`docs/superpowers/specs/2026-10-25-workspace-list-design.md`（结构模板）、`docs/phases/d4-mvp.md`（D4 台账）
 
 ## 1. 背景与范围
@@ -482,7 +482,7 @@ override fun preflight(plan: CbzMetaUpdatePlan, volume: ComicVolume): UpdatePref
 }
 ```
 
-`SAFETY_MARGIN_BYTES = 32L * 1024 * 1024`，与打包链的 `SpaceThreshold.Percentage(10)` + 32 MiB 余量同源（HANGOFF §11 第 12 条）。
+`SAFETY_MARGIN_BYTES = 32L * 1024 * 1024`，与打包链的 `SpaceThreshold.Percentage(10)` + 32 MiB 余量同源（docs/notes/decisions-archive.md §11 第 12 条）。
 
 **为什么 `estimatedWriteBytes` 用「输入 + 余量」而不是精确值**：精确值要数条目、读每条 size 才能算，那是「读一遍整包」—— 预检本身不能有整包成本。输入大小是上界（新 XML 通常只有几百字节），误差方向是**高估**，安全侧。
 

@@ -1,11 +1,11 @@
 # D2 · 平台能力验证
 
-> **来源**：`HANGOFF.md` 原有 §9 内容，原行号 L3150–L3283（2026-10-23 迁出）。
+> **来源**：`docs/product/HANDBOOK.md` 原有 §9 内容，原行号 L3150–L3283（2026-10-23 迁出）。
 > **内容**：D2a SAF 闭环 spike 与 D2b 五项平台能力。
-> **性质**：实现期逐轮留痕，只查不常读。**产品决策仍以 `HANGOFF.md` 为唯一权威**，本文件是其详版。
+> **性质**：实现期逐轮留痕，只查不常读。**产品决策仍以 `docs/product/HANDBOOK.md` 为唯一权威**，本文件是其详版。
 > **索引**：见 [`docs/INDEX.md`](../INDEX.md)。
 
-<!-- 原 HANGOFF.md L3150–L3283 -->
+<!-- 原 docs/product/HANDBOOK.md L3150–L3283 -->
 
 ## D2：平台能力验证
 **目标**:优先 Android SAF。重点验证最容易推翻技术选型的能力,不先做完整业务。
@@ -74,7 +74,7 @@
       - **删掉一条冗余判据**:`isComplete` 原写 `total == 0 || processed >= total`,变异验证实测删掉 `total == 0 ||` 后**无任何测试变红 = 等价变异**(`processed` 已保证非负,故 `processed >= 0` 恒成立)⇒ 按项目既有纪律(D3 `undoRecordOf` 先例)删掉,不留杀不死的判据。
       - **平台层接线与真机验证仍待**(前台服务/WorkManager、切后台恢复走 `SavedStateHandle`、进度推送)。
       - **✅ 平台层接线已落地(2026-10-19 晚)**。`ui/workflowb/PackProgressBar.kt`(10 tests):计数走 `TaskProgress.processed` 而非 `done`(否则会出现「条形走了 60%、文字写已成功 2/5」—— 两者不同源)、`LinearProgressIndicator(progress = { … })` 必须传 lambda(传常量条形不动)、取消按钮在进度条行内且**完成后刻意不隐藏**(隐藏会改变行高造成布局跳动,且「点取消的瞬间刚好跑完」是真实会发生的)。**切换后台恢复(前台服务/WorkManager、`SavedStateHandle`)仍未做** —— 当前实现是「组合作用域内跑协程」,切后台若被系统回收会中断。这是第 2 项唯一未完成的子项,已在退出条件里单列。
-    - **✅ 第 4 项「存储空间预检」平台层接线已落地(2026-10-19 晚)**:`data/saf/SafPackPlatform.kt` 的 `FilesystemSpaceSource.availableBytesOf(treeUri): Long?` —— 只对 `authority == "com.android.externalstorage.documents"` 且 docId 以 `primary:` 开头的树给答案(走 `StatFs`),其余返回 **null = 「不知道」而非 0**。`PackExecutor.kt` 的 `executePackPlans(availableBytes: Long?)`:null 时**跳过空间阻断直接执行**(`preflight = null` 交给上层显示「无法判定」),0 时判 `Rejected`。刻意否定两种做法:拿假的大数(`Long.MAX_VALUE`)会把「不知道」伪装成够用;直接拒绝则真有空间时无法打包。**阈值已定档**:`SpaceThreshold.Percentage(marginPercent = 10)` + `safetyMargin = 32 MiB`(CBZ 输出 ≈ 原图总和,ZIP 再压收益 < 2%;32 MiB 兜 ZIP 缓冲与 provider 元数据更新),**HANGOFF §11 第 12 条由此关闭**。
+    - **✅ 第 4 项「存储空间预检」平台层接线已落地(2026-10-19 晚)**:`data/saf/SafPackPlatform.kt` 的 `FilesystemSpaceSource.availableBytesOf(treeUri): Long?` —— 只对 `authority == "com.android.externalstorage.documents"` 且 docId 以 `primary:` 开头的树给答案(走 `StatFs`),其余返回 **null = 「不知道」而非 0**。`PackExecutor.kt` 的 `executePackPlans(availableBytes: Long?)`:null 时**跳过空间阻断直接执行**(`preflight = null` 交给上层显示「无法判定」),0 时判 `Rejected`。刻意否定两种做法:拿假的大数(`Long.MAX_VALUE`)会把「不知道」伪装成够用;直接拒绝则真有空间时无法打包。**阈值已定档**:`SpaceThreshold.Percentage(marginPercent = 10)` + `safetyMargin = 32 MiB`(CBZ 输出 ≈ 原图总和,ZIP 再压收益 < 2%;32 MiB 兜 ZIP 缓冲与 provider 元数据更新),**docs/notes/decisions-archive.md §11 第 12 条由此关闭**。
     - **✅ 第 5 项「大归档写入」平台层接线已落地(2026-10-19 晚)**:`data/saf/SafPackPlatform.kt` 的 `SafCbzOutputSink`(`createDocument`+`openOutputStream`,`discardFor` 走 `DocumentsContract.deleteDocument` 清半成品)+ `SafPageBytes`(`openInputStream().readBytes()`)+ `SafPackExecutor`(全在 `Dispatchers.IO`)。三条承重细节:①**`createDocument` 的 parent 必须是 document URI**,传 tree URI 在国产 ROM 上抛 `IllegalArgumentException: Invalid URI` ⇒ 用 `getTreeDocumentId` 再逐级 `buildChildDocumentsUriUsingTree` 下钻;②**覆盖必须原地重写**(`openOutputStream(existing, "wt")`),不能用 `createDocument` —— 后者遇同名会**自动改名**成 `xxx (1).cbz`,与 `OutputConflictPolicy.Overwrite` 语义冲突;③`openFor` 返回 null 是**正常业务分支**(记 `Failed`,且**不调用** `discardFor`),只有「流已打开但写入失败」才清理。
     - **✅ 真实端到端已验证(2026-10-19 晚,真机 PJX110 / Android 16)**:工作流 B 从 mock 切到真实工作区扫描(`ComicVolumesFrom.kt` 转换层 + `WorkflowBReconcile.kt` 增量对账),`/storage/emulated/0/test` 同系列两本分别产出 **38,085,495 B** 与 **79,764,587 B** 两个独立 CBZ,报告「共 2 项：成功 2 · 跳过 0 · 失败 0」。
     - **⚠️ 真实端到端当场暴露的缺陷(已修)**:旧实现下同系列两本(目录名都解析不出卷号)默认名都取系列名 ⇒ **两卷写到同一路径,后写静默覆盖前写**;报告显示「成功 2」而磁盘只剩 **1 个** 79,764,572 B 的文件 —— 用户会以为两本都打好了。两处修:①`titleSug` 建议源由系列名改为**卷目录名**(用户 m05761 指出「默认名不是应该从单本的文件(夹)名解析吗」,原理由「避免重复卷号」站不住 —— 真实素材里系列名恰恰等于第一本的名字);②`PackPreflight` 新增 `PackBlocker.OutputNameCollision` **执行前阻断**(判据是 `outputPath` 完整路径而非文件名,不同目录同名合法;跳过的卷不参与)。

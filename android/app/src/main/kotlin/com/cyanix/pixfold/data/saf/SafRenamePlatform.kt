@@ -31,7 +31,7 @@ private const val TAG = "SafRename"
  *
  * ## 为什么捕获 `Exception` 而不是只捕 `SecurityException`
  *
- * 真机上见过 `IllegalArgumentException`(URI 形态不符,见 HANGOFF §12.5 的
+ * 真机上见过 `IllegalArgumentException`(URI 形态不符,见 docs/notes/environment.md §12.5 的
  * `createDocument` 踩坑)、`FileNotFoundException`(目标名被占时部分 ROM 抛)、
  * 以及国产 ROM 的私有异常。逐个列举必然漏,而这里任何一种失败的处理方式都相同:
  * 打日志 + 返回 null 让上层记一行「失败」。

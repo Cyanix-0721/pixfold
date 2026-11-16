@@ -16,7 +16,7 @@
 
 ## 全局约束
 
-1. 验收判据不可调整：HANGOFF §9《D1 验收清单》20 项是 D1 唯一出口；不得改判据以迁就现状。
+1. 验收判据不可调整：HANDBOOK §9《D1 验收清单》20 项是 D1 唯一出口；不得改判据以迁就现状。
 2. 修复自证三层：凡交互或数据改动，依次过「领域单测 → UI 层断言 → 真机实证」；不得只凭"测试通过"交付。
 3. 零三方依赖：只用 Kotlin 标准库、AndroidX/Compose、JUnit4、Robolectric；不引入任何拖拽/排序/日期/序列化三方库。
 4. 不应用 `kotlin-android` 插件（AGP 9 内置 Kotlin）；Compose 编译器插件 `org.jetbrains.kotlin.plugin.compose` 必须单独应用且版本锁 **2.2.10**；子模块声明插件**不带版本号**。
@@ -24,7 +24,7 @@
 6. compileSdk / minSdk / targetSdk = 36 / 24 / 36；namespace 与 applicationId = `com.pixfold.d1`。
    > **⚠️ 2026-09-22 更新**：本行是 09-16 的取值。`compileSdk` 已升到 37、`minSdk` 已由 24 提到 **30**，
    > 并于 **2026-09-25 再提到 `34`**（见 `docs/notes/d1-toolchain-evidence.md` §9 / §9.8 与
-   > `HANGOFF.md` §12.6）。当前锚点 = **37 / 34 / 36**。原文保留作设计记录。
+   > `docs/notes/environment.md` §12.6）。当前锚点 = **37 / 34 / 36**。原文保留作设计记录。
 7. `local.properties`、`build/`、`.gradle/`、`.kotlin/` 不入库。
 8. `domain/` 不得 import 任何 `android.*` / `androidx.*`。
 9. 不可变状态 + 纯函数；不用可变通知链。
@@ -736,7 +736,7 @@ data class ImageCollection(
 ```kotlin
 package com.pixfold.d1.domain.model
 
-/** 枚举声明顺序 = UI 下拉顺序(HANGOFF §4 排序键定位,2026-09-10 用户定序),不得重排。 */
+/** 枚举声明顺序 = UI 下拉顺序(HANDBOOK §4 排序键定位,2026-09-10 用户定序),不得重排。 */
 enum class SortField(val label: String) {
     NaturalName("文件名(自然)"),
     FileName("文件名(字典)"),
@@ -1429,7 +1429,7 @@ private fun SilentStateScreen() {
 
 - [ ] **步骤 3：编写主题与首页**
 
-`ui/theme/Theme.kt`（**已按 HANGOFF §6.5「UI 须符合最新 Material Design」落实**：语义角色 + 深色模式 +
+`ui/theme/Theme.kt`（**已按 HANDBOOK §6.5「UI 须符合最新 Material Design」落实**：语义角色 + 深色模式 +
 Android 12+ 动态取色，API<31 回退静态 scheme；基准 material3 1.4.0 stable）：
 
 ```kotlin
@@ -1476,7 +1476,7 @@ private val DarkColors = darkColorScheme(
 
 > **M3E 不在本阶段范围**：Material 3 Expressive 的公开 API 仅存在于 `material3:1.5.0-alpha28`；
 > 最新 stable 为 1.4.0，且最新 BOM 2026.09.00 亦锁 1.4.0、其中 M3E 类型为 `internal`（编译实测）。
-> 留待 P7 走查后评估（HANGOFF §6.5、`docs/notes/d1-toolchain-evidence.md` §7）。
+> 留待 P7 走查后评估（HANDBOOK §6.5、`docs/notes/d1-toolchain-evidence.md` §7）。
 
 `ui/HomeScreen.kt`：
 
@@ -1607,7 +1607,7 @@ git commit -m "feat(d1/app): 首页两条工作流入口 + UI 层断言与负向
 ### 任务 7：阶段收口与文档回写
 
 **文件：**
-- 修改：`HANGOFF.md`（§9.1 阶段表 P1 状态）
+- 修改：`docs/product/HANDBOOK.md`（§9.1 阶段表 P1 状态）
 - 新建：`docs/superpowers/plans/2026-09-16-d1-p1-scaffold-domain.md`（本文件本身）
 - 修改：`README.md`（进度行，如需）
 
@@ -1636,7 +1636,7 @@ grep -ho 'tests="[0-9]*" skipped="[0-9]*" failures="[0-9]*" errors="[0-9]*"' pix
 
 记录：领域单测数 = ____；UI 断言数 = ____。
 
-- [ ] **步骤 3：回写 HANGOFF §9.1 阶段表**
+- [ ] **步骤 3：回写 HANDBOOK §9.1 阶段表**
 
 在 §9.1 的七阶段表中，把 P1 行的"交付物"后追加状态标记：
 
@@ -1648,7 +1648,7 @@ grep -ho 'tests="[0-9]*" skipped="[0-9]*" failures="[0-9]*" errors="[0-9]*"' pix
 
 ```bash
 cd /mnt/d/Programing/Personal/pixfold
-git add HANGOFF.md README.md docs/
+git add docs/product/HANDBOOK.md README.md docs/
 git commit -m "docs(d1): P1 阶段收口——阶段表状态回写与验证记录"
 ```
 

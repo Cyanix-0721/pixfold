@@ -1,7 +1,7 @@
 package com.cyanix.pixfold.domain.storage
 
 /**
- * D2b 存储空间预检（HANGOFF §11 第 12 条）。
+ * D2b 存储空间预检（docs/notes/decisions-archive.md §11 第 12 条）。
  *
  * 「提前预检 → 明确拒绝 → 引导到电脑」的**纯领域逻辑**。
  *

@@ -10,7 +10,7 @@ import kotlin.test.assertTrue
  *
  * ## 为什么需要一个可执行检查
  *
- * `HANGOFF.md` §9 D3 的退出条件 ② 原文要求:「`domain/` 保持零 Android 依赖,平台层
+ * `docs/product/HANDBOOK.md` §9 D3 的退出条件 ② 原文要求:「`domain/` 保持零 Android 依赖,平台层
  * (SAF/ContentResolver)只承担资源访问、缩略图、权限、任务生命周期 —— 依赖边界**须有可执行检查
  * (如 Gradle 依赖断言),而非仅靠自觉**」。此前这条一直是「❌ 未做」:边界靠人读代码确认,
  * 没有任何东西在它被破坏时变红。
@@ -85,7 +85,7 @@ class AdapterBoundaryTest {
                 appendLine("Android/AndroidX 的类出现在 domain 模块的测试运行时类路径上:")
                 leaked.forEach { appendLine("  $it") }
                 appendLine("退出条件 ② 要求 domain/ 零 Android 依赖;平台能力应由平台层实现并注入。")
-                appendLine("若确有正当需要,应先改本测试与 HANGOFF.md 的边界记录,而不是顺手加依赖。")
+                appendLine("若确有正当需要,应先改本测试与 docs/product/HANDBOOK.md 的边界记录,而不是顺手加依赖。")
             },
         )
     }

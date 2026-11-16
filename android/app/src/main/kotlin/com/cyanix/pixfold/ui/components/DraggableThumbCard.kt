@@ -38,7 +38,7 @@ import com.cyanix.pixfold.domain.model.SourceItem
 const val TAG_GRID_CARD = "grid-card"
 
 /**
- * 可拖拽的网格卡片(**拖拽自研**,零三方依赖 —— HANGOFF §12.5 用户决策)。
+ * 可拖拽的网格卡片(**拖拽自研**,零三方依赖 —— docs/notes/environment.md §12.5 用户决策)。
  *
  * 三条设计结论(与实现栈无关,继续有效):
  * 1. **整卡可拖,不必抢点击**:长按后启动拖拽,静止点按仍是点击 → 无需拖拽把手。

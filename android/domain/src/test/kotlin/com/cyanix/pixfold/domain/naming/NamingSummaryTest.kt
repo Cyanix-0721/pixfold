@@ -13,7 +13,7 @@ import kotlin.test.assertEquals
  *
  * 守三件事:①样本存在时摘要里能看到**真实名字**;②组件计数反映**启用**数而非总数
  * —— 否则用户关掉一个组件后摘要还在报旧数字,反而比不显示更误导;
- * ③人工拖拽过之后追加**手工调整段**(HANGOFF §11 第 10 条)。
+ * ③人工拖拽过之后追加**手工调整段**(docs/notes/decisions-archive.md §11 第 10 条)。
  *
  * **断言 [Msg] 结构而非成品文案**:领域层只给键与参数,成品在 UI 层解析。
  * 这里因此换成"用了哪个键、参数是否传对",换语言不会让本文件变红。
@@ -64,7 +64,7 @@ class NamingSummaryTest {
         assertEquals(listOf(Msg(TextKey.NamingSummaryEnabled, listOf(0))), namingSummaryLine(off, null))
     }
 
-    // ---------------- 手工调整披露(HANGOFF §11 第 10 条) ----------------
+    // ---------------- 手工调整披露(docs/notes/decisions-archive.md §11 第 10 条) ----------------
 
     @Test
     fun `manual count appends a trailing manual segment`() {

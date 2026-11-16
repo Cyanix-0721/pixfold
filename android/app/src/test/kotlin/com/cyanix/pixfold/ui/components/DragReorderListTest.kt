@@ -155,7 +155,7 @@ class DragReorderListTest {
         assertEquals(listOf("i1"), pinned, "列表行必须有可点图钉入口")
     }
 
-    // ---------------- 跟手浮层(HANGOFF §11 第 9 条) ----------------
+    // ---------------- 跟手浮层(docs/notes/decisions-archive.md §11 第 9 条) ----------------
 
     @Test
     fun `list ghost follows the pointer while dragging`() {

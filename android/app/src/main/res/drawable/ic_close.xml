@@ -5,7 +5,7 @@
   License: Apache License 2.0
 
   与 ic_arrow_back / ic_push_pin_* 同策略:官方矢量几何数据 + painterResource,
-  不引入 material-icons 依赖(项目约定,见 HANGOFF §12.5)。
+  不引入 material-icons 依赖(项目约定,见 docs/notes/environment.md §12.5)。
 
   为什么不用 Icons.Default.Close:Close 属于 material-icons-core,
   而本工程 classpath 上根本没有 material-icons 依赖(:app:dependencies 里
