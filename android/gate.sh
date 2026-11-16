@@ -31,6 +31,11 @@
 # 本脚本只是 `cmd.exe` 的包装,真正的构建仍在 Windows 上。
 set -uo pipefail
 
+# Git Bash(MSYS) 会把 cmd.exe 的 `/c` 参数当路径转义成 C:\，于是 cmd 进入交互模式、
+# run-gradle.bat 根本不执行，却因交互 cmd 正常退出而返回 0 —— 假绿（2026-11-16 实测）。
+# 关掉 MSYS 路径转换即可；真 WSL / Linux 没有这个变量，不受影响。
+export MSYS_NO_PATHCONV=1
+
 cd "$(dirname "$0")"
 
 LOG="build/gate-last.log"

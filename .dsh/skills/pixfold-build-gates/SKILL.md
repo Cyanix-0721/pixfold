@@ -12,7 +12,7 @@ description: PixFold 的构建与提交闸门——四道闸门（gate.sh 一次
 | agent 宿主 | 跑闸门 |
 | --- | --- |
 | WSL | `cd android && ./gate.sh`（原生 bash） |
-| Windows | 用 Git Bash 执行：`"<Git>\bin\bash.exe" android/gate.sh`。⚠️ Windows 上裸 `bash` 常被 `C:\Windows\System32\bash.exe`（WSL 启动器）占用，那不是 Git Bash；要显式用 Git Bash 的绝对路径（如 scoop 装的 `C:\ProgramData\scoop\apps\git\current\bin\bash.exe`）。实在没有 bash 时退化用 `cmd.exe /c "cd /d <repo>\android && run-gradle.bat ..."`，但**这条路不写 `build/gate-last.rc` / `gate-last.log`**，退出码判据得自己接管 |
+| Windows | 用 Git Bash 执行：`"<Git>\bin\bash.exe" android/gate.sh`（scoop 装的 Git 在 `C:\ProgramData\scoop\apps\git\current\bin\bash.exe`）。⚠️ Windows 上裸 `bash` 常被 `C:\Windows\System32\bash.exe`（WSL 启动器）占用，那不是 Git Bash，要显式用绝对路径。`gate.sh` 已内置 `export MSYS_NO_PATHCONV=1`——**否则** Git Bash 会把 `cmd.exe /c "run-gradle.bat …"` 里的 `/c` 当路径转义成 `C:\`，cmd 进入交互模式、`run-gradle.bat` 根本不执行却返回 0（**假绿**：日志里只有 cmd 启动横幅、没有 `BUILD SUCCESSFUL`，2026-11-16 实测踩到）。**已验证**：WIN 宿主经此路径跑通四道闸门（`BUILD SUCCESSFUL in 1m57s`、`gate-last.rc=0`、app 909 / domain 986 全绿） |
 
 `gate.sh` 内部就是一次 gradle 调用：
 
