@@ -7,9 +7,12 @@ description: PixFold 的构建与提交闸门——四道闸门（gate.sh 一次
 
 ## 四道闸门（Gradle 必须在 Windows 侧跑）
 
-```bash
-cd android && ./gate.sh
-```
+**平台前提**：Gradle、Android SDK、adb **始终在 Windows 侧**执行；agent 宿主可以是 Windows（当前 DSH 就如此）或 WSL（历史/未来）。`gate.sh` 是 bash 包装，内部 `cmd.exe /c run-gradle.bat` 驱动 Windows 构建，两种宿主都能用，差别只在「怎么拿到一个能调 `cmd.exe` 的 bash」：
+
+| agent 宿主 | 跑闸门 |
+| --- | --- |
+| WSL | `cd android && ./gate.sh`（原生 bash） |
+| Windows | 用 Git Bash 执行：`"<Git>\bin\bash.exe" android/gate.sh`。⚠️ Windows 上裸 `bash` 常被 `C:\Windows\System32\bash.exe`（WSL 启动器）占用，那不是 Git Bash；要显式用 Git Bash 的绝对路径（如 scoop 装的 `C:\ProgramData\scoop\apps\git\current\bin\bash.exe`）。实在没有 bash 时退化用 `cmd.exe /c "cd /d <repo>\android && run-gradle.bat ..."`，但**这条路不写 `build/gate-last.rc` / `gate-last.log`**，退出码判据得自己接管 |
 
 `gate.sh` 内部就是一次 gradle 调用：
 
@@ -32,14 +35,15 @@ run-gradle.bat :app:lintDebug :app:testDebugUnitTest :domain:test :app:assembleD
 - `app` 的 `@Test` 总数比 XML 多 1 是**正常的** —— `NegativeControlTest` 是故意失败的负向对照，默认排除，仅 `-PincludeNegativeControl` 时运行
 - **lint 必须零告警**：`warningsAsErrors = true` + `abortOnError = true`，一条 warning 即硬失败。新增资源 / 权限 / API 后尤其容易多出 `ObsoleteSdkInt`、`UnusedQuantity`、`ExtraTranslation`
 
-## 提交后、推送前的密钥扫描（WSL 侧，读的是 git 对象）
+## 提交后、推送前的密钥扫描（agent 宿主侧，读的是 git 对象）
 
 ```
 betterleaks git . --redact --revision="origin/dev..dev" --include=merges --include=commit-messages
 ```
 
-- 参数随 betterleaks 2.0.0-rc.3 变了：改走 go-git，`--log-opts` **已被移除**，限定范围用 `--revision`（`A..B`），含合并提交用 `--include=merges`。用旧参数会直接报 unknown flag，别照抄旧笔记
+- 参数随 betterleaks 2.0.0-rc.x 变了（当前 Windows PATH 上是 **2.0.0-rc.8**）：rc.3 起改走 go-git，`--log-opts` **已被移除**，限定范围用 `--revision`（`A..B`），含合并提交用 `--include=merges`。用旧参数会直接报 unknown flag，别照抄旧笔记
 - **必须在提交之后跑**：该命令读的是 git 对象，工作树里未提交的改动不在扫描范围内——提交前跑会恰好漏掉正要提交的内容。要扫工作树须用 `betterleaks filesystem <path>`
+- **在哪里跑**：Windows 宿主上 `betterleaks` 已在 PATH（当前 2.0.0-rc.8），直接跑；WSL 宿主用 WSL 侧装的版本，或 `cmd.exe /c betterleaks ...`
 - 只扫**未推送**部分（已推送的无法追回；`origin/dev..dev` 随推送自动收敛）
 - **判绿口径**：真扫描必有 `INF scanned ~NNNN bytes`（百万级）且退出码 0；见到 `scanned ~0 bytes` + `incomplete scan` 一律当**失败**，不许当绿
 - `--redact` **不可省**（否则命中值明文落盘）；回报只给 `rule_id` / 路径 / 行号，不复述 `match.value`

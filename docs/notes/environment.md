@@ -267,6 +267,8 @@ cd android && ./gate.sh :app:compileDebugKotlin   # 只编译,快速查语法
 
 ### 12.6 版本锚点
 
+> **2026-11-16 订正**：仓库根 `.mise.toml` 现为 `java = "temurin-21"`（Robolectric 4.17 的 SDK 36 sandbox 硬性要 Java 21，见 `android/run-gradle.bat` 注释）；下表 `temurin-17` 条目为 2026-09-16 的历史记录，当前构建 JDK 以 **21** 为准。
+
 | 项 | 版本 |
 | --- | --- |
 | Git / VS Code / Android Studio | 2.55.0.windows.5 / 1.138.0 / 2026.1.4.7 |

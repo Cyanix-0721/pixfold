@@ -36,9 +36,9 @@ PixFold 把「图片排序、命名结构、漫画分组、CBZ 元数据、输�
 
 ## 开发环境部署（⚠️ 暂定）
 
-> 完整清单、版本锚点与踩坑见 [`docs/notes/environment.md`](docs/notes/environment.md) §12。
+> 完整清单、版本锚点与踩坑见 [`docs/notes/environment.md`](docs/notes/environment.md) §12。构建 / Android SDK / adb 都在 **Windows 构建机**；agent 宿主当前为 Windows，未来可切 WSL——那只是跑 agent 的地方，构建口径不变。
 
-- **JDK**：mise 管理，`.mise.toml` 声明 `java = "temurin-17"`；`JAVA_HOME` 已设。Gradle 不读 `.mise.toml`，命令行构建靠 `JAVA_HOME`。
+- **JDK**：mise 管理，`.mise.toml` 声明 `java = "temurin-21"`（Robolectric 的 SDK 36 sandbox 硬性要求 Java 21）；构建经 `run-gradle.bat` 的 `mise exec` 切到它，不依赖外部 `JAVA_HOME`。
 - **Android Studio**：scoop 安装（自带 JBR，无需外部 Java 即可启动）。
 - **Android SDK**：由 Studio 的 SDK Manager 装到默认位置；组件含 platform-tools、build-tools、platforms android-36 / 37、cmdline-tools。
 - **环境变量**：`ANDROID_HOME` 指向 SDK 根；用户 PATH 加 `<sdk>\platform-tools`、`<sdk>\cmdline-tools\latest\bin`。

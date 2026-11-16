@@ -15,6 +15,8 @@ Robolectric 不做真实文本测量与真实布局——芯片宽度一律算�
 
 ## 设备与环境（固定）
 
+**入口按宿主**：adb 来自 **Windows 侧 SDK**（WSL 里不装）。Windows 宿主直接 `adb ...`；WSL 宿主用 `cmd.exe /c adb.bat ...`（`adb.bat` 在 `android/`，已固定 SDK 路径）。
+
 - 无线调试：`adb connect 192.168.43.1:4444`
 - 机型 PJX110 / Android 16 / `1264×2780px` / `560dpi` = **361dp × 794dp**；系统 locale `zh-CN`
 - 唤醒常亮：`input keyevent KEYCODE_WAKEUP` → `input keyevent 82`（解锁）→ `svc power stayon true`
@@ -23,7 +25,7 @@ Robolectric 不做真实文本测量与真实布局——芯片宽度一律算�
 
 ## 取证
 
-- `android/dumpui.bat NAME` → dump 到 `/data/local/tmp/NAME.xml` → 落入 `android/artifacts/`（已 gitignored）
+- `dumpui.bat NAME`（在 `android/`）→ dump 到 `/data/local/tmp/NAME.xml` → 落入 `android/artifacts/`（已 gitignored）。Windows 宿主 `android\dumpui.bat NAME`；WSL 宿主 `cmd.exe /c dumpui.bat NAME`
 - 读节点 `bounds` 坐标是唯一能证伪「控件放不下 / 落在视口外」的场合
 - `uiautomator dump` 的坐标会过期，**每次 tap 前重新 dump**
 
@@ -32,7 +34,7 @@ Robolectric 不做真实文本测量与真实布局——芯片宽度一律算�
 - **边缘 x 不可用于应用内滑动**：`input swipe 1200 …` 的 x=1200 落在手势导航边缘区，会被系统当成返回手势、直接退出应用；应用内滑动用 **x ≤ 1000**
 - **中文 IME 下 `adb shell input text` 抛异常**：`NullPointerException: Attempt to get length of null array`（`InputShellCommand.sendText:410`）⇒ 只能输入 ASCII；键盘弹出会把页面整体上移，**点按钮前必须先收键盘**（ESC = `input keyevent 111`），否则坐标落在 IME 上
 - `input swipe` 触发不了长按 → 用 `input draganddrop`
-- `cmd.exe /c "adb.bat shell ls … | grep …"` 的管道会被 cmd.exe 吞掉 → 管道放到 WSL 侧执行
+- 经 `cmd.exe /c "adb.bat … | grep …"` 时管道会被 cmd.exe 吞掉 → 把管道放到宿主 shell 侧（WSL 宿主就放 WSL；Windows 宿主直接用 PowerShell 管道）
 - **调试产物绝不写 `/sdcard` / `/storage/emulated`**（`adb.bat` 已有守卫）；只走 `/data/local/tmp`
 - 汇报要给**读数**（坐标 / 尺寸 / 数值），不能只说「已通过」
 
