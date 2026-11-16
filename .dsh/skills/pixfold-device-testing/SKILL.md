@@ -15,7 +15,7 @@ Robolectric 不做真实文本测量与真实布局——芯片宽度一律算�
 
 ## 设备与环境（固定）
 
-**入口按宿主**：adb 来自 **Windows 侧 SDK**（WSL 里不装）。Windows 宿主直接 `adb ...`；WSL 宿主用 `cmd.exe /c adb.bat ...`（`adb.bat` 在 `android/`，已固定 SDK 路径）。
+**入口按宿主**：adb 来自 **Windows 侧 SDK**（WSL 里不装）。Windows 宿主直接 `adb ...`；WSL 宿主用 `cmd.exe /c adb.bat ...`（`adb.bat` 在 `android/`，已固定 SDK 路径）。⚠️ WSL 侧 **`adb` 不在 Linux PATH**、默认 shell 可能是 **fish**（2026-11-16 实测），别在 WSL 里直接 `adb`。
 
 - 无线调试：`adb connect 192.168.43.1:4444`
 - 机型 PJX110 / Android 16 / `1264×2780px` / `560dpi` = **361dp × 794dp**；系统 locale `zh-CN`
