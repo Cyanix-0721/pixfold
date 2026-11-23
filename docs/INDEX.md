@@ -72,14 +72,14 @@
 | [`superpowers/plans/2026-09-16-d1-p1-scaffold-domain.md`](superpowers/plans/2026-09-16-d1-p1-scaffold-domain.md) | 历史计划 | 仅溯源时读。复选框 46 项全未勾选是历史事实（执行时走的是 `todo_write` 面板），不代表任务未完成 |
 | [`superpowers/plans/2026-09-16-d1-p2-grid-list-preview.md`](superpowers/plans/2026-09-16-d1-p2-grid-list-preview.md) | 历史计划 | 同上，34 项未勾选 |
 
-### 附：项目级 skill（`.dsh/skills/`）
+### 附：项目级 skill（`.agents/skills/`）
 
-项目自带两个 skill，由 DSH `dsh-skill-filesystem` 以 **rank 100** 从仓库根 `.dsh/skills/` 自动发现、随项目走（`.gitignore` 只忽略 `.agents/`，不忽略 `.dsh/`）。它们是「只有某个分支才用到」的操作细节，从 `AGENTS.md` §7 下沉而来，正文不再展开：
+项目自带两个 skill，遵循 Agent Skills 通用目录约定放在仓库根 `.agents/skills/` 下随项目走（`.gitignore` 忽略 `.agents/*` 并白名单放行 `!.agents/skills/`），DSH、Antigravity、Codex、GitHub Copilot 均可自动发现。它们是「只有某个分支才用到」的操作细节，从 `AGENTS.md` §7 下沉而来，正文不再展开：
 
 | skill | 何时加载 |
 | --- | --- |
-| [`pixfold-build-gates`](../.dsh/skills/pixfold-build-gates/SKILL.md) | 跑四道闸门、判构建 / lint / 测试是否真通过、提交后推送前跑 betterleaks 密钥扫描 |
-| [`pixfold-device-testing`](../.dsh/skills/pixfold-device-testing/SKILL.md) | 连真机核对 UI（放不放得下 / 视觉规格 / 动画观感）、判某类结论能否离线断（动设备前先取得当轮授权） |
+| [`pixfold-build-gates`](../.agents/skills/pixfold-build-gates/SKILL.md) | 跑四道闸门、判构建 / lint / 测试是否真通过、提交后推送前跑 betterleaks 密钥扫描 |
+| [`pixfold-device-testing`](../.agents/skills/pixfold-device-testing/SKILL.md) | 连真机核对 UI（放不放得下 / 视觉规格 / 动画观感）、判某类结论能否离线断（动设备前先取得当轮授权） |
 
 ## 历轮台账（2026-09-21 起）
 

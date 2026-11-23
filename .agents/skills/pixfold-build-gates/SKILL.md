@@ -7,7 +7,7 @@ description: PixFold 的构建与提交闸门——四道闸门（gate.sh 一次
 
 ## 四道闸门（Gradle 必须在 Windows 侧跑）
 
-**平台前提**：Gradle、Android SDK、adb **始终在 Windows 侧**执行；agent 宿主可以是 Windows（当前 DSH 就如此）或 WSL（历史/未来）。`gate.sh` 是 bash 包装，内部 `cmd.exe /c run-gradle.bat` 驱动 Windows 构建，两种宿主都能用，差别只在「怎么拿到一个能调 `cmd.exe` 的 bash」：
+**平台前提**：Gradle、Android SDK、adb **始终在 Windows 侧**执行；agent 宿主可以是 Windows 或 WSL。`gate.sh` 是 bash 包装，内部 `cmd.exe /c run-gradle.bat` 驱动 Windows 构建，两种宿主都能用，差别只在「怎么拿到一个能调 `cmd.exe` 的 bash」：
 
 | agent 宿主 | 跑闸门 |
 | --- | --- |

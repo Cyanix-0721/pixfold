@@ -93,7 +93,7 @@
 ## 6. 其他约定
 
 - 语言:与用户用中文交流;仓库文档双语(README)或中文(HANDBOOK),新增/修改匹配所在文件的语言风格。
-- Git:本仓库独立于 chezmoi dotfiles 仓库;忽略项现状为 **`.agents/`**（用户 2026-09-19 移除 `.kilo/`、`.workbuddy*/` —— 两者已不再使用）。
+- Git:本仓库独立于 chezmoi dotfiles 仓库;忽略项现状为 **`.agents/*`（白名单放行 `!.agents/skills/`，项目 skill 随仓库走）**（用户 2026-09-19 移除 `.kilo/`、`.workbuddy*/` —— 两者已不再使用）。
 - **分支模型(2026-09-16 起)**:`ready`(设计文档线,原型代码永不进)→ **`dev`(开发主线)** → 阶段分支 `d1/pN`(D4 起为 `d4/…`)。阶段分支从 `dev` 开、**完成即合回 `dev` 并回写文档**、随即删除;D1 全绿后 `dev` → `main` 发 release,此后开发继续在 `dev`。**push 由用户自行处理**,agent 只提交不推送。详见 HANDBOOK §9.2。**开分支是硬前置,判据与出口见 §0.1 第 4 条。**
 - 验收:任何改动对照 `docs/product/HANDBOOK.md` §10(功能 / 数据正确性 / 平台)自检。
 
@@ -123,7 +123,7 @@
 
 ### 7.2 闸门与真机规约 → 见项目 skill
 
-四道闸门的跑法与判绿口径、真机核对与 adb 已知坑,已各自下沉为项目 skill(`.dsh/skills/`,rank 100,随项目走)。**动手前用 `skill` 工具加载,不在本文件展开:**
+四道闸门的跑法与判绿口径、真机核对与 adb 已知坑,已各自下沉为项目 skill(`.agents/skills/`,随项目走,DSH / Antigravity / Codex / Copilot 均可自动发现)。**动手前按当前 agent 的 skill 机制加载(如 `skill` 工具或读取对应 `SKILL.md`),不在本文件展开:**
 
 - 跑 gradle 闸门 / 判构建·lint·测试是否真通过 / 提交后推送前密钥扫描 → **`pixfold-build-gates`**
 - 连真机核对 UI(放不放得下、视觉规格、动画观感) / 判某类结论能否离线断 → **`pixfold-device-testing`**(动设备前先取得当轮授权)

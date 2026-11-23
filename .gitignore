@@ -12,7 +12,9 @@ $RECYCLE.BIN/
 *.log
 
 # AI 助手缓存目录 / AI assistant cache directories
-.agents/
+# 仅放行随项目走的 .agents/skills/，其余本地缓存仍保持忽略
+.agents/*
+!.agents/skills/
 
 # Python 工具缓存 / Python tooling caches
 # WHY:.uvcache 是 `uv run` 在仓库根留下的缓存目录(可达百 MB 级)。
