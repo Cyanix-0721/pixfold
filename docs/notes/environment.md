@@ -156,7 +156,27 @@ cd android && ./gate.sh :app:compileDebugKotlin   # 只编译,快速查语法
 - **杀软实时防护会拦 SDK 解包**(2026-09-12 实证;本机为火绒,Defender 已被接管):安装 `sources;*` 这类含上万个小文件的包时随机报 `java.nio.file.AccessDeniedException`(实测卡在 `ScreenCaptureCallbackHandler.java`;zip 本体 CRC 完好,只解出 533/16421)。→ 把 **SDK 目录、`~/.gradle`、工程目录**加入杀软信任区/排除列表(官方文档同样建议);临时关防护可确认因果。
 - **Android 16 引入"次版本号"36.0 / 36.1**(2026-09-12 查一手资料):Android 16 QPR2 是首个带次版本的版本,SDK 版本由 36 → **36.1**;在 SDK 里两者是**独立 platform 包**、可并存(目录名形如 `android-36` 与 `android-36.1`,与现有 `android-37.0` 同类)。运行时用 `Build.getMinorSdkVersion(VERSION_CODES_FULL.BAKLAVA)` 查询;Gradle 侧 DSL 是 `compileSdkMinor`(AGP 9.1+);AGP 9.0 兼容表写明"最高支持 API 36.1",要打 37 需 AGP 9.4+。
 - **构建与 SDK 都放 Windows 侧,不给 WSL**(2026-09-12 实测):WSL 经 `/mnt/d`(NTFS)解包 1500 个 4KB 小文件耗时 **2864ms**,同一操作在 ext4 上只要 **18ms**(159×),而 Gradle 构建全是这类小文件操作。→ 工程留在 D 盘、构建走 Windows 原生;WSL 只作 agent 宿主与代码编辑。
-- **代理:按机器区分,勿混用**(2026-09-08 记 R7P21 / 2026-09-16 复检 SLAYER):**R7P21** 需 Clash 代理(127.0.0.1:7897),Gradle/Java **不读** `HTTP_PROXY` 环境变量,须写 `~/.gradle/gradle.properties` 的 `systemProp.http(s).proxyHost/Port`(已配,仅 R7P21 用户级,不随工程文件),否则 gradle wrapper 下载发行版与依赖解析会超时。**SLAYER(本机)**走透明代理**无需配置**——2026-09-16 实测 `dl.google.com` 与 `repo1.maven.org` 均 HTTP 200,且 `~/.gradle/gradle.properties` **不存在**;勿在 SLAYER 上照抄代理配置。工程内一律不写死任何代理/镜像配置。
+- **代理:按机器区分,勿混用**(2026-09-08 记 R7P21 / 2026-09-16 复检 SLAYER / **2026-11-23 R7P21 实测订正**):
+  - **SLAYER** 走透明代理**无需配置**——2026-09-16 实测 `dl.google.com` 与 `repo1.maven.org` 均 HTTP 200,且 `~/.gradle/gradle.properties` **不存在**;勿在 SLAYER 上照抄代理配置。工程内一律不写死任何代理/镜像配置。
+  - **R7P21** 需本机 Clash 代理(`127.0.0.1:7897`),Gradle/Java **不读** `HTTP_PROXY` 环境变量,且**构建期与 Wrapper 下载阶段吃不同的配置**(2026-11-23 实测订正:此前误以为 `~/.gradle/gradle.properties` 同时管 Wrapper 下载,实测拉 `gradle-9.8.0-bin.zip` 时因未走代理报 `SSLHandshakeException: Remote host terminated the handshake`):
+    1. **Gradle Daemon(依赖解析与日常构建)**:写用户级 `~/.gradle/gradle.properties`(仅需代理的机器本地保留,不入库):
+       ```properties
+       systemProp.http.proxyHost=127.0.0.1
+       systemProp.http.proxyPort=7897
+       systemProp.https.proxyHost=127.0.0.1
+       systemProp.https.proxyPort=7897
+       ```
+    2. **Gradle Wrapper(首次下载或升级 `gradle-x.y.z-bin.zip`)**:`gradle-wrapper.jar` 不读 `~/.gradle/gradle.properties`,需经 `GRADLE_OPTS` 传入代理。可二选一(仅在需代理机操作):
+       - 单次临时(拉完进 `~/.gradle/wrapper/dists/` 缓存后,日常构建不再需要):
+         ```powershell
+         $env:GRADLE_OPTS = "-Dhttp.proxyHost=127.0.0.1 -Dhttp.proxyPort=7897 -Dhttps.proxyHost=127.0.0.1 -Dhttps.proxyPort=7897"
+         & "$env:USERPROFILE\scoop\apps\git\current\bin\bash.exe" android/gate.sh
+         ```
+       - 或设为用户级环境变量(新开终端生效;如需取消设为 `$null` 即可):
+         ```powershell
+         [Environment]::SetEnvironmentVariable("GRADLE_OPTS", "-Dhttp.proxyHost=127.0.0.1 -Dhttp.proxyPort=7897 -Dhttps.proxyHost=127.0.0.1 -Dhttps.proxyPort=7897", "User")
+         ```
+    3. **附注(Robolectric 沙箱包)**:`:app:testDebugUnitTest` 的独立 Test Worker JVM 首次下载 `android-all-instrumented-*.jar`(~200 MB)到 `~/.m2/repository/org/robolectric/` 也不继承 `~/.gradle/gradle.properties`,2026-11-23 实测直连可下完(耗时约 12 分钟),缓存落盘后后续复用无需再下。
 - **AGP 9 起 Kotlin 内置,别再手工加 kotlin-android 插件**(2026-09-16 查一手资料 + **探针实测**核实,D1 重建必读):AGP 9.0 引入 built-in Kotlin 并**默认开启**,对 KGP **2.2.10** 有运行时依赖——**不再需要声明 KGP 版本,也不需要单独安装 Kotlin 工具链**(本机确实没有 `kotlinc`,KGP/Compose 编译器均由 Gradle 自动拉取)。**关键坑**:`org.jetbrains.kotlin.android`(`kotlin-android`)插件**与新 DSL 不兼容**,照抄旧教程会撞 `ClassCastException`;实测还会撞 `Cannot add extension with name 'kotlin'`。官方逃生门是 `gradle.properties` 里设 `android.newDsl=false`(+ `android.builtInKotlin=false`),但**AGP 10 会移除该选项**,不应作为长期方案。来源:[AGP 9.0 release notes](https://developer.android.com/build/releases/agp-9-0-0-release-notes)(`JDK 最低 17` / built-in Kotlin / 运行时依赖 KGP 2.2.10 均见其兼容表与 Built-in Kotlin 节)。
   > **两条配套实测结论(2026-09-16)**:① **Compose 编译器插件仍需单独应用**——内置 Kotlin 只取代 `kotlin-android`,不取代 `org.jetbrains.kotlin.plugin.compose`;其**版本必须等于 AGP 内置的 KGP 版本**(AGP 9.4.0 → **2.2.10**),不匹配是**运行期**报错。来源:[Kotlin Compose 编译器迁移指南](https://kotlinlang.org/docs/compose-compiler-migration-guide.html)。② **子模块声明 Kotlin 插件不能带版本号**——否则报 `The request for this plugin could not be satisfied because the plugin is already on the classpath with an unknown version`;正确做法是根 `build.gradle.kts` 以 `apply false` 声明版本,子模块只写 id。
 - **Kotlin `Regex.split` 丢弃捕获组,与 Python `re.split` 不同(移植陷阱)**(2026-09-16 探针实测,静默失败):`Regex("(\\d+)").split(s)` **不会**把捕获的数字段放进结果(与 Python `re.split` 保留捕获组的行为相反),于是自然排序的"数字段 vs 字符段"切分全部失效、每次比较返回 0 → **排序静默返回原序**。表象是"顺序没变",极易误判为 UI 或状态通知问题。**正确做法**:用 `Regex("\\d+").findAll()` 手动扫描切记号。`scripts/batch_pack_cbz.py` 的自然排序是 Python 实现,移植时**必须**配一条"切分行为"单测钉死。

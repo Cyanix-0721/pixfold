@@ -17,5 +17,5 @@ REM
 REM Keep this file pure ASCII. cmd.exe parses .bat/.cmd in the OEM code page
 REM (CP936 here); UTF-8 non-ASCII comments can pair across lines and get
 REM executed as commands.
-cd /d D:\Programing\Personal\pixfold\android
+cd /d "%~dp0"
 call mise exec -- cmd /c gradlew.bat %*
