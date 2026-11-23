@@ -19,7 +19,7 @@ import kotlin.test.assertNull
  *
  * 只测可单测的那部分逻辑：null 透传、Image 到 ImageBitmap 包装、异常吞成 null、
  * 非正尺寸钳制、取消透传。真正的 Coil 解码（ImageLoaderCoilImageFetcher 调
- * ImageLoader.execute）是平台边界，与 AndroidThumbnailSource 同样是「无单测」的胶水层。
+ * ImageLoader.execute）是薄平台边界胶水层。
  *
  * 用假 CoilImageFetcher 返回真 BitmapImage（Robolectric 下 Bitmap 可用），
  * 不碰真实 ImageLoader。

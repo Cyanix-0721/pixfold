@@ -165,7 +165,11 @@ fun PixFoldApp(
     session: PixFoldSession? = null,
 ) {
     val context = LocalContext.current
-    val settingsStore = store ?: remember { SharedPrefsSettingsStore(context) }
+    // remember 必须无条件执行，避免条件 remember 在注入参数变化时导致组合槽位错位。
+    val defaultStore = remember(context, store) {
+        if (store == null) SharedPrefsSettingsStore(context) else null
+    }
+    val settingsStore = store ?: requireNotNull(defaultStore)
     // 设置在**应用根**持有:主题、语言、各页面都要读它,提上层是唯一合理位置。
     var settings by remember { mutableStateOf(settingsStore.load()) }
     // 包 remember:避免每次重组都产生新 lambda 身份,设置写入是稳定的引用。
@@ -297,7 +301,7 @@ fun PixFoldApp(
     // 后台跑而通知栏空着，正好是最需要它的时候。
     val notificationPermission =
         rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { }
-    // minSdk 34 ⇒ `POST_NOTIFICATIONS` 一定存在，无需 SDK_INT 判断（加了 lint 会报
+    // minSdk 36 ⇒ `POST_NOTIFICATIONS` 一定存在，无需 SDK_INT 判断（加了 lint 会报
     // `ObsoleteSdkInt`：那条件恒真，留着只会让人以为还要考虑更老的系统）。
     LaunchedEffect(Unit) {
         val granted = context.checkSelfPermission(
@@ -460,7 +464,7 @@ fun PixFoldApp(
             val builtMetaUpdater: com.cyanix.pixfold.domain.pack.CbzMetaUpdater? =
                 remember(packTreeUri, workspaceHandle?.displayName) {
                     val uri = packTreeUri ?: return@remember null
-                    val rootName = workspaceHandle?.displayName.orEmpty()
+                    val rootName = workspaceHandle.displayName
                     val space = FilesystemSpaceSource(context)
                     SafMetaUpdater(
                         context = context,
@@ -482,7 +486,7 @@ fun PixFoldApp(
                 } else {
                     comicVolumesFrom(
                         collections = collections,
-                        rootDisplayName = workspaceHandle?.displayName.orEmpty(),
+                        rootDisplayName = workspaceHandle.displayName,
                         outputExists = OutputExistsProbe { false },
                     )
                 }
@@ -617,11 +621,10 @@ fun PixFoldApp(
                 }
 
                 composable<OrganizeRoute> {
-                    // 完成通知的文案在**组合期**取：
+                    // 完成通知的文案通过组合期捕获的 `LocalResources.current` 取：
                     // 点击回调里 `context.getString(...)` 会撞 lint
                     // `LocalContextGetResourceValueCall`（回调捕获的 context 可能带着
                     // 旧 Configuration，语言切换后拿到过时译文）。
-                    val organizeDoneTitle = stringResource(R.string.organize_notify_done)
                     val workspaceLabel = workspaceHandle?.displayName.orEmpty()
                     val resources = LocalResources.current
                     // 真实改名 / 撤销的平台端口（D4b）。两者**必须成对**注入：
@@ -808,7 +811,7 @@ fun PixFoldApp(
                                     SafPackExecutor(
                                         context = context,
                                         treeUri = uri,
-                                        rootDisplayName = workspaceHandle?.displayName.orEmpty(),
+                                        rootDisplayName = workspaceHandle.displayName,
                                     )
                                 }
                             },
@@ -904,7 +907,7 @@ fun PixFoldApp(
  * **此前漏了这一步**(真机实测:选 English 后界面仍是中文),属真实缺陷。
  *
  * **版本说明**:`LocaleManager` / `LocaleConfig` 均为 API 33+。本项目 minSdk
- * 已于 2026-09-25 提到 **34**,故此处**不再需要版本分支** —— 早先那句
+ * 当前为 **36**,故此处**不再需要版本分支** —— 早先那句
  * `if (Build.VERSION.SDK_INT < TIRAMISU) return@LaunchedEffect` 已删除
  * (留着会被 lint 判 `ObsoleteSdkInt` 而本项目 `warningsAsErrors=true`)。
  *

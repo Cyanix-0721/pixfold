@@ -13,15 +13,26 @@ android {
 
     defaultConfig {
         applicationId = "com.cyanix.pixfold"
-        // 2026-09-25 由 30 提到 34(用户裁决,替换 2026-09-22 的 24→30)。
-        // 理由:应用内语言依赖的 `LocaleManager`/`LocaleConfig` 是 API 33+,
-        // 而 33 与 34 的代码清理成本完全相同(都删那 3 处版本守卫),
-        // 34 还能拿到 HDR gainmap(`Gainmap`/`Bitmap.getGainmap`)供 D3/D4 图片管线用。
-        // 取舍见 docs/notes/environment.md §12.6 与 docs/notes/d1-toolchain-evidence.md §9。
+        // 当前 minSdk = 36（Android 16）：2026-09-25 曾由 30 提至 34，后为对齐 Android 16
+        // Live Updates（NotificationCompat.ProgressStyle 升格）进一步提至 36。
+        // `LocaleManager`/`LocaleConfig`(API 33+)、动态取色(API 31+)、自适应图标(API 26+)
+        // 与 HDR gainmap(API 34+) 均无条件可用，无需低版本守卫分支。
+        // 历史取舍见 docs/notes/environment.md §12.6 与 docs/notes/d1-toolchain-evidence.md §9。
         minSdk = 36
         targetSdk = 36
         versionCode = 1
         versionName = "0.1.0-dev"
+    }
+
+    buildTypes {
+        release {
+            isMinifyEnabled = true
+            isShrinkResources = true
+            proguardFiles(
+                getDefaultProguardFile("proguard-android-optimize.txt"),
+                "proguard-rules.pro",
+            )
+        }
     }
 
     buildFeatures {

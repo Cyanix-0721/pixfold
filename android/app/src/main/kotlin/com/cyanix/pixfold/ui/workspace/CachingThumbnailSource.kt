@@ -14,9 +14,8 @@ import kotlinx.coroutines.sync.withPermit
  *
  * ## 为什么要单独一个装饰器
  *
- * 平台实现 [com.cyanix.pixfold.data.saf.AndroidThumbnailSource] 只有「调一次
- * `ContentResolver.loadThumbnail`、失败返回 null」这一件事，没有任何可单测的逻辑；
- * 而缓存与并发恰恰是**最容易写错、又最难在真机上看出来**的部分：
+ * 平台解码实现 [com.cyanix.pixfold.data.coil.CoilThumbnailSource] 只管取图与解码，
+ * 不掺杂缓存账目；而缓存与并发恰恰是**最容易写错、又最难在真机上看出来**的部分：
  *
  * - LRU 顺序错了 → 滚动时反复重载同一张，表现为「卡」；
  * - 字节账目错了 → 内存悄悄超预算，表现为「偶发 OOM」；

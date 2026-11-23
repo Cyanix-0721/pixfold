@@ -12,7 +12,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.widthIn
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -165,7 +164,7 @@ fun <T> SingleSelectChipRow(
                         color = MaterialTheme.colorScheme.surfaceVariant.copy(
                             alpha = if (emphasized) 0.45f else 0.18f,
                         ),
-                        shape = RoundedCornerShape(12.dp),
+                        shape = MaterialTheme.shapes.medium,
                     )
                 } else {
                     Modifier
@@ -476,6 +475,7 @@ private fun CollapseChip(
     onClick: () -> Unit,
 ) {
     val borderColor = MaterialTheme.colorScheme.outline
+    val chipShape = MaterialTheme.shapes.small
     Box(
         // 外层:触摸目标 / 点击 / 语义。**宽度不定**,由内层的 widthIn 决定,
         // 因此二者恒等宽 —— 触摸区与视觉块左右对齐。
@@ -485,7 +485,7 @@ private fun CollapseChip(
             // 只给到 36dp。§2.7 是硬约束,不能靠一条会失效的隐式规则。
             .heightIn(min = 48.dp)
             .minimumInteractiveComponentSize()
-            .clip(RoundedCornerShape(8.dp))
+            .clip(chipShape)
             .clickable(onClick = onClick)
             .testTag(tag)
             .semantics(mergeDescendants = true) {
@@ -499,11 +499,11 @@ private fun CollapseChip(
             modifier = Modifier
                 .widthIn(min = CHIP_MIN_WIDTH, max = CHIP_MAX_WIDTH)
                 .heightIn(min = 32.dp)
-                .clip(RoundedCornerShape(8.dp))
+                .clip(chipShape)
                 .drawBehind {
                     drawRoundRect(
                         color = borderColor,
-                        cornerRadius = CornerRadius(8.dp.toPx()),
+                        cornerRadius = CornerRadius(chipShape.topStart.toPx(size, this)),
                         style = Stroke(
                             width = 1.dp.toPx(),
                             pathEffect = PathEffect.dashPathEffect(
