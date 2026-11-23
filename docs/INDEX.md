@@ -55,6 +55,7 @@
 | [`notes/pixfold-agent-纪律台账.md`](notes/pixfold-agent-纪律台账.md) | AGENTS.md §0.1 迁出的历年实测事故原始记录（chip 改版失效 / 未开分支 / 子 agent 未收口 / 重叠 implementer / 关机未执行）；AGENTS.md 正文只留规则 |
 | [`notes/environment.md`](notes/environment.md) | 开发环境实况与 Android 验证（原 `HANGOFF.md` §12，2026-11-16 拆出），小节号 §12.x 沿用原编号以便交叉引用 |
 | [`notes/decisions-archive.md`](notes/decisions-archive.md) | 已裁决问题台账（原 `HANGOFF.md` §11 第 9–18 条，含各自实现与真机记录） |
+| [`notes/d4-optimization-and-non-adb-testing.md`](notes/d4-optimization-and-non-adb-testing.md) | D4 项目优化审查（P0–P2 + 6 条复核约束）、无 ADB 纯 JVM 测试方案（RNG 实证/Roborazzi/离线 SAF/PITest/边界矩阵）与 `d4/opt-and-non-adb-tests` 实施清单（M1–M9） |
 
 ### 第四层：规格与计划（superpowers 产物）
 
