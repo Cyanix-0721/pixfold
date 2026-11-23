@@ -101,6 +101,7 @@ fun DragReorderList(
     // 以及拖动期间的**本地展示顺序**(null = 未拖动)。分工与 [DragReorderGrid] 一致:
     // **界面实时变,数据只在松手时提交一次**。
     var draggingId by remember { mutableStateOf<String?>(null) }
+    var draggingItem by remember { mutableStateOf<SourceItem?>(null) }
     var dragStartIndex by remember { mutableIntStateOf(-1) }
     var dragItems by remember { mutableStateOf<List<SourceItem>?>(null) }
     // 浮层的锚点:容器自身的左上角根坐标,用于把指针的根坐标换算成容器内局部坐标。
@@ -145,9 +146,11 @@ fun DragReorderList(
                         val bounds = currentSlotBounds()
                         val index = findContainedSlotAt(root, bounds)
                         if (index != null && index < currentItems.size) {
-                                dragStartIndex = index
+                            dragStartIndex = index
                             dragItems = currentItems
-                            draggingId = currentItems[index].id
+                            val started = currentItems[index]
+                            draggingId = started.id
+                            draggingItem = started
                             pointerInRoot = root
                             dragSize = bounds[index]?.size ?: Size.Zero
                             edgeBurst = 0
@@ -197,6 +200,7 @@ fun DragReorderList(
                         val id = draggingId
                         val finalIndex = dragItems?.indexOfFirst { it.id == id } ?: -1
                         draggingId = null
+                        draggingItem = null
                         dragItems = null
                         edgeBurst = 0
                         // **数据只在松手时提交一次**:拖动中一次都没提交过,故领域层的
@@ -207,6 +211,7 @@ fun DragReorderList(
                     },
                     onDragCancel = {
                         draggingId = null
+                        draggingItem = null
                         dragItems = null
                         edgeBurst = 0
                     },
@@ -265,17 +270,15 @@ fun DragReorderList(
         }
 
         // 跟手浮层:拖动中手里的那一行跟着指针走。只画不参与命中判定。
-        val ghostId = draggingId
-        if (ghostId != null) {
-            (dragItems ?: items).firstOrNull { it.id == ghostId }?.let { ghostItem ->
-                DragGhost(
-                    item = ghostItem,
-                    pointerInRoot = pointerInRoot,
-                    containerInRoot = containerInRoot,
-                    sizeInRoot = dragSize,
-                    style = DragGhostStyle.Row,
-                )
-            }
+        val ghostItem = draggingItem
+        if (ghostItem != null) {
+            DragGhost(
+                item = ghostItem,
+                pointerInRoot = { pointerInRoot },
+                containerInRoot = { containerInRoot },
+                sizeInRoot = dragSize,
+                style = DragGhostStyle.Row,
+            )
         }
 
         // W2:下滑后显示回顶按钮(右下角);判据同网格(下方还有内容 且 确实下滑过)

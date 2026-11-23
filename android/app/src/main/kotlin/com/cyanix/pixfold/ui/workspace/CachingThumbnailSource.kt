@@ -69,6 +69,12 @@ class CachingThumbnailSource(
     val cachedCount: Int get() = cache.size
 
     /**
+     * 同步查询内存缓存中是否已有 [uri] 的缩略图（零阻塞、线程安全，P1 #8）。
+     * 命中时由 `ItemThumb` 首帧直接渲染，消除 1 帧程序化占位闪烁。
+     */
+    override fun peek(uri: String): ImageBitmap? = cache.get(uri)
+
+    /**
      * **在途请求合并表**：uri → 正在进行的加载。
      *
      * 必须有它，「双检」是不够的：`gate` 的许可数是 `cpuCores + 1`（通常 8），

@@ -185,12 +185,18 @@ interface UndoActions {
  * 无从下手,记失败并给出 [TextKey.UndoFailedNoUri]。**不静默跳过** ——
  * 跳过会让"撤销 3 项"的数字虚高,与 `UndoRecord` 只收成功项同一取舍。
  */
-fun performUndoReal(record: UndoRecord?, actions: UndoActions): UndoResult {
+fun performUndoReal(
+    record: UndoRecord?,
+    actions: UndoActions,
+    token: CancellationToken = CancellationToken(),
+): UndoResult {
     if (record == null || record.ops.isEmpty()) {
         return UndoResult(applied = false, message = Msg(TextKey.UndoNothing))
     }
     var okCount = 0
-    for (op in record.ops) {
+    for ((index, op) in record.ops.withIndex()) {
+        // 中断只在项边界检查：协程被取消后停止继续回滚剩余文件，避免成为孤儿写盘任务。
+        if (token.shouldStop(beforeStartingItem = index)) break
         val ok = runCatching { applyOneUndo(op, actions) }.getOrDefault(false)
         if (ok) okCount++
     }

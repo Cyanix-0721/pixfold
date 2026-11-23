@@ -27,6 +27,15 @@ fun interface ThumbnailSource {
      * @return 取不到时返回 `null`，调用方回退到程序化缩略图。
      */
     suspend fun thumbnail(uri: String, widthPx: Int, heightPx: Int): ImageBitmap?
+
+    /**
+     * 同步查询内存缓存中是否已有 [uri] 的缩略图（不阻塞、不触发 I/O）。
+     *
+     * 默认返回 `null`；有内存缓存的实现（如 [CachingThumbnailSource]）覆写此方法，
+     * 使 [com.cyanix.pixfold.ui.components.ItemThumb] 在首帧组合时即可直接命中缓存，
+     * 避免先闪一帧程序化缩略图再由 `LaunchedEffect` 切换。
+     */
+    fun peek(uri: String): ImageBitmap? = null
 }
 
 /**

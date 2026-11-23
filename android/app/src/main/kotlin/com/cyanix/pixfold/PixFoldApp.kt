@@ -35,23 +35,11 @@ import com.cyanix.pixfold.domain.comic.applyExistingComicInfo
 import com.cyanix.pixfold.domain.comic.comicVolumesFrom
 import com.cyanix.pixfold.domain.comic.markOutputExists
 import com.cyanix.pixfold.domain.source.nestedDirWarnings
-import com.cyanix.pixfold.domain.model.ComicVolume
-import com.cyanix.pixfold.domain.model.ImageCollection
-import com.cyanix.pixfold.domain.model.NamingScheme
-import com.cyanix.pixfold.domain.model.NamingState
 import com.cyanix.pixfold.domain.model.effectiveScheme
 import com.cyanix.pixfold.domain.naming.buildProposals
-import com.cyanix.pixfold.domain.naming.namingSchemeSeedOf
 import com.cyanix.pixfold.domain.naming.setOverride
-import com.cyanix.pixfold.domain.organize.OrganizeState
-import com.cyanix.pixfold.domain.organize.reconcileNamingState
-import com.cyanix.pixfold.domain.organize.reconcileOrganizeState
-import com.cyanix.pixfold.domain.organize.organizeStateOf
 import com.cyanix.pixfold.data.SharedPrefsSettingsStore
-import com.cyanix.pixfold.data.saf.AndroidSafSource
 import com.cyanix.pixfold.domain.source.WorkspaceSource
-import com.cyanix.pixfold.data.coil.CoilThumbnailSource
-import com.cyanix.pixfold.data.coil.ImageLoaderCoilImageFetcher
 import com.cyanix.pixfold.data.saf.FilesystemSpaceSource
 import com.cyanix.pixfold.data.saf.SafVolumeProbeSession
 import com.cyanix.pixfold.data.saf.SafMetaUpdater
@@ -62,7 +50,6 @@ import com.cyanix.pixfold.data.saf.SafUndoActions
 import com.cyanix.pixfold.data.task.TaskCompletionNotification
 import com.cyanix.pixfold.ui.components.DialogBlurController
 import com.cyanix.pixfold.ui.components.DialogBlurHost
-import com.cyanix.pixfold.ui.workspace.CachingThumbnailSource
 import com.cyanix.pixfold.domain.settings.AppLanguage
 import com.cyanix.pixfold.domain.settings.PixFoldSettings
 import com.cyanix.pixfold.domain.settings.SettingsStore
@@ -87,7 +74,6 @@ import com.cyanix.pixfold.ui.settings.LicensesScreen
 import com.cyanix.pixfold.ui.settings.SettingsScreen
 import com.cyanix.pixfold.ui.theme.PixFoldTheme
 import com.cyanix.pixfold.ui.workspace.LocalThumbnailSource
-import com.cyanix.pixfold.ui.workspace.WorkspaceController
 import com.cyanix.pixfold.ui.workspace.WorkspaceListDialog
 import com.cyanix.pixfold.ui.workspace.WorkspaceState
 import com.cyanix.pixfold.ui.workspace.rejectAllPinnedHint
@@ -95,7 +81,6 @@ import com.cyanix.pixfold.ui.workspace.collectionsOr
 import com.cyanix.pixfold.ui.workspace.handleOrNull
 import com.cyanix.pixfold.ui.organize.OrganizeSteps
 import com.cyanix.pixfold.ui.library.LibrarySteps
-import com.cyanix.pixfold.ui.library.LibraryVolumeLoader
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import java.util.concurrent.atomic.AtomicBoolean
@@ -173,6 +158,11 @@ fun PixFoldApp(
     existingComicInfoProbe: ExistingComicInfoProbe? = null,
     /** 卷探测的后台调度器，默认 [Dispatchers.IO]（严禁在组合主线程执行 SAF/ZIP I/O）。 */
     probeDispatcher: CoroutineDispatcher = Dispatchers.IO,
+    /**
+     * 可选的外部托管会话（由 [MainActivity] 经 [PixFoldSessionViewModel] 提供以跨配置变更保态）。
+     * 为 `null` 时（所有既有 Compose UI 测试）在本地 `remember` 独立会话并于离场时释放资源。
+     */
+    session: PixFoldSession? = null,
 ) {
     val context = LocalContext.current
     val settingsStore = store ?: remember { SharedPrefsSettingsStore(context) }
@@ -190,53 +180,30 @@ fun PixFoldApp(
     // (真机实测发现:选了 English 界面仍是中文 —— 此前完全漏了这一步)。
     ApplyAppLanguage(settings.language)
 
-    // ---- 工作区（D2a）：真实 SAF 目录授权 ----
-    //
-    // 三层各司其职，不要合并：
-    //   AndroidSafSource    —— 平台层，DocumentsContract 递归遍历 + readBytes
-    //   WorkspaceController —— 协程编排 + UI 状态机（扫描在 Dispatchers.IO）
-    //   本函数              —— 把结果接到工作流 A 的数据源上
-    // 注入优先：测试用假源绕过真实 SAF（见参数 KDoc）。
-    // 注入的源也要记住**首个实例**（无 key）：测试的 setContent lambda 每次重组都会新建一个
-    // ReadyWorkspaceSource，若直接使用未 remember 的实例，WorkspaceController 的
-    // remember(source, …) 会把每次重组都当成「换了数据源」重建控制器，冷启动
-    // restore() 的结果随即被丢掉。生产路径首次为 null 时同样记住平台实现。
-    val source: WorkspaceSource = remember {
-        workspaceSource ?: AndroidSafSource(context)
-    }
-    // 平台实现只管读；缓存与并发闸门在装饰器里（详见 CachingThumbnailSource 的 KDoc）。
-    // 解码交给 Coil 3（阶段二）：Coil 自己的内存/磁盘缓存都关掉，避免与外层
-    // CachingThumbnailSource 的 LRU 重复占内存，也避免把 SAF 盘上字节复制进 cacheDir。
-    val coilImageLoader = remember(context) {
-        coil3.ImageLoader.Builder(context)
-            .memoryCachePolicy(coil3.request.CachePolicy.DISABLED)
-            .diskCachePolicy(coil3.request.CachePolicy.DISABLED)
-            .build()
-    }
-    val thumbnailSource = remember {
-        CachingThumbnailSource(
-            CoilThumbnailSource(ImageLoaderCoilImageFetcher(context, coilImageLoader)),
-        )
-    }
-    // 预览专用：**不经过** CachingThumbnailSource 的 512px 上限与“按 uri 只存一份”的缓存。
-    // 全屏预览要按实际显示尺寸解码（1264×2780 的屏长边），网格缩略图尺寸不够。
-    // Coil 自己的两级缓存同样关闭；一张图在屏时只保留当前这一份，翻页即换。
-    val previewImageSource = remember(coilImageLoader) {
-        CoilThumbnailSource(ImageLoaderCoilImageFetcher(context, coilImageLoader))
-    }
+    // ---- 应用级会话（P1 #7）：生产由 PixFoldSessionViewModel 跨配置变更持有；
+    // 测试/独立调用（session == null）在本地 remember 独立会话并于离场时释放资源。
+    // 注意：remember 必须无条件执行，避免条件 remember 导致组合槽位错位。
     val workspaceScope = rememberCoroutineScope()
-    val workspaceController = remember(source, workspaceScope) {
-        WorkspaceController(
-            source = source,
-            scope = workspaceScope,
-            // 显示名要靠 provider query 才能拿到（tree URI 本身不含目录名），
-            // 故留在平台层；控制器只接收「URI → 名字」这个纯函数。
-            // 真实实现有 displayNameOf（要查 provider），假源只实现接口 ⇒ 用扩展函数兜住。
-            nameResolver = { treeUri ->
-                (source as? AndroidSafSource)?.displayNameOf(treeUri).orEmpty()
-            },
-        )
+    val ownedSession = remember(session, context, probeDispatcher) {
+        if (session != null) {
+            null
+        } else {
+            createDefaultPixFoldSession(
+                context = context,
+                probeDispatcher = probeDispatcher,
+                workspaceSourceOverride = workspaceSource,
+                scope = workspaceScope,
+            )
+        }
     }
+    DisposableEffect(ownedSession) {
+        onDispose { ownedSession?.close() }
+    }
+    val activeSession = session ?: requireNotNull(ownedSession)
+    val thumbnailSource = activeSession.thumbnailSource
+    val previewImageSource = activeSession.previewImageSource
+    val workspaceController = activeSession.workspaceController
+    val volumeLoader = activeSession.volumeLoader
     // 工作区列表弹窗的开关（2026-10-25 规格 §7.1/§7.3）。
     //
     // **弹窗本体必须挂在 NavDisplay 之外**（见下方 `DialogBlurHost` 内的那一处）：
@@ -257,15 +224,10 @@ fun PixFoldApp(
     // 等扫到非空内容才真正导航；失败/空目录就留在首页，用户能直接换目录。
     var pendingWorkflow by remember { mutableStateOf<NavKey?>(null) }
     // 冷启动：生产走懒启动（只恢复句柄，扫描推迟到用户点进工作流）。
-    // 默认仍走旧的立即重扫，保证既有测试与「马上要内容」的入口行为不变。
-    LaunchedEffect(Unit) {
-        // 从「打包进度」通知进来的启动**不是休息态**：用户马上要看结果，
-        // 这时懒加载会把工作流 B 搭在 mock 上。此时退回立即重扫。
-        if (lazyWorkspaceStart && !openPackOnStart) {
-            workspaceController.prime()
-        } else {
-            workspaceController.restore()
-        }
+    // 经 `ensureWorkspaceStarted` 幂等守护：配置变更重建 Activity 复用同一会话时不再重跑，
+    // 避免把已 Ready 的工作区打回 Idle/Loading。
+    LaunchedEffect(activeSession) {
+        activeSession.ensureWorkspaceStarted(lazy = lazyWorkspaceStart && !openPackOnStart)
     }
     val workspaceState = workspaceController.state
     // 「当前打开的是哪个工作区目录」的稳定标识。**下游凡是「该不该重置」的判断
@@ -274,11 +236,10 @@ fun PixFoldApp(
     // 未授权 / 扫描中 / 失败时它是 `null`，那时 `collections` 是 mock ——
     // 对 UI 而言仍是一个完整可用的工作区。
     val workspaceHandle = workspaceState.handleOrNull()
-    // 工作区切换后旧 uri 全部不可读，缓存留着只会占内存并让新图被提前淘汰。
-    // ⚠️ key 用 handle 不用 `workspaceState`：后者每次刷新都会变一个新实例，
-    // 用它当 key 等于「每次都清空缩略图缓存」—— 刷新时满屏重新解码，正是
-    // 「刷新不该闪烁」要避免的那种抖动。
-    LaunchedEffect(workspaceHandle) { thumbnailSource.clearCache() }
+    // 仅在工作区句柄真正切换时清空缩略图与预览缓存（旋转屏幕与同工作区刷新保留 LRU）。
+    LaunchedEffect(activeSession, workspaceHandle?.treeUri) {
+        activeSession.onWorkspaceHandleObserved(workspaceHandle?.treeUri)
+    }
 
     // ---- 回前台自动刷新（D4「工作区实时刷新」2026-10-19 用户裁决）----
     //
@@ -287,9 +248,11 @@ fun PixFoldApp(
     // 文件再切回来」—— 此时 ContentObserver 的通知往往已经在后台丢失或被子线程
     // 攒着，靠 ON_RESUME 补一次重扫最可靠。
     //
-    // ⚠️ **首次 ON_RESUME 必须跳过**：`restore()` 在 `LaunchedEffect(Unit)` 里发出，
+    // ⚠️ **首次 ON_RESUME 必须跳过**：`restore()` 在 `LaunchedEffect` 里发出，
     // 而 Activity 首次 RESUMED 与首帧组合的先后**没有保证**。不跳过的话冷启动会
     // 连扫两遍（千级目录下是肉眼可见的卡顿），且第二遍扫完紧接着又触发一次对账。
+    // 注意：`workspaceController.close()` 已上移至 `ownedSession.close()`（独立模式）与
+    // `PixFoldSessionViewModel.onCleared()`（生产模式），不在配置变更重建时提前注销。
     val lifecycleOwner = LocalLifecycleOwner.current
     val skipFirstResume = remember { AtomicBoolean(true) }
     DisposableEffect(lifecycleOwner, workspaceController) {
@@ -305,10 +268,6 @@ fun PixFoldApp(
         lifecycleOwner.lifecycle.addObserver(observer)
         onDispose {
             lifecycleOwner.lifecycle.removeObserver(observer)
-            // `ContentObserver` 是注册在 `ContentResolver` 上的**全局**对象，不注销会
-            // 一直活到进程结束；而 Compose 里控制器随组合重建（旋转 / 多窗口），
-            // 泄漏会随重建次数累积，且旧观察者还会替已废弃的目录触发刷新。
-            workspaceController.close()
         }
     }
 
@@ -531,96 +490,30 @@ fun PixFoldApp(
             val libraryRootPath = workspaceHandle?.displayName
                 ?: MockDataB.library.rootPath
             val readyWorkspaceHandle = (workspaceState as? WorkspaceState.Ready)?.handle
-            // 工作流 B 的异步探测与实时刷新增量对账由 LibraryVolumeLoader 统一托管：
-            // 切换工作区时重置，同工作区集合变更时做增量对账并丢弃过期的在途探测结果。
-            val volumeLoader = remember(workspaceScope, probeDispatcher) {
-                LibraryVolumeLoader(
-                    scope = workspaceScope,
-                    ioDispatcher = probeDispatcher,
-                    initialVolumes = baseVolumes,
-                )
-            }
+            // 工作流 B 的异步探测与实时刷新增量对账由 activeSession.volumeLoader 统一托管：
+            // 切换工作区时重置，同工作区集合变更时做增量对账，配置变更重建时保留未保存编辑。
             volumeLoader.syncBase(
                 workspaceKey = readyWorkspaceHandle?.treeUri,
                 rootPath = libraryRootPath,
                 baseVolumes = baseVolumes,
             )
             val libraryVolumes = volumeLoader.volumes
-            // 预览跟随**当前集合**:切集合后打开预览应看到该集合的图,
-            // 否则页码与图片会对不上(索引来自当前集合)。
-            //
-            // ⚠️ key 用 `workspaceHandle` 而不是 `collections`（2026-10-19 改，理由
-            // 见下方「工作流 A 的两份共享状态」处同一段说明）：同一个工作区刷新出
-            // 新列表时，不该把用户正在看的集合重置回第一个。
-            var activeCollectionId by remember(workspaceHandle) {
-                mutableStateOf(collections.firstOrNull()?.id.orEmpty())
-            }
-            // 刷新后原先选中的集合**可能已被删掉**（用户删了这个子目录）。
-            // 派生一个「当前真正可用的集合 id」供下游使用：
-            //  - 仍存在 ⇒ 原样返回（刷新不该把用户从正在看的集合拽走）；
-            //  - 已消失 ⇒ 退回第一个；空目录时是空串。
-            // **不在组合期直接给 `activeCollectionId` 赋值**：那等于在组合中写快照
-            // 状态，Compose 会把本轮判为失效再跑一遍；而且「先渲染旧 id、下一帧才修」
-            // 的那一帧里，子组件可能已经把索引记成空（预览打不开第一张图）。
-            val currentCollectionId = collections.firstOrNull { it.id == activeCollectionId }?.id
+
+            // ---- 工作流 A 的共享状态（托管于 activeSession，配置变更存活 + 同目录增量对账）----
+            activeSession.syncOrganizeCollections(
+                workspaceKey = workspaceHandle?.treeUri,
+                collections = collections,
+            )
+            // 刷新后原先选中的集合可能已被删掉：派生当前真正可用的集合 id，并在副作用回写。
+            val currentCollectionId = collections.firstOrNull { it.id == activeSession.activeCollectionId }?.id
                 ?: collections.firstOrNull()?.id.orEmpty()
-            // 把修正结果回写进状态：否则用户下一次手动切集合时，
-            // `onActiveCollectionChange` 会以那个已消失的 id 为起点，界面看起来「没反应」。
-            LaunchedEffect(collections) {
-                if (activeCollectionId != currentCollectionId) {
-                    activeCollectionId = currentCollectionId
+            LaunchedEffect(collections, activeSession) {
+                if (activeSession.activeCollectionId != currentCollectionId) {
+                    activeSession.activeCollectionId = currentCollectionId
                 }
             }
-
-            // ---- 工作流 A 的两份共享状态提升到应用根(2026-09-25)----
-            //
-            // **为什么必须提上来**:预览页是**根导航的兄弟目的地**,与 `OrganizeSteps`
-            // 内的嵌套图不在同一棵树上,因此它够不到工作流内部的任何状态。而预览页需要两样东西:
-            //
-            //  1. **当前页序**(`PageOrderState.order`)—— 点击回传的 `index` 是**页序下标**
-            //     (见 `SortAndPreviewPage` 传 `items = order.order`),若预览按集合**声明序**
-            //     取图,只有"页序恰好等于声明序"时才碰巧正确。`cn` 集合的声明序是故意打乱的,
-            //     故修复前会点开另一张图(已由 `AppNavigationTest` 钉住)。
-            //  2. **命名状态**(`NamingState`)—— 预览页的重命名入口写回的就是它的
-            //     `overrides`,与命名页共用同一份,故两处改名结果必然一致。
-            //
-            // 工作流 A 的两份共享状态提升到应用根(2026-09-25)—— 理由见上方注释 1./2.
-            //
-            // ⚠️ **key 为什么是「工作区句柄」而不是「集合列表」（2026-10-19 改）**：
-            //
-            // 用户裁决「工作区应该实时刷新」，于是集合列表会在**同一个工作区里**变化
-            // （他在文件管理器里删了图 / 加了图）。若 key 仍是 `collections`，那次变化
-            // 会把这个 `remember` 重建 ⇒ 用户刚拖好的顺序、刚改好的文件名全被清掉。
-            // 反过来，key 用 handle 就只区分「换了目录」(必须全重置 —— 旧集合 id 对新
-            // 目录毫无意义) 与「同一目录内容变了」(用对账保留人工调整)。
-            //
-            // 对账必须**在组合期同步完成**，不能放进 `LaunchedEffect`：子组件
-            // `OrganizeSteps` 自己也是 `remember(collections)` 播种本地状态,而它的
-            // 初值来自这里的 `externalState`。若先以旧状态组合子组件、事后再用副作用
-            // 更新，子组件的 key 已经消费过 ⇒ 它不会重新播种 ⇒ 对账结果在界面上看不见
-            // (预览页读上层那份反而是对的，两处会不一致)。写在子组件之前则同一次组合
-            // 就能拿到对账后的值。
-            var organizeState by remember(workspaceHandle) {
-                mutableStateOf(organizeStateOf(collections))
-            }
-            var namingState by remember(workspaceHandle) {
-                mutableStateOf(
-                    NamingState(
-                        namingSchemeSeedOf(collections),
-                    ),
-                )
-            }
-            // 上一次对账所依据的集合列表。刻意用**普通字段**而不是 `mutableStateOf`：
-            // 它只在组合期读写，写成快照状态会让「读它的这段组合」被自己刚才的写入
-            // 判为失效、白白多重跑一次组合（刷新在千级目录下不算便宜）。
-            val lastReconciled = remember(workspaceHandle) { LastReconciled(collections) }
-            if (lastReconciled.collections != collections) {
-                // `!=` 而不是 `!==`：控制器已保证「内容没变不发新实例」，但这里再用
-                // 结构相等兜一层 —— 等值的新实例不该白跑一次对账。
-                lastReconciled.collections = collections
-                organizeState = reconcileOrganizeState(organizeState, collections)
-                namingState = reconcileNamingState(namingState, collections)
-            }
+            val organizeState = activeSession.organizeState
+            val namingState = activeSession.namingState
 
             // 返回手势/返回键:由 NavDisplay 的 onBack 统一处理(它会随返回栈深度
             // 自动 enable/disable)。返回首页 = pop 掉 Organize/B;首页(栈深 1)时
@@ -680,12 +573,12 @@ fun PixFoldApp(
                     // 当前集合(`activeCollectionId`)。工作流 B 的共享状态全在 `LibrarySteps`
                     // 内部自持,离开组合即自然归零,无需在此处写第二遍。
                     LaunchedEffect(Unit) {
-                        organizeState = organizeStateOf(collections)
-                        namingState =
-                            NamingState(
-                                namingSchemeSeedOf(collections),
-                            )
-                        activeCollectionId = collections.firstOrNull()?.id.orEmpty()
+                        activeSession.resetWorkflowSessions(
+                            workspaceKey = readyWorkspaceHandle?.treeUri,
+                            rootPath = libraryRootPath,
+                            collections = collections,
+                            baseVolumes = baseVolumes,
+                        )
                     }
                     DestinationSurface {
                         HomeScreen(
@@ -749,15 +642,15 @@ fun PixFoldApp(
                             // 步骤级返回同样跟随手势进度:开关透传进工作流子 NavDisplay 的转场策略。
                             predictiveBackAnimation = settings.predictiveBackAnimation,
                             onOpenPreview = { index -> backStack.add(PreviewRoute(index)) },
-                            onActiveCollectionChange = { activeCollectionId = it },
+                            onActiveCollectionChange = { activeSession.activeCollectionId = it },
                             // ⚠️ 必须回传当前集合:打开预览会让本目的地离开组合,
                             // 内部的 `remember { activeId }` 随之销毁;关闭预览回来是
                             // 新的组合实例,不给种子就会退回首个集合(2026-09-25 修复)。
                             initialActiveCollectionId = currentCollectionId,
                             externalState = organizeState,
-                            onStateChange = { organizeState = it },
+                            onStateChange = { activeSession.organizeState = it },
                             initialNamingState = namingState,
-                            onNamingStateChange = { namingState = it },
+                            onNamingStateChange = { activeSession.namingState = it },
                             // 网格默认列数(设置在设置页;排序页按屏幕方向二选一,
                             // 工具栏列的临时覆盖不回写这里)。
                             portraitDefaultColumns = settings.portraitDefaultColumns,
@@ -842,7 +735,7 @@ fun PixFoldApp(
                                 overrides = namingState.overrides,
                                 finalNameOf = { item -> proposals[item.id]?.finalName ?: item.fileName },
                                 onRename = { item, name ->
-                                    namingState = setOverride(namingState, item.id, name)
+                                    activeSession.namingState = setOverride(activeSession.namingState, item.id, name)
                                 },
                             ),
                         )
@@ -941,6 +834,11 @@ fun PixFoldApp(
                             },
                             // 工作流 C（2026-10-26）。null = 没有工作区 ⇒ 两个入口都不渲染。
                             metaUpdater = resolvedMetaUpdater,
+                            // 工作流 B 未保存编辑与当前卷回写会话，配置变更重建后保留（P1 #7）。
+                            initialActiveVolumeId = activeSession.activeLibraryVolumeId,
+                            onActiveVolumeChange = { activeSession.activeLibraryVolumeId = it },
+                            onVolumesChange = { volumeLoader.applyUserEdit(it) },
+                            onResetVolumes = { volumeLoader.resetUserEdits() },
                         )
                     }
                 }
@@ -994,20 +892,6 @@ fun PixFoldApp(
         }
     }
 }
-
-/**
- * 「上一次对账依据的集合列表」的**可变容器**（不是快照状态）。
- *
- * **为什么不用 `mutableStateOf`**：对账这段逻辑在**组合期**同步执行 ——
- * 它读上一份列表、必要时写入新列表并立刻改 `organizeState`。若把「上一份列表」
- * 写成快照状态，那么这次的写入会让「正在读它的这段组合」自己也失效，
- * 于是刚算完又重跑一遍（千级目录下 `reconcileOrganizeState` 是 O(n) 带排序的，
- * 白跑一次很显眼）。用普通可变字段则只有 `organizeState` 的写入触发重组，
- * 而那次重组读到的「上一份列表」已经等于当前列表，不会重复对账。
- *
- * 容器本身仍需 `remember`：它要跨重组存活，且随工作区句柄一起重建。
- */
-private class LastReconciled(var collections: List<ImageCollection>)
 
 /**
  * 把设置里的语言应用到系统的 **per-app locale**。

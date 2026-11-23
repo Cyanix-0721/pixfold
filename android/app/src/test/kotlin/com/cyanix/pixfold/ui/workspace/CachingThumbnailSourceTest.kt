@@ -324,4 +324,49 @@ class CachingThumbnailSourceTest {
         owner.cancelAndJoin()
         assertNull(activeWaiter.await(), "owner 被取消时存活的等待者应安全回退 null")
     }
+
+    // ==================== 同步 peek 命中（P1 #8 零闪烁） ====================
+
+    @Test
+    fun `peek returns null before load, cached bitmap synchronously after load, and null after clear`() = runTest {
+        val platform = RecordingSource()
+        val source = CachingThumbnailSource(platform, budget())
+
+        assertNull(source.peek("content://doc/a"), "未加载前 peek 必须返回 null")
+
+        val loaded = source.thumbnail("content://doc/a", 256, 256)
+        assertNotNull(loaded)
+        assertEquals(loaded, source.peek("content://doc/a"), "缓存命中后 peek 必须同步返回同一张位图")
+        assertEquals(1, platform.calls.size, "peek 不得触发底层平台加载")
+
+        source.clearCache()
+        assertNull(source.peek("content://doc/a"), "clearCache 后 peek 必须返回 null")
+    }
+
+    // ==================== PreviewImageCacheSource 有界 LRU ====================
+
+    @Test
+    fun `PreviewImageCacheSource caches up to 3 entries and preserves non-square request dimensions`() = runTest {
+        val platform = RecordingSource(px = 256)
+        val preview = PreviewImageCacheSource(platform, maxEntries = 3)
+
+        val first = preview.thumbnail("content://doc/p1", 1200, 2400)
+        val again = preview.thumbnail("content://doc/p1", 1200, 2400)
+
+        assertNotNull(first)
+        assertEquals(first, again, "相同 uri 与尺寸应命中预览缓存")
+        assertEquals(1, platform.calls.size, "命中预览缓存不得重解码")
+        assertEquals(1200, platform.calls[0].second, "预览缓存不得把非方形宽度裁成方形")
+        assertEquals(2400, platform.calls[0].third, "预览缓存不得把非方形高度裁成方形")
+
+        // 装满 3 条再加第 4 条，淘汰最久未用的 p1
+        preview.thumbnail("content://doc/p2", 1200, 2400)
+        preview.thumbnail("content://doc/p3", 1200, 2400)
+        preview.thumbnail("content://doc/p4", 1200, 2400)
+        assertEquals(3, preview.cachedCount, "预览缓存条目数必须受 3 条上界约束")
+
+        // p1 已被淘汰，再次请求会回源
+        preview.thumbnail("content://doc/p1", 1200, 2400)
+        assertEquals(5, platform.calls.size, "淘汰后的条目再次请求应重新解码")
+    }
 }

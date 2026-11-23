@@ -13,6 +13,8 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.SideEffect
+import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
@@ -27,6 +29,9 @@ import com.cyanix.pixfold.domain.model.SourceItem
 
 /** 拖拽浮层的 tag(拖拽中才会出现在语义树里)。 */
 const val TAG_DRAG_GHOST = "drag-ghost"
+
+/** 仅供测试观测 [DragGhost] 的重组次数；生产环境下为 null，零运行时开销。 */
+internal val LocalDragGhostRecompositionObserver = staticCompositionLocalOf<((String) -> Unit)?> { null }
 
 /** 浮层内容形态 —— 与来源视图一致,让"手里拿的是什么"一眼可辨。 */
 enum class DragGhostStyle {
@@ -70,12 +75,15 @@ enum class DragGhostStyle {
 @Composable
 fun DragGhost(
     item: SourceItem,
-    pointerInRoot: Offset,
-    containerInRoot: Offset,
+    pointerInRoot: () -> Offset,
+    containerInRoot: () -> Offset,
     sizeInRoot: Size,
     style: DragGhostStyle,
     modifier: Modifier = Modifier,
 ) {
+    LocalDragGhostRecompositionObserver.current?.let { observe ->
+        SideEffect { observe("DragGhost") }
+    }
     val density = LocalDensity.current
     val w = with(density) { sizeInRoot.width.toDp() }
     val h = with(density) { sizeInRoot.height.toDp() }
@@ -85,9 +93,12 @@ fun DragGhost(
         modifier = modifier
             .size(w, h)
             .graphicsLayer {
+                // 延迟到 draw/layer 阶段读取指针与容器根坐标，120Hz 拖拽期间不触发组合 phase 重组（P1 #8）。
+                val pointer = pointerInRoot()
+                val container = containerInRoot()
                 // 以指针为中心(与归档原型一致);`size` 是图层自身的像素尺寸。
-                translationX = pointerInRoot.x - containerInRoot.x - size.width / 2f
-                translationY = pointerInRoot.y - containerInRoot.y - size.height / 2f
+                translationX = pointer.x - container.x - size.width / 2f
+                translationY = pointer.y - container.y - size.height / 2f
                 // 轻微放大 + 投影,读作"抬起来了"
                 scaleX = 1.05f
                 scaleY = 1.05f

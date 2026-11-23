@@ -77,9 +77,11 @@ import com.cyanix.pixfold.nav.libraryStepIndex
 import com.cyanix.pixfold.ui.components.DirMetaButton
 import com.cyanix.pixfold.ui.components.PackProgressDialog
 import com.cyanix.pixfold.ui.components.ResetAllButton
+import com.cyanix.pixfold.ui.task.withCancellationToken
 import com.cyanix.pixfold.ui.text.WarnLine
 import com.cyanix.pixfold.ui.workspace.WorkspaceState
 import com.cyanix.pixfold.ui.workspace.handleOrNull
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
@@ -268,6 +270,14 @@ fun LibrarySteps(
      * 而磁盘上什么都没变 —— 那比不显示入口糟得多。
      */
     metaUpdater: CbzMetaUpdater? = null,
+    /** 上层会话保留的当前选中卷 id（用于配置变更恢复）；默认 null 选第一卷。 */
+    initialActiveVolumeId: String? = null,
+    /** 当前选中卷变更上报。 */
+    onActiveVolumeChange: (String) -> Unit = {},
+    /** 卷列表编辑（勾选、元数据修改、工作流 C 回填）上报到上层会话以跨配置变更保留。 */
+    onVolumesChange: (List<ComicVolume>) -> Unit = {},
+    /** 重置全部时从上层取回干净基线卷列表（清除手工编辑）；null 时直接用入参 [volumes]。 */
+    onResetVolumes: (() -> List<ComicVolume>)? = null,
 ) {
     LocalRecompositionObserver.current?.let { observe ->
         SideEffect { observe("LibrarySteps") }
@@ -290,11 +300,30 @@ fun LibrarySteps(
     // 而 `libraryStateOf` 一律把当前卷设成第一卷。用户删了张图、列表刷新一下
     // 就被拽回第一本，是很突兀的体验。
     val stateKey = workspaceState?.handleOrNull()?.treeUri ?: rootPath
-    var state by remember(stateKey) { mutableStateOf(libraryStateOf(rootPath, volumes)) }
+    var state by remember(stateKey) {
+        val seeded = libraryStateOf(rootPath, volumes)
+        val restored = initialActiveVolumeId
+            ?.takeIf { id -> volumes.any { it.id == id } }
+            ?.let { id -> seeded.copy(activeVolumeId = id) }
+            ?: seeded
+        mutableStateOf(restored)
+    }
     val lastSyncedVolumes = remember(stateKey) { LastLibraryVolumes(volumes) }
     if (lastSyncedVolumes.volumes != volumes) {
         lastSyncedVolumes.volumes = volumes
         state = reconcileLibrary(previous = state, scanned = volumes)
+    }
+    fun updateLibraryState(next: LibraryState) {
+        val volumesChanged = next.volumes != state.volumes
+        val activeChanged = next.activeVolumeId != state.activeVolumeId
+        state = next
+        if (volumesChanged) {
+            lastSyncedVolumes.volumes = next.volumes
+            onVolumesChange(next.volumes)
+        }
+        if (activeChanged) {
+            onActiveVolumeChange(next.activeVolumeId)
+        }
     }
 
     // P6:策略(默认 Rename / Keep,与归档语义一致)、危险动作、确认流程、执行报告。
@@ -477,7 +506,7 @@ fun LibrarySteps(
      */
     fun applyDirMetaToActiveVolume() {
         val volume = state.activeVolumeOrNull ?: return
-        state = updateVolume(state, applyDirMetaSuggestions(volume))
+        updateLibraryState(updateVolume(state, applyDirMetaSuggestions(volume)))
     }
 
     /**
@@ -543,37 +572,40 @@ fun LibrarySteps(
             entryCount = updateEntryCount ?: 0,
         )
         scope.launch {
-            val outcome = withContext(Dispatchers.IO) {
-                runCatching {
-                    updater.update(plan, volume, { token.isCancelled }) { done, total ->
-                        updateDone = done
-                        updateTotal = total
+            try {
+                val outcome = withCancellationToken(token) {
+                    withContext(Dispatchers.IO) {
+                        runCatching {
+                            updater.update(plan, volume, { token.isCancelled }) { done, total ->
+                                updateDone = done
+                                updateTotal = total
+                            }
+                        }.getOrElse { e ->
+                            if (e is CancellationException) throw e
+                            CbzMetaUpdateOutcome.Failed(
+                                UpdateFailure.ReadFailed,
+                                e.message ?: e::class.simpleName,
+                            )
+                        }
                     }
-                }.getOrElse { e ->
-                    CbzMetaUpdateOutcome.Failed(
-                        UpdateFailure.ReadFailed,
-                        e.message ?: e::class.simpleName,
-                    )
                 }
+                if (outcome is CbzMetaUpdateOutcome.Updated) {
+                    // 规格 §8.8：磁盘上的 XML 已经是新的，但内存里的 title/series 还是旧的。
+                    // 用**刚写进去的那份 XML** 回填，不重读磁盘 —— 用户下次看到的就是新值。
+                    // 建议值一个字都不动（与 applyExistingComicInfo 同一立场）。
+                    updateLibraryState(updateVolume(state, withComicInfoValues(volume, plan.comicInfoXml)))
+                }
+                // 取消是用户自己按的，弹「更新失败：已取消」等于把他的决定说成一次故障。
+                val suppressed = outcome is CbzMetaUpdateOutcome.Failed &&
+                    outcome.reason == UpdateFailure.Cancelled
+                // `updating = false` 必须放在 `finally`（在 `updateResult` 之后）：
+                // 先设结果再关进度，任何一帧都至少有一个框在，界面不会闪一下空白。
+                if (!suppressed) updateResult = outcome
+            } finally {
+                updateCancelToken = null
+                updateCancelling = false
+                updating = false
             }
-            // `updating = false` 必须放在**最后**：它是「进度框消失」的判据，而
-            // `updateResult` 是「结果框出现」的判据。先关进度再设结果，两者之间
-            // 会有一帧「两个框都没有」—— 测试线程落在那一帧上就会读到「没有结果框」
-            // （实测：同一份代码单跑绿、整套跑红）。反过来先设结果再关进度，任何一帧
-            // 都至少有一个框在，界面也不会闪一下空白。
-            updateCancelToken = null
-            updateCancelling = false
-            if (outcome is CbzMetaUpdateOutcome.Updated) {
-                // 规格 §8.8：磁盘上的 XML 已经是新的，但内存里的 title/series 还是旧的。
-                // 用**刚写进去的那份 XML** 回填，不重读磁盘 —— 用户下次看到的就是新值。
-                // 建议值一个字都不动（与 applyExistingComicInfo 同一立场）。
-                state = updateVolume(state, withComicInfoValues(volume, plan.comicInfoXml))
-            }
-            // 取消是用户自己按的，弹「更新失败：已取消」等于把他的决定说成一次故障。
-            val suppressed = outcome is CbzMetaUpdateOutcome.Failed &&
-                outcome.reason == UpdateFailure.Cancelled
-            if (!suppressed) updateResult = outcome
-            updating = false
         }
     }
 
@@ -594,7 +626,10 @@ fun LibrarySteps(
         cancelling = false
         progress = null
         executionError = null
-        state = libraryStateOf(rootPath, volumes)
+        val baseline = onResetVolumes?.invoke() ?: volumes
+        lastSyncedVolumes.volumes = baseline
+        state = libraryStateOf(rootPath, baseline)
+        onActiveVolumeChange(state.activeVolumeId)
         conflictPolicy = OutputConflictPolicy.Rename
         sourcePolicy = SourcePolicy.Keep
         cleanEmptyDirs = false
@@ -686,7 +721,7 @@ fun LibrarySteps(
                     Column(modifier = Modifier.fillMaxSize()) {
                         LibraryPage(
                             state = state,
-                            onStateChange = { state = it },
+                            onStateChange = ::updateLibraryState,
                             contentInsets = innerInsets,
                             onNext = { backStack.add(LibraryMetadataRoute) },
                             // 工作区条只在注入状态时出现(D2b);默认 null ⇒ 既有测试布局不变
@@ -709,7 +744,7 @@ fun LibrarySteps(
                     Column(modifier = Modifier.fillMaxSize()) {
                         MetadataPage(
                             libraryState = state,
-                            onLibraryChange = { state = it },
+                            onLibraryChange = ::updateLibraryState,
                             contentInsets = innerInsets,
                             onNext = { backStack.add(LibraryPackRoute) },
                             onBack = { backStack.popWorkflowStep() },
@@ -747,7 +782,7 @@ fun LibrarySteps(
                         Column(modifier = Modifier.fillMaxSize()) {
                             PackPreviewPage(
                                 libraryState = state,
-                                onLibraryChange = { state = it },
+                                onLibraryChange = ::updateLibraryState,
                                 contentInsets = innerInsets,
                                 conflictPolicy = conflictPolicy,
                                 sourcePolicy = sourcePolicy,
@@ -821,13 +856,15 @@ fun LibrarySteps(
                                             executionError = null
                                             scope.launch {
                                                 val outcome = try {
-                                                    executor.execute(
-                                                        plans = plans,
-                                                        token = token,
-                                                        // 回调在 IO 线程上;快照状态本身线程安全,
-                                                        // 但为了让 Compose 观察到变化,写回主线程。
-                                                        onProgress = { p -> progress = p },
-                                                    )
+                                                    withCancellationToken(token) {
+                                                        executor.execute(
+                                                            plans = plans,
+                                                            token = token,
+                                                            // 回调在 IO 线程上;快照状态本身线程安全,
+                                                            // 但为了让 Compose 观察到变化,写回主线程。
+                                                            onProgress = { p -> progress = p },
+                                                        )
+                                                    }
                                                 } finally {
                                                     // 无论成功、被拒、异常还是取消,都必须复位 ——
                                                     // 留在 executing 会让底栏永远停在「取消」,

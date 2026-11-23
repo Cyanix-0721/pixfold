@@ -56,6 +56,7 @@ class LibraryVolumeLoader(
     private var currentWorkspaceKey: String? = null
     private var currentRootPath: String = ""
     private var lastSyncedBase: List<ComicVolume> = emptyList()
+    private var lastProbedVolumes: List<ComicVolume>? = null
     private var lastProbedKey: ProbeKey? = null
     private var inFlightKey: ProbeKey? = null
     private var generation: Long = 0L
@@ -88,6 +89,7 @@ class LibraryVolumeLoader(
         currentWorkspaceKey = workspaceKey
         currentRootPath = rootPath
         lastSyncedBase = baseVolumes
+        lastProbedVolumes = null
         initialized = true
 
         val next = if (workspaceSwitched) {
@@ -107,10 +109,41 @@ class LibraryVolumeLoader(
         }
     }
 
-    /** 记录用户对卷列表的手工编辑，供在途探测返回时通过 [reconcileLibrary] 保留。 */
+    /** 记录用户对卷列表的手工编辑，供在途探测返回或配置变更重建时保留。 */
     fun applyUserEdit(editedVolumes: List<ComicVolume>) {
         if (editedVolumes != volumes) {
             volumes = editedVolumes
+        }
+    }
+
+    /**
+     * 清除用户对卷列表的手工编辑，回到当前工作区最近一次干净快照（已探测结果优先，否则基础卷）。
+     * 用于工作流 B 内的「重置全部」。
+     */
+    fun resetUserEdits(): List<ComicVolume> {
+        val baseline = lastProbedVolumes ?: lastSyncedBase
+        if (volumes != baseline) {
+            volumes = baseline
+        }
+        return baseline
+    }
+
+    /**
+     * 回到首页时复位工作流 B 会话：取消在途探测、清掉手工编辑并回到基础卷。
+     */
+    fun resetToBase(
+        workspaceKey: String?,
+        rootPath: String,
+        baseVolumes: List<ComicVolume>,
+    ) {
+        invalidateProbe()
+        currentWorkspaceKey = workspaceKey
+        currentRootPath = rootPath
+        lastSyncedBase = baseVolumes
+        lastProbedVolumes = null
+        initialized = true
+        if (volumes != baseVolumes) {
+            volumes = baseVolumes
         }
     }
 
@@ -155,6 +188,7 @@ class LibraryVolumeLoader(
                 if (reconciled != volumes) {
                     volumes = reconciled
                 }
+                lastProbedVolumes = probed
                 lastProbedKey = key
             } finally {
                 if (generation == requestGeneration) {

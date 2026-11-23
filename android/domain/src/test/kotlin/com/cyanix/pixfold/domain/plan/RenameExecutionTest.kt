@@ -435,4 +435,58 @@ class RenameExecutionTest {
         assertTrue(actions.calls.isEmpty())
         assertTrue(report.entries.all { it.outcome == ExecOutcome.Skipped })
     }
+
+    @Test
+    fun `cancelling during performUndoReal stops remaining undo operations`() {
+        val token = CancellationToken()
+        val deleted = mutableListOf<String>()
+        val actions = object : UndoActions {
+            override fun delete(uri: String): Boolean {
+                deleted += uri
+                token.cancel()
+                return true
+            }
+
+            override fun rename(uri: String, newName: String): Boolean = true
+        }
+        val record = UndoRecord(
+            ops = listOf(
+                UndoOp.DeleteCreated("a.cbz", uri = "content://doc/a"),
+                UndoOp.DeleteCreated("b.cbz", uri = "content://doc/b"),
+                UndoOp.DeleteCreated("c.cbz", uri = "content://doc/c"),
+            ),
+            kind = ExecKind.Package,
+        )
+
+        val result = performUndoReal(record, actions, token = token)
+
+        assertEquals(listOf("content://doc/a"), deleted, "取消令牌生效后，performUndoReal 不得继续执行剩余撤销项")
+        assertFalse(result.applied, "被中途取消时不应报告全部撤销成功")
+    }
+
+    @Test
+    fun `performUndoReal does not touch platform when token is already cancelled`() {
+        val token = CancellationToken().apply { cancel() }
+        var touched = 0
+        val actions = object : UndoActions {
+            override fun delete(uri: String): Boolean {
+                touched++
+                return true
+            }
+
+            override fun rename(uri: String, newName: String): Boolean {
+                touched++
+                return true
+            }
+        }
+        val record = UndoRecord(
+            ops = listOf(UndoOp.RestoreRenamed("new.jpg", "old.jpg", uri = "content://doc/1")),
+            kind = ExecKind.Rename,
+        )
+
+        val result = performUndoReal(record, actions, token = token)
+
+        assertEquals(0, touched, "令牌已取消时不得再调用平台撤销端口")
+        assertFalse(result.applied)
+    }
 }

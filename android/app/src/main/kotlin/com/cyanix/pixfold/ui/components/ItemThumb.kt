@@ -25,6 +25,12 @@ import com.cyanix.pixfold.ui.workspace.ThumbnailSource
  */
 const val TAG_ITEM_THUMB = "item-thumb"
 
+/** [ItemThumb] 真实图片分支标签（用于断言首帧直接命中缓存、未闪退到程序化占位）。 */
+const val TAG_ITEM_THUMB_IMAGE = "item-thumb-image"
+
+/** [ItemThumb] 程序化占位分支标签。 */
+const val TAG_ITEM_THUMB_PLACEHOLDER = "item-thumb-placeholder"
+
 /**
  * 一张来源图的缩略图（D2a）：有真实缩略图就画它，否则回退到 D1 的程序化缩略图。
  *
@@ -67,14 +73,20 @@ fun ItemThumb(
     contentScale: ContentScale = ContentScale.Crop,
 ) {
     val uri = item.uri
-    var bitmap by remember(uri, source, requestPx, requestHeightPx) { mutableStateOf<ImageBitmap?>(null) }
+    // 标准方形缩略图路径首帧同步查内存缓存（P1 #8）：命中直接画 Image，消除 1 帧 ProceduralThumb 闪烁；
+    // 非方形自定义尺寸（如全屏预览传 requestWidthPx != requestHeightPx）绕过缩略图 peek，照常按精确尺寸加载。
+    val canPeek = uri != null && source != null && requestPx == requestHeightPx
+    var bitmap by remember(uri, source, requestPx, requestHeightPx) {
+        mutableStateOf(if (canPeek) source.peek(uri) else null)
+    }
 
     LaunchedEffect(uri, source, requestPx, requestHeightPx) {
         // mock 数据（uri == null）与测试环境（source == null）都不发请求。
-        bitmap = if (uri != null && source != null) {
-            source.thumbnail(uri, requestPx, requestHeightPx)
-        } else {
-            null
+        // 首帧已同步命中缓存（bitmap != null）时直接跳过异步加载，避免多余协程调度与重组。
+        if (uri == null || source == null) {
+            bitmap = null
+        } else if (bitmap == null) {
+            bitmap = source.thumbnail(uri, requestPx, requestHeightPx)
         }
     }
 
@@ -85,7 +97,9 @@ fun ItemThumb(
                 bitmap = loaded,
                 contentDescription = null,
                 contentScale = contentScale,
-                modifier = Modifier.fillMaxSize(),
+                modifier = Modifier
+                    .fillMaxSize()
+                    .testTag(TAG_ITEM_THUMB_IMAGE),
             )
         } else {
             ProceduralThumb(
@@ -93,7 +107,9 @@ fun ItemThumb(
                 fileName = item.fileName,
                 showIndex = showIndex,
                 captionMaxChars = captionMaxChars,
-                modifier = Modifier.fillMaxSize(),
+                modifier = Modifier
+                    .fillMaxSize()
+                    .testTag(TAG_ITEM_THUMB_PLACEHOLDER),
             )
         }
     }
