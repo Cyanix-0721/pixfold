@@ -53,6 +53,7 @@ class WorkspaceControllerListTest {
     ) : WorkspaceSource, AndroidGrantReleaser {
 
         var rememberCalls = 0
+        var persistentGrantsCalls = 0
         var rejectRemember = false
         val released = mutableListOf<String>()
 
@@ -83,7 +84,10 @@ class WorkspaceControllerListTest {
             entries.add(to.coerceIn(0, entries.size), item)
         }
 
-        override fun persistentGrants(): Set<String> = granted
+        override fun persistentGrants(): Set<String> {
+            persistentGrantsCalls++
+            return granted
+        }
 
         /**
          * 按调用顺序依次返回的脚本队列（先例见 [WorkspaceControllerTest] 的 ScriptedSource）。
@@ -571,5 +575,38 @@ class WorkspaceControllerListTest {
             source.entries.map { it.handle.displayName },
             "跨分区不得换位，分区是运行时事实",
         )
+    }
+
+    @Test
+    fun `move 只查询一次 persistentGrants 快照并复用刷新列表`() = runTest {
+        val a = WorkspaceEntry(handle("a"))
+        val b = WorkspaceEntry(handle("b"))
+        val c = WorkspaceEntry(handle("c"))
+        val source = ListSource(
+            mutableListOf(a, b, c),
+            granted = setOf(a.handle.treeUri, b.handle.treeUri, c.handle.treeUri),
+        )
+        val controller = controller(source, testScope())
+        source.persistentGrantsCalls = 0
+
+        controller.move(a.handle.treeUri, c.handle.treeUri)
+
+        assertEquals(1, source.persistentGrantsCalls, "move 应只查一次 persistentGrants 快照而非 3 次 Binder IPC")
+        assertEquals(listOf("b", "c", "a"), controller.listings.map { it.entry.handle.displayName })
+    }
+
+    @Test
+    fun `跨分区 move 也只查询一次 persistentGrants 快照`() = runTest {
+        val a = WorkspaceEntry(handle("a"))
+        val b = WorkspaceEntry(handle("b"))
+        val source = ListSource(mutableListOf(a, b), granted = setOf(a.handle.treeUri))
+        val controller = controller(source, testScope())
+        controller.openList()
+        source.persistentGrantsCalls = 0
+
+        controller.move(a.handle.treeUri, b.handle.treeUri)
+
+        assertEquals(1, source.persistentGrantsCalls, "跨分区判定应复用单次 persistentGrants 快照")
+        assertEquals(listOf("a", "b"), source.entries.map { it.handle.displayName })
     }
 }

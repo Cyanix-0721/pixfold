@@ -292,6 +292,77 @@ class CbzMetaRewriterTest {
         assertTrue(!out.closed, "输出流归调用方，重写器不得关闭它")
     }
 
+    // T13: P1 #5 STORED 直通透传（超过 INLINE_LIMIT_BYTES 也不落盘、不依赖 spillDir）
+    @Test
+    fun `large stored entry with known size and crc streams directly without spill`() {
+        val largeSize = (CbzMetaRewriter.INLINE_LIMIT_BYTES + 4096L).toInt()
+        val payload = ByteArray(largeSize) { (it % 251).toByte() }
+        val src = zipped(
+            "001.jpg" to payload,
+            "ComicInfo.xml" to bytes("<old/>"),
+        )
+
+        // spillDir = null：若没有走 STORED 直通流式透传，超过 8 MiB 会直接抛 IllegalStateException。
+        val outFile = File(spill(), "direct-stored.cbz")
+        val written = outFile.outputStream().use { fos ->
+            CbzMetaRewriter.rewrite(
+                input = src.inputStream(),
+                out = fos,
+                comicInfoXml = xml,
+                timeMillis = time,
+                spillDir = null,
+            )
+        }
+
+        assertEquals(2, written)
+        ZipFile(outFile).use { zip ->
+            val entries = zip.entries().toList()
+            assertEquals(listOf("ComicInfo.xml", "001.jpg"), entries.map { it.name })
+            entries.forEach { assertEquals(ZipEntry.STORED, it.method) }
+            val pageEntry = zip.getEntry("001.jpg")!!
+            assertEquals(largeSize.toLong(), pageEntry.size)
+            assertEquals(CRC32().apply { update(payload) }.value, pageEntry.crc)
+            assertContentEquals(payload, zip.getInputStream(pageEntry).use { it.readBytes() })
+        }
+    }
+
+    // T14: P1 #5 大体积 DEFLATED 条目仍走 spill 落盘并写成有效 STORED CBZ，且清理临时文件
+    @Test
+    fun `large deflated entry still spills to disk and rewrites as stored with ComicInfo first`() {
+        val largeSize = (CbzMetaRewriter.INLINE_LIMIT_BYTES + 4096L).toInt()
+        // 高度可压缩内容，输入 ZIP 极小但解压后 > 8 MiB，触发 spill 路径。
+        val payload = ByteArray(largeSize) { ((it / 256) % 13).toByte() }
+        val src = zipped(
+            "001.jpg" to payload,
+            "ComicInfo.xml" to bytes("<old/>"),
+            deflated = setOf("001.jpg"),
+        )
+
+        val spillOnly = File(spill(), "spill-sub").apply { mkdirs() }
+        val outFile = File(spill(), "deflated-spilled.cbz")
+        val written = outFile.outputStream().use { fos ->
+            CbzMetaRewriter.rewrite(
+                input = src.inputStream(),
+                out = fos,
+                comicInfoXml = xml,
+                timeMillis = time,
+                spillDir = spillOnly,
+            )
+        }
+
+        assertEquals(2, written)
+        assertEquals(emptyList(), spillOnly.listFiles()?.toList().orEmpty(), "临时落盘文件必须清理干净")
+        ZipFile(outFile).use { zip ->
+            val entries = zip.entries().toList()
+            assertEquals(listOf("ComicInfo.xml", "001.jpg"), entries.map { it.name })
+            entries.forEach { assertEquals(ZipEntry.STORED, it.method) }
+            val pageEntry = zip.getEntry("001.jpg")!!
+            assertEquals(largeSize.toLong(), pageEntry.size)
+            assertEquals(CRC32().apply { update(payload) }.value, pageEntry.crc)
+            assertContentEquals(payload, zip.getInputStream(pageEntry).use { it.readBytes() })
+        }
+    }
+
     private class TrackingInput(private val inner: InputStream) : InputStream() {
         var closed = false
         override fun read(): Int = inner.read()

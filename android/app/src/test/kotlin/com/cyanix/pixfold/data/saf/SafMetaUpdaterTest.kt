@@ -7,7 +7,9 @@ import androidx.test.core.app.ApplicationProvider
 import com.cyanix.pixfold.domain.model.ComicVolume
 import com.cyanix.pixfold.domain.model.LangChoice
 import com.cyanix.pixfold.domain.model.Suggestion
+import com.cyanix.pixfold.domain.pack.CbzMetaUpdateOutcome
 import com.cyanix.pixfold.domain.pack.CbzMetaUpdatePlan
+import com.cyanix.pixfold.domain.pack.UpdateFailure
 import com.cyanix.pixfold.domain.pack.UpdatePreflight
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -159,5 +161,78 @@ class SafMetaUpdaterTest {
             lookupTarget = { targetUri },
         )
         assertTrue(short.preflight(plan(), volume()) is UpdatePreflight.NoSpace)
+    }
+
+    @Test
+    fun `preflight returns TargetMissing in a single lookup when the archive is absent`() {
+        var lookupCalls = 0
+        val updater = SafMetaUpdater(
+            context = context,
+            treeUri = treeUri,
+            spaceBytesOf = { 10L * 1024 * 1024 * 1024 },
+            dirOfVolume = { "" },
+            documentSizeOf = { _, _ -> 1024L },
+            renameDocument = { _, _, _ -> null },
+            lookupTarget = {
+                lookupCalls++
+                null
+            },
+        )
+        assertEquals(UpdatePreflight.TargetMissing, updater.preflight(plan(), volume()))
+        assertEquals("存在性与预检合并，只做一次目标查找", 1, lookupCalls)
+    }
+
+    @Test
+    fun `update reuses the resolved target URI for space check without a second SAF lookup`() {
+        val input = 100L * 1024 * 1024
+        val parentUri = "content://com.android.externalstorage.documents/document/primary%3Atest".toUri()
+        var preflightLookupCalls = 0
+        var updateLookupCalls = 0
+        val updater = SafMetaUpdater(
+            context = context,
+            treeUri = treeUri,
+            spaceBytesOf = { input + 1024 }, // 不足 input + 32 MiB，触发 NoSpace 快速返回
+            dirOfVolume = { "" },
+            documentSizeOf = { _, _ -> input },
+            renameDocument = { _, _, _ -> null },
+            lookupTarget = {
+                preflightLookupCalls++
+                targetUri
+            },
+            lookupParentAndTarget = {
+                updateLookupCalls++
+                parentUri to targetUri
+            },
+        )
+
+        val outcome = updater.update(plan(), volume(), shouldStop = { false }, onProgress = { _, _ -> })
+
+        val failed = outcome as CbzMetaUpdateOutcome.Failed
+        assertEquals(UpdateFailure.NoSpace, failed.reason)
+        assertEquals("update 只解析一次目标 URI", 1, updateLookupCalls)
+        assertEquals("update 内部空间检查必须复用已解析的 target，不得再次调用 preflight/findTarget", 0, preflightLookupCalls)
+    }
+
+    @Test
+    fun `update reports TargetMissing when target disappears before execution`() {
+        var updateLookupCalls = 0
+        val updater = SafMetaUpdater(
+            context = context,
+            treeUri = treeUri,
+            spaceBytesOf = { 10L * 1024 * 1024 * 1024 },
+            dirOfVolume = { "" },
+            documentSizeOf = { _, _ -> 1024L },
+            renameDocument = { _, _, _ -> null },
+            lookupParentAndTarget = {
+                updateLookupCalls++
+                null
+            },
+        )
+
+        val outcome = updater.update(plan(), volume(), shouldStop = { false }, onProgress = { _, _ -> })
+
+        val failed = outcome as CbzMetaUpdateOutcome.Failed
+        assertEquals(UpdateFailure.TargetMissing, failed.reason)
+        assertEquals(1, updateLookupCalls)
     }
 }

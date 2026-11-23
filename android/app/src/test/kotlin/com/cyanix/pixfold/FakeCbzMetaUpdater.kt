@@ -32,6 +32,14 @@ class FakeCbzMetaUpdater(
     var updateCalls: Int = 0
         private set
 
+    /** targetExists 被调了几次。用于验证工作流 C 不再做多余的单独存在性遍历。 */
+    var targetExistsCalls: Int = 0
+        private set
+
+    /** preflight 被调了几次。用于验证工作流 C 确认前只做一次预检遍历。 */
+    var preflightCalls: Int = 0
+        private set
+
     /** 最后一次拿到的计划。断言「写进去的 XML 是从这一卷算出来的」。 */
     var lastPlan: CbzMetaUpdatePlan? = null
         private set
@@ -39,10 +47,15 @@ class FakeCbzMetaUpdater(
     /** 最后一次 shouldStop 的返回值,用来验证「取消真的传到了平台层」。 */
     val stopProbes: MutableList<Boolean> = mutableListOf()
 
-    override fun targetExists(volume: ComicVolume): Boolean = exists
+    override fun targetExists(volume: ComicVolume): Boolean {
+        targetExistsCalls++
+        return exists
+    }
 
-    override fun preflight(plan: CbzMetaUpdatePlan, volume: ComicVolume): UpdatePreflight =
-        preflightResult
+    override fun preflight(plan: CbzMetaUpdatePlan, volume: ComicVolume): UpdatePreflight {
+        preflightCalls++
+        return if (!exists) UpdatePreflight.TargetMissing else preflightResult
+    }
 
     override fun update(
         plan: CbzMetaUpdatePlan,

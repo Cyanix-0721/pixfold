@@ -1,5 +1,6 @@
 package com.cyanix.pixfold.domain.pack
 
+import java.io.BufferedOutputStream
 import java.io.OutputStream
 import java.util.zip.CRC32
 import java.util.zip.ZipEntry
@@ -65,12 +66,13 @@ object CbzWriter {
         // 的坏值流进成品,不如在入口挡住 —— 时间戳本来就是调用方给的确定性输入。
         require(timeMillis > 0) { "timeMillis 必须为正：$timeMillis（时间戳需由调用方显式给定以保证可复现）" }
 
-        val zip = ZipOutputStream(out)
+        val zip = ZipOutputStream(BufferedOutputStream(out, STREAM_BUFFER_BYTES))
         // 全部 STORED:与参考脚本一致(见文件头)。STORED 不允许流式写入,
         // 必须预先给出 size 与 crc —— 这恰好强制"内容已在手里",与领域层无副作用相合。
         zip.setLevel(0)
-        zip.putNextEntry(stored(COMIC_INFO_ENTRY, comicInfoXml.toByteArray(Charsets.UTF_8), timeMillis))
-        zip.write(comicInfoXml.toByteArray(Charsets.UTF_8))
+        val xmlBytes = comicInfoXml.toByteArray(Charsets.UTF_8)
+        zip.putNextEntry(stored(COMIC_INFO_ENTRY, xmlBytes, timeMillis))
+        zip.write(xmlBytes)
         zip.closeEntry()
 
         pages.forEach { page ->
@@ -79,8 +81,9 @@ object CbzWriter {
             zip.closeEntry()
         }
 
-        // finish() 而非 close():写出中央目录,但**不关闭**调用方的流。
+        // finish() + flush() 而非 close():写出中央目录并刷空缓冲流,但**不关闭**调用方的流。
         zip.finish()
+        zip.flush()
     }
 
     /**
@@ -113,9 +116,30 @@ object CbzWriter {
         timeMillis: Long,
         onPageWritten: (Int, Int) -> Unit = { _, _ -> },
     ) {
-        require(timeMillis > 0) { "timeMillis 必须为正：$timeMillis（时间戳需由调用方显式给定以保证可复现）" }
+        writeStreaming(
+            comicInfoXml = comicInfoXml,
+            pages = pages,
+            source = source,
+            out = out,
+            timeMillis = timeMillis,
+            singlePassLimitBytes = SINGLE_PASS_LIMIT_BYTES,
+            onPageWritten = onPageWritten,
+        )
+    }
 
-        val zip = ZipOutputStream(out)
+    internal fun writeStreaming(
+        comicInfoXml: String,
+        pages: List<CbzPageEntry>,
+        source: PageByteSource,
+        out: OutputStream,
+        timeMillis: Long,
+        singlePassLimitBytes: Int,
+        onPageWritten: (Int, Int) -> Unit = { _, _ -> },
+    ) {
+        require(timeMillis > 0) { "timeMillis 必须为正：$timeMillis（时间戳需由调用方显式给定以保证可复现）" }
+        require(singlePassLimitBytes >= 0) { "singlePassLimitBytes 不能为负：$singlePassLimitBytes" }
+
+        val zip = ZipOutputStream(BufferedOutputStream(out, STREAM_BUFFER_BYTES))
         zip.setLevel(0)
 
         val xmlBytes = comicInfoXml.toByteArray(Charsets.UTF_8)
@@ -123,19 +147,51 @@ object CbzWriter {
         zip.write(xmlBytes)
         zip.closeEntry()
 
+        // 单个 64 KiB 读缓冲提到页循环外复用，消除逐页分配带来的 GC 抖动。
+        val ioBuffer = ByteArray(STREAM_BUFFER_BYTES)
+        // 有界可复用单趟缓冲：按需倍增、严格封顶 ≤ singlePassLimitBytes（默认 8 MiB），
+        // 既把常规页的 SAF 开流与读盘减半，又守住 256 MB 堆的 OOM 护栏。
+        var singlePassBuffer = ByteArray(0)
+        val crc = CRC32()
+
         pages.forEachIndexed { index, page ->
-            // 第一遍:只算 size 与 CRC,字节读完即丢。
-            val crc = CRC32()
+            crc.reset()
             var size = 0L
+            var buffered = true
+            var bufferedLen = 0
+
             val probe = source.openFor(page.itemId)
                 ?: error("页在写入阶段读不到了：${page.itemId}")
             probe.use { stream ->
-                val buffer = ByteArray(STREAM_BUFFER_BYTES)
                 while (true) {
-                    val n = stream.read(buffer)
+                    val n = stream.read(ioBuffer)
                     if (n < 0) break
-                    crc.update(buffer, 0, n)
+                    crc.update(ioBuffer, 0, n)
                     size += n
+                    if (buffered) {
+                        if (size > singlePassLimitBytes.toLong()) {
+                            buffered = false
+                        } else {
+                            val needed = size.toInt()
+                            if (singlePassBuffer.size < needed) {
+                                val grown = minOf(
+                                    singlePassLimitBytes.toLong(),
+                                    maxOf(
+                                        needed.toLong(),
+                                        maxOf(STREAM_BUFFER_BYTES.toLong(), singlePassBuffer.size.toLong() * 2L),
+                                    ),
+                                ).toInt()
+                                singlePassBuffer = singlePassBuffer.copyOf(grown)
+                            }
+                            ioBuffer.copyInto(
+                                destination = singlePassBuffer,
+                                destinationOffset = bufferedLen,
+                                startIndex = 0,
+                                endIndex = n,
+                            )
+                            bufferedLen += n
+                        }
+                    }
                 }
             }
 
@@ -147,15 +203,20 @@ object CbzWriter {
             entry.time = timeMillis
             zip.putNextEntry(entry)
 
-            // 第二遍:再读一遍并写出去。
-            val body = source.openFor(page.itemId)
-                ?: error("页在写入阶段读不到了：${page.itemId}")
-            body.use { stream ->
-                val buffer = ByteArray(STREAM_BUFFER_BYTES)
-                while (true) {
-                    val n = stream.read(buffer)
-                    if (n < 0) break
-                    zip.write(buffer, 0, n)
+            if (buffered) {
+                if (bufferedLen > 0) {
+                    zip.write(singlePassBuffer, 0, bufferedLen)
+                }
+            } else {
+                // 超过单趟上限的大页回退两趟流式写出，复用循环外 ioBuffer。
+                val body = source.openFor(page.itemId)
+                    ?: error("页在写入阶段读不到了：${page.itemId}")
+                body.use { stream ->
+                    while (true) {
+                        val n = stream.read(ioBuffer)
+                        if (n < 0) break
+                        zip.write(ioBuffer, 0, n)
+                    }
                 }
             }
             zip.closeEntry()
@@ -166,10 +227,14 @@ object CbzWriter {
         }
 
         zip.finish()
+        zip.flush()
     }
 
     /** 流式写入时的单次读取缓冲区大小。64 KiB 是流式 I/O 的常见折中:再大对吞吐无益,再小系统调用偏多。 */
     private const val STREAM_BUFFER_BYTES = 64 * 1024
+
+    /** 单趟有界缓冲的严格上限（8 MiB）：≤ 此值单趟算 CRC 并直写，超过则回退两趟流式读取以守住 256 MB 堆护栏。 */
+    internal const val SINGLE_PASS_LIMIT_BYTES = 8 * 1024 * 1024
 
     /**
      * 造一个 STORED 条目。

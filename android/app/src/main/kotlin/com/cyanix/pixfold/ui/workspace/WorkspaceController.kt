@@ -252,27 +252,47 @@ class WorkspaceController(
      */
     fun move(fromUri: String, toUri: String) {
         val store = source.workspaces()
-        val fromGranted = source.isPersistentGrant(fromUri)
-        if (fromGranted != source.isPersistentGrant(toUri)) return
+        // 单次快照复用：把原来的 isPersistentGrant(from) + isPersistentGrant(to) + refreshListings()
+        // 3 次 Binder IPC 合并为 1 次。
+        val grants = source.persistentGrants()
+        val fromGranted = fromUri in grants
+        if (fromGranted != (toUri in grants)) return
         val moved = movedOrder(store, fromUri, toUri) ?: return
         val from = store.indexOfFirst { it.handle.treeUri == fromUri }
         val to = moved.indexOfFirst { it.handle.treeUri == fromUri }
         source.moveWorkspace(from, to)
-        refreshListings()
+        refreshListings(grants)
     }
 
     /**
      * 用户选好了一个目录。
      *
+     * `nameResolver`（SAF `query`）与 `rememberWorkspace`（`takePersistableUriPermission` +
+     * SharedPreferences）均为阻塞 IPC，统一放到 [ioDispatcher] 上执行。
+     *
      * @param treeUri `ACTION_OPEN_DOCUMENT_TREE` 返回的树 URI。
      */
     fun pick(treeUri: String) {
-        val name = nameResolver(treeUri)
-        val handle = WorkspaceHandle(treeUri = treeUri, displayName = name)
-        // 先记住授权（takePersistableUriPermission 也在这里做），再扫描。
-        // 顺序重要：扫描失败/被取消时，用户下次启动仍应恢复到该目录。
-        listRejected = source.rememberWorkspace(handle) == RememberResult.RejectedAllPinned
-        load(handle)
+        cancelJob()
+        closeWatcher()
+        state = WorkspaceState.Loading
+        loadingHandle = WorkspaceHandle(treeUri = treeUri, displayName = "")
+        job = scope.launch {
+            try {
+                val (handle, rememberResult) = withContext(ioDispatcher) {
+                    val name = nameResolver(treeUri)
+                    val resolved = WorkspaceHandle(treeUri = treeUri, displayName = name)
+                    // 先记住授权（takePersistableUriPermission 也在这里做），再扫描。
+                    // 顺序重要：扫描失败/被取消时，用户下次启动仍应恢复到该目录。
+                    resolved to source.rememberWorkspace(resolved)
+                }
+                loadingHandle = handle
+                listRejected = rememberResult == RememberResult.RejectedAllPinned
+                executeLoad(handle)
+            } finally {
+                refreshListings()
+            }
+        }
     }
 
     /**
@@ -316,35 +336,7 @@ class WorkspaceController(
         loadingHandle = handle
         job = scope.launch {
             try {
-                // 阻塞遍历必须离开主线程：851 张实测约 1 秒，千级更久，
-                // 留在主线程就是肉眼可见的掉帧甚至 ANR。
-                val first = withContext(ioDispatcher) { source.loadCollections(handle) }
-
-                // 授权失效的自动重试（D2b 退出条件 ③「授权失效恢复流程」）。
-                //
-                // **为什么必须自动重试一次而不是直接报失效**：Cold start 时
-                // takePersistableUriPermission 授予的权限可能尚未就绪，表现同样是
-                // SecurityException —— 与「用户真的撤销了授权」在平台层无法区分。
-                // 不重试的话，用户每次冷启动都会看到一次「授权已失效」，
-                // 然后点一下重选又莫名其妙地好了。
-                val cause = first.failureCause
-                if (cause == null || !shouldAutoRetry(cause, retriedTimes = 0)) {
-                    rememberIfLoaded(first, handle)
-                    state = first.toWorkspaceState(handle)
-                    watchIfReady(handle, first)
-                    return@launch
-                }
-
-                val second = withContext(ioDispatcher) { source.loadCollections(handle) }
-                // 自动重试成功的那一支同样要 remember —— 「冷启动抖一下才读到」的那次
-                // 不更新顺序的话，restore 就永远恢复不到上次真正用过的目录。
-                rememberIfLoaded(second, handle)
-                state = when (second) {
-                    is LoadResult.Success -> second.toWorkspaceState(handle)
-                    LoadResult.Denied -> WorkspaceState.Denied(handle, autoRetried = 1)
-                    is LoadResult.Failed -> second.toWorkspaceState(handle)
-                }
-                watchIfReady(handle, second)
+                executeLoad(handle)
             } finally {
                 // 无论读到与否，列表都可能已经变了（成功时被移到最前）。放在 finally 里
                 // 而不是每个分支末尾：`return@launch` 那条也是分支，漏掉就会留下一个
@@ -352,6 +344,38 @@ class WorkspaceController(
                 refreshListings()
             }
         }
+    }
+
+    private suspend fun executeLoad(handle: WorkspaceHandle) {
+        // 阻塞遍历必须离开主线程：851 张实测约 1 秒，千级更久，
+        // 留在主线程就是肉眼可见的掉帧甚至 ANR。
+        val first = withContext(ioDispatcher) { source.loadCollections(handle) }
+
+        // 授权失效的自动重试（D2b 退出条件 ③「授权失效恢复流程」）。
+        //
+        // **为什么必须自动重试一次而不是直接报失效**：Cold start 时
+        // takePersistableUriPermission 授予的权限可能尚未就绪，表现同样是
+        // SecurityException —— 与「用户真的撤销了授权」在平台层无法区分。
+        // 不重试的话，用户每次冷启动都会看到一次「授权已失效」，
+        // 然后点一下重选又莫名其妙地好了。
+        val cause = first.failureCause
+        if (cause == null || !shouldAutoRetry(cause, retriedTimes = 0)) {
+            rememberIfLoaded(first, handle)
+            state = first.toWorkspaceState(handle)
+            watchIfReady(handle, first)
+            return
+        }
+
+        val second = withContext(ioDispatcher) { source.loadCollections(handle) }
+        // 自动重试成功的那一支同样要 remember —— 「冷启动抖一下才读到」的那次
+        // 不更新顺序的话，restore 就永远恢复不到上次真正用过的目录。
+        rememberIfLoaded(second, handle)
+        state = when (second) {
+            is LoadResult.Success -> second.toWorkspaceState(handle)
+            LoadResult.Denied -> WorkspaceState.Denied(handle, autoRetried = 1)
+            is LoadResult.Failed -> second.toWorkspaceState(handle)
+        }
+        watchIfReady(handle, second)
     }
 
     /**
@@ -511,14 +535,16 @@ class WorkspaceController(
      * **不在这里刷 [listings]**：调用方（[load] 的 finally、[applyRefresh] 的末尾）
      * 统一收口，否则「成功要刷、失败也要刷」会变成四处各写一次。
      */
-    private fun rememberIfLoaded(result: LoadResult, handle: WorkspaceHandle) {
+    private suspend fun rememberIfLoaded(result: LoadResult, handle: WorkspaceHandle) {
         if (result !is LoadResult.Success) return
         // 真实实现下这一行**恒走 MovedToFront**：能走到这里说明刚扫成功，而 open / restore
         // 的 handle 必然已经在列表里（open 先从 workspaces() 找出来，restore 直接取第一条）。
         // 因此 RejectedAllPinned 这条分支在真实路径上不可达，置位只是极端竞态（另一进程
         // 同时改写了列表文件）的兜底。**不要当 bug 删**：删掉它并不让任何用例变红，
         // 但那一格竞态里会静默丢掉「加不进列表」这条信号。
-        listRejected = source.rememberWorkspace(handle) == RememberResult.RejectedAllPinned
+        // rememberWorkspace 含 takePersistableUriPermission Binder IPC，必须留在 ioDispatcher。
+        val rememberResult = withContext(ioDispatcher) { source.rememberWorkspace(handle) }
+        listRejected = rememberResult == RememberResult.RejectedAllPinned
     }
 
     /**
@@ -555,9 +581,8 @@ class WorkspaceController(
      * 跨进程调用（读缩略图、查文档 provider……），必须改成 `suspend` +
      * `withContext(ioDispatcher)`，不要再往主线程上加常数项。
      */
-    private fun refreshListings() {
+    private fun refreshListings(grants: Set<String> = source.persistentGrants()) {
         // 一次拿全集再在内存里比：Binder 次数从「每条一次」降到常数 1（评审 Important-2）。
-        val grants = source.persistentGrants()
         val (grantedPart, rememberedPart) = source.workspaces()
             .map { WorkspaceListing(it, it.handle.treeUri in grants) }
             .partition { it.granted }

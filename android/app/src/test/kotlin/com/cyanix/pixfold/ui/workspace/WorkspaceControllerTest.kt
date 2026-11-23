@@ -8,13 +8,16 @@ import com.cyanix.pixfold.domain.source.WorkspaceChangeWatcher
 import com.cyanix.pixfold.domain.source.WorkspaceEntry
 import com.cyanix.pixfold.domain.source.WorkspaceHandle
 import com.cyanix.pixfold.domain.source.WorkspaceSource
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.Runnable
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
+import kotlin.coroutines.CoroutineContext
 import org.junit.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -622,5 +625,95 @@ class WorkspaceControllerTest {
 
         assertIs<WorkspaceState.Ready>(controller.state)
         assertEquals(2, source.watches, "恢复成功必须重新挂上")
+    }
+
+    /** 追踪任务是否在 ioDispatcher 内执行的调度器包装。 */
+    private class TrackingIoDispatcher(
+        private val delegate: CoroutineDispatcher,
+    ) : CoroutineDispatcher() {
+        var isRunningOnIo: Boolean = false
+            private set
+
+        override fun dispatch(context: CoroutineContext, block: Runnable) {
+            delegate.dispatch(
+                context,
+                Runnable {
+                    val prev = isRunningOnIo
+                    isRunningOnIo = true
+                    try {
+                        block.run()
+                    } finally {
+                        isRunningOnIo = prev
+                    }
+                },
+            )
+        }
+    }
+
+    @Test
+    fun `pick 在 ioDispatcher 上执行 nameResolver 与 rememberWorkspace`() = runTest {
+        val io = TrackingIoDispatcher(StandardTestDispatcher(testScheduler))
+        var nameResolverOnIo: Boolean? = null
+        val rememberOnIo = mutableListOf<Boolean>()
+        val inner = ScriptedSource(LoadResult.Success(collections()))
+        val source = object : WorkspaceSource by inner {
+            override fun rememberWorkspace(handle: WorkspaceHandle): RememberResult {
+                rememberOnIo += io.isRunningOnIo
+                return inner.rememberWorkspace(handle)
+            }
+        }
+        val controller = WorkspaceController(
+            source = source,
+            scope = testScope(),
+            nameResolver = {
+                nameResolverOnIo = io.isRunningOnIo
+                "IO解析目录"
+            },
+            ioDispatcher = io,
+        )
+
+        controller.pick("content://tree/io-pick")
+
+        // 标准调度器尚未推进前，主线程不得同步跑 nameResolver / rememberWorkspace
+        assertEquals(null, nameResolverOnIo, "pick 不得在调用线程同步执行 nameResolver")
+        assertTrue(rememberOnIo.isEmpty(), "pick 不得在调用线程同步执行 rememberWorkspace")
+        assertIs<WorkspaceState.Loading>(controller.state)
+
+        advanceUntilIdle()
+
+        assertEquals(true, nameResolverOnIo, "nameResolver 必须在 ioDispatcher 上执行")
+        assertTrue(rememberOnIo.isNotEmpty() && rememberOnIo.all { it }, "rememberWorkspace 必须在 ioDispatcher 上执行：$rememberOnIo")
+        val ready = assertIs<WorkspaceState.Ready>(controller.state)
+        assertEquals("IO解析目录", ready.handle.displayName)
+    }
+
+    @Test
+    fun `load 与 refresh 成功后 rememberIfLoaded 均在 ioDispatcher 上执行`() = runTest {
+        val io = TrackingIoDispatcher(StandardTestDispatcher(testScheduler))
+        val rememberOnIo = mutableListOf<Boolean>()
+        val inner = ScriptedSource(
+            LoadResult.Success(collections()),
+            LoadResult.Success(collections()),
+            last = handle,
+        )
+        val source = object : WorkspaceSource by inner {
+            override fun rememberWorkspace(handle: WorkspaceHandle): RememberResult {
+                rememberOnIo += io.isRunningOnIo
+                return inner.rememberWorkspace(handle)
+            }
+        }
+        val controller = WorkspaceController(
+            source = source,
+            scope = testScope(),
+            ioDispatcher = io,
+        )
+
+        controller.load(handle)
+        advanceUntilIdle()
+        controller.refresh()
+        advanceUntilIdle()
+
+        assertEquals(2, rememberOnIo.size, "load 与 refresh 各应 remember 一次")
+        assertTrue(rememberOnIo.all { it }, "rememberIfLoaded 必须在 ioDispatcher 上执行：$rememberOnIo")
     }
 }

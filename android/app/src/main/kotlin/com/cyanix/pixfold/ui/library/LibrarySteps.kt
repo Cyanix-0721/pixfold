@@ -483,12 +483,10 @@ fun LibrarySteps(
     /**
      * 打开发更新确认框（工作流 C 入口的共同落点）。
      *
-     * 两件事必须在**弹框之前**做完，且都在 IO 线程：
-     *  - `targetExists` —— 包被删/改名时弹一个「要点确认」的框再告诉用户
-     *    「包不见了」是骗人的，直接给结果框；
-     *  - `preflight` —— 体积这一行是用户在确认框里最想知道的事（整包会被重写）。
-     *
-     * 拿不到体积就保持 `null` ⇒ 界面显示「未知」，**不删掉这一行**。
+     * 存在性判定与空间预检合并在单次 `preflight` 中完成（IO 线程），避免
+     * `targetExists` + `preflight` 触发两次 SAF 目录树遍历：
+     *  - 返回 [UpdatePreflight.TargetMissing] 时直接切到结果框，不弹「体积未知」的确认框；
+     *  - 返回 [UpdatePreflight.Ready] 时带出体积；拿不到体积则保持 `null` ⇒ 显示「未知」。
      */
     fun requestUpdate(volume: ComicVolume) {
         val updater = metaUpdater ?: return
@@ -507,19 +505,16 @@ fun LibrarySteps(
                 targetDisplayName = volume.cbzFileName,
                 entryCount = 0,
             )
-            val exists = withContext(Dispatchers.IO) {
-                runCatching { updater.targetExists(volume) }.getOrDefault(false)
-            }
-            if (!exists) {
-                updateTarget = null
-                updateResult = CbzMetaUpdateOutcome.Failed(UpdateFailure.TargetMissing, volume.cbzFileName)
-                return@launch
-            }
             val pre = withContext(Dispatchers.IO) {
                 runCatching { updater.preflight(plan, volume) }.getOrDefault(UpdatePreflight.Unknown)
             }
             // 期间用户可能已经关掉了确认框 —— 别把迟到结论塞回一个已关闭的框。
             if (updateTarget?.id != volume.id) return@launch
+            if (pre is UpdatePreflight.TargetMissing) {
+                updateTarget = null
+                updateResult = CbzMetaUpdateOutcome.Failed(UpdateFailure.TargetMissing, volume.cbzFileName)
+                return@launch
+            }
             updatePreflight = pre
             updateSizeBytes = (pre as? UpdatePreflight.Ready)?.estimatedReadBytes
         }

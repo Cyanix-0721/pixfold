@@ -7,7 +7,12 @@ import com.cyanix.pixfold.domain.plan.buildPackagePlans
 import com.cyanix.pixfold.domain.sort.pageOrderOf
 import com.cyanix.pixfold.domain.task.CancellationToken
 import java.io.ByteArrayOutputStream
+import java.io.File
 import java.io.InputStream
+import java.nio.file.Files
+import java.util.zip.CRC32
+import java.util.zip.ZipEntry
+import java.util.zip.ZipFile
 import java.util.zip.ZipInputStream
 import kotlin.test.Test
 import kotlin.test.assertContentEquals
@@ -98,9 +103,125 @@ class CbzStreamingTest {
     }
 
     @Test
+    fun `streaming source uses single pass for pages within limit and verifies via ZipFile`() {
+        // ≤ 8 MiB 的页应在单趟有界缓冲内算完 CRC 与长度并写出：
+        // writeStreaming 本身只开 1 次流（不再双趟重读），经 writeCbz 合计 2 次（1 次探测 + 1 次写入）。
+        val pageA = ByteArray(256 * 1024 + 137) { (it % 251).toByte() }
+        val pageB = ByteArray(1024 * 1024 + 19) { ((it * 7) % 251).toByte() }
+        val payloads = mapOf("p1" to pageA, "p2" to pageB)
+        val plan = buildCbzWritePlan(volumeWith(2))
+
+        val openedByItem = mutableMapOf<String, Int>()
+        val source = streamingPageByteSource { id ->
+            openedByItem[id] = (openedByItem[id] ?: 0) + 1
+            payloads.getValue(id).inputStream()
+        }
+
+        val out = ByteArrayOutputStream()
+        CbzWriter.writeStreaming(plan.comicInfoXml, plan.pages, source, out, time)
+
+        assertEquals(1, openedByItem["p1"], "≤ 8 MiB 的第 1 页应只开 1 次流")
+        assertEquals(1, openedByItem["p2"], "≤ 8 MiB 的第 2 页应只开 1 次流")
+
+        val temp = Files.createTempFile("cbz-single-pass-", ".cbz").toFile()
+        try {
+            temp.writeBytes(out.toByteArray())
+            ZipFile(temp).use { zip ->
+                val entries = zip.entries().toList()
+                assertEquals(listOf("ComicInfo.xml", "001.jpg", "002.jpg"), entries.map { it.name })
+                entries.forEach { assertEquals(ZipEntry.STORED, it.method) }
+                assertContentEquals(pageA, zip.getInputStream(zip.getEntry("001.jpg")!!).use { it.readBytes() })
+                assertContentEquals(pageB, zip.getInputStream(zip.getEntry("002.jpg")!!).use { it.readBytes() })
+                assertEquals(CRC32().apply { update(pageA) }.value, zip.getEntry("001.jpg")!!.crc)
+                assertEquals(CRC32().apply { update(pageB) }.value, zip.getEntry("002.jpg")!!.crc)
+            }
+        } finally {
+            temp.delete()
+        }
+    }
+
+    @Test
+    fun `streaming source falls back to two passes when page exceeds 8 MiB limit`() {
+        // 超过 8 MiB 的大图必须回退两趟流式读写，严守 256 MB 堆 OOM 护栏。
+        val largeSize = 8 * 1024 * 1024 + 4096
+        val smallPage = ByteArray(128 * 1024 + 7) { ((it * 3) % 251).toByte() }
+        val plan = buildCbzWritePlan(volumeWith(2))
+
+        fun patternStream(totalBytes: Int): InputStream = object : InputStream() {
+            private var remaining = totalBytes
+            private var pos = 0
+            override fun read(): Int {
+                if (remaining <= 0) return -1
+                remaining--
+                return (pos++ % 251) and 0xFF
+            }
+            override fun read(b: ByteArray, off: Int, len: Int): Int {
+                if (remaining <= 0) return -1
+                val n = minOf(len, remaining)
+                for (i in 0 until n) {
+                    b[off + i] = ((pos + i) % 251).toByte()
+                }
+                pos += n
+                remaining -= n
+                return n
+            }
+        }
+
+        val openedByItem = mutableMapOf<String, Int>()
+        val source = streamingPageByteSource { id ->
+            openedByItem[id] = (openedByItem[id] ?: 0) + 1
+            if (id == "p1") patternStream(largeSize) else smallPage.inputStream()
+        }
+
+        val temp = Files.createTempFile("cbz-two-pass-", ".cbz").toFile()
+        try {
+            temp.outputStream().use { fos ->
+                CbzWriter.writeStreaming(plan.comicInfoXml, plan.pages, source, fos, time)
+            }
+            assertEquals(2, openedByItem["p1"], "> 8 MiB 的页必须回退 2 趟读取")
+            assertEquals(1, openedByItem["p2"], "其后的 ≤ 8 MiB 小页仍走单趟读取")
+
+            ZipFile(temp).use { zip ->
+                val entries = zip.entries().toList()
+                assertEquals(listOf("ComicInfo.xml", "001.jpg", "002.jpg"), entries.map { it.name })
+                entries.forEach { assertEquals(ZipEntry.STORED, it.method) }
+
+                val largeEntry = zip.getEntry("001.jpg")!!
+                assertEquals(largeSize.toLong(), largeEntry.size)
+                val expectedCrc = CRC32()
+                val actualCrc = CRC32()
+                patternStream(largeSize).use { expected ->
+                    val buf = ByteArray(64 * 1024)
+                    while (true) {
+                        val n = expected.read(buf)
+                        if (n < 0) break
+                        expectedCrc.update(buf, 0, n)
+                    }
+                }
+                var readTotal = 0L
+                zip.getInputStream(largeEntry).use { actual ->
+                    val buf = ByteArray(64 * 1024)
+                    while (true) {
+                        val n = actual.read(buf)
+                        if (n < 0) break
+                        actualCrc.update(buf, 0, n)
+                        readTotal += n
+                    }
+                }
+                assertEquals(largeSize.toLong(), readTotal)
+                assertEquals(expectedCrc.value, largeEntry.crc)
+                assertEquals(expectedCrc.value, actualCrc.value)
+
+                assertContentEquals(smallPage, zip.getInputStream(zip.getEntry("002.jpg")!!).use { it.readBytes() })
+            }
+        } finally {
+            temp.delete()
+        }
+    }
+
+    @Test
     fun `streaming source does not buffer the whole page`() {
-        // 关键断言:4MB 的页在读取期间**不应**被要求一次性交出全部字节。
-        // 用一个只在 read() 时逐块吐字节的流来证明实现是边读边算 CRC 的。
+        // 4MB 页 ≤ 8 MiB 单趟上限：writeCbz 打开 2 次（探测 1 次 + 单趟算 CRC 并写出 1 次）。
         val big = ByteArray(4 * 1024 * 1024) { (it % 251).toByte() }
         val plan = buildCbzWritePlan(volumeWith(1))
 
@@ -114,9 +235,7 @@ class CbzStreamingTest {
         val result = writeCbz(plan, source, out, time)
 
         assertTrue(result.ok)
-        // 3 次 = 探测可读 1 次 + 算 CRC/size 1 次 + 写出 1 次。
-        // 关键不是次数本身,而是**没有一次把整页留在内存里**(逐块读、读完即丢)。
-        assertEquals(3, streamOpened, "流式路径:探测 / 算 CRC / 写出各开一次流")
+        assertEquals(2, streamOpened, "≤ 8 MiB 路径：探测 1 次 + 单趟写入 1 次")
         val entries = readBack(out.toByteArray())
         assertContentEquals(big, entries[1].second, "内容必须原样写出")
     }
