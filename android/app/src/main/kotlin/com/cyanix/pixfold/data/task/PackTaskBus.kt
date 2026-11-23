@@ -6,6 +6,7 @@ import com.cyanix.pixfold.domain.task.TaskProgress
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.update
 
 /**
  * 打包任务的进程内状态（D2b「切后台恢复」）。
@@ -34,9 +35,11 @@ object PackTaskBus {
     val state: StateFlow<PackTaskState> = mutableState.asStateFlow()
 
     /** 等待被 Service 取走的请求。只在 [requestStart] 与 [takeRequest] 之间非空。 */
+    @Volatile
     private var pendingRequest: PackTaskRequest? = null
 
     /** 当前任务的取消令牌。Service 开始执行时创建。 */
+    @Volatile
     private var currentToken: CancellationToken? = null
 
     /**
@@ -51,6 +54,7 @@ object PackTaskBus {
      *
      * @return 是否接受。已有任务在跑时返回 `false`（并发写同一批输出路径会互相覆盖）。
      */
+    @Synchronized
     fun requestStart(request: PackTaskRequest): Boolean {
         if (mutableState.value is PackTaskState.Running) return false
         pendingRequest = request
@@ -63,6 +67,7 @@ object PackTaskBus {
     }
 
     /** Service 侧取请求。取走后清空，保证一次请求只被启动一次。 */
+    @Synchronized
     fun takeRequest(): PackTaskRequest? {
         val request = pendingRequest
         pendingRequest = null
@@ -83,28 +88,33 @@ object PackTaskBus {
     /** 服务已销毁（`onDestroy`）。把运行中状态标成中断，避免 UI 永远显示「正在打包」。 */
     fun onServiceGone() {
         currentToken = null
-        val running = mutableState.value as? PackTaskState.Running ?: return
-        // 任务在跑但服务没了 ⇒ 进程级中断：磁盘上可能留半成品，交给恢复提示处理。
-        mutableState.value = PackTaskState.Settled(
-            PackTaskSettled.Error(
-                "打包任务被系统中断（进度 ${running.progress.processed}/${running.progress.total}）",
-            ),
-        )
+        mutableState.update { current ->
+            val running = current as? PackTaskState.Running ?: return@update current
+            // 任务在跑但服务没了 ⇒ 进程级中断：磁盘上可能留半成品，交给恢复提示处理。
+            PackTaskState.Settled(
+                PackTaskSettled.Error(
+                    "打包任务被系统中断（进度 ${running.progress.processed}/${running.progress.total}）",
+                ),
+            )
+        }
     }
 
-    /** 进度推进（由 Service 节流后调用）。 */
+    /** 进度推进（由 Service 节流后调用）。使用原子 CAS 更新，确保已置位的 cancelling 不会被迟到进度覆盖。 */
     fun publish(
         progress: TaskProgress,
         cancelling: Boolean,
         pageDone: Int? = null,
         pageTotal: Int? = null,
     ) {
-        mutableState.value = PackTaskState.Running(
-            progress = progress,
-            cancelling = cancelling,
-            pageDone = pageDone,
-            pageTotal = pageTotal,
-        )
+        mutableState.update { current ->
+            val alreadyCancelling = (current as? PackTaskState.Running)?.cancelling == true
+            PackTaskState.Running(
+                progress = progress,
+                cancelling = cancelling || alreadyCancelling,
+                pageDone = pageDone,
+                pageTotal = pageTotal,
+            )
+        }
     }
 
     /**
@@ -114,18 +124,24 @@ object PackTaskBus {
      * 而 `TaskProgress` 是卷级快照 —— 攒着发就得在服务里再维护一份卷级计数，
      * 两份计数一旦不同步，界面会出现「卷进度倒退」。
      *
+     * 使用 [MutableStateFlow.update] 原子 CAS，避免 IO 页进度与主线程 [requestCancel]
+     * 并发交错时把 `cancelling = true` 覆盖回 `false`。
      * 非 Running 状态下直接忽略（收尾后再来的页回调没有意义）。
      */
     fun publishPage(pageDone: Int, pageTotal: Int) {
-        val running = mutableState.value as? PackTaskState.Running ?: return
-        mutableState.value = running.copy(pageDone = pageDone, pageTotal = pageTotal)
+        mutableState.update { current ->
+            val running = current as? PackTaskState.Running ?: return@update current
+            running.copy(pageDone = pageDone, pageTotal = pageTotal)
+        }
     }
 
     /** 用户点了取消。[CancellationToken] 在卷间生效，故界面先显示「正在取消」。 */
     fun requestCancel() {
         currentToken?.cancel()
-        val running = mutableState.value as? PackTaskState.Running ?: return
-        mutableState.value = running.copy(cancelling = true)
+        mutableState.update { current ->
+            val running = current as? PackTaskState.Running ?: return@update current
+            running.copy(cancelling = true)
+        }
     }
 
     /** 任务收尾。`outcome` 里带着界面要显示的报告或拒绝理由。 */
@@ -141,8 +157,8 @@ object PackTaskBus {
      * 仍然看到上一次的报告，用户会以为刚才那次打包又跑了一遍。
      */
     fun consumeResult() {
-        if (mutableState.value is PackTaskState.Settled) {
-            mutableState.value = PackTaskState.Idle
+        mutableState.update { current ->
+            if (current is PackTaskState.Settled) PackTaskState.Idle else current
         }
     }
 

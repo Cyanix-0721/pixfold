@@ -5,6 +5,10 @@ import androidx.compose.ui.graphics.ImageBitmapConfig
 import androidx.compose.ui.graphics.colorspace.ColorSpace
 import androidx.compose.ui.graphics.colorspace.ColorSpaces
 import org.junit.Test
+import java.util.concurrent.CopyOnWriteArrayList
+import java.util.concurrent.CyclicBarrier
+import java.util.concurrent.Executors
+import java.util.concurrent.TimeUnit
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
@@ -176,5 +180,51 @@ class ThumbnailCacheTest {
 
         assertEquals(0, cache.size)
         assertEquals(0L, cache.sizeBytes)
+    }
+
+    @Test
+    fun `多线程并发读写清空不抛异常且账目守恒`() {
+        // LinkedHashMap(accessOrder = true) 连 get() 都会改内部双向链表指针；
+        // 未同步时多线程同时 get/put/clear 极易抛 ConcurrentModificationException 或破坏链表。
+        val maxEntries = 16
+        val maxBytes = bytes(64) * maxEntries
+        val cache = ThumbnailCache(maxBytes = maxBytes, maxEntries = maxEntries)
+        val threads = 8
+        val iterations = 1_500
+        val pool = Executors.newFixedThreadPool(threads)
+        val barrier = CyclicBarrier(threads)
+        val errors = CopyOnWriteArrayList<Throwable>()
+
+        try {
+            val futures = (0 until threads).map { tid ->
+                pool.submit {
+                    try {
+                        barrier.await(5, TimeUnit.SECONDS)
+                        repeat(iterations) { step ->
+                            val key = "content://doc/${(tid * 13 + step) % 24}"
+                            when (step % 5) {
+                                0, 1 -> cache.put(key, bmp(64))
+                                2, 3 -> cache.get(key)
+                                else -> if (step % 50 == 4) cache.clear() else cache.get(key)
+                            }
+                            val s = cache.size
+                            val b = cache.sizeBytes
+                            if (s < 0 || b < 0L) {
+                                errors += AssertionError("缓存账目出现负值: size=$s, bytes=$b")
+                            }
+                        }
+                    } catch (t: Throwable) {
+                        errors += t
+                    }
+                }
+            }
+            futures.forEach { it.get(15, TimeUnit.SECONDS) }
+        } finally {
+            pool.shutdownNow()
+        }
+
+        assertTrue(errors.isEmpty(), "并发访问抛出异常: ${errors.firstOrNull()}")
+        assertTrue(cache.size in 0..maxEntries, "并发后条目数越界: ${cache.size}")
+        assertTrue(cache.sizeBytes in 0L..maxBytes, "并发后字节数越界: ${cache.sizeBytes}")
     }
 }

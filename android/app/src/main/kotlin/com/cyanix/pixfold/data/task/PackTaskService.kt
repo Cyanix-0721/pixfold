@@ -112,11 +112,13 @@ class PackTaskService : Service() {
      * 回调，它要能读到「任务跑到哪儿了」才能写出正确的收尾快照。做成局部变量时
      * `onTimeout` 只能写一条空快照，恢复提示会丢失进度。
      *
-     * 只在主线程读写（`CoroutineScope` 用 `Dispatchers.Main.immediate`），故不加锁。
+     * `onProgress` 回调在 `Dispatchers.IO` 上写入本字段，而 [onTimeout] 由系统在主线程读取，
+     * 故必须标 `@Volatile` 保证跨线程可见性（[PackTaskSnapshot] 为不可变值对象，安全发布即可）。
      *
      * 声明为 `internal`（而非 private）**只为了可测**：[onTimeout] 的整条路径在
      * Robolectric 里没有别的入口能种进「任务跑到一半」的状态。
      */
+    @Volatile
     internal var snapshot: PackTaskSnapshot? = null
 
     override fun onCreate() {

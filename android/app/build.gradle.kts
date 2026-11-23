@@ -100,6 +100,14 @@ android {
     }
 }
 
+composeCompiler {
+    // 声明纯 Kotlin `:domain` 模块中真正不可变的值对象与状态类为稳定类型，
+    // 消除跨模块不稳定退化，且不给 `:domain` 引入任何 Android/Compose 依赖（AdapterBoundaryTest 保持全绿）。
+    stabilityConfigurationFiles.add(
+        layout.projectDirectory.file("compose_stability.conf"),
+    )
+}
+
 dependencies {
     implementation(project(":domain"))
 

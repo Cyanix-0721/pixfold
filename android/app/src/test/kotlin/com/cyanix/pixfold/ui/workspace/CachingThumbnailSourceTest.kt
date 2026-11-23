@@ -5,15 +5,21 @@ import androidx.compose.ui.graphics.ImageBitmapConfig
 import androidx.compose.ui.graphics.colorspace.ColorSpace
 import androidx.compose.ui.graphics.colorspace.ColorSpaces
 import com.cyanix.pixfold.domain.thumb.ThumbBudget
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import org.junit.Test
 import java.util.concurrent.CopyOnWriteArrayList
 import java.util.concurrent.atomic.AtomicInteger
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
@@ -251,5 +257,71 @@ class CachingThumbnailSourceTest {
             "缓存条目 ${source.cachedCount} 超过上限 4",
         )
         assertEquals(4L * 256L * 256L * 4L, source.cachedBytes)
+    }
+
+    // ==================== 取消传播与并发在途安全 ====================
+
+    @Test
+    fun `等待者协程取消时必须重抛 CancellationException 且不影响其他并发等待者`() = runTest {
+        val gate = CompletableDeferred<ImageBitmap?>()
+        val started = CompletableDeferred<Unit>()
+        val delegate = object : ThumbnailSource {
+            override suspend fun thumbnail(uri: String, widthPx: Int, heightPx: Int): ImageBitmap? {
+                started.complete(Unit)
+                return gate.await()
+            }
+        }
+        val source = CachingThumbnailSource(delegate, budget(concurrent = 4, entries = 8))
+
+        val owner = async { source.thumbnail("content://doc/shared", 256, 256) }
+        started.await()
+
+        var waiter1RethrewCancel = false
+        var waiter1ReturnedNormally = false
+        val waiter1 = launch {
+            try {
+                source.thumbnail("content://doc/shared", 256, 256)
+                waiter1ReturnedNormally = true
+            } catch (e: CancellationException) {
+                waiter1RethrewCancel = true
+                throw e
+            }
+        }
+        val waiter2 = async { source.thumbnail("content://doc/shared", 256, 256) }
+        runCurrent()
+
+        waiter1.cancelAndJoin()
+        assertTrue(
+            waiter1RethrewCancel,
+            "调用方协程取消时不得吞掉 CancellationException，否则会破坏结构化并发",
+        )
+        assertFalse(waiter1ReturnedNormally, "被取消的等待者不该以返回 null 的形式正常结束")
+
+        val expected = FakeBitmap(256, 256)
+        gate.complete(expected)
+        assertEquals(expected, owner.await(), "owner 不应受单个等待者取消影响")
+        assertEquals(expected, waiter2.await(), "其余存活等待者应正常拿到共享结果")
+    }
+
+    @Test
+    fun `owner 取消时存活等待者安全回退 null 而不崩溃`() = runTest {
+        val gate = CompletableDeferred<ImageBitmap?>()
+        val started = CompletableDeferred<Unit>()
+        val delegate = object : ThumbnailSource {
+            override suspend fun thumbnail(uri: String, widthPx: Int, heightPx: Int): ImageBitmap? {
+                started.complete(Unit)
+                return gate.await()
+            }
+        }
+        val source = CachingThumbnailSource(delegate, budget(concurrent = 4, entries = 8))
+
+        val owner = launch { source.thumbnail("content://doc/owner-cancel", 256, 256) }
+        started.await()
+
+        val activeWaiter = async { source.thumbnail("content://doc/owner-cancel", 256, 256) }
+        runCurrent()
+
+        owner.cancelAndJoin()
+        assertNull(activeWaiter.await(), "owner 被取消时存活的等待者应安全回退 null")
     }
 }

@@ -7,6 +7,7 @@ import com.cyanix.pixfold.domain.model.MetaValue
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
+import kotlin.test.assertSame
 import kotlin.test.assertTrue
 
 /**
@@ -132,5 +133,14 @@ class LibraryStateTest {
         assertEquals(0, result.skippedCount)
         assertEquals("统一系列", vol(next, "aot-1").series, "必须把新库写回状态,否则 UI 看到的是没改过的库")
         assertEquals("进击的巨人", vol(state, "aot-1").series, "原状态不得被就地改动")
+    }
+
+    @Test
+    fun `series groups are cached per LibraryState instance without breaking data class equality`() {
+        val first = state.seriesGroups
+        val second = state.seriesGroups
+        assertSame(first, second, "同一 LibraryState 实例重复读取 seriesGroups 不应重复计算 groupVolumes")
+        assertEquals(state, state.copy(), "缓存字段不得破坏 data class 的 equals 语义")
+        assertEquals(state.hashCode(), state.copy().hashCode(), "缓存字段不得破坏 data class 的 hashCode 语义")
     }
 }

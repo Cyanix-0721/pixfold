@@ -23,10 +23,11 @@ import androidx.compose.ui.graphics.ImageBitmap
  * 只在 [put] 时淘汰。`get` 不淘汰：读一次就丢掉别的条目会让滚动时反复重载，
  * 反而更慢；预算本身已经留了 8 倍余量（12.5% 堆）。
  *
- * ## 为什么不是线程安全的
+ * ## 线程安全
  *
- * 全部访问都在主线程（Compose 的组合/LaunchedEffect 恢复点），与 `WorkspaceController`
- * 同样的取舍。真要跨线程再说 —— 现在加锁是纯开销。
+ * `LinkedHashMap(accessOrder = true)` 连 [get] 都会修改内部双向链表指针，而上层
+ * `CachingThumbnailSource` 在 `Semaphore.withPermit` / `Dispatchers.IO` 恢复时可能跨线程
+ * 访问缓存。所有公开读写均通过私有 [lock] 同步，保证账目与链表结构在多线程下始终一致。
  *
  * @param maxBytes 字节上限。`<= 0` 时退化为「只放 maxEntries 条」。
  * @param maxEntries 条目数上限（取 [maxBytes] 与它的**双**约束）。
@@ -35,18 +36,20 @@ class ThumbnailCache(
     private val maxBytes: Long,
     private val maxEntries: Int,
 ) {
+    private val lock = Any()
+
     // LinkedHashMap 的 accessOrder = true 即「最近访问的移到队尾」，头部就是最久未用。
     private val entries = LinkedHashMap<String, ImageBitmap>(16, 0.75f, true)
     private var bytes = 0L
 
     /** 当前缓存占用字节数。测试与调试用。 */
-    val sizeBytes: Long get() = bytes
+    val sizeBytes: Long get() = synchronized(lock) { bytes }
 
     /** 当前缓存条目数。测试与调试用。 */
-    val size: Int get() = entries.size
+    val size: Int get() = synchronized(lock) { entries.size }
 
     /** 取一张；命中会把它移到队尾（成为「最近使用」）。 */
-    fun get(uri: String): ImageBitmap? = entries[uri]
+    fun get(uri: String): ImageBitmap? = synchronized(lock) { entries[uri] }
 
     /**
      * 放入一张，超预算则从最久未用开始淘汰。
@@ -55,7 +58,7 @@ class ThumbnailCache(
      * 传两个数会有「调用方按请求尺寸算、缓存里却是 provider 实际返回的尺寸」的漂移，
      * 而 provider 返回的尺寸完全可能不等于请求值（它只保证不超过）。
      */
-    fun put(uri: String, bitmap: ImageBitmap) {
+    fun put(uri: String, bitmap: ImageBitmap) = synchronized(lock) {
         // 同一 uri 覆盖时先把旧账扣掉，否则重复加载同一张会让账目越滚越大。
         entries.remove(uri)?.let { this.bytes -= entryBytesOf(it) }
         entries[uri] = bitmap
@@ -64,7 +67,7 @@ class ThumbnailCache(
     }
 
     /** 清空（工作区切换时必须调用 —— 旧工作区的 uri 已不可读）。 */
-    fun clear() {
+    fun clear() = synchronized(lock) {
         entries.clear()
         bytes = 0L
     }

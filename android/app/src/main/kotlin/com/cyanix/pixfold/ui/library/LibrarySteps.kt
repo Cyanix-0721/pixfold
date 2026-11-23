@@ -16,7 +16,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -24,6 +24,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.staticCompositionLocalOf
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
@@ -73,11 +75,14 @@ import com.cyanix.pixfold.nav.popTo
 import com.cyanix.pixfold.nav.popWorkflowStep
 import com.cyanix.pixfold.nav.libraryStepIndex
 import com.cyanix.pixfold.ui.components.DirMetaButton
+import com.cyanix.pixfold.ui.components.PackProgressDialog
 import com.cyanix.pixfold.ui.components.ResetAllButton
 import com.cyanix.pixfold.ui.text.WarnLine
 import com.cyanix.pixfold.ui.workspace.WorkspaceState
 import com.cyanix.pixfold.ui.workspace.handleOrNull
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import com.cyanix.pixfold.domain.comic.ComicInfo
@@ -264,6 +269,9 @@ fun LibrarySteps(
      */
     metaUpdater: CbzMetaUpdater? = null,
 ) {
+    LocalRecompositionObserver.current?.let { observe ->
+        SideEffect { observe("LibrarySteps") }
+    }
     // 跨步骤共享的唯一状态源。这些状态**必须留在工作流子 NavDisplay 之外** ——
     // 它们要跨步骤存活,而 NavDisplay 里每个 destination 都是独立作用域。
     //
@@ -364,57 +372,35 @@ fun LibrarySteps(
     )
 
     // ---- 前台服务执行（D2b 第 2 项）----
-    // Service 是唯一执行方，这里只是观察者。`collectAsState` 在 Activity 重建后
-    // 直接拿到当前进度（进程还活着的情况下），不需要任何重连逻辑。
-    val backgroundState by PackTaskBus.state.collectAsState()
-    val backgroundRunning = backgroundState as? PackTaskState.Running
+    // Service 是唯一执行方，这里只订阅**粗粒度运行态**（是否在跑），
+    // 把逐页进度/卷进度/取消态的细粒度收集隔离在 [BackgroundPackProgressDialog] 内部：
+    // 1,599 页打包期间每写一页都发射一次页进度，若在顶层直接 `collectAsState()`，
+    // 每一页都会驱动整棵 `LibrarySteps` + `PackPreviewPage` 重组。
+    // `initialValue = PackTaskBus.isRunning()` 保证首帧即反映运行态（避免通知进页闪一帧未开始态），
+    // `collectAsStateWithLifecycle` 保证退到后台自动停止收集。
+    val isBackgroundRunning by remember {
+        PackTaskBus.state.map { it is PackTaskState.Running }.distinctUntilChanged()
+    }.collectAsStateWithLifecycle(initialValue = PackTaskBus.isRunning())
 
-    // 三个派生值，**不写回**上面那组 mutable 状态：
-    // 组合期写 `mutableStateOf` 会把「读取」变成「读取+写入」，在同一帧里触发
-    // 额外的重组，且让「服务态」与「进程内态」两份真相互相覆盖。
-    //
-    // ⚠️ **判据是「总线在跑」，不是 `backgroundPacking`**（2026-10-20 真机缺陷）：
-    // 从通知进来时，工作区恢复（`restore()` 读 SharedPreferences + 扫目录）比
-    // 组合慢一拍 ⇒ 那几十毫秒里 `packTreeUri == null` ⇒ `backgroundPacking` 是
-    // false。第一版据此判定「没在执行」，于是先渲染出**未开始的打包页**、
-    // 等恢复完成才切成进度条 —— 用户看到的正是「先闪一下未开始的卡片」。
-    //
-    // `backgroundPacking` 表达的是「能不能走服务」（需要 tree URI），
-    // 「现在是否正在执行」是另一个问题，答案只该看总线。
+    // 判据仍是「总线在跑」，不是 `backgroundPacking`（2026-10-20 真机缺陷：通知回来时
+    // 工作区恢复慢一拍，`backgroundPacking` 暂为 false，但总线已在 Running）。
     val effectiveExecuting =
-        backgroundRunning != null || (!backgroundPacking && executing)
-    val effectiveCancelling =
-        backgroundRunning?.cancelling ?: (!backgroundPacking && cancelling)
-    val effectiveProgress =
-        backgroundRunning?.progress ?: if (backgroundPacking) null else progress
-    // 当前卷的页级进度（双层圆环**外环**）。只有服务路径能给出它 —— 进程内
-    // 路径与模拟路径都没有页回调来源，此时外环画不确定态而不是假的 0%。
-    val effectivePageDone = backgroundRunning?.pageDone
-    val effectivePageTotal = backgroundRunning?.pageTotal
-    // 正在写的卷名（弹窗底部一行）。取 `processed` 指向的那一卷：
-    // 卷是顺序处理的，`processed` 就是「已完成卷数」，正好是当前卷的下标。
-    //
-    // ⚠️ 用 `dirPath`（目录相对路径）而不是 `title`（用户 `User said (m15457)`
-    // 「当前打包的名称要完整显示作者和标题」）。`title` 是**清洗后**的元数据值，
-    // 开头 `[作者]` 前缀被剥掉了 —— 同系列多本只剩后半截，弹窗里几乎一样，
-    // 分不清卡在哪一本。`dirPath` 与卷列表里显示的名字同源，用户能对上号。
-    val effectiveVolumeLabel = remember(backgroundRunning, state.volumes) {
-        val running = backgroundRunning ?: return@remember null
-        state.volumes.getOrNull(running.progress.processed)?.dirPath?.takeIf { it.isNotEmpty() }
-    }
+        isBackgroundRunning || (!backgroundPacking && executing)
 
-    // 收尾结果只在副作用里消费一次。展示完把总线拨回 Idle，否则下次进打包页
-    // 还会看到上一次的报告，用户会以为刚才那次又跑了一遍。
-    LaunchedEffect(backgroundState, backgroundPacking) {
+    // 收尾结果只在副作用里消费一次，不在组合期直接收集全量 StateFlow。
+    // 展示完把总线拨回 Idle，否则下次进打包页还会看到上一次的报告。
+    LaunchedEffect(backgroundPacking) {
         if (!backgroundPacking) return@LaunchedEffect
-        val settled = backgroundState as? PackTaskState.Settled ?: return@LaunchedEffect
-        when (val outcome = settled.outcome) {
-            is PackTaskSettled.Done -> report = outcome.report
-            is PackTaskSettled.Cancelled -> report = outcome.report
-            is PackTaskSettled.Rejected -> executionError = outcome.message
-            is PackTaskSettled.Error -> executionError = outcome.message
+        PackTaskBus.state.collect { busState ->
+            val settled = busState as? PackTaskState.Settled ?: return@collect
+            when (val outcome = settled.outcome) {
+                is PackTaskSettled.Done -> report = outcome.report
+                is PackTaskSettled.Cancelled -> report = outcome.report
+                is PackTaskSettled.Rejected -> executionError = outcome.message
+                is PackTaskSettled.Error -> executionError = outcome.message
+            }
+            PackTaskBus.consumeResult()
         }
-        PackTaskBus.consumeResult()
     }
 
 
@@ -606,7 +592,7 @@ fun LibrarySteps(
         //
         // 判据同 `effectiveExecuting`：看总线有没有在跑，而不是 `backgroundPacking`
         // （工作区还没恢复完时后者是 false，会把在跑的服务任务漏掉、只取消进程内令牌）。
-        if (backgroundRunning != null) PackTaskBus.requestCancel()
+        if (PackTaskBus.isRunning()) PackTaskBus.requestCancel()
         if (!backgroundPacking) cancelToken?.cancel()
         cancelToken = null
         executing = false
@@ -870,13 +856,16 @@ fun LibrarySteps(
                                 onExecute = {},
                                 showPlanSection = true,
                                 // 执行态:底栏换「取消」+ 上方进度条(见 PackPreviewPage)
+                                // 服务路径由独立小组件 [BackgroundPackProgressDialog] 收集逐页进度，
+                                // 避免每写一页触发 PackPreviewPage 全树重组。
                                 executing = effectiveExecuting,
-                                progress = effectiveProgress,
-                                pageDone = effectivePageDone,
-                                pageTotal = effectivePageTotal,
-                                volumeLabel = effectiveVolumeLabel,
+                                showProgressDialog = !isBackgroundRunning,
+                                progress = if (backgroundPacking || isBackgroundRunning) null else progress,
+                                pageDone = null,
+                                pageTotal = null,
+                                volumeLabel = null,
                                 onCancelExecution = {
-                                    if (backgroundPacking) {
+                                    if (backgroundPacking || PackTaskBus.isRunning()) {
                                         // 服务侧取消：令牌在总线里，`requestCancel` 会置
                                         // `cancelling = true` 并让执行方在**卷间**停下。
                                         PackTaskBus.requestCancel()
@@ -887,11 +876,17 @@ fun LibrarySteps(
                                         cancelToken?.cancel()
                                     }
                                 },
-                                cancelling = effectiveCancelling,
+                                cancelling = if (backgroundPacking || isBackgroundRunning) false else cancelling,
                                 executionError = executionError,
                                 pagePreflight = pagePreflight,
                                 onBack = { backStack.popWorkflowStep() },
                                 modifier = Modifier.weight(1f),
+                            )
+                        }
+                        if (isBackgroundRunning) {
+                            BackgroundPackProgressDialog(
+                                volumes = state.volumes,
+                                onCancel = { PackTaskBus.requestCancel() },
                             )
                         }
                     }
@@ -995,5 +990,36 @@ const val TAG_B_INTERRUPTED_NOTICE = "library-interrupted-notice"
 /** 关掉「上次打包被中断」提示。 */
 const val TAG_B_INTERRUPTED_DISMISS = "library-interrupted-dismiss"
 
+/**
+ * 前台服务打包进度弹窗的独立状态观察容器（P0 #3）。
+ *
+ * 把 `PackTaskBus.state.collectAsStateWithLifecycle()` 隔离在这个小 Composable 内，
+ * 使千页级打包的逐页进度更新只重组弹窗自身，不驱动外层 `LibrarySteps` 与 `PackPreviewPage` 重组。
+ */
+@Composable
+private fun BackgroundPackProgressDialog(
+    volumes: List<ComicVolume>,
+    onCancel: () -> Unit,
+) {
+    val busState by PackTaskBus.state.collectAsStateWithLifecycle()
+    val running = busState as? PackTaskState.Running ?: return
+    // 正在写的卷名（弹窗底部一行）。取 `processed` 指向的那一卷：
+    // 用 `dirPath`（含作者前缀）而不是清洗后的 `title`（User said m15457）。
+    val volumeLabel = remember(running.progress.processed, volumes) {
+        volumes.getOrNull(running.progress.processed)?.dirPath?.takeIf { it.isNotEmpty() }
+    }
+    PackProgressDialog(
+        progress = running.progress,
+        pageDone = running.pageDone,
+        pageTotal = running.pageTotal,
+        onCancel = onCancel,
+        cancelling = running.cancelling,
+        volumeLabel = volumeLabel,
+    )
+}
+
 /** 记录上一次对账的卷列表（普通可变字段，避免组合期写快照状态触发多余重组）。 */
 private class LastLibraryVolumes(var volumes: List<ComicVolume>)
+
+/** 仅供测试观测关键节点的重组次数；生产环境下为 null，零运行时开销。 */
+internal val LocalRecompositionObserver = staticCompositionLocalOf<((String) -> Unit)?> { null }

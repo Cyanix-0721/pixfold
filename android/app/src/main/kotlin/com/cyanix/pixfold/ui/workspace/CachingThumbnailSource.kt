@@ -2,7 +2,10 @@ package com.cyanix.pixfold.ui.workspace
 
 import androidx.compose.ui.graphics.ImageBitmap
 import com.cyanix.pixfold.domain.thumb.ThumbBudget
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withPermit
 
@@ -95,11 +98,13 @@ class CachingThumbnailSource(
         }
 
         if (!owner) {
-            // 等待者拿到 owner 的结果。owner 被取消时这里是 CancellationException ——
-            // 吞掉并返回 null（回退程序化缩略图），比让整屏协程一起崩要好。
+            // 等待者拿到 owner 的结果。
+            // 若是调用方自身协程被取消（!isActive），必须重抛 CancellationException 维持结构化并发；
+            // 若等待者自身仍存活而仅 owner 被取消，则安全回退 null（回退程序化缩略图，不连带打崩整屏）。
             return try {
                 request.await()
-            } catch (e: kotlinx.coroutines.CancellationException) {
+            } catch (e: CancellationException) {
+                if (!currentCoroutineContext().isActive) throw e
                 null
             }
         }
@@ -125,7 +130,11 @@ class CachingThumbnailSource(
             request.completeExceptionally(e)
             throw e
         } finally {
-            synchronized(inFlight) { inFlight.remove(uri) }
+            synchronized(inFlight) {
+                if (inFlight[uri] === request) {
+                    inFlight.remove(uri)
+                }
+            }
         }
     }
 

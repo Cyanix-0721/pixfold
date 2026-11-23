@@ -71,8 +71,14 @@ data class LibraryState(
      * 分组规则现在**只有一份**:`domain/comic/VolumeGroups.kt` 的 [groupVolumes] ——
      * 与元数据页卷芯片、集合芯片同一套。两套并存时书架页与芯片行的分组会不一致,
      * 而这种漂移只表现为「有时分对了、有时混在一起」。
+     *
+     * 声明在类体内的只读懒加载属性不参与 `data class` 的 `equals`/`hashCode`/`copy`，
+     * 且 `LazyThreadSafetyMode.PUBLICATION` 线程安全，避免同一次重组中 `seriesCount` /
+     * `singleCount` / 列表渲染重复执行 `groupVolumes(volumes)`。
      */
-    val seriesGroups: List<VolumeGroup> get() = groupVolumes(volumes)
+    val seriesGroups: List<VolumeGroup> by lazy(LazyThreadSafetyMode.PUBLICATION) {
+        groupVolumes(volumes)
+    }
 
     /** 真正的系列数(单本不计入)—— 摘要里「识别到 N 个系列」用的是它。 */
     val seriesCount: Int get() = seriesGroups.count { it.isSeries }

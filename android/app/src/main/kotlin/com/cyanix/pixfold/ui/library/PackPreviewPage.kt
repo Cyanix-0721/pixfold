@@ -14,7 +14,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.material3.Button
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.FilterChip
@@ -22,6 +22,8 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.SideEffect
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
@@ -133,6 +135,13 @@ fun PackPreviewPage(
      */
     executing: Boolean = false,
     /**
+     * 是否由本页内置渲染 [PackProgressDialog]。
+     *
+     * 默认 `true`（进程内执行与直接组合本页的测试均保持原行为）；
+     * 前台服务路径由外层独立小组件收集逐页进度并渲染弹窗时传 `false`，避免双弹窗。
+     */
+    showProgressDialog: Boolean = true,
+    /**
      * 打包进度（D2b）。`null` = 未开始或无进度可报。
      *
      * 类型用领域层已算好的 [TaskProgress] 而不是「已完成/总数」两个 Int：分段进度条
@@ -181,6 +190,9 @@ fun PackPreviewPage(
      */
     pagePreflight: PackUiPreflight? = null,
 ) {
+    LocalRecompositionObserver.current?.let { observe ->
+        SideEffect { observe("PackPreviewPage") }
+    }
     // 空工作区必须**先于**任何 `activeVolume` 读取判定（2026-10-19）。
     // 真实 SAF 扫描可能一卷都不产生（目录里没有图片，或图片全散在根目录 ——
     // 按「每个直接含图片的目录 = 一个集合」的规则，根目录本身不构成卷）。
@@ -197,7 +209,24 @@ fun PackPreviewPage(
     }
 
     val volume = libraryState.activeVolume
-    val preview = previewOf(volume)
+    val preview = remember(volume) { previewOf(volume) }
+    val includedCount = remember(libraryState.volumes) { includedVolumes(libraryState.volumes).size }
+    val plans = remember(showPlanSection, libraryState.volumes, conflictPolicy, sourcePolicy) {
+        if (showPlanSection) {
+            buildPackagePlans(
+                libraryState.volumes,
+                conflictPolicy = conflictPolicy,
+                sourcePolicy = sourcePolicy,
+            )
+        } else {
+            emptyList()
+        }
+    }
+    val dangers = remember(plans, cleanEmptyDirs) {
+        if (plans.isEmpty()) emptySet() else effectiveDangerActions(plans, cleanEmptyDirs)
+    }
+    val dangersList = remember(dangers) { dangers.toList() }
+    val planCounts = remember(plans) { planCountsOf(plans) }
 
     Column(
         modifier = modifier
@@ -235,7 +264,7 @@ fun PackPreviewPage(
             item(key = "header") {
                 PackHeader(
                     volume = volume,
-                    includedCount = includedVolumes(libraryState.volumes).size,
+                    includedCount = includedCount,
                     totalCount = libraryState.volumes.size,
                 )
             }
@@ -303,8 +332,11 @@ fun PackPreviewPage(
                 }
             }
 
-            items(preview.pages.indices.toList()) { i ->
-                val page = preview.pages[i]
+            itemsIndexed(
+                items = preview.pages,
+                key = { _, page -> "page-${page.item.id}" },
+                contentType = { _, _ -> "page" },
+            ) { i, page ->
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -342,14 +374,7 @@ fun PackPreviewPage(
 
             // ---- P6:执行计划(仅当前卷? 不 —— 计划覆盖全部 included 卷) ----
             if (showPlanSection) {
-                item(key = "plan") {
-                    val plans = buildPackagePlans(
-                        libraryState.volumes,
-                        conflictPolicy = conflictPolicy,
-                        sourcePolicy = sourcePolicy,
-                    )
-                    val dangers = effectiveDangerActions(plans, cleanEmptyDirs)
-
+                item(key = "plan-header", contentType = "plan-header") {
                     Column(modifier = Modifier.fillMaxWidth()) {
                         HorizontalDivider(modifier = Modifier.padding(top = 8.dp))
                         Text(
@@ -429,11 +454,16 @@ fun PackPreviewPage(
                             }
                         }
 
-                        PlanHeader(counts = planCountsOf(plans), dangers = dangers.toList())
-                        for (i in plans.indices) {
-                            PlanRow(plans[i], i)
-                        }
+                        PlanHeader(counts = planCounts, dangers = dangersList)
                     }
+                }
+
+                itemsIndexed(
+                    items = plans,
+                    key = { _, plan -> "plan-row-${plan.volume.id}" },
+                    contentType = { _, _ -> "plan-row" },
+                ) { i, plan ->
+                    PlanRow(plan, i)
                 }
             }
         }
@@ -504,7 +534,7 @@ fun PackPreviewPage(
 
     // 打包进度弹窗（D2b / 2026-10-20 用户裁决「弹窗双层圆圈 + 背景高斯模糊」）。
     // 与确认框同层：独立窗口，放进滚动容器会被裁切。
-    if (showPlanSection && executing) {
+    if (showPlanSection && executing && showProgressDialog) {
         PackProgressDialog(
             progress = progress ?: TaskProgress(total = 0),
             pageDone = pageDone,

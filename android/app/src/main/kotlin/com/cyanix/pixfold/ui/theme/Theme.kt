@@ -10,6 +10,7 @@ import androidx.compose.material3.MotionScheme
 import androidx.compose.material3.dynamicDarkColorScheme
 import androidx.compose.material3.dynamicLightColorScheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalContext
@@ -52,27 +53,35 @@ fun PixFoldTheme(
     }
 
     val context = LocalContext.current
-    val seedArgb = if (settings.monetEnabled) {
-        // 取系统动态配色的 primary 作种子:深浅两种模式下它都来自同一套壁纸色调。
-        val systemScheme = if (dark) {
-            dynamicDarkColorScheme(context)
+    val scheme = remember(
+        dark,
+        settings.monetEnabled,
+        settings.accent,
+        settings.colorStyle,
+        settings.colorSpec,
+        settings.pureBlack,
+        context,
+    ) {
+        val seedArgb = if (settings.monetEnabled) {
+            // 取系统动态配色的 primary 作种子:深浅两种模式下它都来自同一套壁纸色调。
+            val systemScheme = if (dark) {
+                dynamicDarkColorScheme(context)
+            } else {
+                dynamicLightColorScheme(context)
+            }
+            systemScheme.primary.toArgb()
         } else {
-            dynamicLightColorScheme(context)
+            // 含 AccentChoice.System 但 API < 31 的情况(回退到内置默认种子)。
+            AccentPresets.seedOf(settings.accent).toArgb()
         }
-        systemScheme.primary.toArgb()
-    } else {
-        // 含 AccentChoice.System 但 API < 31 的情况(回退到内置默认种子)。
-        AccentPresets.seedOf(settings.accent).toArgb()
-    }
 
-    var scheme = ColorSchemes.fromSeed(
-        seedArgb = seedArgb,
-        dark = dark,
-        style = settings.colorStyle,
-        spec = settings.colorSpec,
-    )
-    if (settings.pureBlack && dark) {
-        scheme = scheme.withPureBlack()
+        val base = ColorSchemes.fromSeed(
+            seedArgb = seedArgb,
+            dark = dark,
+            style = settings.colorStyle,
+            spec = settings.colorSpec,
+        )
+        if (settings.pureBlack && dark) base.withPureBlack() else base
     }
 
     MaterialExpressiveTheme(

@@ -20,6 +20,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
@@ -146,6 +147,8 @@ fun LibraryPage(
 ) {
     // 要进 semantics{},故先在组合上下文里解析
     val nextCd = stringResource(R.string.lib_next_cd)
+    val seriesGroups = remember(state.volumes) { state.seriesGroups }
+    val seriesCount = remember(seriesGroups) { seriesGroups.count { it.isSeries } }
     Column(
         modifier = modifier
             .fillMaxSize()
@@ -174,8 +177,8 @@ fun LibraryPage(
         Text(
             text = pluralStringResource(
                 R.plurals.lib_summary,
-                state.seriesCount,
-                state.seriesCount,
+                seriesCount,
+                seriesCount,
                 state.volumeCount,
                 state.includedCount,
                 state.pendingCount,
@@ -224,7 +227,7 @@ fun LibraryPage(
                     )
                 }
             }
-            state.seriesGroups.forEach { group ->
+            seriesGroups.forEach { group ->
                 // **单本不挂系列头**(2026-10-21 真机缺陷的收尾):单本各自成组,但它自己
                 // 就是那一本 —— 给每个单本配一个「系列头 + 1 卷」读起来像在说"这些单本
                 // 各自是一个系列"。系列头只在 group.isSeries 时出现。
