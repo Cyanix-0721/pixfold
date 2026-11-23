@@ -7,7 +7,9 @@ description: PixFold 的 Android 真机核对规约——授权、adb 连接与�
 
 真机核对是「修复自证三层」的第三层：领域单测 → UI 层断言 → 真机实证（埋点 + 模拟输入 + 像素/快照对比）。不得只凭「测试通过」交付。
 
-Robolectric 不做真实文本测量与真实布局——芯片宽度一律算成约 0（实测 trip 34.9dp / scan 34.6 / misc 34.3 / cn 34.3）。所以「放得下 / 是否挤出视口」这类结论**只能真机断**：删掉 `horizontalScroll` 后 312 项全绿也只是假保障。
+**区分 Robolectric 的两种图形后端**（`GraphicsMode.LEGACY` vs `GraphicsMode.NATIVE`）：
+- **`GraphicsMode.LEGACY`（默认）**：`ShadowPaint` 把文本宽度打桩为 ~0（实测 trip 34.9dp / scan 34.6 / misc 34.3 / cn 34.3），因此 LEGACY 用例里「放得下 / 是否挤出视口」属于假保障（删掉 `horizontalScroll` 后仍全绿）。
+- **`GraphicsMode.NATIVE`（`robolectric-nativeruntime.dll` + `NotoSansCJK` / `Roboto`）**：纯 JVM 原生 Skia + Minikin 真实文本测量与排版。日常布局是否放得下、折行、水平溢出、`fontScale` 缩放、以及 HANDBOOK §6.5 `>=48dp` 触控目标与无障碍守卫，一律优先在 `@GraphicsMode(GraphicsMode.Mode.NATIVE)` + `zh-rCN/en-w361dp-h794dp-560dpi` 套件（见 `PixFoldUiTestDefaults`）离线跑通；只有距视口边缘 `<5%` 的 OEM 字体临界布局才需真机抽验。
 
 ## 授权
 
@@ -46,10 +48,15 @@ Robolectric 不做真实文本测量与真实布局——芯片宽度一律算�
 
 | 结论类型 | 能否离线断 | 说明 |
 | --- | --- | --- |
-| 领域逻辑（排序 / 命名 / 元数据） | ✅ 领域单测 | 第一层 |
+| 领域逻辑（排序 / 命名 / 元数据 / `ZipFile` 兼容） | ✅ 领域单测 | 第一层（`:domain:test`） |
 | 结构 / 接线（节点存在、点击推进、按钮左右槽位） | ✅ UI 断言 | `getBoundsInRoot()` 能反映 `graphicsLayer` 缩放 |
-| 「放得下」「是否挤出视口」 | ❌ 只能真机 | 删掉 `horizontalScroll` 后 312 项全绿 = 纯假保障 |
-| 视觉规格（底色、高度、危险红） | ⚠️ 像素断言 + 真机 | 需 `@GraphicsMode(NATIVE)` + `captureToImage()`；LEGACY 后端画不出真实颜色 |
-| 动画观感 / 是否生硬 | ❌ 只能真机（用户判定） | 用户观感判定才算定稿 |
+| 日常布局「放得下 / 折行 / 水平溢出 / `fontScale` / `>=48dp` 无障碍」 | ✅ `@GraphicsMode(NATIVE)` | 使用 `robolectric-nativeruntime.dll` + `NotoSansCJK` 真实测宽排版（`w361dp-h794dp-560dpi` + `zh-rCN`/`en` + `1.0f`/`1.3f`）；LEGACY 后端（~0 宽打桩）下仍属假保障 |
+| 近边缘（`<5%` 视口裕度）OEM 字体临界布局 | ❌ 需真机抽验 | ColorOS `OnePlus Sans`/`OPPO Sans` 与 AOSP `Roboto`+`NotoSansCJK` 存在细微字宽差 |
+| 视觉规格（底色、描边、高度、危险红） | ⚠️ NATIVE 像素/黄金图 + 真机 | 需 `@GraphicsMode(NATIVE)` + `PixFoldNativeTestHost`（避开 `#FAFAFA` 窗口底色）；OLED 观感与壁纸动态取色（`AccentChoice.System`）须真机 |
+| 大体积流式打包与内存压测（1 GB+ Zip64 / 256 MB 堆 OOM） | ❌ 只能真机 | 需真机真实堆限制与真实存储写盘压测 |
+| 真实 OEM SAF 怪癖（`ExternalStorageProvider`、`(1)` 自动改名、真实 `StatFs`） | ❌ 只能真机 | 离线测试不可替代厂商 DocumentsProvider 行为 |
+| Android 16 Live Updates 状态栏 / 通知栏渲染 | ❌ 只能真机 | 需真实 SystemUI / ColorOS 通知栏渲染核对 |
+| 中文 IME 软键盘 / 边缘手势冲突 | ❌ 只能真机 | 需真实输入法与系统手势导航验证 |
+| 动画观感 / 60·120Hz 流畅度 / 是否生硬 | ❌ 只能真机（用户判定） | 用户观感判定才算定稿 |
 
 ⚠️ 变异能存活就说明断言没有杀伤力——删掉它，并写明为什么刻意不设这条断言，留着只会给假保障。变异纪律：先用 assert 确认旧串真的消失、再解读结果；备份 + 变异 + 还原必须在同一次调用内完成；还原一律用 `cp` 备份，**绝不用 `git checkout --`**（会连未提交改动一起丢掉）。

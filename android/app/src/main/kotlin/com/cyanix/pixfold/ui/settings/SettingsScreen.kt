@@ -11,11 +11,13 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.HorizontalDivider
@@ -38,6 +40,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
@@ -438,18 +441,25 @@ private fun RadioRow(
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .clickable(onClick = onClick)
+            .heightIn(min = 48.dp)
+            .selectable(
+                selected = selected,
+                role = Role.RadioButton,
+                onClick = onClick,
+            )
             .testTag(tag)
             .semantics { contentDescription = label }
-            .padding(vertical = 2.dp),
+            .padding(horizontal = 4.dp, vertical = 2.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        RadioButton(selected = selected, onClick = onClick)
+        // onClick = null 交由整行 selectable 承载点击与无障碍语义（M3 推荐模式），
+        // 避免 TalkBack 把 RadioButton 暴露成缺少 contentDescription 的重复可点击节点。
+        RadioButton(selected = selected, onClick = null)
         Text(
             text = label,
             style = MaterialTheme.typography.bodyLarge,
             color = MaterialTheme.colorScheme.onSurface,
-            modifier = Modifier.padding(start = 4.dp),
+            modifier = Modifier.padding(start = 12.dp),
         )
     }
 }
@@ -524,26 +534,28 @@ private fun <T> ChoiceRow(
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .clickable {
-                                    open = false
-                                    onSelect(value)
-                                }
+                                .heightIn(min = 48.dp)
+                                .selectable(
+                                    selected = text == current,
+                                    role = Role.RadioButton,
+                                    onClick = {
+                                        open = false
+                                        onSelect(value)
+                                    },
+                                )
                                 .testTag(choiceOptionTag("$tag-$index"))
                                 .semantics { contentDescription = text }
-                                .padding(vertical = 4.dp),
+                                .padding(horizontal = 4.dp, vertical = 4.dp),
                             verticalAlignment = Alignment.CenterVertically,
                         ) {
                             RadioButton(
                                 selected = text == current,
-                                onClick = {
-                                    open = false
-                                    onSelect(value)
-                                },
+                                onClick = null,
                             )
                             Text(
                                 text = text,
                                 style = MaterialTheme.typography.bodyLarge,
-                                modifier = Modifier.padding(start = 4.dp),
+                                modifier = Modifier.padding(start = 12.dp),
                             )
                         }
                     }
