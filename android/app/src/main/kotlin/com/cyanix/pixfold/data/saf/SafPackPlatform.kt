@@ -11,8 +11,10 @@ import com.cyanix.pixfold.domain.comic.ComicInfoData
 import com.cyanix.pixfold.domain.comic.ExistingComicInfoProbe
 import com.cyanix.pixfold.domain.comic.OutputExistsProbe
 import com.cyanix.pixfold.domain.comic.PageBytes
-import com.cyanix.pixfold.domain.model.ComicVolume
+import com.cyanix.pixfold.domain.comic.applyExistingComicInfo
 import com.cyanix.pixfold.domain.comic.comicInfoOfEntry
+import com.cyanix.pixfold.domain.comic.markOutputExists
+import com.cyanix.pixfold.domain.model.ComicVolume
 import com.cyanix.pixfold.domain.pack.CbzOutputSink
 import com.cyanix.pixfold.domain.plan.VolumePackPlan
 import java.io.BufferedInputStream
@@ -153,42 +155,8 @@ class SafOutputExistsProbe(
     private val resolver: ContentResolver = context.applicationContext.contentResolver
 
     override fun exists(volume: ComicVolume): Boolean {
-        val parentUri = parentDocumentUri(dirOfVolume(volume)) ?: return false
-        val parentDocId = try {
-            DocumentsContract.getDocumentId(parentUri)
-        } catch (e: Exception) {
-            return false
-        }
-        val childrenUri = DocumentsContract.buildChildDocumentsUriUsingTree(treeUri, parentDocId)
-        val projection = arrayOf(
-            DocumentsContract.Document.COLUMN_DISPLAY_NAME,
-            DocumentsContract.Document.COLUMN_MIME_TYPE,
-        )
-        return try {
-            resolver.query(childrenUri, projection, null, null, null)?.use { cursor ->
-                while (cursor.moveToNext()) {
-                    val name = cursor.getString(0)
-                    val mime = cursor.getString(1) ?: ""
-                    if (name == volume.cbzFileName && mime != DocumentsContract.Document.MIME_TYPE_DIR) {
-                        return true
-                    }
-                }
-                false
-            } ?: false
-        } catch (e: Exception) {
-            // 查不到就当不存在?不行 —— 判成不存在会让覆盖变成新建,后果更糟。
-            // 但领域层的 outputExists 只有布尔值,无法表达「不确定」;此处选择
-            // 保守=false 并在界面侧由 preflight 的「估算下界」警告兜住风险。
-            Log.w(TAG, "查询输出是否已存在失败,按不存在处理", e)
-            false
-        }
-    }
-
-    private fun parentDocumentUri(dirRel: String): Uri? =
-        safParentDocumentUri(resolver, treeUri, dirRel)
-
-    private companion object {
-        const val TAG = "SafOutputExistsProbe"
+        val parentUri = safParentDocumentUri(resolver, treeUri, dirOfVolume(volume)) ?: return false
+        return safFindChild(resolver, treeUri, parentUri, volume.cbzFileName) != null
     }
 }
 
@@ -327,100 +295,189 @@ class SafExistingComicInfoProbe(
     private val resolver: ContentResolver = context.applicationContext.contentResolver
 
     override fun read(volume: ComicVolume): ComicInfoData? {
-        val parentUri = parentDocumentUri(dirOfVolume(volume)) ?: return null
-        val parentDocId = runCatching { DocumentsContract.getDocumentId(parentUri) }.getOrNull()
-            ?: return null
-        val childrenUri = DocumentsContract.buildChildDocumentsUriUsingTree(treeUri, parentDocId)
-        val projection = arrayOf(
-            DocumentsContract.Document.COLUMN_DOCUMENT_ID,
-            DocumentsContract.Document.COLUMN_DISPLAY_NAME,
-            DocumentsContract.Document.COLUMN_MIME_TYPE,
+        val parentUri = safParentDocumentUri(resolver, treeUri, dirOfVolume(volume)) ?: return null
+        val cbzUri = safFindChild(resolver, treeUri, parentUri, volume.cbzFileName) ?: return null
+        return readComicInfoFromSafUri(resolver, cbzUri)
+    }
+}
+
+/** SAF 目录下单个子项的轻量快照（供 [SafVolumeProbeSession] 按父目录缓存列举结果）。 */
+internal data class SafChildEntry(
+    val documentId: String,
+    val displayName: String,
+    val isDirectory: Boolean,
+)
+
+/**
+ * 批量卷探测会话：按父目录缓存一次 SAF 子项列举，单趟合并「输出是否存在」与「已有 CBZ URI 查找」。
+ *
+ * ## 为什么按会话缓存目录列举（P0 #1）
+ *
+ * 同一系列目录下有 N 卷时，分别调用 [SafOutputExistsProbe] 与 [SafExistingComicInfoProbe]
+ * 会触发 **2N** 次完整目录下钻 + **2N** 次 `resolver.query(childrenUri)`。
+ * 本类在单次探测会话内缓存 `parentDocId -> (dirs, files)` 与 `dirRel -> parentDocId`：
+ * - 同目录 N 卷合计只执行 **1** 次 SAF 子项查询（根下 N 卷 = 1 次，系列下 N 卷 = 根 1 次 + 系列 1 次）；
+ * - 存在性判定与 ComicInfo 读取共享同一份 `displayName -> docUri` 映射，不存在的卷不打开流；
+ * - 缺失或不可读目录也会被缓存（使用 `containsKey` 而非 `getOrPut`），避免重复下钻失败路径。
+ *
+ * **生命周期**：仅限单次扫描/进入库页的一趟探测，切勿跨刷新长期复用，否则用户外部增删 CBZ 后看不到变化。
+ */
+class SafVolumeProbeSession internal constructor(
+    private val rootDocId: () -> String?,
+    private val listChildren: (parentDocId: String) -> List<SafChildEntry>?,
+    private val buildDocumentUri: (docId: String) -> Uri,
+    private val readComicInfoFromUri: (Uri) -> ComicInfoData?,
+    private val dirOfVolume: (ComicVolume) -> String,
+) : OutputExistsProbe, ExistingComicInfoProbe {
+
+    constructor(
+        context: Context,
+        treeUri: Uri,
+        dirOfVolume: (ComicVolume) -> String,
+    ) : this(
+        rootDocId = {
+            runCatching { DocumentsContract.getTreeDocumentId(treeUri) }.getOrNull()
+        },
+        listChildren = { parentDocId ->
+            safListChildren(context.applicationContext.contentResolver, treeUri, parentDocId)
+        },
+        buildDocumentUri = { docId ->
+            DocumentsContract.buildDocumentUriUsingTree(treeUri, docId)
+        },
+        readComicInfoFromUri = { cbzUri ->
+            readComicInfoFromSafUri(context.applicationContext.contentResolver, cbzUri)
+        },
+        dirOfVolume = dirOfVolume,
+    )
+
+    private data class DirSnapshot(
+        val dirs: Map<String, String>,
+        val files: Map<String, Uri>,
+    )
+
+    private val childrenCache = HashMap<String, DirSnapshot?>()
+    private val dirIdCache = HashMap<String, String?>()
+
+    /** 在缓存的目录快照中查找该卷的已有 CBZ URI（不存在或同名是目录则返回 null）。 */
+    internal fun findExistingCbzUri(volume: ComicVolume): Uri? {
+        val dirDocId = resolveDirDocId(dirOfVolume(volume)) ?: return null
+        return childrenOf(dirDocId)?.files?.get(volume.cbzFileName)
+    }
+
+    override fun exists(volume: ComicVolume): Boolean = findExistingCbzUri(volume) != null
+
+    override fun read(volume: ComicVolume): ComicInfoData? {
+        val cbzUri = findExistingCbzUri(volume) ?: return null
+        return readComicInfoFromUri(cbzUri)
+    }
+
+    /** 单趟批量探测：先标 `outputExists`，再复命中目录缓存读取已有 CBZ 里的 `ComicInfo.xml`。 */
+    fun probe(volumes: List<ComicVolume>): List<ComicVolume> =
+        applyExistingComicInfo(
+            volumes = markOutputExists(volumes, this),
+            probe = this,
         )
-        val cbzUri = try {
-            resolver.query(childrenUri, projection, null, null, null)?.use { cursor ->
-                var found: Uri? = null
-                while (cursor.moveToNext() && found == null) {
-                    val docId = cursor.getString(0)
-                    val name = cursor.getString(1)
-                    val mime = cursor.getString(2) ?: ""
-                    if (name == volume.cbzFileName && mime != DocumentsContract.Document.MIME_TYPE_DIR) {
-                        found = DocumentsContract.buildDocumentUriUsingTree(treeUri, docId)
-                    }
+
+    private fun childrenOf(parentDocId: String): DirSnapshot? {
+        if (childrenCache.containsKey(parentDocId)) return childrenCache[parentDocId]
+        val snapshot = listChildren(parentDocId)?.let { raw ->
+            val dirs = HashMap<String, String>()
+            val files = HashMap<String, Uri>()
+            for (entry in raw) {
+                if (entry.isDirectory) {
+                    dirs.putIfAbsent(entry.displayName, entry.documentId)
+                } else {
+                    files.putIfAbsent(entry.displayName, buildDocumentUri(entry.documentId))
                 }
-                found
             }
-        } catch (e: Exception) {
-            Log.w(TAG, "查询已有 CBZ 失败: ${volume.cbzFileName}", e)
-            null
+            DirSnapshot(dirs = dirs, files = files)
         }
-        return cbzUri?.let { readComicInfoFrom(it) }
+        childrenCache[parentDocId] = snapshot
+        return snapshot
     }
 
-    private fun readComicInfoFrom(cbzUri: Uri): ComicInfoData? = try {
-        resolver.openInputStream(cbzUri)?.use { raw ->
-            ZipInputStream(BufferedInputStream(raw)).use { zip ->
-                var scanned = 0
-                var xml: String? = null
-                while (scanned < MAX_ENTRIES_SCANNED) {
-                    val entry = zip.nextEntry ?: break
-                    scanned++
-                    val name = entry.name.substringAfterLast('/')
-                    if (name.equals(COMIC_INFO_ENTRY, ignoreCase = true)) {
-                        xml = zip.readBytes().toString(Charsets.UTF_8)
-                        break
-                    }
-                }
-                // 三态交给领域层：没有条目 ⇒ 空对象(清空当前值)；条目在但解析不出 ⇒ null
-                // (保持建议值)。见 `comicInfoOfEntry` 的 KDoc —— 把两者混成一个空对象
-                // 会让「读不懂」变成「把用户的元数据清空」。
-                comicInfoOfEntry(xml)
-            }
-        }
-    } catch (e: Exception) {
-        Log.w(TAG, "读取已有 CBZ 失败,按没有处理: $cbzUri", e)
-        null
+    private fun resolveDirDocId(dirRel: String): String? {
+        if (dirIdCache.containsKey(dirRel)) return dirIdCache[dirRel]
+        val resolved = resolveDirDocIdUncached(dirRel)
+        dirIdCache[dirRel] = resolved
+        return resolved
     }
 
-    private fun parentDocumentUri(dirRel: String): Uri? {
-        val rootDocId = runCatching { DocumentsContract.getTreeDocumentId(treeUri) }.getOrNull()
-            ?: return null
-        if (dirRel.isEmpty()) return DocumentsContract.buildDocumentUriUsingTree(treeUri, rootDocId)
-        var currentDocId = rootDocId
+    private fun resolveDirDocIdUncached(dirRel: String): String? {
+        val root = rootDocId() ?: return null
+        if (dirRel.isEmpty()) return root
+        var currentDocId = root
         for (segment in dirRel.split('/')) {
             if (segment.isEmpty()) continue
-            val childrenUri = DocumentsContract.buildChildDocumentsUriUsingTree(treeUri, currentDocId)
-            currentDocId = queryDirId(childrenUri, segment) ?: return null
+            val snapshot = childrenOf(currentDocId) ?: return null
+            currentDocId = snapshot.dirs[segment] ?: return null
         }
-        return DocumentsContract.buildDocumentUriUsingTree(treeUri, currentDocId)
+        return currentDocId
     }
+}
 
-    private fun queryDirId(childrenUri: Uri, displayName: String): String? {
-        val projection = arrayOf(
-            DocumentsContract.Document.COLUMN_DOCUMENT_ID,
-            DocumentsContract.Document.COLUMN_DISPLAY_NAME,
-            DocumentsContract.Document.COLUMN_MIME_TYPE,
-        )
-        return try {
-            resolver.query(childrenUri, projection, null, null, null)?.use { cursor ->
-                while (cursor.moveToNext()) {
-                    val name = cursor.getString(1)
-                    val mime = cursor.getString(2) ?: ""
-                    if (name == displayName && mime == DocumentsContract.Document.MIME_TYPE_DIR) {
-                        return cursor.getString(0)
-                    }
+/** 从已有 CBZ 的 document URI 读取并解析 `ComicInfo.xml`（供单卷与批量探测共用）。 */
+internal fun readComicInfoFromSafUri(resolver: ContentResolver, cbzUri: Uri): ComicInfoData? = try {
+    resolver.openInputStream(cbzUri)?.use { raw ->
+        ZipInputStream(BufferedInputStream(raw)).use { zip ->
+            var scanned = 0
+            var xml: String? = null
+            while (scanned < MAX_COMIC_INFO_ENTRIES_SCANNED) {
+                val entry = zip.nextEntry ?: break
+                scanned++
+                val name = entry.name.substringAfterLast('/')
+                if (name.equals(COMIC_INFO_ENTRY_NAME, ignoreCase = true)) {
+                    xml = zip.readBytes().toString(Charsets.UTF_8)
+                    break
                 }
-                null
             }
-        } catch (e: Exception) {
-            null
+            // 三态交给领域层：没有条目 ⇒ 空对象(清空当前值)；条目在但解析不出 ⇒ null
+            // (保持建议值)。见 `comicInfoOfEntry` 的 KDoc —— 把两者混成一个空对象
+            // 会让「读不懂」变成「把用户的元数据清空」。
+            comicInfoOfEntry(xml)
         }
     }
+} catch (e: Exception) {
+    Log.w(COMIC_INFO_TAG, "读取已有 CBZ 失败,按没有处理: $cbzUri", e)
+    null
+}
 
-    private companion object {
-        const val TAG = "SafExistingComicInfo"
-        const val COMIC_INFO_ENTRY = "ComicInfo.xml"
-        /** 最多扫这么多个条目找 ComicInfo —— 防第三方包把它埋在最末。 */
-        const val MAX_ENTRIES_SCANNED = 16
+private const val COMIC_INFO_TAG = "SafExistingComicInfo"
+private const val COMIC_INFO_ENTRY_NAME = "ComicInfo.xml"
+
+/** 最多扫这么多个条目找 ComicInfo —— 防第三方包把它埋在最末。 */
+private const val MAX_COMIC_INFO_ENTRIES_SCANNED = 16
+
+/** 一次性列举 [parentDocId] 下的所有直接子项；失败返回 null 不抛。 */
+internal fun safListChildren(
+    resolver: ContentResolver,
+    treeUri: Uri,
+    parentDocId: String,
+): List<SafChildEntry>? {
+    val childrenUri = DocumentsContract.buildChildDocumentsUriUsingTree(treeUri, parentDocId)
+    val projection = arrayOf(
+        DocumentsContract.Document.COLUMN_DOCUMENT_ID,
+        DocumentsContract.Document.COLUMN_DISPLAY_NAME,
+        DocumentsContract.Document.COLUMN_MIME_TYPE,
+    )
+    return try {
+        resolver.query(childrenUri, projection, null, null, null)?.use { cursor ->
+            val entries = ArrayList<SafChildEntry>()
+            while (cursor.moveToNext()) {
+                val docId = cursor.getString(0) ?: continue
+                val name = cursor.getString(1) ?: continue
+                val mime = cursor.getString(2) ?: ""
+                entries += SafChildEntry(
+                    documentId = docId,
+                    displayName = name,
+                    isDirectory = mime == DocumentsContract.Document.MIME_TYPE_DIR,
+                )
+            }
+            entries
+        }
+    } catch (e: Exception) {
+        Log.w(SAF_TAG, "列举子项失败", e)
+        null
     }
 }
 

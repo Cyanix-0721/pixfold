@@ -29,8 +29,11 @@ import androidx.navigation3.runtime.NavKey
 import androidx.navigation3.runtime.rememberNavBackStack
 import com.cyanix.pixfold.domain.mock.MockData
 import com.cyanix.pixfold.domain.mock.MockDataB
+import com.cyanix.pixfold.domain.comic.ExistingComicInfoProbe
+import com.cyanix.pixfold.domain.comic.OutputExistsProbe
 import com.cyanix.pixfold.domain.comic.applyExistingComicInfo
 import com.cyanix.pixfold.domain.comic.comicVolumesFrom
+import com.cyanix.pixfold.domain.comic.markOutputExists
 import com.cyanix.pixfold.domain.source.nestedDirWarnings
 import com.cyanix.pixfold.domain.model.ComicVolume
 import com.cyanix.pixfold.domain.model.ImageCollection
@@ -50,8 +53,7 @@ import com.cyanix.pixfold.domain.source.WorkspaceSource
 import com.cyanix.pixfold.data.coil.CoilThumbnailSource
 import com.cyanix.pixfold.data.coil.ImageLoaderCoilImageFetcher
 import com.cyanix.pixfold.data.saf.FilesystemSpaceSource
-import com.cyanix.pixfold.data.saf.SafExistingComicInfoProbe
-import com.cyanix.pixfold.data.saf.SafOutputExistsProbe
+import com.cyanix.pixfold.data.saf.SafVolumeProbeSession
 import com.cyanix.pixfold.data.saf.SafMetaUpdater
 import com.cyanix.pixfold.data.saf.SafPackExecutor
 import com.cyanix.pixfold.data.saf.outputDirRelOf
@@ -60,8 +62,6 @@ import com.cyanix.pixfold.data.saf.SafUndoActions
 import com.cyanix.pixfold.data.task.TaskCompletionNotification
 import com.cyanix.pixfold.ui.components.DialogBlurController
 import com.cyanix.pixfold.ui.components.DialogBlurHost
-import com.cyanix.pixfold.domain.library.LibraryState
-import com.cyanix.pixfold.domain.library.reconcileLibrary
 import com.cyanix.pixfold.ui.workspace.CachingThumbnailSource
 import com.cyanix.pixfold.domain.settings.AppLanguage
 import com.cyanix.pixfold.domain.settings.PixFoldSettings
@@ -95,6 +95,9 @@ import com.cyanix.pixfold.ui.workspace.collectionsOr
 import com.cyanix.pixfold.ui.workspace.handleOrNull
 import com.cyanix.pixfold.ui.organize.OrganizeSteps
 import com.cyanix.pixfold.ui.library.LibrarySteps
+import com.cyanix.pixfold.ui.library.LibraryVolumeLoader
+import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.Dispatchers
 import java.util.concurrent.atomic.AtomicBoolean
 
 /**
@@ -158,6 +161,18 @@ fun PixFoldApp(
      * 留这道缝是为了让测试能注入假实现 —— 与 workspaceSource 同一套思路。
      */
     metaUpdater: com.cyanix.pixfold.domain.pack.CbzMetaUpdater? = null,
+    /**
+     * 工作流 B 输出是否存在探针。默认 `null` = 生产路径在进入 `LibraryRoute` 后于
+     * [probeDispatcher] 上走批量 [SafVolumeProbeSession]；测试可注入假实现验证懒加载与离主线程行为。
+     */
+    outputExistsProbe: OutputExistsProbe? = null,
+    /**
+     * 工作流 B 已有 CBZ 的 `ComicInfo.xml` 探针。默认 `null` = 与 [outputExistsProbe] 共享同一次
+     * [SafVolumeProbeSession] 目录快照；测试可注入假实现。
+     */
+    existingComicInfoProbe: ExistingComicInfoProbe? = null,
+    /** 卷探测的后台调度器，默认 [Dispatchers.IO]（严禁在组合主线程执行 SAF/ZIP I/O）。 */
+    probeDispatcher: CoroutineDispatcher = Dispatchers.IO,
 ) {
     val context = LocalContext.current
     val settingsStore = store ?: remember { SharedPrefsSettingsStore(context) }
@@ -496,61 +511,41 @@ fun PixFoldApp(
                     )
                 }
             val resolvedMetaUpdater = metaUpdater ?: builtMetaUpdater
-            // probe 的目录解析必须与 `dirOfVolume` 用**同一套**规则,否则「判断存在」
-            // 和「实际写入」会看两个不同的目录。规则由 `comicVolumesFrom` 的输出目录
-            // 建议值定义:卷目录的父目录;根下一级时回退工作区根的显示名。
-            val outputDirOf: (com.cyanix.pixfold.domain.model.ComicVolume) -> String = { volume ->
-                volume.outputDir
-            }
-            val scannedVolumes = remember(collections, packTreeUri, workspaceHandle?.displayName) {
+            // 基础卷在组合期**零 I/O** 纯计算构造；`outputExists` 与已有 CBZ 的 `ComicInfo.xml`
+            // 探测推迟到进入 `LibraryRoute` 后在 `probeDispatcher`（默认 `Dispatchers.IO`）异步执行，
+            // 绝不在首页 / 整理页或主线程触发 SAF Binder IPC 与 ZIP/XML 读取（P0 #1）。
+            val baseVolumes = remember(collections, packTreeUri, workspaceHandle?.displayName) {
                 if (packTreeUri == null) {
                     // 没有可用工作区 ⇒ 退回演示数据。这不是「悄悄塞假数据」:
                     // 界面顶部的工作区条同时显示「未选择工作区」,用户看得见自己在
                     // 哪个状态,与工作流 A 的 `collectionsOr` 是同一套回退口径。
                     MockDataB.library.volumes
                 } else {
-                    val probe = SafOutputExistsProbe(
-                        context = context,
-                        treeUri = packTreeUri,
-                        dirOfVolume = outputDirOf,
-                    )
-                    // 已有 CBZ 里的 ComicInfo.xml 作为**当前值**,建议值原样保留
-                    // (用户 2026-10-20 裁决:内容以文件为准,恢复建议仍取文件夹)。
-                    // 顺序不能反 —— 先有建议值才有 `cbzFileName`,才知道去哪个文件名里找。
-                    applyExistingComicInfo(
-                        volumes = comicVolumesFrom(
-                            collections = collections,
-                            rootDisplayName = workspaceHandle?.displayName.orEmpty(),
-                            outputExists = probe,
-                        ),
-                        probe = SafExistingComicInfoProbe(
-                            context = context,
-                            treeUri = packTreeUri,
-                            dirOfVolume = outputDirOf,
-                        ),
+                    comicVolumesFrom(
+                        collections = collections,
+                        rootDisplayName = workspaceHandle?.displayName.orEmpty(),
+                        outputExists = OutputExistsProbe { false },
                     )
                 }
             }
             val libraryRootPath = workspaceHandle?.displayName
                 ?: MockDataB.library.rootPath
-            // 工作流 B 也有「实时刷新 + 增量对账」(与 A 同构):用户在文件管理器里
-            // 增删图片/目录后,卷列表会重扫;重扫**不能**清掉用户填好的元数据与勾选。
-            // 对账责任在这一层 —— `LibrarySteps` 只负责不缓存(见其 KDoc)。
-            var libraryVolumes by remember(workspaceHandle) {
-                mutableStateOf(scannedVolumes)
+            val readyWorkspaceHandle = (workspaceState as? WorkspaceState.Ready)?.handle
+            // 工作流 B 的异步探测与实时刷新增量对账由 LibraryVolumeLoader 统一托管：
+            // 切换工作区时重置，同工作区集合变更时做增量对账并丢弃过期的在途探测结果。
+            val volumeLoader = remember(workspaceScope, probeDispatcher) {
+                LibraryVolumeLoader(
+                    scope = workspaceScope,
+                    ioDispatcher = probeDispatcher,
+                    initialVolumes = baseVolumes,
+                )
             }
-            val lastReconciledB = remember(workspaceHandle) { LastReconciledVolumes(scannedVolumes) }
-            if (lastReconciledB.volumes != scannedVolumes) {
-                lastReconciledB.volumes = scannedVolumes
-                libraryVolumes = reconcileLibrary(
-                    previous = LibraryState(
-                        rootPath = libraryRootPath,
-                        volumes = libraryVolumes,
-                        activeVolumeId = "",
-                    ),
-                    scanned = scannedVolumes,
-                ).volumes
-            }
+            volumeLoader.syncBase(
+                workspaceKey = readyWorkspaceHandle?.treeUri,
+                rootPath = libraryRootPath,
+                baseVolumes = baseVolumes,
+            )
+            val libraryVolumes = volumeLoader.volumes
             // 预览跟随**当前集合**:切集合后打开预览应看到该集合的图,
             // 否则页码与图片会对不上(索引来自当前集合)。
             //
@@ -855,6 +850,46 @@ fun PixFoldApp(
                 }
 
                 composable<LibraryRoute> {
+                    // 懒触发卷探测：只有进入 LibraryRoute 且工作区 Ready 时才切 IO 线程探测，
+                    // 离开 LibraryRoute 时取消在途探测，确保首页 / 整理页零 SAF/ZIP I/O。
+                    LaunchedEffect(
+                        readyWorkspaceHandle,
+                        baseVolumes,
+                        outputExistsProbe,
+                        existingComicInfoProbe,
+                    ) {
+                        val handle = readyWorkspaceHandle ?: return@LaunchedEffect
+                        val uri = handle.treeUri.toUri()
+                        val rootName = handle.displayName
+                        volumeLoader.requestProbe(
+                            workspaceKey = handle.treeUri,
+                            rootPath = libraryRootPath,
+                            baseVolumes = baseVolumes,
+                        ) { vols ->
+                            // 生产路径：单次批量会话共享目录列举缓存（每唯一目录仅 1 次 SAF query）。
+                            // 测试注入路径：按需懒构造 session，两个探针都注入时完全不碰 SAF。
+                            val session by lazy {
+                                SafVolumeProbeSession(
+                                    context = context,
+                                    treeUri = uri,
+                                    dirOfVolume = { vol -> outputDirRelOf(vol.outputDir, rootName) },
+                                )
+                            }
+                            if (outputExistsProbe == null && existingComicInfoProbe == null) {
+                                session.probe(vols)
+                            } else {
+                                val exists = outputExistsProbe ?: session
+                                val info = existingComicInfoProbe ?: session
+                                applyExistingComicInfo(
+                                    volumes = markOutputExists(vols, exists),
+                                    probe = info,
+                                )
+                            }
+                        }
+                    }
+                    DisposableEffect(volumeLoader) {
+                        onDispose { volumeLoader.cancelProbe() }
+                    }
                     DestinationSurface {
                         LibrarySteps(
                             rootPath = libraryRootPath,
@@ -973,22 +1008,6 @@ fun PixFoldApp(
  * 容器本身仍需 `remember`：它要跨重组存活，且随工作区句柄一起重建。
  */
 private class LastReconciled(var collections: List<ImageCollection>)
-
-/**
- * 工作流 B 的对账基准（**普通可变字段**，不是 `mutableStateOf`）。
- *
- * 为什么用普通字段：它只用来回答「这一帧的扫描结果跟上一帧是不是同一份」，答案
- * 不该参与重组；写成 state 会多触发一轮与界面无关的重组，而且会让「记录基准」
- * 这个动作本身被 Compose 的写-读追踪当成状态变更。
- *
- * 为什么用 `!=` 而不是引用比较：`comicVolumesFrom` 每次扫描都新建列表，
- * 引用永远不等 ⇒ 每次重组都对账一次，把用户正在改的元数据反复重算。
- *
- * 与工作流 A 的 [LastReconciled] 分开两个类而非泛型化：两者记录的元素类型不同
- * （`ImageCollection` / `ComicVolume`），合并成一个泛型类只会多一层类型参数
- * 而不减少任何逻辑。
- */
-private class LastReconciledVolumes(var volumes: List<ComicVolume>)
 
 /**
  * 把设置里的语言应用到系统的 **per-app locale**。

@@ -23,7 +23,6 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
-import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -61,6 +60,7 @@ import com.cyanix.pixfold.domain.text.Msg
 import com.cyanix.pixfold.domain.comic.applyDirMetaSuggestions
 import com.cyanix.pixfold.domain.library.LibraryState
 import com.cyanix.pixfold.domain.library.libraryStateOf
+import com.cyanix.pixfold.domain.library.reconcileLibrary
 import com.cyanix.pixfold.domain.library.updateVolume
 import com.cyanix.pixfold.nav.DestinationSurface
 import com.cyanix.pixfold.nav.NavTransitionStyle
@@ -281,18 +281,13 @@ fun LibrarySteps(
     // 唯一需要额外保住的是「当前选中的是哪一卷」—— 它在 `LibraryState` 里，
     // 而 `libraryStateOf` 一律把当前卷设成第一卷。用户删了张图、列表刷新一下
     // 就被拽回第一本，是很突兀的体验。
-    var lastActiveVolumeId by remember(rootPath) { mutableStateOf("") }
-    var state by remember(volumes) {
-        val seeded = libraryStateOf(rootPath, volumes)
-        // 上一次选的那卷还在就用它；已消失则退回扫描给出的默认（第一本）
-        val keep = seeded.volumes.firstOrNull { it.id == lastActiveVolumeId }?.id
-            ?: seeded.activeVolumeId
-        mutableStateOf(seeded.copy(activeVolumeId = keep))
+    val stateKey = workspaceState?.handleOrNull()?.treeUri ?: rootPath
+    var state by remember(stateKey) { mutableStateOf(libraryStateOf(rootPath, volumes)) }
+    val lastSyncedVolumes = remember(stateKey) { LastLibraryVolumes(volumes) }
+    if (lastSyncedVolumes.volumes != volumes) {
+        lastSyncedVolumes.volumes = volumes
+        state = reconcileLibrary(previous = state, scanned = volumes)
     }
-    // 把当前卷的变化记到跨刷新存活的容器里。写成 SideEffect 而不是在
-    // `onStateChange` 各处埋点：卷的切换路径有 4 条（点卡片、批次设置、重置、
-    // 对账重建），逐条埋点必漏，而这里只需要「state 变了就同步一次」。
-    SideEffect { lastActiveVolumeId = state.activeVolumeId }
 
     // P6:策略(默认 Rename / Keep,与归档语义一致)、危险动作、确认流程、执行报告。
     // 全部提到这一层 —— 在步骤 3 内执行完再看报告,切回来时不该丢掉策略选择。
@@ -999,3 +994,6 @@ const val TAG_B_INTERRUPTED_NOTICE = "library-interrupted-notice"
 
 /** 关掉「上次打包被中断」提示。 */
 const val TAG_B_INTERRUPTED_DISMISS = "library-interrupted-dismiss"
+
+/** 记录上一次对账的卷列表（普通可变字段，避免组合期写快照状态触发多余重组）。 */
+private class LastLibraryVolumes(var volumes: List<ComicVolume>)
