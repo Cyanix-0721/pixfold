@@ -5,6 +5,7 @@ plugins {
     // `@Serializable` 的 route / NavKey 需要这个插件在**编译期**生成序列化器。
     alias(libs.plugins.kotlin.serialization)
     alias(libs.plugins.aboutLibraries)
+    alias(libs.plugins.roborazzi)
 }
 
 android {
@@ -119,6 +120,23 @@ composeCompiler {
     )
 }
 
+roborazzi {
+    // 必须用 layout.projectDirectory.dir(...) 而非 file(...)，满足 Gradle 9 配置缓存卫生约束（Roborazzi #968）。
+    outputDir.set(layout.projectDirectory.dir("src/test/snapshots"))
+}
+
+// 兼容带全局 mirrors.init.gradle 的构建环境：Gradle Plugin Portal（及其阿里云镜像 gradle-plugin）
+// 仅为 roborazzi-gradle-plugin 同步了 JVM 端 artifact，而對 Android 端变体（roborazzi-core-android /
+// roborazzi-painter）只存在无 .module/.aar 的残缺元数据。排除从插件仓库解析该组库依赖，使其固定走 Maven Central。
+repositories.withType<MavenArtifactRepository>().configureEach {
+    val repoUrl = url.toString()
+    if (repoUrl.contains("gradle-plugin") || repoUrl.contains("plugins.gradle.org")) {
+        content {
+            excludeGroup("io.github.takahirom.roborazzi")
+        }
+    }
+}
+
 dependencies {
     implementation(project(":domain"))
 
@@ -158,5 +176,8 @@ dependencies {
     testImplementation(libs.robolectric)
     testImplementation(libs.compose.ui.test.junit4)
     testImplementation(libs.androidx.test.ext.junit)
+    testImplementation(libs.roborazzi)
+    testImplementation(libs.roborazzi.compose)
+    testImplementation(libs.roborazzi.junit.rule)
     debugImplementation(libs.compose.ui.test.manifest)
 }

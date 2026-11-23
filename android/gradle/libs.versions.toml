@@ -23,6 +23,8 @@ lifecycle = "2.11.0"
 coreKtx = "1.19.0"
 # Coil 3(图片加载);core artifact 不绑网络栈,本项目图片全走 SAF 的 content://,无需 coil-network-okhttp。
 coil = "3.6.3"
+# Roborazzi(无 ADB Phase 2 视觉回归截图):>= 1.78.0 修复 Gradle 9 + Configuration Cache(#969/#976)。
+roborazzi = "1.79.0"
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }
@@ -30,6 +32,7 @@ compose-compiler = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "
 kotlin-jvm = { id = "org.jetbrains.kotlin.jvm", version.ref = "kotlin" }
 kotlin-serialization = { id = "org.jetbrains.kotlin.plugin.serialization", version.ref = "kotlin" }
 aboutLibraries = { id = "com.mikepenz.aboutlibraries.plugin", version.ref = "aboutLibraries" }
+roborazzi = { id = "io.github.takahirom.roborazzi", version.ref = "roborazzi" }
 
 [libraries]
 compose-bom = { group = "androidx.compose", name = "compose-bom", version.ref = "composeBom" }
@@ -55,3 +58,6 @@ kotlinx-coroutines-android = { group = "org.jetbrains.kotlinx", name = "kotlinx-
 lifecycle-runtime-compose = { group = "androidx.lifecycle", name = "lifecycle-runtime-compose", version.ref = "lifecycle" }
 core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
 coil = { group = "io.coil-kt.coil3", name = "coil", version.ref = "coil" }
+roborazzi = { group = "io.github.takahirom.roborazzi", name = "roborazzi", version.ref = "roborazzi" }
+roborazzi-compose = { group = "io.github.takahirom.roborazzi", name = "roborazzi-compose", version.ref = "roborazzi" }
+roborazzi-junit-rule = { group = "io.github.takahirom.roborazzi", name = "roborazzi-junit-rule", version.ref = "roborazzi" }
