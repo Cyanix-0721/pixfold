@@ -21,6 +21,11 @@
 # ## 用法
 #
 #   ./gate.sh                              # 四道闸门(默认任务集)
+#   ./gate.sh --rerun-tasks                # 四道闸门(禁用缓存重跑)
+#   ./gate.sh --visual                     # 四道闸门 + Roborazzi 视觉回归校验
+#   ./gate.sh --visual --rerun-tasks       # 同上(禁用缓存重跑)
+#   ./gate.sh --record                     # 录制/更新 Roborazzi 视觉回归黄金图
+#   ./gate.sh --mutate                     # :domain PITest 自动变异测试
 #   ./gate.sh :app:testDebugUnitTest       # 指定任务
 #   ./gate.sh :app:lintDebug               # 同上
 #
@@ -45,7 +50,44 @@ mkdir -p build
 # 顺序不动 —— 与 HANGOFF §7.2 一致,且 lint 最便宜、先失败先止损。
 DEFAULT_TASKS=":app:lintDebug :app:testDebugUnitTest :domain:test :app:assembleDebug"
 
-TASKS="${*:-$DEFAULT_TASKS}"
+PROFILE_TASKS=""
+case "${1:-}" in
+    --visual)
+        PROFILE_TASKS="$DEFAULT_TASKS :app:verifyRoborazziDebug"
+        shift
+        ;;
+    --record)
+        PROFILE_TASKS=":app:recordRoborazziDebug"
+        shift
+        ;;
+    --mutate)
+        PROFILE_TASKS=":domain:pitest"
+        shift
+        ;;
+esac
+
+if [ -n "$PROFILE_TASKS" ]; then
+    if [ "$#" -gt 0 ]; then
+        TASKS="$PROFILE_TASKS $*"
+    else
+        TASKS="$PROFILE_TASKS"
+    fi
+elif [ "$#" -eq 0 ]; then
+    TASKS="$DEFAULT_TASKS"
+else
+    has_explicit_task=0
+    for arg in "$@"; do
+        case "$arg" in
+            -*) ;;
+            *) has_explicit_task=1; break ;;
+        esac
+    done
+    if [ "$has_explicit_task" -eq 1 ]; then
+        TASKS="$*"
+    else
+        TASKS="$DEFAULT_TASKS $*"
+    fi
+fi
 : > "$LOG"
 
 echo "任务:$TASKS"

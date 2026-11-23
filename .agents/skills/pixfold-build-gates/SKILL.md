@@ -20,6 +20,15 @@ description: PixFold 的构建与提交闸门——四道闸门（gate.sh 一次
 run-gradle.bat :app:lintDebug :app:testDebugUnitTest :domain:test :app:assembleDebug
 ```
 
+`gate.sh` 同时支持无 ADB 扩展档位（可后接 `--rerun-tasks` 等 Gradle 参数，显式任务参数写法保持原样兼容）：
+
+| 命令 | 实际执行任务 | 用途 |
+| --- | --- | --- |
+| `./gate.sh`（或 `./gate.sh --rerun-tasks`） | 默认四道闸门 | 日常构建、lint、单测与 debug APK |
+| `./gate.sh --visual`（可加 `--rerun-tasks`） | 默认四道闸门 + `:app:verifyRoborazziDebug` | 含 Roborazzi 视觉回归黄金图校验的五道闸门 |
+| `./gate.sh --record` | `:app:recordRoborazziDebug` | 录制或更新 Roborazzi 视觉回归黄金图 |
+| `./gate.sh --mutate` | `:domain:pitest` | `:domain` 纯 JVM PITest 自动变异测试（报告输出至 `android/domain/build/reports/pitest/`） |
+
 **为什么必须经 gate.sh —— 退出码。** 以前写 `cmd.exe /c "run-gradle.bat …" | tail -20`，管道的 RC 来自 `tail` 而非 gradle ⇒ 构建失败也报成功（实测：故意漏一个 `}`，gradle `BUILD FAILED` 但 RC=0）。`gate.sh` 把输出重定向进 `build/gate-last.log`、直接取 gradle 退出码、失败时打出行号。**不要在它外面再套 `| tail`** —— `tail` 等 EOF 而 `run-gradle.bat` 的句柄不关，会导致命令早已结束、作业一直报 running。
 
 **判绿三条硬判据（防止用缓存/作业状态冒充通过）：**

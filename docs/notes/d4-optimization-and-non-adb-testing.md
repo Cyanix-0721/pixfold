@@ -297,18 +297,30 @@
 
 ---
 
-## 三、按序实施清单（分支 `d4/opt-and-non-adb-tests`）
+## 三、按序实施清单与落地实证（分支 `d4/opt-and-non-adb-tests`，M1–M9 全部完成）
 
-后续实施从 `dev` 切出阶段分支 `d4/opt-and-non-adb-tests`，按 **M1 → M9** 顺序推进；每步遵循「先红后绿 → 暖闸门四道全绿（`gate-last.rc=0` + 非缓存复跑）→ 变异验证 → 需要真机的项取证后再收口」。
+后续实施自 `dev`（`ad48f1d`）切出阶段分支 `d4/opt-and-non-adb-tests`，按 **M1 → M9** 顺序全部落地；每步均按「先红后绿 → 四道/五道闸门非缓存全绿（`gate-last.rc=0` + `--rerun-tasks`）→ 变异验证」推进。
 
-| 里程碑 | 对应条目 | 核心交付物与验收判据 |
-| --- | --- | --- |
-| **M1** | **P0 #1** | 消除组合期主线程 SAF/ZIP I/O：卷探测异步化（`Dispatchers.IO`，按需加载）、父目录列举批量缓存、合并存在性与 CBZ URI 查询、删除 `SafExistingComicInfoProbe` 重复辅助函数；补异步加载与缓存单测 |
-| **M2** | **P0 #2–#4** | ① `ThumbnailCache` 同步化 + `CancellationException` 重抛 + `PackTaskBus` `update {}` + `PackTaskService.snapshot` `@Volatile`；② `LibrarySteps` `collectAsStateWithLifecycle()` 与进度弹窗隔离、`PackPreviewPage`/`NamingPage`/`PixFoldTheme` `remember` 与 `LazyColumn` `key`/`contentType` 虚拟化；③ `:app` Compose `stabilityConfigurationFiles` 覆盖 `:domain` + `seriesGroups` 缓存（`AdapterBoundaryTest` 保持全绿） |
-| **M3** | **P1 #5–#6** | ① `CbzWriter`/`CbzMetaRewriter` 64 KiB 缓冲与缓冲区复用、`CbzWriter` ≤ 8 MiB 有界单趟缓冲、`CbzMetaRewriter` `STORED && size >= 0 && crc >= 0` 直通透传（`CbzReaderCompatTest` 全绿）；② `WorkspaceController.pick`/`rememberIfLoaded` 下沉 `ioDispatcher`、`move()` 单次快照、`SafMetaUpdater` SAF 遍历 4→2 |
-| **M4** | **P1 #7–#8** | ① 协程 `isActive` 接通工作流 C / Organize 取消、引入轻量 `AppViewModel` 跨配置变更持态并拆解 `PixFoldApp`/`LibrarySteps` 巨型文件；② `ThumbnailSource.peek()` 消 1 帧闪烁、`ImagePreview`/`DragGhost` lambda `graphicsLayer`、`ChipFlow` 短路 `Probe`、`previewImageSource` 小 LRU、`coilImageLoader` 清理 |
-| **M5** | **P2 #9** | 删除死代码 `AndroidThumbnailSource.kt` 与 `app/src/debug/nav3spike/`；硬编码 `RoundedCornerShape` 迁至 `MaterialTheme.shapes`；清理过期 `minSdk 34` 注释、`PixFoldApp.kt` 3 处编译警告与 L163 条件 `remember`；`--info` 排查配置期急切 classpath 解析；维持 `maxParallelForks = 1`；配置 release R8/shrink（或记录发版前清单） |
-| **M6** | **无 ADB Phase 1** | 建 `PixFoldUiTestDefaults`（`junit4.v2`、`w361dp-h794dp-560dpi`、`Surface(background)`、视口与 48dp 无障碍断言），补齐芯片/元数据/预览/设置 `@GraphicsMode(NATIVE)` 多语言与 `fontScale` 测试，更新 `pixfold-device-testing/SKILL.md` |
-| **M7** | **无 ADB Phase 2** | 接入 Roborazzi `1.79.0`（`layout.projectDirectory.dir("src/test/snapshots")`），落地首批核心页面与弹窗黄金图并替代易碎像素探针，验证 CC 与 `:app:lintDebug` 零告警 |
-| **M8** | **无 ADB Phase 3** | 搭建 `@TempDir` 驱动的 `FakeDocumentsProvider`，端到端覆盖 `data/saf/*` 与 `CoilThumbnailSource`（真实 `ZipFile` + `ShadowLooper` 400ms 防抖） |
-| **M9** | **无 ADB Phase 4** | `:domain` 接入 `info.solidsoft.pitest:1.19.0`（开源配置），在 `android/gate.sh` 增加 `--visual` / `--record` / `--mutate` 档位并实测 `gate-last.rc` 与增量耗时 |
+| 里程碑 | 对应条目 | 提交 | 状态与核心交付物 |
+| --- | --- | --- | --- |
+| **M1** | **P0 #1** | `1f2e866` | ✅ 消除组合期主线程 SAF/ZIP I/O：引入 `LibraryVolumeLoader` 将卷探测移至 `Dispatchers.IO` 懒加载、`SafVolumeProbeSession` 按父目录批量缓存 `childrenUri` 并合并存在性与 CBZ URI 查询、删除 `SafExistingComicInfoProbe` 重复辅助函数；新增 3 组单测/UI 守卫 |
+| **M2** | **P0 #2–#4** | `a64b057` | ✅ ① `ThumbnailCache` 同步化、`CachingThumbnailSource` 重抛结构化取消、`PackTaskBus` `update {}` 原子 CAS、`PackTaskService.snapshot` `@Volatile`；② `LibrarySteps` 改 `collectAsStateWithLifecycle()` 并隔离逐页进度弹窗、`PackPreviewPage`/`NamingPage`/`PixFoldTheme` 补 `remember` 与 `LazyColumn` `key`/`contentType` 虚拟化；③ 新增 `android/app/compose_stability.conf` 覆盖 `:domain` 值对象 + 缓存 `LibraryState.seriesGroups`（`AdapterBoundaryTest` 全绿） |
+| **M3** | **P1 #5–#6** | `15500bd` | ✅ ① `CbzWriter`/`CbzMetaRewriter` 改 64 KiB `BufferedOutputStream` 与缓冲区复用、`CbzWriter` 落地 ≤ 8 MiB 有界单趟缓冲、`CbzMetaRewriter` 守卫 `STORED && size >= 0 && crc >= 0` 直通流式透传（`CbzReaderCompatTest` 全绿）；② `WorkspaceController.pick`/`rememberIfLoaded` 下沉 `ioDispatcher`、`move()` 单次 `persistentGrants()` 快照、`SafMetaUpdater` SAF 遍历 4→2 |
+| **M4** | **P1 #7–#8** | `ca5ebe1` | ✅ ① `CancellationBridge` 接通协程 `isActive` 消除工作流 C / Organize 孤儿 IO、引入 `PixFoldSession` ViewModel 跨配置变更持态并收敛 `PixFoldApp`；② `ThumbnailSource.peek()` 消除 1 帧闪烁、`ImagePreview`/`DragGhost` 改 lambda `graphicsLayer`、`ChipFlow` 短路 `Probe` 趟、新增 `PreviewImageCacheSource` 小 LRU 并清理 `coilImageLoader` |
+| **M5** | **P2 #9** | `3a50ba8` | ✅ 删除死代码 `AndroidThumbnailSource.kt` 与 `app/src/debug/nav3spike/`；硬编码 `RoundedCornerShape` 统一迁至 `MaterialTheme.shapes`；清理过期 `minSdk 34` 注释与 `PixFoldApp.kt` 编译警告/条件 `remember`；维持 `maxParallelForks = 1`；配置 Release R8 压缩与资源裁剪（**实测 release R8 APK 3.59 MB**） |
+| **M6** | **无 ADB Phase 1** | `fa9005f` | ✅ 建立 `PixFoldUiTestDefaults`（`junit4.v2`、`w361dp-h794dp-560dpi`、`Surface(background)`、视口与 48dp 无障碍断言），补齐芯片/元数据/预览/设置 `@GraphicsMode(NATIVE)` 多语言与 `fontScale` 测试，并同步 `pixfold-device-testing/SKILL.md`。**当场抓出并修复真实无障碍缺陷**：`SettingsScreen.kt` 中 `RadioRow` 与 `ChoiceRow` 对话框选项同时存在 `Row.clickable` 与子 `RadioButton(onClick = ...)`，导致 TalkBack 暴露缺少 `contentDescription` 的重复可点击节点；改为 M3 推荐的 `Row.heightIn(min = 48.dp).selectable(role = Role.RadioButton)` + `RadioButton(onClick = null)` |
+| **M7** | **无 ADB Phase 2** | `e13e3ad` | ✅ 接入 Roborazzi `1.79.0`（`layout.projectDirectory.dir("src/test/snapshots")`），落地 **14 张**核心页面与弹窗黄金图，验证 Configuration Cache 与 `:app:lintDebug` 零告警 |
+| **M8** | **无 ADB Phase 3** | `5b4ff71` | ✅ 搭建 `@TempDir` 驱动的 `FakeDocumentsProvider` 离线 SAF 测试底座，端到端覆盖 `AndroidSafSource`（含 400ms 防抖）、`SafPackPlatform`、`SafMetaUpdater`、`SafRenameActions`/`SafUndoActions` 与 `CoilThumbnailSource`（真实 `ZipFile` 校验） |
+| **M9** | **无 ADB Phase 4** | 本提交（M9） | ✅ `:domain` 接入 `info.solidsoft.pitest:1.19.0`（开源配置，PIT `1.22.1` + `junit5PluginVersion = "1.2.1"`、`threads = 4`），扩展 `android/gate.sh` 支持 `--visual` / `--record` / `--mutate`（保持默认四道闸门与显式参数 100% 向后兼容），同步 `pixfold-build-gates/SKILL.md` 与 `docs/INDEX.md` 台账 |
+
+### 3.1 M1–M9 实测总览（2026-11-24）
+
+| 指标 | 基线（`ad48f1d`） | M1–M9 完成后（`d4/opt-and-non-adb-tests`） | 来源与判据 |
+| --- | --- | --- | --- |
+| `:app` 单测（JUnit XML） | 97 类 / **909** pass（+1 负向对照排除） | **117** 类 / **1,020** pass（0 fail / 0 error / 0 skip） | `android/app/build/test-results/testDebugUnitTest/TEST-*.xml` |
+| `:domain` 单测（JUnit XML） | 65 类 / **986** pass | **66** 类 / **993** pass（0 fail / 0 error / 0 skip） | `android/domain/build/test-results/test/TEST-*.xml` |
+| Roborazzi 视觉回归黄金图 | 0 张 | **14** 张（`:app:verifyRoborazziDebug` 全绿） | `android/app/src/test/snapshots/` |
+| `:domain` PITest 自动变异（`./gate.sh --mutate`） | 未接入 | **62** 源码类（149 变异单元）/ 行覆盖 **98%**（`2,690/2,751`）/ 变异击杀 **83%**（**`1,449/1,736`**，`KILLED=1,448`、`TIMED_OUT=1`、`SURVIVED=191`、`NO_COVERAGE=96`）/ 测试强度 **88%**（`1,449/1,640`）/ 引擎耗时 **144s**（Gradle `3m 15s`，CC stored） | `android/domain/build/reports/pitest/index.html`、`mutations.xml` |
+| 五道闸门全量非缓存（`./gate.sh --visual --rerun-tasks`） | —（仅四道闸门） | **`gate-last.rc = 0`**、`BUILD SUCCESSFUL in 3m 30s`、`63 actionable tasks: 63 executed`、`:app:lintDebug` **0 告警**、`Configuration cache entry stored.` | `android/build/gate-last.rc`、`android/build/gate-last.log` |
+| Release R8 产物 | 未配置 minify/shrink | **3.59 MB**（启用 `isMinifyEnabled = true` + `isShrinkResources = true`） | M5（`3a50ba8`）实测 |
+| 真实缺陷捕获 | — | **1 条真实无障碍缺陷**：M6 无障碍守卫捕获 `SettingsScreen.kt` `RadioRow`/`ChoiceRow` 重复可点击 `RadioButton`（TalkBack 缺 `contentDescription`），已按 M3 `selectable` 规范修复 | M6（`fa9005f`） |

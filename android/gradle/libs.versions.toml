@@ -25,6 +25,8 @@ coreKtx = "1.19.0"
 coil = "3.6.3"
 # Roborazzi(无 ADB Phase 2 视觉回归截图):>= 1.78.0 修复 Gradle 9 + Configuration Cache(#969/#976)。
 roborazzi = "1.79.0"
+# PITest(无 ADB Phase 4 :domain 自动变异测试):1.19.0 支持 Gradle 9 + Configuration Cache。
+pitest = "1.19.0"
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }
@@ -33,6 +35,7 @@ kotlin-jvm = { id = "org.jetbrains.kotlin.jvm", version.ref = "kotlin" }
 kotlin-serialization = { id = "org.jetbrains.kotlin.plugin.serialization", version.ref = "kotlin" }
 aboutLibraries = { id = "com.mikepenz.aboutlibraries.plugin", version.ref = "aboutLibraries" }
 roborazzi = { id = "io.github.takahirom.roborazzi", version.ref = "roborazzi" }
+pitest = { id = "info.solidsoft.pitest", version.ref = "pitest" }
 
 [libraries]
 compose-bom = { group = "androidx.compose", name = "compose-bom", version.ref = "composeBom" }
