@@ -33,9 +33,9 @@ Windows 开发机的**基础设施**已就位(git / VS Code / scoop / winget / m
 | ANDROID_HOME | ✅ | 指向上述 SDK 根;2026-09-12 手工设为**用户级**(Studio 不会设它,见机制注) |
 | ANDROID_SDK_ROOT | ✅ 留空 | 官方要求:与 `ANDROID_HOME` 二者只设其一,或取值一致 |
 | ANDROID_SDK_HOME | ⚠️ 非 SDK 路径变量 | Studio 自动设为同一目录;它只影响老工具创建 `.android` 用户数据的位置,**不能当 SDK 路径用** |
-| 用户 PATH | ✅ | `<sdk>\platform-tools`(adb / fastboot)、`<sdk>\cmdline-tools\latest\bin`(sdkmanager) |
+| 用户 PATH | ✅ | `<sdk>\platform-tools`(adb / fastboot)、`<sdk>\cmdline-tools\latest\bin`(sdkmanager / android) |
 | SDK 组件 | ✅ | platform-tools **37.0.1**;build-tools **35.0.1 + 36.0.0**;platforms **android-36 + android-37.0**;sources **android-36 + android-37.0**;emulator **37.1.11**;system-images **android-36**(google_apis_playstore / x86_64);licenses(android-sdk-license) |
-| cmdline-tools | ✅ | SDK 根内 `cmdline-tools\latest` = **23.0.0**(2026-09-16 复检;原记录 19.0 已过期) |
+| cmdline-tools | ✅ | SDK 根内 `cmdline-tools\latest` = **23.0.0**(2026-09-16 复检;原记录 19.0 已过期);内含 `android.exe`(2026-11-24 实测版本 **1.0.16261425**,见 §12.8) |
 | platforms;android-36 | ✅ 已装 | 2026-09-16 复检确认已存在(Platform 16,rev 2),与真机 Android 16 对齐;原 ⬜ 标记作废 |
 | adb / fastboot | ✅ | 均来自 SDK `platform-tools` **37.0.1**,PATH 中各仅一份;未装独立 scoop adb(防双 adb,见 §12.5) |
 | Gradle / Kotlin 工程侧 | ✅ 有构建实证 | 2026-09-12 一次 `BUILD SUCCESSFUL in 4m 45s`(Studio 模板 `MyApplication`,Gradle **9.6.0** / AGP **9.4.0** / Kotlin **2.2.10**,跑在 Studio JBR 25 上);**2026-09-16 在 `temurin-17` 下完整复验通过**(探针工程:assembleDebug + 纯 JVM 单测 + Robolectric UI 测试 + lint 全绿);工程事后已删,无残留代码。**AGP 9 起 Kotlin 为内置**(不再需要单独装 kotlinc) |
@@ -324,4 +324,16 @@ cd android && ./gate.sh :app:compileDebugKotlin   # 只编译,快速查语法
 
 > **⚠️ 教训与约定变更(2026-09-16)**:上一次的丢失风险根因是**原型代码放在仓库外的 `C:\Personal\` 目录**、且不在任何分支上——目录一删就只剩事后补的归档分支。故**本次 D1 重建改为在仓库内开阶段分支开发**(见 §9.2):代码从第一天起就在版本控制里,且每阶段完成即提交。**归档分支从此只作历史参考,不再是"唯一副本"的存放处。**
 > 归档中**已提取为独立笔记**的部分(便于新栈直接取用,不必再读 Dart 源码):领域语义与 16 项测试意图 → `docs/notes/d1-archive-domain-semantics.md`。
+
+### 12.8 Android CLI（`android.exe`）与 Antigravity 面板换机配置（2026-11-24 实测）
+
+- **来源与定位**：`android.exe` 随 Android Studio SDK Manager 的 **Android SDK Command-line Tools (latest)**（本机实测 `cmdline-tools;23.0`，路径 `C:\Users\Administrator\AppData\Local\Android\Sdk\cmdline-tools\latest\bin\android.exe`）一并安装，是 Antigravity `android-cli-plugin`（Compose Preview / Device Hub 侧栏面板）的底层工具。
+- **本机版本与升级**：本机实测版本为 **`1.0.16261425`**；可执行 `android update` 在线升级（如升至 `1.1.16919734`）。
+- **换机配置（两种路径）**：
+  1. **已安装 Android Studio（推荐）**：在 Android Studio 中打开 `Settings → Languages & Frameworks → Android SDK → SDK Tools`，勾选安装 **`Android SDK Command-line Tools (latest)`**，并将 `…\Android\Sdk\cmdline-tools\latest\bin` 加入用户 `PATH`（即 §12.3 步骤 ③ 已涵盖的目录；新开终端后运行 `android --version` 验证）。
+  2. **未安装 Android Studio**：使用官方 Windows 安装脚本直接安装独立 CLI：
+     ```cmd
+     curl -fsSL https://dl.google.com/android/cli/latest/windows_x86_64/install.cmd -o "%TEMP%\i.cmd" && "%TEMP%\i.cmd"
+     ```
+- **配合用法**：Compose Preview 与 Device Hub 侧栏面板的 UI 调试分工与跨机推荐组合见 [`docs/notes/d4-m3e-ui-polish.md`](d4-m3e-ui-polish.md) §6.2。
 

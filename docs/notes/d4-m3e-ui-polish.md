@@ -78,3 +78,28 @@
 - [ ] **ColorOS OEM 字体下 `361dp × 1.3×` 窄屏与连接式切换组**：在系统较大字体下复核主题模式 3 连按钮、排序网格/列表 2 连按钮与「全部 / 仅问题（N）」2 连按钮中英文均不换行裁切、不溢出视口。
 - [ ] **`ImagePreview` 顶部胶囊与底部 `HorizontalFloatingToolbar` 全面屏适配**：核对挖孔状态栏与底部手势条 insets 下顶部文件名胶囊、48dp tonal 关闭按钮与底部活力浮动工具栏（上一页 / 页码 / 重命名 / 下一页）无遮挡、无边缘手势误触，且双击 2× 缩放与双指平移零掉帧、清晰无糊。
 - [ ] **`UndoScopeDialog` / `ConfirmDialog` `SoftBurst` 徽章与背景高斯模糊**：实测触发覆盖撤销警告与删除源目录二次确认时，居中 56dp `SoftBurst` 警示徽章排版、三档按钮视觉重量区分与底层 12dp 高斯模糊观感。
+
+---
+
+## 6. 后续优化方向：APK 体积压缩与实时 UI 调试方案
+
+> **跨机续接说明（2026-11-24）**：以下记录换机后即可落地的两项工程提效方向——APK 体积精简（立即可压 90%）与实时可视化调 UI 方案，方便在另一台机器与 §5 真机核对一并推进。
+
+### 6.1 APK 体积压缩方案（2026-11-24 实测拆包）
+
+| 产物 | 总大小 | 内部拆包分布 | 说明 |
+| --- | --- | --- | --- |
+| `app-debug.apk` | **36.59 MB**（`38,369,705 B`） | `dex` 35.75 MB（97.7%）、`resources.arsc` 0.69 MB、`lib` 0.04 MB、`res` 0.03 MB | 未混淆且 `minSdk >= 28` 默认不压缩 dex |
+| M5 R8 `app-release-unsigned.apk` | **3.59 MB**（`3,763,684 B`） | `dex` 3.09 MB（↓ 91.4%）、`resources.arsc` 0.36 MB（↓ 48%） | 已开启 R8 压缩与资源裁剪，缺签名暂不可直接安装 |
+
+- **方案 A（立即可压 90%，36.59 MB → ~3.7 MB）**：给 `release`（或新增临时 `staging` buildType）配置本地签名（临时 debug keystore 或正式 keystore），产出约 3.7 MB 可直接安装的 R8 精简包，并同步完成 §5A 中的 R8 混淆真机冒烟。
+- **方案 B（进一步精简至 ~3.2–3.4 MB，可选）**：通过 `androidResources { localeFilters += listOf("en", "zh") }` 裁掉 AndroidX / M3 非中英文语言表；通过 `packaging.resources.excludes` 剔除 `DebugProbesKt.bin` 及冗余 `META-INF` 元数据（原生 `lib/` 仅 0.04 MB，无需拆 ABI）。
+
+### 6.2 实时调 UI 可视化方案（4 种对比与推荐组合）
+
+1. **Android Compose Preview 侧栏面板**（`android-cli-plugin` 的 `compose-preview` sidecar，底层走 `android preview render`，可开 `--daemon` 与 `--component-tree` 悬停高亮组件树与像素坐标）：在 `android/app/src/debug/` 补核心页面 `@Preview`（首页、设置页、排序/书架/打包预览、双波浪进度框、全屏预览，零影响正式包），免真机、免模拟器即可并排查看浅色 / 深色 / 纯黑 / 1.3× 字号。
+2. **Android Device Hub 侧栏面板**（`android-cli-plugin` 的 `device-hub` sidecar）：管理 AVD 模拟器及直接 Mirror 投屏 AVD 或 USB / `adb connect` 真机，用于实测 M3E 弹簧形变、波浪进度、拖拽与缩放手感（16 GB 机器开 WSL 时内存偏紧，优先投屏真机或大内存机器跑 AVD）。
+3. **现有 Roborazzi 25 张全屏黄金图**（零改造）：运行 `./gate.sh --record` 刷新 `android/app/src/test/snapshots/`，适合点击、弹层后的真实交互态像素对比与回归门禁。
+4. **Android Studio Split Preview（Interactive Mode）+ Live Edit**：与方案 1 共用 `debug` 源集 `@Preview` 代码，手调间距与色值可获秒级反馈。
+
+- **跨机推荐组合**：先在 `android/app/src/debug/` 补齐一组核心页面 `@Preview` → 静态调排版、配色、纯黑描边走 **Compose Preview 面板**（或 AS Split Preview）；动效、波浪进度与触控手感走 **Device Hub 投屏真机 / 模拟器**。换机端 `android` CLI 与面板前置配置见 [`docs/notes/environment.md`](environment.md) §12.8。
