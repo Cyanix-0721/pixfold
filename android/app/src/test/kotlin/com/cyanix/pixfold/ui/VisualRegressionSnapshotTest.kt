@@ -18,6 +18,7 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.unit.dp
+import com.cyanix.pixfold.domain.library.libraryStateOf
 import com.cyanix.pixfold.domain.mock.MockData
 import com.cyanix.pixfold.domain.mock.MockDataB
 import com.cyanix.pixfold.domain.plan.OutputConflictPolicy
@@ -31,10 +32,17 @@ import com.cyanix.pixfold.domain.settings.ThemeMode
 import com.cyanix.pixfold.domain.source.WorkspaceEntry
 import com.cyanix.pixfold.domain.source.WorkspaceHandle
 import com.cyanix.pixfold.domain.source.WorkspaceListing
+import com.cyanix.pixfold.domain.task.TaskProgress
 import com.cyanix.pixfold.ui.components.ChipRowTags
+import com.cyanix.pixfold.ui.components.PackProgressDialog
 import com.cyanix.pixfold.ui.components.SingleSelectChipRow
+import com.cyanix.pixfold.ui.components.TAG_PACK_PROGRESS_DIALOG
 import com.cyanix.pixfold.ui.components.TwoLevelChipRows
 import com.cyanix.pixfold.ui.components.TwoLevelGroup
+import com.cyanix.pixfold.ui.library.LibraryPage
+import com.cyanix.pixfold.ui.library.MetadataPage
+import com.cyanix.pixfold.ui.library.PackPreviewPage
+import com.cyanix.pixfold.ui.organize.SortAndPreviewPage
 import com.cyanix.pixfold.ui.plan.ExecutionReportPage
 import com.cyanix.pixfold.ui.plan.TAG_REPORT_UNDO
 import com.cyanix.pixfold.ui.plan.TAG_UNDO_SCOPE_DIALOG
@@ -531,6 +539,149 @@ class VisualRegressionSnapshotTest {
         rule.waitForIdle()
         rule.onNodeWithTag(TAG_REPORT_UNDO).performClick()
         rule.waitForIdle()
+    }
+
+    // ================= f) Workflow A / B / C & Wavy Progress (Slice U3) =================
+
+    @Test
+    fun sortPage_dark() {
+        rule.setContent {
+            PixFoldNativeTestHost(
+                settings = PixFoldSettings(
+                    themeMode = ThemeMode.Dark,
+                    accent = AccentChoice.Default,
+                    pureBlack = false,
+                ),
+            ) {
+                SortAndPreviewPage(
+                    collections = MockData.workspaceA.collections,
+                    contentInsets = WindowInsets(0, 0, 0, 0),
+                    onNext = {},
+                )
+            }
+        }
+        rule.waitForIdle()
+        rule.onRoot().captureRoboImage(
+            filePath = snapshotPath("sort_page_dark"),
+            roborazziOptions = roborazziOptions,
+        )
+    }
+
+    @Test
+    fun libraryPage_dark() {
+        val base = MockDataB.library
+        val volumes = base.volumes.mapIndexed { idx, v ->
+            if (idx == 0) v.copy(outputExists = true) else v
+        }
+        rule.setContent {
+            PixFoldNativeTestHost(
+                settings = PixFoldSettings(
+                    themeMode = ThemeMode.Dark,
+                    accent = AccentChoice.Default,
+                    pureBlack = false,
+                ),
+            ) {
+                var state by remember { mutableStateOf(libraryStateOf(base.rootPath, volumes)) }
+                LibraryPage(
+                    state = state,
+                    onStateChange = { state = it },
+                    contentInsets = WindowInsets(0, 0, 0, 0),
+                    onNext = {},
+                    onUpdateMeta = {},
+                )
+            }
+        }
+        rule.waitForIdle()
+        rule.onRoot().captureRoboImage(
+            filePath = snapshotPath("library_page_dark"),
+            roborazziOptions = roborazziOptions,
+        )
+    }
+
+    @Test
+    fun metadataPage_light() {
+        val base = MockDataB.library
+        val volumes = base.volumes.mapIndexed { idx, v ->
+            if (idx == 0) v.copy(outputExists = true) else v
+        }
+        rule.setContent {
+            PixFoldNativeTestHost(
+                settings = PixFoldSettings(
+                    themeMode = ThemeMode.Light,
+                    accent = AccentChoice.Default,
+                    pureBlack = false,
+                ),
+            ) {
+                var state by remember { mutableStateOf(libraryStateOf(base.rootPath, volumes)) }
+                MetadataPage(
+                    libraryState = state,
+                    onLibraryChange = { state = it },
+                    contentInsets = WindowInsets(0, 0, 0, 0),
+                    onBack = {},
+                    onNext = {},
+                    onUpdateMeta = {},
+                )
+            }
+        }
+        rule.waitForIdle()
+        rule.onRoot().captureRoboImage(
+            filePath = snapshotPath("metadata_page_light"),
+            roborazziOptions = roborazziOptions,
+        )
+    }
+
+    @Test
+    fun packPreview_dark() {
+        val base = MockDataB.library
+        rule.setContent {
+            PixFoldNativeTestHost(
+                settings = PixFoldSettings(
+                    themeMode = ThemeMode.Dark,
+                    accent = AccentChoice.Default,
+                    pureBlack = false,
+                ),
+            ) {
+                var state by remember { mutableStateOf(libraryStateOf(base.rootPath, base.volumes)) }
+                PackPreviewPage(
+                    libraryState = state,
+                    onLibraryChange = { state = it },
+                    contentInsets = WindowInsets(0, 0, 0, 0),
+                    showPlanSection = true,
+                    onBack = {},
+                )
+            }
+        }
+        rule.waitForIdle()
+        rule.onRoot().captureRoboImage(
+            filePath = snapshotPath("pack_preview_dark"),
+            roborazziOptions = roborazziOptions,
+        )
+    }
+
+    @Test
+    fun packProgressDialog_dark() {
+        rule.setContent {
+            PixFoldNativeTestHost(
+                settings = PixFoldSettings(
+                    themeMode = ThemeMode.Dark,
+                    accent = AccentChoice.Default,
+                    pureBlack = false,
+                ),
+            ) {
+                PackProgressDialog(
+                    progress = TaskProgress(total = 4, done = 1, failed = 0, skipped = 0),
+                    pageDone = 62,
+                    pageTotal = 100,
+                    volumeLabel = "[Cior (Ken-1)] 彼女がボクの知らないところで",
+                    onCancel = {},
+                )
+            }
+        }
+        rule.waitForIdle()
+        rule.onNodeWithTag(TAG_PACK_PROGRESS_DIALOG).captureRoboImage(
+            filePath = snapshotPath("pack_progress_dialog_dark"),
+            roborazziOptions = roborazziOptions,
+        )
     }
 
     private companion object {

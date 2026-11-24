@@ -52,6 +52,7 @@ fun ScrollToTopButton(
         ) {
             FilledTonalIconButton(
                 onClick = onClick,
+                shapes = IconButtonDefaults.shapes(),
                 modifier = Modifier
                     .padding(16.dp)
                     .size(48.dp) // M3 触控下限

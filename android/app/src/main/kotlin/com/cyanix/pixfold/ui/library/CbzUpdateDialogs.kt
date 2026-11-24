@@ -7,7 +7,10 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.size
-import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.CircularWavyProgressIndicator
+import androidx.compose.material3.ContainedLoadingIndicator
+import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -18,9 +21,11 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.cyanix.pixfold.R
@@ -38,6 +43,12 @@ const val TAG_UPDATE_CONFIRM_SIZE = "update-confirm-size"
 
 /** 进度弹窗。 */
 const val TAG_UPDATE_PROGRESS_DIALOG = "update-progress-dialog"
+
+/** 进度弹窗里的确定态 M3E 波浪圆环（`total > 0`）。 */
+const val TAG_UPDATE_PROGRESS_WAVY = "update-progress-wavy"
+
+/** 进度弹窗里的不确定态 M3E 容装加载器（`total <= 0`）。 */
+const val TAG_UPDATE_PROGRESS_LOADING = "update-progress-loading"
 
 /** 进度弹窗里的取消按钮。 */
 const val TAG_UPDATE_CANCEL = "update-cancel"
@@ -112,8 +123,7 @@ fun CbzUpdateConfirmDialog(
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Text(
                     text = volumeName,
-                    style = MaterialTheme.typography.bodyMedium,
-                    fontWeight = FontWeight.SemiBold,
+                    style = MaterialTheme.typography.titleSmallEmphasized,
                 )
                 Text(
                     text = textOf(TextKey.UpdateMetaSizeWarning, sizeText),
@@ -125,10 +135,16 @@ fun CbzUpdateConfirmDialog(
             }
         },
         confirmButton = {
-            TextButton(onClick = onConfirm) { Text(stringResource(R.string.update_meta_confirm)) }
+            TextButton(
+                onClick = onConfirm,
+                shapes = ButtonDefaults.shapes(),
+            ) { Text(stringResource(R.string.update_meta_confirm)) }
         },
         dismissButton = {
-            TextButton(onClick = onCancel) { Text(stringResource(R.string.common_cancel)) }
+            TextButton(
+                onClick = onCancel,
+                shapes = ButtonDefaults.shapes(),
+            ) { Text(stringResource(R.string.common_cancel)) }
         },
     )
 }
@@ -170,16 +186,28 @@ fun CbzUpdateProgressDialog(
                         confirming = false
                         onCancel()
                     },
+                    shapes = ButtonDefaults.shapes(),
                     modifier = Modifier.testTag(TAG_UPDATE_CANCEL_CONFIRM),
                 ) { Text(stringResource(R.string.update_meta_cancel_ok)) }
             },
             dismissButton = {
-                TextButton(onClick = { confirming = false }) {
+                TextButton(
+                    onClick = { confirming = false },
+                    shapes = ButtonDefaults.shapes(),
+                ) {
                     Text(stringResource(R.string.update_meta_cancel_dismiss))
                 }
             },
         )
         return
+    }
+
+    val density = LocalDensity.current
+    val stroke = remember(density) {
+        Stroke(width = with(density) { 4.dp.toPx() }, cap = StrokeCap.Round)
+    }
+    val trackStroke = remember(density) {
+        Stroke(width = with(density) { 3.dp.toPx() }, cap = StrokeCap.Round)
     }
 
     PixFoldAlertDialog(
@@ -200,30 +228,33 @@ fun CbzUpdateProgressDialog(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalAlignment = Alignment.CenterHorizontally,
             ) {
-                Box(contentAlignment = Alignment.Center) {
-                    if (total > 0) {
-                        CircularProgressIndicator(
+                if (total > 0) {
+                    Box(contentAlignment = Alignment.Center) {
+                        CircularWavyProgressIndicator(
                             progress = { (done.toFloat() / total).coerceIn(0f, 1f) },
-                            modifier = Modifier.size(120.dp),
-                            strokeWidth = 6.dp,
-                            trackColor = MaterialTheme.colorScheme.surfaceVariant,
+                            modifier = Modifier
+                                .size(88.dp)
+                                .testTag(TAG_UPDATE_PROGRESS_WAVY),
+                            color = MaterialTheme.colorScheme.primary,
+                            trackColor = MaterialTheme.colorScheme.surfaceContainerHighest,
+                            stroke = stroke,
+                            trackStroke = trackStroke,
+                            wavelength = 16.dp,
                         )
-                    } else {
-                        // 条目数未知：不确定态。写一个假的 0% 会让用户以为卡住了。
-                        CircularProgressIndicator(
-                            modifier = Modifier.size(120.dp),
-                            strokeWidth = 6.dp,
-                            trackColor = MaterialTheme.colorScheme.surfaceVariant,
+                        Text(
+                            text = stringResource(R.string.pack_progress_volumes, done, total),
+                            style = MaterialTheme.typography.titleSmallEmphasized,
+                            color = MaterialTheme.colorScheme.onSurface,
                         )
                     }
+                } else {
+                    // 条目数未知：不确定态 M3E ContainedLoadingIndicator，不叠字遮住形变几何。
+                    CbzUpdateIndeterminateIndicator()
+                    Spacer(Modifier.height(8.dp))
                     Text(
-                        text = if (total > 0) {
-                            stringResource(R.string.pack_progress_volumes, done, total)
-                        } else {
-                            done.toString()
-                        },
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.SemiBold,
+                        text = done.toString(),
+                        style = MaterialTheme.typography.titleMediumEmphasized,
+                        color = MaterialTheme.colorScheme.onSurface,
                     )
                 }
                 Spacer(Modifier.height(16.dp))
@@ -238,10 +269,21 @@ fun CbzUpdateProgressDialog(
         confirmButton = {
             TextButton(
                 onClick = { confirming = true },
+                shapes = ButtonDefaults.shapes(),
                 modifier = Modifier.testTag(TAG_UPDATE_CANCEL),
                 enabled = !cancelling,
             ) { Text(stringResource(R.string.common_cancel)) }
         },
+    )
+}
+
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
+@Composable
+private fun CbzUpdateIndeterminateIndicator() {
+    ContainedLoadingIndicator(
+        modifier = Modifier
+            .size(88.dp)
+            .testTag(TAG_UPDATE_PROGRESS_LOADING),
     )
 }
 
@@ -289,6 +331,7 @@ fun CbzUpdateResultDialog(
             // 再写「执行」会让人以为要点它才生效（真机实测被误读）。
             TextButton(
                 onClick = onDone,
+                shapes = ButtonDefaults.shapes(),
                 modifier = Modifier.testTag(TAG_UPDATE_RESULT_CONFIRM),
             ) {
                 Text(textOf(if (ok) TextKey.GeneralDone else TextKey.GeneralClose))

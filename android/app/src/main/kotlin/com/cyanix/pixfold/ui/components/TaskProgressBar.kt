@@ -4,18 +4,27 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.material3.LinearProgressIndicator
+import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.LinearWavyProgressIndicator
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.cyanix.pixfold.R
 import com.cyanix.pixfold.domain.task.TaskProgress
+import com.cyanix.pixfold.ui.theme.pixFoldCardContainerColor
+import com.cyanix.pixfold.ui.theme.pixFoldSurfaceBorder
 
 /**
  * 进度条本体的测试 tag。
@@ -105,38 +114,69 @@ fun TaskProgressBar(
     modifier: Modifier = Modifier,
     cancelling: Boolean = false,
 ) {
-    Column(
+    val density = LocalDensity.current
+    val stroke = remember(density) {
+        Stroke(width = with(density) { 4.dp.toPx() }, cap = StrokeCap.Round)
+    }
+
+    Surface(
         modifier = modifier.fillMaxWidth(),
-        verticalArrangement = Arrangement.spacedBy(4.dp),
+        shape = MaterialTheme.shapes.large,
+        color = pixFoldCardContainerColor(),
+        border = pixFoldSurfaceBorder(),
     ) {
-        // 必须传 lambda:见 KDoc 第二节。写成 `{ progress.fraction }` 才会在
-        // 进度推进时被重新读取;在这里先求值再传常量会让条形永远停在首次组合的值。
-        LinearProgressIndicator(
-            progress = { progress.fraction },
+        Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .testTag(TAG_TASK_PROGRESS),
-        )
-
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically,
+                .padding(horizontal = 12.dp, vertical = 10.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            // 计数用 `processed` 而非 `done`:与条形同源(见 KDoc 第一节)。
-            // 纯数字 + 斜杠,语言无关;「已处理」的措辞由调用方所在的标题行承担。
-            Text(
-                text = "${progress.processed} / ${progress.total}",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.weight(1f),
-            )
-            TextButton(
-                onClick = onCancel,
-                // 已请求取消就禁用:再点一次没有新语义,反而可能让上层重复发信号。
-                enabled = !cancelling,
-                modifier = Modifier.testTag(TAG_TASK_CANCEL),
+            // 必须传 lambda:见 KDoc 第二节。写成 `{ progress.fraction }` 才会在
+            // 进度推进时被重新读取;total <= 0 时回落不确定波浪进度条。
+            if (progress.total > 0) {
+                LinearWavyProgressIndicator(
+                    progress = { progress.fraction },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .testTag(TAG_TASK_PROGRESS),
+                    color = MaterialTheme.colorScheme.primary,
+                    trackColor = MaterialTheme.colorScheme.surfaceContainerHighest,
+                    stroke = stroke,
+                    trackStroke = stroke,
+                )
+            } else {
+                LinearWavyProgressIndicator(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .testTag(TAG_TASK_PROGRESS),
+                    color = MaterialTheme.colorScheme.primary,
+                    trackColor = MaterialTheme.colorScheme.surfaceContainerHighest,
+                    stroke = stroke,
+                    trackStroke = stroke,
+                )
+            }
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
             ) {
-                Text(stringResource(R.string.common_cancel))
+                // 计数用 `processed` 而非 `done`:与条形同源(见 KDoc 第一节)。
+                // 纯数字 + 斜杠,语言无关;「已处理」的措辞由调用方所在的标题行承担。
+                Text(
+                    text = "${progress.processed} / ${progress.total}",
+                    style = MaterialTheme.typography.labelLargeEmphasized,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    modifier = Modifier.weight(1f),
+                )
+                TextButton(
+                    onClick = onCancel,
+                    shapes = ButtonDefaults.shapes(),
+                    // 已请求取消就禁用:再点一次没有新语义,反而可能让上层重复发信号。
+                    enabled = !cancelling,
+                    modifier = Modifier.testTag(TAG_TASK_CANCEL),
+                ) {
+                    Text(stringResource(R.string.common_cancel))
+                }
             }
         }
     }

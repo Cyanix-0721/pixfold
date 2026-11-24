@@ -9,11 +9,14 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.windowInsetsPadding
-import androidx.compose.material3.PrimaryTabRow
-import androidx.compose.material3.Tab
-import androidx.compose.material3.TextButton
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.PrimaryTabRow
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Tab
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.SideEffect
@@ -33,6 +36,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.navigation3.runtime.rememberNavBackStack
 import com.cyanix.pixfold.R
 import com.cyanix.pixfold.data.task.PackTaskBus
@@ -79,6 +83,7 @@ import com.cyanix.pixfold.ui.components.PackProgressDialog
 import com.cyanix.pixfold.ui.components.ResetAllButton
 import com.cyanix.pixfold.ui.task.withCancellationToken
 import com.cyanix.pixfold.ui.text.WarnLine
+import com.cyanix.pixfold.ui.theme.pixFoldSurfaceBorder
 import com.cyanix.pixfold.ui.workspace.WorkspaceState
 import com.cyanix.pixfold.ui.workspace.handleOrNull
 import kotlinx.coroutines.CancellationException
@@ -660,46 +665,69 @@ fun LibrarySteps(
             InterruptedNoticeRow(text = interruptedNotice, onDismiss = onDismissInterruptedNotice)
         }
 
-        // 页签行 + 右侧「重置全部」:理由与槽位写法同 OrganizeSteps
-        //(`PrimaryTabRow` 无 trailing 槽位,故外层 Row 分槽)。
-        Row(
+        // 页签行 + 右侧「按目录结构获取」「重置全部」：统一落在 surfaceContainerLow 头带 + 纯黑底边分隔线上。
+        Surface(
             modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically,
+            color = MaterialTheme.colorScheme.surfaceContainerLow,
         ) {
-            PrimaryTabRow(
-                selectedTabIndex = currentIndex,
-                modifier = Modifier
-                    .weight(1f)
-                    .testTag(TAG_B_STEP_TABS),
-            ) {
-                LibraryStep.entries.forEachIndexed { i, step ->
-                    // 要进 semantics{},故先在组合上下文里解析
-                    val stepLabel = stringResource(step.labelRes)
-                    Tab(
-                        selected = currentIndex == i,
-                        // 跳步走 goToLibraryStep,保证返回链始终线性(详见该函数注释)
-                        onClick = { backStack.goToLibraryStep(currentIndex, i) },
-                        text = { Text(stepLabel) },
+            Column(modifier = Modifier.fillMaxWidth()) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(end = 4.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    PrimaryTabRow(
+                        selectedTabIndex = currentIndex,
+                        containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
+                        divider = {},
                         modifier = Modifier
-                            .testTag(
-                                when (step) {
-                                    LibraryStep.Library -> TAG_B_STEP_LIBRARY
-                                    LibraryStep.Metadata -> TAG_B_STEP_METADATA
-                                    LibraryStep.Pack -> TAG_B_STEP_PACK
+                            .weight(1f)
+                            .testTag(TAG_B_STEP_TABS),
+                    ) {
+                        LibraryStep.entries.forEachIndexed { i, step ->
+                            // 要进 semantics{},故先在组合上下文里解析
+                            val stepLabel = stringResource(step.labelRes)
+                            val selected = currentIndex == i
+                            Tab(
+                                selected = selected,
+                                // 跳步走 goToLibraryStep,保证返回链始终线性(详见该函数注释)
+                                onClick = { backStack.goToLibraryStep(currentIndex, i) },
+                                text = {
+                                    Text(
+                                        text = stepLabel,
+                                        style = if (selected) {
+                                            MaterialTheme.typography.titleSmallEmphasized
+                                        } else {
+                                            MaterialTheme.typography.titleSmall
+                                        },
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis,
+                                    )
                                 },
+                                modifier = Modifier
+                                    .testTag(
+                                        when (step) {
+                                            LibraryStep.Library -> TAG_B_STEP_LIBRARY
+                                            LibraryStep.Metadata -> TAG_B_STEP_METADATA
+                                            LibraryStep.Pack -> TAG_B_STEP_PACK
+                                        },
+                                    )
+                                    .semantics { contentDescription = stepLabel },
                             )
-                            .semantics { contentDescription = stepLabel },
-                    )
-                }
-            }
+                        }
+                    }
 
-            // 「按目录结构获取」紧邻重置:两者都是「我想重来一遍」类动作,
-            // 放在同一槽位,用户找它们时不必跨页面。作用于**当前卷**(用户 2026-10-22 裁决)。
-            DirMetaButton(
-                onApply = { applyDirMetaToActiveVolume() },
-                enabled = state.activeVolumeOrNull?.let { dirMetaAvailable(it) } == true,
-            )
-            ResetAllButton(onReset = { resetAll() })
+                    // 「按目录结构获取」紧邻重置:两者都是「我想重来一遍」类动作,
+                    // 放在同一槽位,用户找它们时不必跨页面。作用于**当前卷**(用户 2026-10-22 裁决)。
+                    DirMetaButton(
+                        onApply = { applyDirMetaToActiveVolume() },
+                        enabled = state.activeVolumeOrNull?.let { dirMetaAvailable(it) } == true,
+                    )
+                    ResetAllButton(onReset = { resetAll() })
+                }
+                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+            }
         }
 
         // 步骤内容不重复叠加 inset(外层已处理)
@@ -996,22 +1024,33 @@ fun LibrarySteps(
  */
 @Composable
 private fun InterruptedNoticeRow(text: String, onDismiss: () -> Unit) {
-    Row(
+    Surface(
         modifier = Modifier
             .fillMaxWidth()
-            .testTag(TAG_B_INTERRUPTED_NOTICE)
-            .padding(horizontal = 16.dp, vertical = 8.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
+            .testTag(TAG_B_INTERRUPTED_NOTICE),
+        color = MaterialTheme.colorScheme.errorContainer,
+        border = pixFoldSurfaceBorder(),
     ) {
-        WarnLine(
-            icon = R.drawable.ic_warning_triangle,
-            text = text,
-            color = MaterialTheme.colorScheme.error,
-            modifier = Modifier.weight(1f),
-        )
-        TextButton(onClick = onDismiss, modifier = Modifier.testTag(TAG_B_INTERRUPTED_DISMISS)) {
-            Text(stringResource(R.string.b_interrupted_dismiss))
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            WarnLine(
+                icon = R.drawable.ic_warning_triangle,
+                text = text,
+                color = MaterialTheme.colorScheme.onErrorContainer,
+                modifier = Modifier.weight(1f),
+            )
+            TextButton(
+                onClick = onDismiss,
+                shapes = ButtonDefaults.shapes(),
+                modifier = Modifier.testTag(TAG_B_INTERRUPTED_DISMISS),
+            ) {
+                Text(stringResource(R.string.b_interrupted_dismiss))
+            }
         }
     }
 }

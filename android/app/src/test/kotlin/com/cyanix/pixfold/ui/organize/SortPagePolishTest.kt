@@ -321,13 +321,17 @@ class SortPagePolishTest {
     @Test
     fun mode_toggle_suppresses_the_default_checkmark() {
         val code = decommented(source("ui/organize/SortAndPreviewPage.kt"))
-        // 只看 `ModeToggle` 这一个函数体 —— 文件里还有别的分段按钮用法,
+        // 只看 `ModeToggle` 这一个函数体 —— 文件里还有别的切换用法,
         // 按整份文件断言会让本用例在 `ModeToggle` 被改回去时仍然通过。
         val body = functionBody(code, "private fun ModeToggle(")
 
         assertTrue(
-            body.contains("icon = {}"),
-            "模式切换的 SegmentedButton 没有传空 icon ⇒ 选中态仍会画默认对勾(✔)",
+            body.contains("FilledTonalToggleButton("),
+            "模式切换应使用 M3E FilledTonalToggleButton 连接切换组，而非旧版带默认对勾的 SegmentedButton",
+        )
+        assertTrue(
+            body.contains("connectedLeadingButtonShapes"),
+            "模式切换应使用 ButtonGroupDefaults.connectedLeadingButtonShapes() 表达连接形态",
         )
         assertTrue(
             !body.contains("SegmentedButtonDefaults.Icon("),

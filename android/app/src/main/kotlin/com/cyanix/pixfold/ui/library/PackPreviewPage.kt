@@ -4,10 +4,11 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -15,11 +16,16 @@ import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.FilterChip
-import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.ListItemDefaults
+import androidx.compose.material3.MaterialShapes
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.SideEffect
@@ -27,40 +33,42 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.res.pluralStringResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontFamily
-import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.cyanix.pixfold.R
 import com.cyanix.pixfold.domain.comic.includedVolumes
+import com.cyanix.pixfold.domain.comic.previewOf
+import com.cyanix.pixfold.domain.library.LibraryState
+import com.cyanix.pixfold.domain.library.selectVolume
+import com.cyanix.pixfold.domain.model.ComicVolume
+import com.cyanix.pixfold.domain.model.LangChoice
 import com.cyanix.pixfold.domain.plan.ConfirmFlowState
 import com.cyanix.pixfold.domain.plan.OutputConflictPolicy
 import com.cyanix.pixfold.domain.plan.SourcePolicy
 import com.cyanix.pixfold.domain.plan.buildPackagePlans
 import com.cyanix.pixfold.domain.plan.effectiveDangerActions
-import com.cyanix.pixfold.domain.plan.generalSummaryLines
-import com.cyanix.pixfold.domain.plan.buildConfirmSequence
 import com.cyanix.pixfold.domain.plan.planCountsOf
 import com.cyanix.pixfold.domain.task.TaskProgress
+import com.cyanix.pixfold.ui.components.PackProgressDialog
+import com.cyanix.pixfold.ui.components.PageActionBar
+import com.cyanix.pixfold.ui.components.PixFoldEmptyState
+import com.cyanix.pixfold.ui.components.PixFoldSectionCard
+import com.cyanix.pixfold.ui.components.PixFoldSegmentedItem
+import com.cyanix.pixfold.ui.components.PixFoldStatusPill
+import com.cyanix.pixfold.ui.components.VolumeChipRow
 import com.cyanix.pixfold.ui.plan.ConfirmDialog
 import com.cyanix.pixfold.ui.plan.PlanHeader
 import com.cyanix.pixfold.ui.plan.PlanRow
 import com.cyanix.pixfold.ui.plan.TAG_PLAN_CONFIRM
-import com.cyanix.pixfold.domain.comic.previewOf
-import com.cyanix.pixfold.domain.model.ComicVolume
-import com.cyanix.pixfold.domain.model.LangChoice
-import com.cyanix.pixfold.domain.library.LibraryState
-import com.cyanix.pixfold.domain.library.selectVolume
-import com.cyanix.pixfold.ui.components.PageActionBar
-import com.cyanix.pixfold.ui.components.PackProgressDialog
-import com.cyanix.pixfold.ui.components.TaskProgressBar
-import com.cyanix.pixfold.ui.components.VolumeChipRow
 import com.cyanix.pixfold.ui.text.WarnLine
 import com.cyanix.pixfold.ui.text.textOf
 import com.cyanix.pixfold.ui.text.warnIcon
+import com.cyanix.pixfold.ui.theme.pixFoldSurfaceBorder
 
 const val TAG_PACK_PAGE = "pack-page"
 const val TAG_PACK_LIST = "pack-list"
@@ -260,6 +268,8 @@ fun PackPreviewPage(
                 .fillMaxWidth()
                 .weight(1f)
                 .testTag(TAG_PACK_LIST),
+            contentPadding = PaddingValues(vertical = 4.dp),
+            verticalArrangement = Arrangement.spacedBy(ListItemDefaults.SegmentedGap),
         ) {
             item(key = "header") {
                 PackHeader(
@@ -274,46 +284,54 @@ fun PackPreviewPage(
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = 12.dp),
+                        .padding(horizontal = 12.dp, vertical = 6.dp),
+                    verticalArrangement = Arrangement.spacedBy(6.dp),
                 ) {
                     Text(
                         text = stringResource(R.string.pack_xml_title),
-                        style = MaterialTheme.typography.titleSmall,
+                        style = MaterialTheme.typography.titleSmallEmphasized,
                         color = MaterialTheme.colorScheme.onBackground,
                     )
-                    Text(
-                        text = preview.xml,
-                        style = MaterialTheme.typography.bodySmall,
-                        // 等宽字体:XML 的缩进与对齐才有意义
-                        fontFamily = FontFamily.Monospace,
-                        color = MaterialTheme.colorScheme.onSurface,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(vertical = 4.dp)
-                            .testTag(TAG_XML_PREVIEW),
-                    )
-                    HorizontalDivider()
+                    Surface(
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = MaterialTheme.shapes.large,
+                        color = MaterialTheme.colorScheme.surfaceContainerHighest,
+                        border = pixFoldSurfaceBorder(),
+                    ) {
+                        Text(
+                            text = preview.xml,
+                            style = MaterialTheme.typography.bodySmall,
+                            // 等宽字体:XML 的缩进与对齐才有意义
+                            fontFamily = FontFamily.Monospace,
+                            color = MaterialTheme.colorScheme.onSurface,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(12.dp)
+                                .testTag(TAG_XML_PREVIEW),
+                        )
+                    }
                 }
             }
 
             // ---- 页码列表预览 ----
             item(key = "page-header") {
-                Column(modifier = Modifier.fillMaxWidth()) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 12.dp, vertical = 6.dp),
+                    verticalArrangement = Arrangement.spacedBy(4.dp),
+                ) {
                     Text(
                         text = pluralStringResource(R.plurals.pack_page_header, preview.pages.size, preview.pages.size),
-                        style = MaterialTheme.typography.titleSmall,
+                        style = MaterialTheme.typography.titleSmallEmphasized,
                         color = MaterialTheme.colorScheme.onBackground,
-                        modifier = Modifier
-                            .padding(horizontal = 12.dp, vertical = 6.dp)
-                            .testTag(TAG_PAGE_PREVIEW_COUNT),
+                        modifier = Modifier.testTag(TAG_PAGE_PREVIEW_COUNT),
                     )
                     Text(
                         text = stringResource(R.string.pack_page_hint),
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier
-                            .padding(horizontal = 12.dp)
-                            .testTag(TAG_PAGE_PREVIEW),
+                        modifier = Modifier.testTag(TAG_PAGE_PREVIEW),
                     )
                     if (!preview.consistent) {
                         // pageIssues 是领域层的 `List<Msg>` —— 逐条解析后在**这里**拼接,
@@ -321,53 +339,76 @@ fun PackPreviewPage(
                         // transform 是普通 lambda,里面调不了 @Composable。
                         val issueSeparator = stringResource(R.string.pack_page_issue_separator)
                         val issues = preview.pageIssues.map { textOf(it) }.joinToString(issueSeparator)
-                        WarnLine(
-                            icon = warnIcon(R.string.pack_page_issues) ?: R.drawable.ic_warning_triangle,
-                            text = stringResource(R.string.pack_page_issues, issues),
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.error,
-                            modifier = Modifier.padding(horizontal = 12.dp),
-                        )
+                        Surface(
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = MaterialTheme.shapes.medium,
+                            color = MaterialTheme.colorScheme.errorContainer,
+                            border = pixFoldSurfaceBorder(),
+                        ) {
+                            WarnLine(
+                                icon = warnIcon(R.string.pack_page_issues) ?: R.drawable.ic_warning_triangle,
+                                text = stringResource(R.string.pack_page_issues, issues),
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onErrorContainer,
+                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                            )
+                        }
                     }
                 }
             }
 
+            val pageCount = preview.pages.size
             itemsIndexed(
                 items = preview.pages,
                 key = { _, page -> "page-${page.item.id}" },
                 contentType = { _, _ -> "page" },
             ) { i, page ->
-                Row(
+                PixFoldSegmentedItem(
+                    shapes = ListItemDefaults.segmentedShapes(index = i, count = pageCount.coerceAtLeast(1)),
+                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = 12.dp, vertical = 2.dp)
+                        .padding(horizontal = 12.dp)
                         .testTag(packPageRowTag(i)),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(6.dp),
                 ) {
-                    Text(
-                        text = "${i + 1}",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                    Text(
-                        text = page.fileName,
-                        style = MaterialTheme.typography.bodySmall,
-                        fontFamily = FontFamily.Monospace,
-                        color = MaterialTheme.colorScheme.onBackground,
-                    )
-                    Text(
-                        text = "← ${page.item.fileName}",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                    if (volume.pageOrder.isManual(page.item.id)) {
-                        // 人工调整过的页:预览必须能看出来(归档原型用蓝字标注同一意图)
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        Surface(
+                            shape = CircleShape,
+                            color = MaterialTheme.colorScheme.surfaceContainerHighest,
+                            contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                        ) {
+                            Text(
+                                text = "${i + 1}",
+                                style = MaterialTheme.typography.labelSmallEmphasized,
+                                modifier = Modifier.padding(horizontal = 7.dp, vertical = 2.dp),
+                            )
+                        }
                         Text(
-                            text = stringResource(R.string.pack_page_manual),
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.primary,
+                            text = page.fileName,
+                            style = MaterialTheme.typography.bodySmall,
+                            fontFamily = FontFamily.Monospace,
+                            color = MaterialTheme.colorScheme.onSurface,
                         )
+                        Text(
+                            text = "← ${page.item.fileName}",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.weight(1f, fill = false),
+                        )
+                        if (volume.pageOrder.isManual(page.item.id)) {
+                            // 人工调整过的页:预览必须能看出来(归档原型用蓝字标注同一意图)
+                            PixFoldStatusPill(
+                                text = stringResource(R.string.pack_page_manual),
+                                containerColor = MaterialTheme.colorScheme.primaryContainer,
+                                contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                            )
+                        }
                     }
                 }
             }
@@ -375,82 +416,102 @@ fun PackPreviewPage(
             // ---- P6:执行计划(仅当前卷? 不 —— 计划覆盖全部 included 卷) ----
             if (showPlanSection) {
                 item(key = "plan-header", contentType = "plan-header") {
-                    Column(modifier = Modifier.fillMaxWidth()) {
-                        HorizontalDivider(modifier = Modifier.padding(top = 8.dp))
-                        Text(
-                            text = stringResource(R.string.pack_plan_title),
-                            style = MaterialTheme.typography.titleSmall,
-                            color = MaterialTheme.colorScheme.onBackground,
-                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
-                        )
-
-                        // ---- 策略选择(默认 Rename / Keep) ----
-                        Column(modifier = Modifier.padding(horizontal = 12.dp)) {
-                            Text(
-                                text = stringResource(R.string.pack_conflict_policy_title),
-                                style = MaterialTheme.typography.labelMedium,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
-                            // 2026-09-25:改 FlowRow(同源缺陷,与卷芯片行一并处理)
-                            FlowRow(
+                    Column(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalArrangement = Arrangement.spacedBy(6.dp),
+                    ) {
+                        PixFoldSectionCard(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 12.dp, vertical = 6.dp),
+                            contentPadding = PaddingValues(14.dp),
+                        ) {
+                            Column(
                                 modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.spacedBy(6.dp),
-                                verticalArrangement = Arrangement.spacedBy(4.dp),
+                                verticalArrangement = Arrangement.spacedBy(6.dp),
                             ) {
-                                OutputConflictPolicy.entries.forEach { p ->
-                                    FilterChip(
-                                        selected = conflictPolicy == p,
-                                        onClick = { onConflictPolicyChange(p) },
-                                        label = { Text(textOf(p.textKey)) },
-                                        modifier = Modifier.testTag("policy-conflict-" + p.name),
-                                    )
-                                }
-                            }
-                            Text(
-                                text = stringResource(R.string.pack_source_policy_title),
-                                style = MaterialTheme.typography.labelMedium,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                modifier = Modifier.padding(top = 4.dp),
-                            )
-                            // 2026-09-25:改 FlowRow(同源缺陷)
-                            FlowRow(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.spacedBy(6.dp),
-                                verticalArrangement = Arrangement.spacedBy(4.dp),
-                            ) {
-                                SourcePolicy.entries.forEach { p ->
-                                    FilterChip(
-                                        selected = sourcePolicy == p,
-                                        onClick = { onSourcePolicyChange(p) },
-                                        label = { Text(textOf(p.textKey)) },
-                                        modifier = Modifier.testTag("policy-source-" + p.name),
-                                    )
-                                }
-                            }
-                            FilterChip(
-                                selected = cleanEmptyDirs,
-                                onClick = { onCleanEmptyDirsChange(!cleanEmptyDirs) },
-                                label = {
-                                    Text(
-                                        stringResource(
-                                            if (cleanEmptyDirs) {
-                                                R.string.pack_clean_empty_on
-                                            } else {
-                                                R.string.pack_clean_empty_off
-                                            },
-                                        ),
-                                    )
-                                },
-                                modifier = Modifier.testTag(TAG_CLEAN_EMPTY_TOGGLE),
-                            )
-                            if (sourcePolicy == SourcePolicy.Delete) {
-                                WarnLine(
-                                    icon = warnIcon(R.string.pack_delete_warning) ?: R.drawable.ic_warning_triangle,
-                                    text = stringResource(R.string.pack_delete_warning),
-                                    style = MaterialTheme.typography.labelMedium,
-                                    color = MaterialTheme.colorScheme.error,
-                                    modifier = Modifier.testTag(TAG_DELETE_WARNING),
+                                Text(
+                                    text = stringResource(R.string.pack_plan_title),
+                                    style = MaterialTheme.typography.titleMediumEmphasized,
+                                    color = MaterialTheme.colorScheme.onSurface,
                                 )
+
+                                // ---- 策略选择(默认 Rename / Keep) ----
+                                Text(
+                                    text = stringResource(R.string.pack_conflict_policy_title),
+                                    style = MaterialTheme.typography.labelMediumEmphasized,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                                // 2026-09-25:改 FlowRow(同源缺陷,与卷芯片行一并处理)
+                                FlowRow(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                    verticalArrangement = Arrangement.spacedBy(4.dp),
+                                ) {
+                                    OutputConflictPolicy.entries.forEach { p ->
+                                        FilterChip(
+                                            selected = conflictPolicy == p,
+                                            onClick = { onConflictPolicyChange(p) },
+                                            label = { Text(textOf(p.textKey)) },
+                                            modifier = Modifier.testTag("policy-conflict-" + p.name),
+                                        )
+                                    }
+                                }
+                                Text(
+                                    text = stringResource(R.string.pack_source_policy_title),
+                                    style = MaterialTheme.typography.labelMediumEmphasized,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    modifier = Modifier.padding(top = 2.dp),
+                                )
+                                // 2026-09-25:改 FlowRow(同源缺陷)
+                                FlowRow(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                    verticalArrangement = Arrangement.spacedBy(4.dp),
+                                ) {
+                                    SourcePolicy.entries.forEach { p ->
+                                        FilterChip(
+                                            selected = sourcePolicy == p,
+                                            onClick = { onSourcePolicyChange(p) },
+                                            label = { Text(textOf(p.textKey)) },
+                                            modifier = Modifier.testTag("policy-source-" + p.name),
+                                        )
+                                    }
+                                }
+                                FilterChip(
+                                    selected = cleanEmptyDirs,
+                                    onClick = { onCleanEmptyDirsChange(!cleanEmptyDirs) },
+                                    label = {
+                                        Text(
+                                            stringResource(
+                                                if (cleanEmptyDirs) {
+                                                    R.string.pack_clean_empty_on
+                                                } else {
+                                                    R.string.pack_clean_empty_off
+                                                },
+                                            ),
+                                        )
+                                    },
+                                    modifier = Modifier.testTag(TAG_CLEAN_EMPTY_TOGGLE),
+                                )
+                                if (sourcePolicy == SourcePolicy.Delete) {
+                                    Surface(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        shape = MaterialTheme.shapes.medium,
+                                        color = MaterialTheme.colorScheme.errorContainer,
+                                        border = pixFoldSurfaceBorder(),
+                                    ) {
+                                        WarnLine(
+                                            icon = warnIcon(R.string.pack_delete_warning) ?: R.drawable.ic_warning_triangle,
+                                            text = stringResource(R.string.pack_delete_warning),
+                                            style = MaterialTheme.typography.labelMedium,
+                                            color = MaterialTheme.colorScheme.onErrorContainer,
+                                            modifier = Modifier
+                                                .padding(horizontal = 10.dp, vertical = 6.dp)
+                                                .testTag(TAG_DELETE_WARNING),
+                                        )
+                                    }
+                                }
                             }
                         }
 
@@ -477,33 +538,29 @@ fun PackPreviewPage(
         // 执行故障横条:必须是**错误色**而不是普通的提示色 —— 它是「这次什么都没写成」,
         // 不是「有个小提醒」。放在底栏正上方,因为用户的视线在按钮附近。
         if (executionError != null) {
-            WarnLine(
-                icon = warnIcon(R.string.pack_error_space) ?: R.drawable.ic_warning_triangle,
-                text = executionError,
-                style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.error,
+            Surface(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 12.dp, vertical = 6.dp)
-                    .testTag(TAG_PACK_EXECUTION_ERROR),
-            )
+                    .padding(horizontal = 12.dp, vertical = 6.dp),
+                shape = MaterialTheme.shapes.large,
+                color = MaterialTheme.colorScheme.errorContainer,
+                border = pixFoldSurfaceBorder(),
+            ) {
+                WarnLine(
+                    icon = warnIcon(R.string.pack_error_space) ?: R.drawable.ic_warning_triangle,
+                    text = executionError,
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onErrorContainer,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 12.dp, vertical = 8.dp)
+                        .testTag(TAG_PACK_EXECUTION_ERROR),
+                )
+            }
         }
 
         // 底栏:左 = 返回上一步,右 = 确认打包(用户 2026-09-25 指定)。
-        // 终局动作原先在计划区末尾,计划覆盖全部 included 卷,长列表要滚很久才够得到,
-        // 且未滚到之前按钮根本没被组合。与 A 侧 [TAG_A_PLAN_CONFIRM] 一致。
-        //
-        // 执行期间(D2b)整条底栏换形态:计划区已经不可编辑,「确认打包」按下去只会
-        // 再启一次任务。此时唯一有意义的动作是**取消**,故右侧换成取消按钮,
-        // 左侧的返回也一并撤掉 —— 返回会离开这个目的地,而任务还在后台跑。
         if (showPlanSection && executing) {
-            // 执行期底栏整条撤掉（留一条占位高度，避免计划区在弹窗出现时跳动）:
-            // 左侧「返回」会离开这个目的地（任务却还在后台跑），
-            // 右侧「确认打包」再按一次就是并发写同一批文件。
-            //
-            // 进度改由**模态弹窗**承载（双层圆环 + 背景模糊，见 PackProgressDialog）。
-            // 底栏不再挂进度条 —— 弹窗里已有唯一一份读数，两处同挂
-            // `TAG_TASK_PROGRESS` 会让 `onNodeWithTag` 撞到多个节点。
             Spacer(Modifier.height(72.dp))
         } else if (showPlanSection) {
             val back = onBack
@@ -514,6 +571,7 @@ fun PackPreviewPage(
                     if (back != null) {
                         FilledTonalButton(
                             onClick = back,
+                            shapes = ButtonDefaults.shapes(),
                             modifier = Modifier
                                 .testTag(TAG_B_STEP_BACK)
                                 .semantics { contentDescription = backCd },
@@ -523,6 +581,7 @@ fun PackPreviewPage(
                 trailing = {
                     Button(
                         onClick = onStartConfirm,
+                        shapes = ButtonDefaults.shapes(),
                         modifier = Modifier
                             .testTag(TAG_PLAN_CONFIRM)
                             .semantics { contentDescription = confirmCd },
@@ -574,77 +633,107 @@ private fun PackHeader(volume: ComicVolume, includedCount: Int, totalCount: Int)
         if (includedCount < totalCount) stringResource(R.string.pack_included_count_hint) else ""
     // pendingIssues 是领域 `List<Msg>` —— 逐条解析后拼接(`map` 内联,理由同页码问题行)。
     val issuesText = volume.pendingIssues.map { textOf(it) }.joinToString(" / ")
-    Column(
+
+    PixFoldSectionCard(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 12.dp, vertical = 4.dp),
+            .padding(horizontal = 12.dp, vertical = 6.dp),
+        contentPadding = PaddingValues(14.dp),
     ) {
-        Text(
-            text = volume.dirPath,
-            style = MaterialTheme.typography.titleSmall,
-            color = MaterialTheme.colorScheme.onBackground,
-        )
-        Text(
-            text = outputText,
-            style = MaterialTheme.typography.labelSmall,
-            color = if (volume.outputExists) {
-                MaterialTheme.colorScheme.error
-            } else {
-                MaterialTheme.colorScheme.onSurfaceVariant
-            },
-        )
-        Text(
-            text = languageText,
-            style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-        if (!volume.included) {
-            // 未勾选 = 本次不打包。必须显式说明,否则"能看到预览"会被当成"会被打包"。
-            WarnLine(
-                icon = warnIcon(R.string.pack_excluded_warning) ?: R.drawable.ic_warning_triangle,
-                text = stringResource(R.string.pack_excluded_warning),
-                style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.error,
-                modifier = Modifier.testTag(TAG_PACK_EXCLUDED),
-            )
-        }
-        // 用领域层 includedVolumes 求"本次实际会打包几卷"——预览必须回答"这次到底做什么",
-        // 而不是只展示当前这一卷(用户勾选状态改了却看不到反馈,是 P3 那类"界面没用上领域规则")。
-        Text(
-            text = includedText,
-            style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.testTag(TAG_PACK_INCLUDED_COUNT),
-        )
-        if (volume.pendingIssues.isNotEmpty()) {
+        Column(
+            modifier = Modifier.fillMaxWidth(),
+            verticalArrangement = Arrangement.spacedBy(6.dp),
+        ) {
             Text(
-                text = stringResource(R.string.meta_pending_prefix) + issuesText,
-                style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.tertiary,
-                modifier = Modifier.testTag(TAG_PACK_PENDING),
+                text = volume.dirPath,
+                style = MaterialTheme.typography.titleMediumEmphasized,
+                color = MaterialTheme.colorScheme.onSurface,
             )
+            Text(
+                text = outputText,
+                style = MaterialTheme.typography.bodySmall,
+                color = if (volume.outputExists) {
+                    MaterialTheme.colorScheme.error
+                } else {
+                    MaterialTheme.colorScheme.onSurfaceVariant
+                },
+            )
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Surface(
+                    shape = MaterialTheme.shapes.medium,
+                    color = MaterialTheme.colorScheme.secondaryContainer,
+                    contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
+                    modifier = Modifier
+                        .weight(1f, fill = false)
+                        .testTag(TAG_PACK_INCLUDED_COUNT),
+                ) {
+                    Text(
+                        text = includedText,
+                        style = MaterialTheme.typography.labelSmallEmphasized,
+                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
+                    )
+                }
+                PixFoldStatusPill(
+                    text = languageText,
+                    containerColor = MaterialTheme.colorScheme.surfaceContainerHighest,
+                    contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                    border = pixFoldSurfaceBorder(),
+                )
+            }
+            if (!volume.included) {
+                // 未勾选 = 本次不打包。必须显式说明,否则"能看到预览"会被当成"会被打包"。
+                Surface(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = MaterialTheme.shapes.medium,
+                    color = MaterialTheme.colorScheme.errorContainer,
+                    border = pixFoldSurfaceBorder(),
+                ) {
+                    WarnLine(
+                        icon = warnIcon(R.string.pack_excluded_warning) ?: R.drawable.ic_warning_triangle,
+                        text = stringResource(R.string.pack_excluded_warning),
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onErrorContainer,
+                        modifier = Modifier
+                            .padding(horizontal = 10.dp, vertical = 6.dp)
+                            .testTag(TAG_PACK_EXCLUDED),
+                    )
+                }
+            }
+            if (volume.pendingIssues.isNotEmpty()) {
+                Surface(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = MaterialTheme.shapes.medium,
+                    color = MaterialTheme.colorScheme.tertiaryContainer,
+                    border = pixFoldSurfaceBorder(),
+                ) {
+                    Text(
+                        text = stringResource(R.string.meta_pending_prefix) + issuesText,
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onTertiaryContainer,
+                        modifier = Modifier
+                            .padding(horizontal = 10.dp, vertical = 6.dp)
+                            .testTag(TAG_PACK_PENDING),
+                    )
+                }
+            }
         }
-        HorizontalDivider(modifier = Modifier.padding(top = 4.dp))
     }
 }
 
-/**
- * 步骤 3 的空工作区态。
- *
- * 与 `MetadataPage` 的 `MetadataEmptyState` 刻意同构（外层 `Column` 撑满 + 内边距 +
- * `PageActionBar` 在列表之外），这样返回按钮在两种状态下落在同一位置。
- *
- * 为什么步骤 2 与步骤 3 都要各写一份而不是抽公共组件：两页的 tag 与文案都不同，
- * 且这个空态只有 30 行、没有第二个变化维度；抽成公共组件反而要传 tag 与文案两个
- * 参数，比复制更难读。真正需要统一的是**位置**（底栏同槽位），而这一点由两处都
- * 用 `PageActionBar` 保证。
- */
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 private fun PackEmptyState(
     modifier: Modifier,
     contentInsets: WindowInsets,
     onBack: (() -> Unit)?,
 ) {
+    val raw = stringResource(R.string.b_pack_empty)
+    val title = raw.substringBefore('\n')
+    val subtitle = raw.substringAfter('\n', "")
     Column(
         modifier = modifier
             .fillMaxSize()
@@ -657,14 +746,12 @@ private fun PackEmptyState(
                 .weight(1f),
             contentAlignment = Alignment.Center,
         ) {
-            Text(
-                text = stringResource(R.string.b_pack_empty),
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                textAlign = TextAlign.Center,
-                modifier = Modifier
-                    .padding(horizontal = 24.dp, vertical = 16.dp)
-                    .testTag(TAG_PACK_EMPTY),
+            PixFoldEmptyState(
+                polygon = MaterialShapes.Cookie7Sided,
+                iconRes = R.drawable.ic_folder_open,
+                title = title,
+                subtitle = subtitle,
+                modifier = Modifier.testTag(TAG_PACK_EMPTY),
             )
         }
 
@@ -674,6 +761,7 @@ private fun PackEmptyState(
                 leading = {
                     FilledTonalButton(
                         onClick = onBack,
+                        shapes = ButtonDefaults.shapes(),
                         modifier = Modifier
                             .testTag(TAG_B_STEP_BACK)
                             .semantics { contentDescription = backCd },
@@ -733,18 +821,37 @@ private fun PackPreflightPanel(preflight: PackUiPreflight) {
             .fillMaxWidth()
             .padding(horizontal = 12.dp, vertical = 6.dp)
             .testTag(TAG_PACK_PREFLIGHT),
-        verticalArrangement = Arrangement.spacedBy(4.dp),
+        verticalArrangement = Arrangement.spacedBy(ListItemDefaults.SegmentedGap),
     ) {
-        rows.forEach { row ->
-            WarnLine(
-                icon = warnIcon(row.iconKey) ?: R.drawable.ic_warning_triangle,
-                text = row.text,
-                style = MaterialTheme.typography.labelMedium,
-                color = if (row.blocking) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant,
+        rows.forEachIndexed { index, row ->
+            val container = if (row.blocking) {
+                MaterialTheme.colorScheme.errorContainer
+            } else {
+                MaterialTheme.colorScheme.tertiaryContainer
+            }
+            val contentColor = if (row.blocking) {
+                MaterialTheme.colorScheme.onErrorContainer
+            } else {
+                MaterialTheme.colorScheme.onTertiaryContainer
+            }
+            PixFoldSegmentedItem(
+                shapes = ListItemDefaults.segmentedShapes(index = index, count = rows.size),
+                colors = ListItemDefaults.segmentedColors(
+                    containerColor = container,
+                    disabledContainerColor = container,
+                ),
+                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp),
                 modifier = Modifier.testTag(
                     if (row.blocking) TAG_PACK_PREFLIGHT_BLOCKER else TAG_PACK_PREFLIGHT_WARNING,
                 ),
-            )
+            ) {
+                WarnLine(
+                    icon = warnIcon(row.iconKey) ?: R.drawable.ic_warning_triangle,
+                    text = row.text,
+                    style = MaterialTheme.typography.labelMedium,
+                    color = contentColor,
+                )
+            }
         }
     }
 }

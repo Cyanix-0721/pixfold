@@ -3,27 +3,29 @@ package com.cyanix.pixfold.ui.organize
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Card
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExposedDropdownMenu
 import androidx.compose.material3.ExposedDropdownMenuAnchorType
 import androidx.compose.material3.ExposedDropdownMenuBox
 import androidx.compose.material3.ExposedDropdownMenuDefaults
-import androidx.compose.material3.FilterChip
-import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.IconButtonDefaults
+import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -36,15 +38,18 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
-import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.res.pluralStringResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import com.cyanix.pixfold.ui.components.PixFoldAlertDialog
 import com.cyanix.pixfold.R
+import com.cyanix.pixfold.ui.components.PixFoldAlertDialog
+import com.cyanix.pixfold.ui.components.PixFoldSectionCard
 import com.cyanix.pixfold.ui.text.textOf
+import com.cyanix.pixfold.ui.theme.pixFoldCardContainerColor
+import com.cyanix.pixfold.ui.theme.pixFoldSurfaceBorder
 import com.cyanix.pixfold.domain.model.CasePolicy
 import com.cyanix.pixfold.domain.model.ExtPolicy
 import com.cyanix.pixfold.domain.model.NameComponent
@@ -142,10 +147,14 @@ fun SchemeSummaryBar(
     val toggleCd = stringResource(
         if (expanded) R.string.a_scheme_toggle_collapse_cd else R.string.a_scheme_toggle_expand_cd,
     )
-    Column(
+    Surface(
         modifier = modifier
             .fillMaxWidth()
+            .padding(horizontal = 12.dp, vertical = 2.dp)
             .testTag(TAG_SCHEME_BAR),
+        shape = MaterialTheme.shapes.large,
+        color = pixFoldCardContainerColor(),
+        border = pixFoldSurfaceBorder(),
     ) {
         Row(
             modifier = Modifier
@@ -153,18 +162,18 @@ fun SchemeSummaryBar(
                 // 触控目标 ≥48dp(约束 7);摘要行本身只有一行文字,靠最小高度撑开
                 .heightIn(min = 48.dp)
                 .clickable(onClick = onToggle)
-                .padding(horizontal = 12.dp)
+                .padding(horizontal = 12.dp, vertical = 6.dp)
                 .testTag(TAG_SCHEME_TOGGLE)
                 .semantics {
                     contentDescription = toggleCd
                 },
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(4.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             Text(
                 text = summary,
-                style = MaterialTheme.typography.titleSmall,
-                color = MaterialTheme.colorScheme.onBackground,
+                style = MaterialTheme.typography.titleSmallEmphasized,
+                color = MaterialTheme.colorScheme.onSurface,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
                 modifier = Modifier.weight(1f),
@@ -178,7 +187,6 @@ fun SchemeSummaryBar(
                 tint = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
-        HorizontalDivider()
     }
 }
 
@@ -213,147 +221,147 @@ fun SchemeEditor(
     val rootFollowCd = stringResource(R.string.a_scheme_root_follow_cd)
     val sanitizeCd = stringResource(R.string.a_scheme_sanitize_cd)
 
-    Column(
+    PixFoldSectionCard(
         modifier = modifier
             .fillMaxWidth()
-            .padding(horizontal = 12.dp, vertical = 4.dp)
+            .padding(horizontal = 8.dp, vertical = 2.dp)
             .testTag(TAG_SCHEME_EDITOR),
-        verticalArrangement = Arrangement.spacedBy(6.dp),
+        contentPadding = PaddingValues(horizontal = 10.dp, vertical = 6.dp),
     ) {
-        Row(
+        Column(
             modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically,
+            verticalArrangement = Arrangement.spacedBy(4.dp),
         ) {
-            Text(
-                text = pluralStringResource(
-                    R.plurals.a_scheme_title,
-                    scheme.components.count { it.enabled },
-                    scheme.components.count { it.enabled },
-                ),
-                style = MaterialTheme.typography.titleSmall,
-                color = MaterialTheme.colorScheme.onBackground,
-            )
-            TextButton(
-                onClick = { onChange(addComponent(state, NameComponentKind.CustomText)) },
-                modifier = Modifier
-                    .testTag(TAG_SCHEME_ADD)
-                    .semantics { contentDescription = addCd },
-            ) { Text(stringResource(R.string.a_scheme_add)) }
-        }
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    text = pluralStringResource(
+                        R.plurals.a_scheme_title,
+                        scheme.components.count { it.enabled },
+                        scheme.components.count { it.enabled },
+                    ),
+                    style = MaterialTheme.typography.titleSmallEmphasized,
+                    color = MaterialTheme.colorScheme.onSurface,
+                )
+                FilledTonalButton(
+                    onClick = { onChange(addComponent(state, NameComponentKind.CustomText)) },
+                    shapes = ButtonDefaults.shapes(),
+                    modifier = Modifier
+                        .testTag(TAG_SCHEME_ADD)
+                        .semantics { contentDescription = addCd },
+                ) { Text(stringResource(R.string.a_scheme_add)) }
+            }
 
-        // ---- 组件列表:启用 / 类型 / 分隔符 / 文本 / 顺序 / 删除 ----
-        scheme.components.forEachIndexed { index, comp ->
-            ComponentRow(
-                index = index,
-                component = comp,
-                canRemove = scheme.components.size > 1,
-                onChange = onChange,
-                state = state,
-            )
-        }
+            // ---- 组件列表:启用 / 类型 / 分隔符 / 文本 / 顺序 / 删除 ----
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                verticalArrangement = Arrangement.spacedBy(ListItemDefaults.SegmentedGap),
+            ) {
+                scheme.components.forEachIndexed { index, comp ->
+                    ComponentRow(
+                        index = index,
+                        count = scheme.components.size,
+                        component = comp,
+                        canRemove = scheme.components.size > 1,
+                        onChange = onChange,
+                        state = state,
+                    )
+                }
+            }
 
-        // ---- 全局选项:根目录名 / 起始序号 / 补零 / 扩展名策略 / 自动清洗 ----
-        //
-        // **分两行而非横向滚动**:手机上横向滚动会让靠后的控件落在视口之外,
-        // 用户点不到(实测:sanitize 开关点不动,导致"可调"名不副实)。
-        // 纵向空间在手机上更宽裕,故按语义分成"命名要素"与"策略开关"两行。
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            OutlinedTextField(
-                value = scheme.rootDirName,
-                onValueChange = { onChange(setRootDirNameOnScheme(state, it)) },
-                label = { Text(rootDirLabel) },
-                singleLine = true,
-                modifier = Modifier
-                    .widthInChars(12)
-                    .testTag(TAG_SCHEME_ROOT_DIR),
-            )
-            NumberField(
-                label = indexStartLabel,
-                value = scheme.indexStart,
-                tag = TAG_SCHEME_INDEX_START,
-                min = 1,
-                onValue = { onChange(updateScheme(state, scheme.copy(indexStart = it))) },
-            )
-            NumberField(
-                label = indexPaddingLabel,
-                value = scheme.indexPadding,
-                tag = TAG_SCHEME_INDEX_PADDING,
-                min = 1,
-                onValue = { onChange(updateScheme(state, scheme.copy(indexPadding = it))) },
-            )
-        }
+            // ---- 全局选项:根目录名 / 起始序号 / 补零 / 扩展名策略 / 自动清洗 ----
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                OutlinedTextField(
+                    value = scheme.rootDirName,
+                    onValueChange = { onChange(setRootDirNameOnScheme(state, it)) },
+                    label = { Text(rootDirLabel) },
+                    singleLine = true,
+                    modifier = Modifier
+                        .widthInChars(12)
+                        .testTag(TAG_SCHEME_ROOT_DIR),
+                )
+                NumberField(
+                    label = indexStartLabel,
+                    value = scheme.indexStart,
+                    tag = TAG_SCHEME_INDEX_START,
+                    min = 1,
+                    onValue = { onChange(updateScheme(state, scheme.copy(indexStart = it))) },
+                )
+                NumberField(
+                    label = indexPaddingLabel,
+                    value = scheme.indexPadding,
+                    tag = TAG_SCHEME_INDEX_PADDING,
+                    min = 1,
+                    onValue = { onChange(updateScheme(state, scheme.copy(indexPadding = it))) },
+                )
+            }
 
-        // 根目录名的跟随状态:默认跟随集合;用户改过则提示并可一键恢复跟随
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(4.dp),
-        ) {
-            Text(
-                text = stringResource(
-                    if (state.hasRootDirNameOverride) {
-                        R.string.a_scheme_root_override
+            // 根目录名的跟随状态:默认跟随集合;用户改过则提示并可一键恢复跟随
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(4.dp),
+            ) {
+                Text(
+                    text = stringResource(
+                        if (state.hasRootDirNameOverride) {
+                            R.string.a_scheme_root_override
+                        } else {
+                            R.string.a_scheme_root_follow
+                        },
+                    ),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = if (state.hasRootDirNameOverride) {
+                        MaterialTheme.colorScheme.primary
                     } else {
-                        R.string.a_scheme_root_follow
+                        MaterialTheme.colorScheme.onSurfaceVariant
                     },
-                ),
-                style = MaterialTheme.typography.labelSmall,
-                color = if (state.hasRootDirNameOverride) {
-                    MaterialTheme.colorScheme.primary
-                } else {
-                    MaterialTheme.colorScheme.onSurfaceVariant
-                },
-                modifier = Modifier.testTag(TAG_ROOT_DIR_FOLLOW_LABEL),
-            )
-            TextButton(
-                onClick = { onChange(clearRootDirNameOverride(state)) },
-                enabled = state.hasRootDirNameOverride,
-                modifier = Modifier
-                    .testTag(TAG_ROOT_DIR_FOLLOW_RESET)
-                    .semantics { contentDescription = rootFollowCd },
-            ) { Text(stringResource(R.string.a_scheme_root_follow_btn)) }
-        }
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(4.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            ExtPolicyField(
-                value = scheme.extPolicy,
-                onValue = { onChange(updateScheme(state, scheme.copy(extPolicy = it))) },
-            )
-            // 把"自动清洗"整组推到右侧;说明改由图标承载后,这里不再需要长文案,
-            // weight 得以正常吸收剩余空间(此前长文案会把它压到 0,开关被挤出屏幕)。
-            Spacer(Modifier.weight(1f))
+                    modifier = Modifier.testTag(TAG_ROOT_DIR_FOLLOW_LABEL),
+                )
+                TextButton(
+                    onClick = { onChange(clearRootDirNameOverride(state)) },
+                    shapes = ButtonDefaults.shapes(),
+                    enabled = state.hasRootDirNameOverride,
+                    modifier = Modifier
+                        .testTag(TAG_ROOT_DIR_FOLLOW_RESET)
+                        .semantics { contentDescription = rootFollowCd },
+                ) { Text(stringResource(R.string.a_scheme_root_follow_btn)) }
+            }
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(4.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                ExtPolicyField(
+                    value = scheme.extPolicy,
+                    onValue = { onChange(updateScheme(state, scheme.copy(extPolicy = it))) },
+                )
+                Spacer(Modifier.weight(1f))
 
-            Text(
-                text = stringResource(R.string.a_scheme_sanitize),
-                style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            // 替换字符放在**说明对话框内**(而非再加一行):
-            // 编辑器展开时在真机上高达 ~692dp(占视口 87%),再加一行会把它顶得更高
-            // —— 折叠摘要栏(P0 修复,2026-09-24)已经把"主工作区被挤出屏幕"这个后果
-            // 消掉了,但"不给一个低频字段再加一行高度"这个取舍仍然成立。
-            // 放进对话框既零高度成本,也与「清洗规则」的说明同处一室,语义更顺。
-            // 历史注:首版曾加成行内新行,当时展开态常驻,加行后建议行完全不组合、
-            // 14 项既有测试失败 —— 这条教训促成了后来的折叠修复。
-            SanitizeInfoButton(
-                scheme = scheme,
-                onScheme = { onChange(updateScheme(state, it)) },
-            )
-            Switch(
-                checked = scheme.sanitize,
-                onCheckedChange = { onChange(updateScheme(state, scheme.copy(sanitize = it))) },
-                modifier = Modifier
-                    .testTag(TAG_SCHEME_SANITIZE)
-                    .semantics { contentDescription = sanitizeCd },
-            )
+                Text(
+                    text = stringResource(R.string.a_scheme_sanitize),
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                SanitizeInfoButton(
+                    scheme = scheme,
+                    onScheme = { onChange(updateScheme(state, it)) },
+                )
+                Switch(
+                    checked = scheme.sanitize,
+                    onCheckedChange = { onChange(updateScheme(state, scheme.copy(sanitize = it))) },
+                    modifier = Modifier
+                        .testTag(TAG_SCHEME_SANITIZE)
+                        .semantics { contentDescription = sanitizeCd },
+                )
+            }
         }
     }
 }
@@ -407,6 +415,7 @@ private fun SanitizeInfoButton(
 
     IconButton(
         onClick = { showInfo = true },
+        shapes = IconButtonDefaults.shapes(),
         modifier = Modifier
             .testTag(TAG_SCHEME_SANITIZE_INFO)
             .semantics { contentDescription = infoCd },
@@ -455,6 +464,7 @@ private fun SanitizeInfoButton(
                             )
                             TextButton(
                                 onClick = { onScheme(scheme.copy(replacement = DEFAULT_REPLACEMENT)) },
+                                shapes = ButtonDefaults.shapes(),
                                 enabled = scheme.replacement != DEFAULT_REPLACEMENT,
                                 modifier = Modifier
                                     .testTag(TAG_SCHEME_REPLACEMENT_RESET)
@@ -462,25 +472,12 @@ private fun SanitizeInfoButton(
                             ) { Text(stringResource(R.string.a_scheme_replace_reset)) }
                         }
                         Text(
-                            // 留空不是"没填",而是一种真实语义:领域层 `append(replacement)`,
-                            // 替换字符为空 = 把非法字符**删掉**。必须说清,否则用户清空后
-                            // 看到非法字符凭空消失、却不知道是自己造成的。
                             text = replaceHint,
                             style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                         Spacer(Modifier.size(8.dp))
                         Text(
-                            // ---- 实时示例(用户 2026-09-19 裁决「方案 A」) ----
-                            //
-                            // 用户困惑的根源是"不知道这个字符做什么"。一句具体示例即可消除;
-                            // 比"条件提示"更值:后者在真实数据下(根目录名/原文件名常含非法字符)
-                            // 很少触发,等真看到提示时用户多半已经困惑过了。
-                            //
-                            // **示例值由真实的 `sanitizeName` 算出,不是写死的字符串** ——
-                            // 写死的话,一旦清洗规则变了(改非法字符集/改替换逻辑),
-                            // 说明文字会与真实行为不符,而那种"文档说谎"极难被发现。
-                            // 这里让示例**结构上不可能说谎**(规则一改,示例自动跟着改)。
                             text = exampleText,
                             style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -494,6 +491,7 @@ private fun SanitizeInfoButton(
             confirmButton = {
                 TextButton(
                     onClick = { showInfo = false },
+                    shapes = ButtonDefaults.shapes(),
                     modifier = Modifier
                         .testTag(TAG_SCHEME_SANITIZE_INFO_OK)
                         .semantics { contentDescription = gotItCd },
@@ -515,6 +513,7 @@ private fun SanitizeInfoButton(
 @Composable
 private fun ComponentRow(
     index: Int,
+    count: Int,
     component: NameComponent,
     canRemove: Boolean,
     state: NamingState,
@@ -527,17 +526,19 @@ private fun ComponentRow(
     val textLabel = stringResource(R.string.a_scheme_comp_text)
     val upCd = stringResource(R.string.a_scheme_comp_up_cd, index + 1)
     val downCd = stringResource(R.string.a_scheme_comp_down_cd, index + 1)
+    val itemShape = ListItemDefaults.segmentedShapes(index = index, count = count).shape
 
-    Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 12.dp),
+    Surface(
+        shape = itemShape,
+        color = MaterialTheme.colorScheme.surfaceContainer,
+        border = pixFoldSurfaceBorder(),
+        modifier = Modifier.fillMaxWidth(),
     ) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 8.dp, vertical = 6.dp),
-            verticalArrangement = Arrangement.spacedBy(4.dp),
+                .padding(horizontal = 8.dp, vertical = 4.dp),
+            verticalArrangement = Arrangement.spacedBy(2.dp),
         ) {
             // 第一行:序号 + 启用 + 类型 + 删除
             Row(
@@ -547,7 +548,7 @@ private fun ComponentRow(
             ) {
                 Text(
                     text = "${index + 1}",
-                    style = MaterialTheme.typography.labelLarge,
+                    style = MaterialTheme.typography.labelLargeEmphasized,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
                 Switch(
@@ -565,6 +566,7 @@ private fun ComponentRow(
                 Spacer(Modifier.weight(1f))
                 TextButton(
                     onClick = { onChange(removeComponent(state, index)) },
+                    shapes = ButtonDefaults.shapes(),
                     enabled = canRemove,
                     modifier = Modifier
                         .testTag(compRemoveTag(index))
@@ -616,6 +618,7 @@ private fun ComponentRow(
                 // 顺序可调:均为 ≥48dp 触控目标(IconButton 默认 48dp)
                 IconButton(
                     onClick = { onChange(moveComponent(state, index, -1)) },
+                    shapes = IconButtonDefaults.shapes(),
                     modifier = Modifier
                         .testTag(compMoveUpTag(index))
                         .semantics { contentDescription = upCd },
@@ -628,6 +631,7 @@ private fun ComponentRow(
                 }
                 IconButton(
                     onClick = { onChange(moveComponent(state, index, +1)) },
+                    shapes = IconButtonDefaults.shapes(),
                     modifier = Modifier
                         .testTag(compMoveDownTag(index))
                         .semantics { contentDescription = downCd },

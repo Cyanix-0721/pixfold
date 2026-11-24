@@ -1,20 +1,23 @@
 package com.cyanix.pixfold.ui.organize
 
-import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.MaterialShapes
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Tab
 import androidx.compose.material3.PrimaryTabRow
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Tab
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -28,6 +31,7 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.navigation3.runtime.rememberNavBackStack
 import kotlinx.coroutines.Dispatchers
@@ -70,6 +74,7 @@ import com.cyanix.pixfold.nav.goToOrganizeStep
 import com.cyanix.pixfold.nav.popTo
 import com.cyanix.pixfold.nav.popWorkflowStep
 import com.cyanix.pixfold.nav.organizeStepIndex
+import com.cyanix.pixfold.ui.components.PixFoldEmptyState
 import com.cyanix.pixfold.ui.components.ResetAllButton
 import com.cyanix.pixfold.ui.task.withCancellationToken
 import com.cyanix.pixfold.ui.workspace.WorkspaceBar
@@ -358,42 +363,64 @@ fun OrganizeSteps(
             )
         }
 
-        // 页签行 + 右侧「重置全部」。M3 的 `PrimaryTabRow` **没有 trailing 槽位**
-        // (API 只有 selectedTabIndex/modifier/colors/indicator/content),
-        // 故只能在外面套一层 Row 分槽:页签 weight(1f) 吃掉剩余宽度,按钮靠右。
-        Row(
+        // 页签行 + 右侧「重置全部」：统一落在 surfaceContainerLow 头带 + 纯黑底边分隔线上。
+        Surface(
             modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically,
+            color = MaterialTheme.colorScheme.surfaceContainerLow,
         ) {
-            PrimaryTabRow(
-                selectedTabIndex = currentIndex,
-                modifier = Modifier
-                    .weight(1f)
-                    .testTag(TAG_STEP_TABS),
-            ) {
-                OrganizeStep.entries.forEachIndexed { i, step ->
-                    // 要进 semantics{},故先在组合上下文里解析
-                    val stepLabel = stringResource(step.labelRes)
-                    Tab(
-                        selected = currentIndex == i,
-                        // 跳步必须走 goToOrganizeStep:往回 pop、往前逐级 push,
-                        // 保证返回链始终是线性的一步一退(详见该函数注释)。
-                        onClick = { backStack.goToOrganizeStep(currentIndex, i) },
-                        text = { Text(stepLabel) },
+            Column(modifier = Modifier.fillMaxWidth()) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(end = 4.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    PrimaryTabRow(
+                        selectedTabIndex = currentIndex,
+                        containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
+                        divider = {},
                         modifier = Modifier
-                            .testTag(
-                                when (step) {
-                                    OrganizeStep.Sort -> TAG_STEP_SORT
-                                    OrganizeStep.Naming -> TAG_STEP_NAMING
-                                    OrganizeStep.Plan -> TAG_STEP_PLAN
+                            .weight(1f)
+                            .testTag(TAG_STEP_TABS),
+                    ) {
+                        OrganizeStep.entries.forEachIndexed { i, step ->
+                            // 要进 semantics{},故先在组合上下文里解析
+                            val stepLabel = stringResource(step.labelRes)
+                            val selected = currentIndex == i
+                            Tab(
+                                selected = selected,
+                                // 跳步必须走 goToOrganizeStep:往回 pop、往前逐级 push,
+                                // 保证返回链始终是线性的一步一退(详见该函数注释)。
+                                onClick = { backStack.goToOrganizeStep(currentIndex, i) },
+                                text = {
+                                    Text(
+                                        text = stepLabel,
+                                        style = if (selected) {
+                                            MaterialTheme.typography.titleSmallEmphasized
+                                        } else {
+                                            MaterialTheme.typography.titleSmall
+                                        },
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis,
+                                    )
                                 },
+                                modifier = Modifier
+                                    .testTag(
+                                        when (step) {
+                                            OrganizeStep.Sort -> TAG_STEP_SORT
+                                            OrganizeStep.Naming -> TAG_STEP_NAMING
+                                            OrganizeStep.Plan -> TAG_STEP_PLAN
+                                        },
+                                    )
+                                    .semantics { contentDescription = stepLabel },
                             )
-                            .semantics { contentDescription = stepLabel },
-                    )
-                }
-            }
+                        }
+                    }
 
-            ResetAllButton(onReset = { resetAll() })
+                    ResetAllButton(onReset = { resetAll() })
+                }
+                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+            }
         }
 
         // 步骤内容不重复叠加 inset(外层已处理)
@@ -654,39 +681,37 @@ fun OrganizeSteps(
  * @param showPick 是否显示选择按钮。宿主没接工作区（`workspaceState == null`）
  *   时无从选起，只显示说明文字。
  */
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 private fun EmptyWorkspace(
     onPick: () -> Unit,
     showPick: Boolean,
     modifier: Modifier = Modifier,
 ) {
-    Column(
+    Box(
         modifier = modifier
             .fillMaxSize()
-            .padding(24.dp)
             .testTag(TAG_EMPTY_WORKSPACE),
-        verticalArrangement = Arrangement.Center,
-        horizontalAlignment = Alignment.CenterHorizontally,
+        contentAlignment = Alignment.Center,
     ) {
-        Text(
-            text = stringResource(R.string.workspace_empty),
-            style = MaterialTheme.typography.titleMedium,
-            color = MaterialTheme.colorScheme.onSurface,
+        PixFoldEmptyState(
+            polygon = MaterialShapes.Cookie7Sided,
+            iconRes = R.drawable.ic_photo_library,
+            title = stringResource(R.string.workspace_empty),
+            subtitle = stringResource(R.string.workspace_empty_hint),
+            action = if (showPick) {
+                {
+                    Button(
+                        onClick = onPick,
+                        shapes = ButtonDefaults.shapes(),
+                        modifier = Modifier.testTag(TAG_EMPTY_WORKSPACE_PICK),
+                    ) {
+                        Text(text = stringResource(R.string.workspace_pick))
+                    }
+                }
+            } else {
+                null
+            },
         )
-        Spacer(modifier = Modifier.height(8.dp))
-        Text(
-            text = stringResource(R.string.workspace_empty_hint),
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-        if (showPick) {
-            Spacer(modifier = Modifier.height(16.dp))
-            Button(
-                onClick = onPick,
-                modifier = Modifier.testTag(TAG_EMPTY_WORKSPACE_PICK),
-            ) {
-                Text(text = stringResource(R.string.workspace_pick))
-            }
-        }
     }
 }

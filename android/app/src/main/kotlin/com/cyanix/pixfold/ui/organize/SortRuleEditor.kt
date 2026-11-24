@@ -3,12 +3,16 @@ package com.cyanix.pixfold.ui.organize
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
+import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -17,8 +21,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
-import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.res.pluralStringResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
@@ -26,6 +30,9 @@ import com.cyanix.pixfold.R
 import com.cyanix.pixfold.domain.model.SortField
 import com.cyanix.pixfold.domain.model.SortKey
 import com.cyanix.pixfold.domain.model.SortRule
+import com.cyanix.pixfold.ui.components.PixFoldSectionCard
+import com.cyanix.pixfold.ui.components.PixFoldSegmentedItem
+import com.cyanix.pixfold.ui.components.PixFoldStatusPill
 import com.cyanix.pixfold.ui.text.textOf
 
 const val TAG_RULE_LEVEL_PREFIX = "rule-level-"
@@ -84,128 +91,146 @@ fun SortRuleEditor(
     val descendingLabel = stringResource(R.string.a_sort_descending)
     val addCd = stringResource(R.string.a_sort_add_cd)
 
-    Column(
+    val levelColors = ListItemDefaults.segmentedColors(
+        containerColor = MaterialTheme.colorScheme.surfaceContainer,
+        disabledContainerColor = MaterialTheme.colorScheme.surfaceContainer,
+    )
+
+    PixFoldSectionCard(
         modifier = modifier
             .fillMaxWidth()
-            .padding(horizontal = 12.dp, vertical = 4.dp)
+            .padding(horizontal = 12.dp, vertical = 6.dp)
             .testTag(TAG_SORT_RULE_EDITOR),
-        verticalArrangement = Arrangement.spacedBy(4.dp),
+        contentPadding = PaddingValues(12.dp),
     ) {
-        Row(
+        Column(
             modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically,
+            verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            Column {
-                Text(
-                    text = pluralStringResource(R.plurals.a_sort_levels, draft.size, draft.size, SortRule.MAX_LEVELS),
-                    style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.onBackground,
-                )
-                if (scopeLabel != null) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                     Text(
-                        text = scopeLabel,
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.primary,
+                        text = pluralStringResource(R.plurals.a_sort_levels, draft.size, draft.size, SortRule.MAX_LEVELS),
+                        style = MaterialTheme.typography.titleSmallEmphasized,
+                        color = MaterialTheme.colorScheme.onSurface,
                     )
+                    if (scopeLabel != null) {
+                        PixFoldStatusPill(
+                            text = scopeLabel,
+                            containerColor = MaterialTheme.colorScheme.secondaryContainer,
+                            contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
+                        )
+                    }
                 }
-            }
-            Row {
-                TextButton(
+                FilledTonalButton(
                     onClick = { emit(draft + SortKey(SortField.NaturalName, true)) },
+                    shapes = ButtonDefaults.shapes(),
                     enabled = draft.size < SortRule.MAX_LEVELS,
                     modifier = Modifier
                         .testTag(TAG_RULE_ADD)
                         .semantics { contentDescription = addCd },
                 ) { Text(stringResource(R.string.a_sort_add)) }
-
             }
-        }
 
-        draft.forEachIndexed { index, key ->
-            // 2026-09-25 真机实测缺陷:原为 `Row + horizontalScroll`。361dp 下列宽只够放
-            // 3 个字段芯片(实测 `第1级 | 文件名(自然) | 文件名(字典) | 目录名` 已到 x1182),
-            // `扩展名`/`修改时间`/`大小` 三个芯片**完全落在视口外**,而这是 P3 的核心操作
-            // (多级排序规则),用户根本看不到自己还能按什么排。
-            // 改 FlowRow 自动换行:字段再多也只是增高,不会有芯片不可达。
-            FlowRow(
+            Column(
                 modifier = Modifier.fillMaxWidth(),
-                verticalArrangement = Arrangement.spacedBy(4.dp),
-                horizontalArrangement = Arrangement.spacedBy(4.dp),
-                itemVerticalAlignment = Alignment.CenterVertically,
+                verticalArrangement = Arrangement.spacedBy(ListItemDefaults.SegmentedGap),
             ) {
-                Text(
-                    text = stringResource(R.string.a_sort_level, index + 1),
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-                // 要进 semantics{},故先在组合上下文里解析
-                val removeCd = stringResource(R.string.a_sort_remove_cd, index + 1)
+                draft.forEachIndexed { index, key ->
+                    // 要进 semantics{},故先在组合上下文里解析
+                    val removeCd = stringResource(R.string.a_sort_remove_cd, index + 1)
 
-                SortField.entries.forEach { field ->
-                    val selected = key.field == field
-                    // 字段名与方向都要进 semantics{},故先在组合上下文里解析成局部变量
-                    val fieldLabel = textOf(field.textKey)
-                    val direction = if (key.ascending) ascendingLabel else descendingLabel
-                    val levelCd = if (selected) {
-                        stringResource(R.string.a_sort_level_cd, index + 1, fieldLabel, direction)
-                    } else {
-                        stringResource(R.string.a_sort_level_cd_bare, index + 1, fieldLabel)
-                    }
+                    PixFoldSegmentedItem(
+                        shapes = ListItemDefaults.segmentedShapes(index = index, count = draft.size),
+                        colors = levelColors,
+                        contentPadding = PaddingValues(horizontal = 10.dp, vertical = 8.dp),
+                    ) {
+                        // 2026-09-25 真机实测缺陷:原为 `Row + horizontalScroll`。改 FlowRow 自动换行:
+                        // 字段再多也只是增高,不会有芯片不可达。
+                        FlowRow(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalArrangement = Arrangement.spacedBy(4.dp),
+                            horizontalArrangement = Arrangement.spacedBy(4.dp),
+                            itemVerticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            PixFoldStatusPill(
+                                text = stringResource(R.string.a_sort_level, index + 1),
+                                containerColor = MaterialTheme.colorScheme.surfaceContainerHighest,
+                                contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
 
-                    FilterChip(
-                        selected = selected,
-                        onClick = {
-                            emit(draft.toMutableList().also {
-                                it[index] = if (selected) {
-                                    // 再次点击已选中字段 -> 只翻转方向,不换字段
-                                    key.copy(ascending = !key.ascending)
+                            SortField.entries.forEach { field ->
+                                val selected = key.field == field
+                                // 字段名与方向都要进 semantics{},故先在组合上下文里解析成局部变量
+                                val fieldLabel = textOf(field.textKey)
+                                val direction = if (key.ascending) ascendingLabel else descendingLabel
+                                val levelCd = if (selected) {
+                                    stringResource(R.string.a_sort_level_cd, index + 1, fieldLabel, direction)
                                 } else {
-                                    // 换字段 -> 回到默认升序
-                                    SortKey(field, true)
+                                    stringResource(R.string.a_sort_level_cd_bare, index + 1, fieldLabel)
                                 }
-                            })
-                        },
-                        label = { Text(fieldLabel) },
-                        // 方向三角只挂在**选中**字段之后(用户指定)
-                        trailingIcon = if (selected) {
-                            {
-                                Icon(
-                                    painter = painterResource(
-                                        if (key.ascending) {
-                                            R.drawable.ic_arrow_drop_up
-                                        } else {
-                                            R.drawable.ic_arrow_drop_down
-                                        },
-                                    ),
-                                    contentDescription = null, // 方向由下方 semantics 统一播报
+
+                                FilterChip(
+                                    selected = selected,
+                                    onClick = {
+                                        emit(draft.toMutableList().also {
+                                            it[index] = if (selected) {
+                                                // 再次点击已选中字段 -> 只翻转方向,不换字段
+                                                key.copy(ascending = !key.ascending)
+                                            } else {
+                                                // 换字段 -> 回到默认升序
+                                                SortKey(field, true)
+                                            }
+                                        })
+                                    },
+                                    label = { Text(fieldLabel) },
+                                    // 方向三角只挂在**选中**字段之后(用户指定)
+                                    trailingIcon = if (selected) {
+                                        {
+                                            Icon(
+                                                painter = painterResource(
+                                                    if (key.ascending) {
+                                                        R.drawable.ic_arrow_drop_up
+                                                    } else {
+                                                        R.drawable.ic_arrow_drop_down
+                                                    },
+                                                ),
+                                                contentDescription = null, // 方向由下方 semantics 统一播报
+                                                modifier = Modifier
+                                                    // 18dp + 资源内图形已放大 1.6 倍(见 drawable 注释)
+                                                    // -> 实际三角约 12x6dp,比初版(~6.7dp 宽)大约 1.8 倍,
+                                                    // 清晰可辨但不与字段名抢视觉重心。
+                                                    .size(18.dp)
+                                                    .testTag(directionTag(index, field)),
+                                            )
+                                        }
+                                    } else {
+                                        null
+                                    },
                                     modifier = Modifier
-                                        // 18dp + 资源内图形已放大 1.6 倍(见 drawable 注释)
-                                        // -> 实际三角约 12x6dp,比初版(~6.7dp 宽)大约 1.8 倍,
-                                        // 清晰可辨但不与字段名抢视觉重心。
-                                        .size(18.dp)
-                                        .testTag(directionTag(index, field)),
+                                        .testTag(fieldTag(index, field))
+                                        .semantics {
+                                            contentDescription = levelCd
+                                        },
                                 )
                             }
-                        } else {
-                            null
-                        },
-                        modifier = Modifier
-                            .testTag(fieldTag(index, field))
-                            .semantics {
-                                contentDescription = levelCd
-                            },
-                    )
-                }
 
-                // 删除该级(至少保留 1 级)
-                TextButton(
-                    onClick = { emit(draft.toMutableList().also { it.removeAt(index) }) },
-                    enabled = draft.size > 1,
-                    modifier = Modifier
-                        .testTag(ruleRemoveTag(index))
-                        .semantics { contentDescription = removeCd },
-                ) { Text(stringResource(R.string.a_sort_remove)) }
+                            // 删除该级(至少保留 1 级)
+                            TextButton(
+                                onClick = { emit(draft.toMutableList().also { it.removeAt(index) }) },
+                                shapes = ButtonDefaults.shapes(),
+                                enabled = draft.size > 1,
+                                modifier = Modifier
+                                    .testTag(ruleRemoveTag(index))
+                                    .semantics { contentDescription = removeCd },
+                            ) { Text(stringResource(R.string.a_sort_remove)) }
+                        }
+                    }
+                }
             }
         }
     }

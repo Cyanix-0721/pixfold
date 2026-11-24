@@ -6,28 +6,24 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
-import androidx.compose.ui.geometry.Rect
-import androidx.compose.ui.layout.boundsInRoot
-import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.cyanix.pixfold.domain.model.SourceItem
+import com.cyanix.pixfold.ui.theme.pixFoldCardContainerColor
+import com.cyanix.pixfold.ui.theme.pixFoldSurfaceBorder
 
 /**
  * 网格卡片 testTag。
@@ -62,6 +58,7 @@ fun DraggableThumbCard(
     onClick: () -> Unit,
     onPin: () -> Unit,
     modifier: Modifier = Modifier,
+    pageIndex: Int? = null,
 ) {
     Box(modifier = modifier.fillMaxWidth()) {
         Card(
@@ -70,20 +67,41 @@ fun DraggableThumbCard(
                 .testTag(TAG_GRID_CARD)
                 .alpha(if (isDragging) 0.35f else 1f)
                 .semantics { contentDescription = item.fileName },
-            colors = CardDefaults.cardColors(),
+            shape = MaterialTheme.shapes.large,
+            colors = CardDefaults.cardColors(containerColor = pixFoldCardContainerColor()),
+            border = pixFoldSurfaceBorder(),
         ) {
             // clickable 放在内容上:长按拖拽由外层 pointerInput 处理,静止点按仍是点击
             // (两者可共存:长按超时后 drag 才启动,短按走 click)
             Column(modifier = Modifier.clickable(onClick = onClick)) {
-                ItemThumb(
-                    item = item,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .aspectRatio(1f),
-                )
+                Box(modifier = Modifier.fillMaxWidth()) {
+                    ItemThumb(
+                        item = item,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .aspectRatio(1f),
+                    )
+                    if (pageIndex != null) {
+                        Surface(
+                            modifier = Modifier
+                                .align(Alignment.TopStart)
+                                .padding(6.dp),
+                            shape = CircleShape,
+                            color = MaterialTheme.colorScheme.surfaceContainerHighest.copy(alpha = 0.88f),
+                            contentColor = MaterialTheme.colorScheme.onSurface,
+                            border = pixFoldSurfaceBorder(),
+                        ) {
+                            Text(
+                                text = "$pageIndex",
+                                style = MaterialTheme.typography.labelSmallEmphasized,
+                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+                            )
+                        }
+                    }
+                }
                 Text(
                     text = item.fileName,
-                    modifier = Modifier.padding(6.dp),
+                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 6.dp),
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurface,
                     maxLines = 1,
