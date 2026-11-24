@@ -73,15 +73,20 @@
 | [`superpowers/specs/2026-09-16-d1-interaction-prototype-design.md`](superpowers/specs/2026-09-16-d1-interaction-prototype-design.md) | 已完成规格 | 查 D1 交互设计依据时读 |
 | [`superpowers/plans/2026-09-16-d1-p1-scaffold-domain.md`](superpowers/plans/2026-09-16-d1-p1-scaffold-domain.md) | 历史计划 | 仅溯源时读。复选框 46 项全未勾选是历史事实（执行时走的是 `todo_write` 面板），不代表任务未完成 |
 | [`superpowers/plans/2026-09-16-d1-p2-grid-list-preview.md`](superpowers/plans/2026-09-16-d1-p2-grid-list-preview.md) | 历史计划 | 同上，34 项未勾选 |
+| [`superpowers/specs/2026-11-24-live-ui-preview-design.md`](superpowers/specs/2026-11-24-live-ui-preview-design.md) | 已实施规格（实时 UI 预览画廊） | 改 `scripts/live_preview.py` 或 Roborazzi 预览通道时读 |
+| [`superpowers/plans/2026-11-24-live-ui-preview.md`](superpowers/plans/2026-11-24-live-ui-preview.md) | 已执行计划（实时 UI 预览画廊） | 仅溯源时读 |
+| [`superpowers/specs/2026-11-25-live-device-showcase-design.md`](superpowers/specs/2026-11-25-live-device-showcase-design.md) | 已实施规格（真机 scrcpy 与 Debug 15 场景直达） | 改 `DebugShowcaseScreen` / `scripts/live_device.py` 或多态入口时读 |
+| [`superpowers/plans/2026-11-25-live-device-showcase.md`](superpowers/plans/2026-11-25-live-device-showcase.md) | 已执行计划（真机 scrcpy 与 Debug 15 场景直达） | 仅溯源时读 |
 
 ### 附：项目级 skill（`.agents/skills/`）
 
-项目自带两个 skill，遵循 Agent Skills 通用目录约定放在仓库根 `.agents/skills/` 下随项目走（`.gitignore` 忽略 `.agents/*` 并白名单放行 `!.agents/skills/`），DSH、Antigravity、Codex、GitHub Copilot 均可自动发现。它们是「只有某个分支才用到」的操作细节，从 `AGENTS.md` §7 下沉而来，正文不再展开：
+项目自带三个 skill，遵循 Agent Skills 通用目录约定放在仓库根 `.agents/skills/` 下随项目走（`.gitignore` 忽略 `.agents/*` 并白名单放行 `!.agents/skills/`），DSH、Antigravity、Codex、GitHub Copilot 均可自动发现。它们是「只有某个分支才用到」的操作细节，从 `AGENTS.md` §7 下沉而来，正文不再展开：
 
 | skill | 何时加载 |
 | --- | --- |
 | [`pixfold-build-gates`](../.agents/skills/pixfold-build-gates/SKILL.md) | 跑四道闸门、判构建 / lint / 测试是否真通过、提交后推送前跑 betterleaks 密钥扫描 |
 | [`pixfold-device-testing`](../.agents/skills/pixfold-device-testing/SKILL.md) | 连真机核对 UI（放不放得下 / 视觉规格 / 动画观感）、判某类结论能否离线断（动设备前先取得当轮授权） |
+| [`pixfold-live-ui`](../.agents/skills/pixfold-live-ui/SKILL.md) | 改完 Compose UI 后免手机在浏览器实时预览/对比，或在真机授权后用 scrcpy + delta 推包直达 15 个 Debug 场景（DSH / Antigravity / Windows / WSL 通用） |
 
 ## 历轮台账（2026-09-21 起）
 

@@ -7,3 +7,7 @@ local.properties
 
 # 真机实证产物(截图/日志,可再生产;不入库)
 artifacts/
+
+# Roborazzi 视觉回归失败对比产物(黄金图 *.png 保持入库)
+app/src/test/snapshots/*_compare.png
+app/src/test/snapshots/*_actual.png

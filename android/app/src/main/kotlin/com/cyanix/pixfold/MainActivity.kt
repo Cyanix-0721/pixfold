@@ -8,6 +8,11 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.ViewModelProvider
+import com.cyanix.pixfold.debug.DebugShowcaseRequest
+import com.cyanix.pixfold.debug.DebugShowcaseScreen
+import com.cyanix.pixfold.debug.clearDebugShowcaseExtras
+import com.cyanix.pixfold.debug.isExitShowcaseIntent
+import com.cyanix.pixfold.debug.parseDebugShowcaseRequest
 
 class MainActivity : ComponentActivity() {
     /**
@@ -28,6 +33,7 @@ class MainActivity : ComponentActivity() {
      * 弹回打包页，表现成「回不去首页」。
      */
     private var openPackOnStart by mutableStateOf(false)
+    private var debugShowcase by mutableStateOf<DebugShowcaseRequest?>(null)
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -36,19 +42,29 @@ class MainActivity : ComponentActivity() {
         if (savedInstanceState == null) {
             openPackOnStart = intent?.getBooleanExtra(EXTRA_OPEN_LIBRARY_PACK, false) == true
             intent?.removeExtra(EXTRA_OPEN_LIBRARY_PACK)
+            debugShowcase = parseDebugShowcaseRequest(intent)
+            clearDebugShowcaseExtras(intent)
         }
         val session = sessionViewModel.session
         setContent {
-            PixFoldApp(
-                openPackOnStart = openPackOnStart,
-                // 正常冷启动只恢复上次目录的句柄，不预扫描；点进工作流才加载。
-                lazyWorkspaceStart = true,
-                // 导航完成后回清 —— 热启动时 `onNewIntent` 才能**再次**置 true 并
-                // 触发 `LaunchedEffect(openPackOnStart)` 的 key 变化。
-                // 不清零的话第二次点通知静默失效（真机第二轮实测）。
-                onPackRouteHandled = { openPackOnStart = false },
-                session = session,
-            )
+            val activeShowcase = debugShowcase
+            if (activeShowcase != null) {
+                DebugShowcaseScreen(
+                    request = activeShowcase,
+                    onExitShowcase = { debugShowcase = null },
+                )
+            } else {
+                PixFoldApp(
+                    openPackOnStart = openPackOnStart,
+                    // 正常冷启动只恢复上次目录的句柄，不预扫描；点进工作流才加载。
+                    lazyWorkspaceStart = true,
+                    // 导航完成后回清 —— 热启动时 `onNewIntent` 才能**再次**置 true 并
+                    // 触发 `LaunchedEffect(openPackOnStart)` 的 key 变化。
+                    // 不清零的话第二次点通知静默失效（真机第二轮实测）。
+                    onPackRouteHandled = { openPackOnStart = false },
+                    session = session,
+                )
+            }
         }
     }
 
@@ -63,6 +79,15 @@ class MainActivity : ComponentActivity() {
      */
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
+        if (isExitShowcaseIntent(intent)) {
+            debugShowcase = null
+            clearDebugShowcaseExtras(intent)
+        } else {
+            parseDebugShowcaseRequest(intent)?.let { req ->
+                debugShowcase = req
+                clearDebugShowcaseExtras(intent)
+            }
+        }
         if (intent.getBooleanExtra(EXTRA_OPEN_LIBRARY_PACK, false)) {
             openPackOnStart = true
             intent.removeExtra(EXTRA_OPEN_LIBRARY_PACK)

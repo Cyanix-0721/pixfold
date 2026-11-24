@@ -24,3 +24,17 @@ $RECYCLE.BIN/
 # 注:缓存本身**保留在本地**(可能被后续 UV 操作复用),只是不参与版本控制。
 .uvcache/
 .venv/
+__pycache__/
+*.py[cod]
+
+# IDEA / JetBrains IDE
+/.idea/
+*.iml
+
+# 本地环境变量与签名密钥 / Local env & signing keys
+.env
+.env.*
+!.env.example
+*.keystore
+*.jks
+signing.properties

@@ -103,3 +103,6 @@
 4. **Android Studio Split Preview（Interactive Mode）+ Live Edit**：与方案 1 共用 `debug` 源集 `@Preview` 代码，手调间距与色值可获秒级反馈。
 
 - **跨机推荐组合**：先在 `android/app/src/debug/` 补齐一组核心页面 `@Preview` → 静态调排版、配色、纯黑描边走 **Compose Preview 面板**（或 AS Split Preview）；动效、波浪进度与触控手感走 **Device Hub 投屏真机 / 模拟器**。换机端 `android` CLI 与面板前置配置见 [`docs/notes/environment.md`](environment.md) §12.8。
+- **已落地免插件方案（2026-11-24，分支 `d4/live-ui-preview`）**：为兼容不具备 `android-cli-plugin` 的终端 agent（如 DSH）及 Windows PowerShell/WSL 双宿主，已落地双轨方案：
+  - **模式 A（免手机静态画廊）**：[`scripts/live_preview.py`](../../scripts/live_preview.py) 基于 Roborazzi NATIVE 无污染重定向至 `android/app/build/live-preview/`，提供本地 SSE 浏览器实时画廊与像素对比（规格见 [`docs/superpowers/specs/2026-11-24-live-ui-preview-design.md`](../superpowers/specs/2026-11-24-live-ui-preview-design.md)）。
+  - **模式 B（真机 `scrcpy` + 15 场景直达）**：[`scripts/live_device.py`](../../scripts/live_device.py) + `src/debug`/`src/release` 同名多态入口支持 `android install --use-delta-install` 增量推包与一秒直达 15 场景（零侵入 Release、不建 `debug/AndroidManifest.xml`，规格见 [`docs/superpowers/specs/2026-11-25-live-device-showcase-design.md`](../superpowers/specs/2026-11-25-live-device-showcase-design.md)）。统一技能入口见 [`pixfold-live-ui`](../../.agents/skills/pixfold-live-ui/SKILL.md)。

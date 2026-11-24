@@ -80,6 +80,9 @@ import org.robolectric.annotation.GraphicsMode
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 class VisualRegressionSnapshotTest {
 
+    @get:Rule(order = Int.MIN_VALUE)
+    val previewFilterRule = PreviewFilterRule()
+
     @get:Rule
     val rule = createComposeRule()
 
@@ -90,7 +93,7 @@ class VisualRegressionSnapshotTest {
     )
 
     private fun snapshotPath(name: String): String =
-        "src/test/snapshots/$name.png"
+        LivePreviewConfig.snapshotPath(name)
 
     private val readyWorkspace = WorkspaceState.Ready(
         handle = WorkspaceHandle(

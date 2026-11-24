@@ -369,7 +369,7 @@ fun ExecutionReportPage(
  * 换成竖排 —— 这正是该 Shell 把 `buttons` 设计成任意槽的原因。
  */
 @Composable
-private fun UndoScopeDialog(
+internal fun UndoScopeDialog(
     overwrittenCount: Int,
     onChoose: (UndoScope) -> Unit,
     onCancel: () -> Unit,
