@@ -135,6 +135,14 @@
     <string name="workspace_failed">Could not read that folder. Pick it again or choose another one.</string>
     <string name="workspace_empty">This folder has no images</string>
     <string name="workspace_empty_hint">Pick another folder to organize.</string>
+    <plurals name="workspace_summary_folders">
+        <item quantity="one">%1$d folder</item>
+        <item quantity="other">%1$d folders</item>
+    </plurals>
+    <plurals name="workspace_summary_images">
+        <item quantity="one">%1$d image</item>
+        <item quantity="other">%1$d images</item>
+    </plurals>
     <string name="workspace_demo_note">Showing demo data — choose a folder to work on real files</string>
     <!-- ============ Workspace list dialog (D4 · 最近 8 条 + 图钉 + 拖拽) ============ -->
     <string name="workspace_list_title">Workspace folders</string>

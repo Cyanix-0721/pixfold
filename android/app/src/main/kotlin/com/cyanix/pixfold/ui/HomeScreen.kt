@@ -1,6 +1,6 @@
 package com.cyanix.pixfold.ui
 
-import androidx.compose.foundation.BorderStroke
+import androidx.annotation.DrawableRes
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -10,16 +10,23 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
+import androidx.compose.material3.FilledTonalIconButton
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
+import androidx.compose.material3.IconButtonDefaults
+import androidx.compose.material3.MaterialShapes
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.boundsInRoot
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.testTag
@@ -28,9 +35,16 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
+import androidx.graphics.shapes.RoundedPolygon
 import com.cyanix.pixfold.R
+import com.cyanix.pixfold.ui.components.PixFoldShapeBadge
+import com.cyanix.pixfold.ui.theme.pixFoldCardBorder
+import com.cyanix.pixfold.ui.theme.pixFoldCardContainerColor
+import com.cyanix.pixfold.ui.theme.pixFoldSurfaceBorder
 import com.cyanix.pixfold.ui.workspace.WorkspaceBar
 import com.cyanix.pixfold.ui.workspace.WorkspaceState
+
+private const val DISABLED_CONTENT_ALPHA = 0.38f
 
 /**
  * 首页:两条工作流入口(验收第 19 项"从首页完整走通")。
@@ -54,6 +68,7 @@ import com.cyanix.pixfold.ui.workspace.WorkspaceState
  *   可注入是为了**可测**:Robolectric 下系统 inset 恒为 0,若不注入就无法断言
  *   "内容确实让开了系统栏"(否则测试会因 16dp 内边距而假通过)。
  */
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 fun HomeScreen(
     onOpenOrganize: () -> Unit,
@@ -100,7 +115,7 @@ fun HomeScreen(
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         // 标题行:标题左对齐,设置入口在右上角。
-        // 设置是**次要入口**,故用图标按钮而非等宽卡片 —— 不与两条工作流入口抢视觉重量。
+        // 设置是**次要入口**,故用色调图标按钮而非等宽卡片 —— 不与两条工作流入口抢视觉重量。
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween,
@@ -109,12 +124,13 @@ fun HomeScreen(
             Text(
                 text = "PixFold",
                 modifier = Modifier.testTag(TAG_TITLE),
-                style = MaterialTheme.typography.headlineMedium,
+                style = MaterialTheme.typography.headlineMediumEmphasized,
                 color = MaterialTheme.colorScheme.onBackground,
             )
-            IconButton(
+            FilledTonalIconButton(
                 onClick = onOpenSettings,
-                // M3 IconButton 默认触控目标已 ≥ 48dp(HANDBOOK §6.5)。
+                shapes = IconButtonDefaults.shapes(),
+                // M3 FilledTonalIconButton 默认触控目标已 ≥ 48dp(HANDBOOK §6.5)。
                 modifier = Modifier
                     .testTag(TAG_SETTINGS_BUTTON)
                     .semantics { contentDescription = settingsCd },
@@ -122,22 +138,31 @@ fun HomeScreen(
                 Icon(
                     painter = painterResource(R.drawable.ic_settings),
                     contentDescription = null, // 语义由外层 contentDescription 统一播报
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
         }
         val canStart = canStartWorkflow(workspaceState)
         WorkflowEntry(
-            organizeTitle,
-            organizeSubtitle,
-            onOpenOrganize,
+            title = organizeTitle,
+            subtitle = organizeSubtitle,
+            badgePolygon = MaterialShapes.Cookie9Sided,
+            badgeContainerColor = MaterialTheme.colorScheme.primaryContainer,
+            badgeContentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+            badgeIconRes = R.drawable.ic_photo_library,
+            badgeTag = TAG_ORGANIZE_BADGE,
+            onClick = onOpenOrganize,
             enabled = canStart,
             onBoundsChange = onOrganizeCardBounds,
         )
         WorkflowEntry(
-            libraryTitle,
-            librarySubtitle,
-            onOpenLibrary,
+            title = libraryTitle,
+            subtitle = librarySubtitle,
+            badgePolygon = MaterialShapes.Clover4Leaf,
+            badgeContainerColor = MaterialTheme.colorScheme.tertiaryContainer,
+            badgeContentColor = MaterialTheme.colorScheme.onTertiaryContainer,
+            badgeIconRes = R.drawable.ic_auto_stories,
+            badgeTag = TAG_LIBRARY_BADGE,
+            onClick = onOpenLibrary,
             enabled = canStart,
             onBoundsChange = onLibraryCardBounds,
         )
@@ -145,14 +170,21 @@ fun HomeScreen(
         // 两张卡都点不动时必须**说明为什么**,否则首屏就是一堵死墙。
         // 只在真的被挡住时才出现,工作区就绪时这一行不存在。
         if (!canStart) {
-            Text(
-                text = stringResource(R.string.home_workspace_gate_hint),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            Surface(
                 modifier = Modifier
                     .fillMaxWidth()
                     .testTag(TAG_WORKSPACE_GATE_HINT),
-            )
+                shape = MaterialTheme.shapes.medium,
+                color = MaterialTheme.colorScheme.surfaceContainer,
+                border = pixFoldSurfaceBorder(),
+            ) {
+                Text(
+                    text = stringResource(R.string.home_workspace_gate_hint),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+                )
+            }
         }
 
         // 工作区条:两张大卡**之下**的从属层(HANDBOOK §4,2026-10-15 用户裁决:
@@ -210,8 +242,14 @@ const val TAG_SETTINGS_BUTTON = "home-settings"
 /** 两张大卡被禁用时那一行说明（只有被挡住时才出现）。 */
 const val TAG_WORKSPACE_GATE_HINT = "home-workspace-gate-hint"
 
+/** 整理图片卡片前置 M3E 形状徽章。 */
+const val TAG_ORGANIZE_BADGE = "home-badge-organize"
+
+/** 打包漫画卡片前置 M3E 形状徽章。 */
+const val TAG_LIBRARY_BADGE = "home-badge-library"
+
 /**
- * 首页的大卡片入口:标题一行 + 副标题一行。
+ * 首页的大卡片入口:前置有机形状徽章 + 强调标题一行 + 副标题一行 + 尾随右箭头。
  *
  * ## 为什么必须**显式描边**(不是审美选择,是实测缺陷的修复)
  *
@@ -226,15 +264,8 @@ const val TAG_WORKSPACE_GATE_HINT = "home-workspace-gate-hint"
  *
  * ## 描边为什么用 `outlineVariant` 而不是 `outline`
  *
- * 与设置页的分隔线同源(`SettingsScreen.kt` 的 `HorizontalDivider` 也用 `outlineVariant`):
  * `outline` 是**强**边界(用于输入框、需要明确"这里可以输入"的位置),
  * `outlineVariant` 是**弱**边界 —— 卡片只需要"看得出有块区域",不需要抢眼。
- *
- * ## 为什么不用 `ElevatedCard` / 换填充色
- *
- * 纯黑模式下**阴影不可见**(黑底上的黑阴影)、`surfaceContainer*` 又全被压黑;
- * 换成 `primaryContainer` 这类有色底会出现大块彩色,与"纯黑省电"的诉求冲突。
- * 用户裁决也明确选了「卡片加描边(跟随纯黑开关说明)」这一项。
  *
  * ## 触控与无障碍
  *
@@ -245,10 +276,16 @@ const val TAG_WORKSPACE_GATE_HINT = "home-workspace-gate-hint"
 private fun WorkflowEntry(
     title: String,
     subtitle: String,
+    badgePolygon: RoundedPolygon,
+    badgeContainerColor: Color,
+    badgeContentColor: Color,
+    @DrawableRes badgeIconRes: Int,
+    badgeTag: String,
     onClick: () -> Unit,
     enabled: Boolean = true,
     onBoundsChange: (Rect?) -> Unit = {},
 ) {
+    val contentAlpha = if (enabled) 1f else DISABLED_CONTENT_ALPHA
     // enabled = false 走 clickable 的 enabled 参数，不是把 onClick 换成空 lambda：
     // 只有前者会往语义树写 Disabled，读屏才知道「这个入口现在用不了」；
     // 换成空 lambda 虽然点了没反应，但读屏照样报「按钮」，用户会一直点。
@@ -259,38 +296,46 @@ private fun WorkflowEntry(
             .onGloballyPositioned { onBoundsChange(it.boundsInRoot()) }
             .clickable(enabled = enabled, onClick = onClick)
             .semantics { contentDescription = title },
-        border = BorderStroke(
-            1.dp,
-            if (enabled) {
-                MaterialTheme.colorScheme.outlineVariant
-            } else {
-                // 禁用态描边再淡一档：纯黑模式下阴影本来就不可见，若描边不变，
-                // 「灰标题 + 正常描边」看起来仍像可用入口，用户会反复点。
-                MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f)
-            },
-        ),
+        shape = MaterialTheme.shapes.extraLarge,
+        colors = CardDefaults.cardColors(containerColor = pixFoldCardContainerColor()),
+        border = pixFoldCardBorder(enabled = enabled),
     ) {
-        Column(
+        Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 20.dp, vertical = 18.dp),
-            verticalArrangement = Arrangement.spacedBy(4.dp),
+                .padding(start = 16.dp, end = 12.dp, top = 20.dp, bottom = 20.dp),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            verticalAlignment = Alignment.CenterVertically,
         ) {
-            Text(
-                text = title,
-                style = MaterialTheme.typography.titleLarge,
-                color = if (enabled) {
-                    MaterialTheme.colorScheme.onSurface
-                } else {
-                    MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f)
-                },
+            PixFoldShapeBadge(
+                polygon = badgePolygon,
+                containerColor = badgeContainerColor.copy(alpha = contentAlpha),
+                contentColor = badgeContentColor.copy(alpha = contentAlpha),
+                iconRes = badgeIconRes,
+                modifier = Modifier.testTag(badgeTag),
+                size = 52.dp,
+                iconSize = 24.dp,
             )
-            Text(
-                text = subtitle,
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(
-                    alpha = if (enabled) 1f else 0.38f,
-                ),
+            Column(
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.spacedBy(4.dp),
+            ) {
+                Text(
+                    text = title,
+                    style = MaterialTheme.typography.titleLargeEmphasized,
+                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = contentAlpha),
+                )
+                Text(
+                    text = subtitle,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = contentAlpha),
+                )
+            }
+            Icon(
+                painter = painterResource(R.drawable.ic_chevron_right),
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = contentAlpha),
+                modifier = Modifier.size(20.dp),
             )
         }
     }

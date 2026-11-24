@@ -2,32 +2,47 @@ package com.cyanix.pixfold.ui.workspace
 
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
+import androidx.compose.material3.FilledTonalButton
+import androidx.compose.material3.Icon
+import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.cyanix.pixfold.R
+import com.cyanix.pixfold.ui.theme.pixFoldSurfaceBorder
 
 /** 工作区状态条的根节点。 */
 const val TAG_WORKSPACE_BAR = "workspace-bar"
 
-/** 条上的动作按钮（选择 / 更换）。 */
+/** 条上的动作按钮（选择 / 工作区）。 */
 const val TAG_WORKSPACE_ACTION = "workspace-action"
 
+/** 扫描中（[WorkspaceState.Loading]）前置 M3E 加载指示器。 */
+const val TAG_WORKSPACE_LOADING = "workspace-loading"
+
 /**
- * 工作区状态条（D2a）—— 常驻在工作流 A 的页签行**上方**。
+ * 工作区状态条（D2a）—— 常驻在工作流 A 的页签行**上方**，以及首页两张大卡**下方**的从属紧凑条。
  *
  * ## 为什么长在这里，而不是首页加第三张卡
  *
@@ -36,18 +51,18 @@ const val TAG_WORKSPACE_ACTION = "workspace-action"
  * 理由原文是「Workspace 是**范围**，两个工作流是**任务**，层级不同」，摆成三张等权卡会误导用户。
  *
  * 所以这里**不是**第 4 个步骤页签（那会打破 3 步线性流程，并牵动 `organizeStepIndex()` /
- * `goToOrganizeStep()` / `popWorkflowStep()` 与 ~30 条导航测试）；它是一行**从属信息**，
- * 和页签行同属容器层，不参与步骤推进。
+ * `goToOrganizeStep()` / `popWorkflowStep()` 与 ~30 条导航测试）；它是一行**从属紧凑胶囊**，
+ * 视觉体量明显小于首页两张大卡。
  *
  * ## 状态到文案的映射
  *
  * | 状态 | 左侧文字 | 右侧按钮 |
  * | --- | --- | --- |
  * | [WorkspaceState.None] | 未选择工作区 | 选择文件夹 |
- * | [WorkspaceState.Loading] | 正在扫描文件夹… | （无，扫描中不给动作） |
- * | [WorkspaceState.Ready] | 当前工作区：{名字} | 工作区（打开列表） |
- * | [WorkspaceState.Denied] | 授权已失效，请重新选择 | 重新选择 |
- * | [WorkspaceState.Failed] | 无法读取该文件夹 | 重新选择 |
+ * | [WorkspaceState.Loading] | 正在扫描文件夹… | （无，扫描中不给动作，左侧显示 M3E [LoadingIndicator]） |
+ * | [WorkspaceState.Ready] | 当前工作区：{名字} + 目录/图片计数摘要 | 工作区（打开列表） |
+ * | [WorkspaceState.Denied] | 授权已失效，请重新选择 | 选择文件夹 |
+ * | [WorkspaceState.Failed] | 无法读取该文件夹 | 选择文件夹 |
  *
  * **无授权时也显示「未选择工作区」而不是整条隐藏**：用户需要知道当前看的是演示数据，
  * 否则会以为 D1 的 mock 数据是真扫出来的。文案见 `workspace_demo_note`。
@@ -82,18 +97,21 @@ fun WorkspaceBar(
     val actionCd: String
     val statusText: String
     val statusCd: String?
+    val summaryText: String?
     when (state) {
         WorkspaceState.None -> {
             actionLabel = stringResource(R.string.workspace_pick)
             actionCd = stringResource(R.string.workspace_pick_cd)
             statusText = stringResource(R.string.workspace_demo_note)
             statusCd = null
+            summaryText = null
         }
         WorkspaceState.Loading -> {
             actionLabel = ""
             actionCd = ""
             statusText = stringResource(R.string.workspace_loading)
             statusCd = null
+            summaryText = null
         }
         is WorkspaceState.Idle -> {
             // 还没扫，但目录名是已知的；展示成和 Ready 一样的「当前工作区」，
@@ -102,12 +120,30 @@ fun WorkspaceBar(
             actionCd = stringResource(R.string.workspace_button_cd)
             statusText = stringResource(R.string.workspace_current, state.handle.displayName)
             statusCd = stringResource(R.string.workspace_current_cd, state.handle.displayName)
+            summaryText = null
         }
         is WorkspaceState.Ready -> {
             actionLabel = stringResource(R.string.workspace_button)
             actionCd = stringResource(R.string.workspace_button_cd)
             statusText = stringResource(R.string.workspace_current, state.handle.displayName)
             statusCd = stringResource(R.string.workspace_current_cd, state.handle.displayName)
+            summaryText = if (state.collections.isEmpty()) {
+                stringResource(R.string.workspace_empty)
+            } else {
+                val folderCount = state.collections.size
+                val imageCount = state.collections.sumOf { it.images.size }
+                val folders = pluralStringResource(
+                    R.plurals.workspace_summary_folders,
+                    folderCount,
+                    folderCount,
+                )
+                val images = pluralStringResource(
+                    R.plurals.workspace_summary_images,
+                    imageCount,
+                    imageCount,
+                )
+                "$folders · $images"
+            }
         }
         is WorkspaceState.Denied -> {
             actionLabel = stringResource(R.string.workspace_pick)
@@ -122,63 +158,115 @@ fun WorkspaceBar(
                 else -> stringResource(R.string.workspace_denied, name)
             }
             statusCd = null
+            summaryText = null
         }
         is WorkspaceState.Failed -> {
             actionLabel = stringResource(R.string.workspace_pick)
             actionCd = stringResource(R.string.workspace_pick_cd)
             statusText = stringResource(R.string.workspace_failed)
             statusCd = null
+            summaryText = null
         }
     }
 
-    Row(
+    val isError = state is WorkspaceState.Denied || state is WorkspaceState.Failed
+    val shape = MaterialTheme.shapes.large
+
+    Surface(
         modifier = modifier
             .fillMaxWidth()
-            // 触控目标 ≥48dp（AGENTS.md §2.7）。Loading 态不渲染右侧 TextButton，
-            // 而 Modifier.clickable **自己不给**最小触控尺寸 —— 其余四态全靠 TextButton
-            // 的 M3 minimumInteractiveComponentSize() 把行撑到 48dp，那层保护在这一态缺席，
-            // 行高会退化成一行 bodySmall 文本（离线实测 16.0dp）。故由本行自己兜底。
+            // 触控目标 ≥48dp（AGENTS.md §2.7）。Loading 态不渲染右侧按钮，
+            // 由本容器自行兜底最小高度，避免退化成单行文本高度。
             .heightIn(min = 48.dp)
             .testTag(TAG_WORKSPACE_BAR)
+            .clip(shape)
             .clickable(onClick = rowAction)
-            // 必须合并：不合并时读屏把「当前工作区：x」与右侧按钮念成两个独立可聚焦节点，
-            // 而整条又是第三个可点区域 —— 用户听到三样东西，其中两样做同一件事。
-            .semantics(mergeDescendants = true) {}
-            .padding(start = 16.dp, end = 4.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.SpaceBetween,
+            // 必须合并：不合并时读屏把状态文案与整条可点区念成重复节点。
+            .semantics(mergeDescendants = true) {},
+        shape = shape,
+        color = MaterialTheme.colorScheme.surfaceContainer,
+        border = pixFoldSurfaceBorder(),
     ) {
-        Text(
-            text = statusText,
-            style = MaterialTheme.typography.bodySmall,
-            color = when (state) {
-                is WorkspaceState.Denied, is WorkspaceState.Failed ->
-                    MaterialTheme.colorScheme.error
-                else -> MaterialTheme.colorScheme.onSurfaceVariant
-            },
-            // 长目录名不换行：这一行是**从属信息**，撑高会把页签行推走。
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
+        Row(
             modifier = Modifier
-                .weight(1f)
-                .then(
-                    if (statusCd != null) {
+                .fillMaxWidth()
+                .padding(start = 12.dp, end = 8.dp, top = 6.dp, bottom = 6.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            if (state is WorkspaceState.Loading) {
+                WorkspaceLoadingIndicator()
+            } else {
+                Icon(
+                    painter = painterResource(R.drawable.ic_folder_open),
+                    contentDescription = null,
+                    tint = if (isError) {
+                        MaterialTheme.colorScheme.error
+                    } else {
+                        MaterialTheme.colorScheme.onSurfaceVariant
+                    },
+                    modifier = Modifier.size(20.dp),
+                )
+            }
+            Column(
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.spacedBy(2.dp),
+            ) {
+                Text(
+                    text = statusText,
+                    style = MaterialTheme.typography.titleSmallEmphasized,
+                    color = if (isError) {
+                        MaterialTheme.colorScheme.error
+                    } else {
+                        MaterialTheme.colorScheme.onSurface
+                    },
+                    // 长目录名不换行：这一行是**从属信息**，撑高会把页签行推走。
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = if (statusCd != null) {
                         Modifier.semantics { contentDescription = statusCd }
                     } else {
                         Modifier
                     },
-                ),
-        )
-        // 扫描中不给按钮：此时再点一次会并发两个扫描，且用户没有可做的决定。
-        if (actionLabel.isNotEmpty()) {
-            TextButton(
-                onClick = rowAction,
-                modifier = Modifier
-                    .testTag(TAG_WORKSPACE_ACTION)
-                    .semantics { contentDescription = actionCd },
-            ) {
-                Text(actionLabel)
+                )
+                if (summaryText != null) {
+                    Text(
+                        text = summaryText,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
+            }
+            // 扫描中不给按钮：此时再点一次会并发两个扫描，且用户没有可做的决定。
+            if (actionLabel.isNotEmpty()) {
+                FilledTonalButton(
+                    onClick = rowAction,
+                    shapes = ButtonDefaults.shapes(),
+                    contentPadding = PaddingValues(horizontal = 14.dp, vertical = 8.dp),
+                    modifier = Modifier
+                        .testTag(TAG_WORKSPACE_ACTION)
+                        .semantics { contentDescription = actionCd },
+                ) {
+                    Text(
+                        text = actionLabel,
+                        style = MaterialTheme.typography.labelLargeEmphasized,
+                        maxLines = 1,
+                        softWrap = false,
+                    )
+                }
             }
         }
     }
+}
+
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
+@Composable
+private fun WorkspaceLoadingIndicator() {
+    LoadingIndicator(
+        modifier = Modifier
+            .size(24.dp)
+            .testTag(TAG_WORKSPACE_LOADING),
+    )
 }

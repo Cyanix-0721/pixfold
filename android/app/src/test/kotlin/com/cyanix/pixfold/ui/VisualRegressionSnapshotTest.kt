@@ -28,7 +28,9 @@ import com.cyanix.pixfold.domain.settings.ColorSpecVersion
 import com.cyanix.pixfold.domain.settings.ColorStyle
 import com.cyanix.pixfold.domain.settings.PixFoldSettings
 import com.cyanix.pixfold.domain.settings.ThemeMode
+import com.cyanix.pixfold.domain.source.WorkspaceEntry
 import com.cyanix.pixfold.domain.source.WorkspaceHandle
+import com.cyanix.pixfold.domain.source.WorkspaceListing
 import com.cyanix.pixfold.ui.components.ChipRowTags
 import com.cyanix.pixfold.ui.components.SingleSelectChipRow
 import com.cyanix.pixfold.ui.components.TwoLevelChipRows
@@ -37,6 +39,8 @@ import com.cyanix.pixfold.ui.plan.ExecutionReportPage
 import com.cyanix.pixfold.ui.plan.TAG_REPORT_UNDO
 import com.cyanix.pixfold.ui.plan.TAG_UNDO_SCOPE_DIALOG
 import com.cyanix.pixfold.ui.settings.SettingsScreen
+import com.cyanix.pixfold.ui.workspace.TAG_WORKSPACE_DIALOG
+import com.cyanix.pixfold.ui.workspace.WorkspaceListDialog
 import com.cyanix.pixfold.ui.workspace.WorkspaceState
 import com.github.takahirom.roborazzi.ExperimentalRoborazziApi
 import com.github.takahirom.roborazzi.RoborazziOptions
@@ -361,6 +365,101 @@ class VisualRegressionSnapshotTest {
         )
         rule.onRoot().captureRoboImage(
             filePath = snapshotPath("settings_color_spec_2025"),
+            roborazziOptions = roborazziOptions,
+        )
+    }
+
+    @Test
+    fun settingsScreen_light() {
+        renderSettingsScreen(
+            PixFoldSettings(
+                themeMode = ThemeMode.Light,
+                accent = AccentChoice.Default,
+                colorStyle = ColorStyle.Expressive,
+                colorSpec = ColorSpecVersion.V2025,
+                pureBlack = false,
+            ),
+        )
+        rule.onRoot().captureRoboImage(
+            filePath = snapshotPath("settings_light"),
+            roborazziOptions = roborazziOptions,
+        )
+    }
+
+    @Test
+    fun settingsScreen_pureBlack() {
+        renderSettingsScreen(
+            PixFoldSettings(
+                themeMode = ThemeMode.Dark,
+                accent = AccentChoice.Default,
+                colorStyle = ColorStyle.Expressive,
+                colorSpec = ColorSpecVersion.V2025,
+                pureBlack = true,
+            ),
+        )
+        rule.onRoot().captureRoboImage(
+            filePath = snapshotPath("settings_pure_black"),
+            roborazziOptions = roborazziOptions,
+        )
+    }
+
+    @Test
+    fun workspaceListDialog_dark() {
+        val listings = listOf(
+            WorkspaceListing(
+                entry = WorkspaceEntry(
+                    handle = WorkspaceHandle(
+                        treeUri = "content://com.cyanix.pixfold.test/tree/comics",
+                        displayName = "漫画书库工作区",
+                    ),
+                    pinned = true,
+                ),
+                granted = true,
+            ),
+            WorkspaceListing(
+                entry = WorkspaceEntry(
+                    handle = WorkspaceHandle(
+                        treeUri = "content://com.cyanix.pixfold.test/tree/photos",
+                        displayName = "旅行照片整理",
+                    ),
+                    pinned = false,
+                ),
+                granted = true,
+            ),
+            WorkspaceListing(
+                entry = WorkspaceEntry(
+                    handle = WorkspaceHandle(
+                        treeUri = "content://com.cyanix.pixfold.test/tree/archive",
+                        displayName = "旧版归档目录",
+                    ),
+                    pinned = false,
+                ),
+                granted = false,
+            ),
+        )
+        rule.setContent {
+            PixFoldNativeTestHost(
+                settings = PixFoldSettings(
+                    themeMode = ThemeMode.Dark,
+                    accent = AccentChoice.Default,
+                    pureBlack = false,
+                ),
+            ) {
+                WorkspaceListDialog(
+                    listings = listings,
+                    currentTreeUri = "content://com.cyanix.pixfold.test/tree/comics",
+                    onDismiss = {},
+                    onOpen = {},
+                    onRemove = { _, _ -> },
+                    onTogglePin = {},
+                    onMove = { _, _ -> },
+                    onAdd = {},
+                )
+            }
+        }
+        rule.waitForIdle()
+        rule.onNodeWithTag(TAG_WORKSPACE_DIALOG).captureRoboImage(
+            filePath = snapshotPath("workspace_list_dialog_dark"),
             roborazziOptions = roborazziOptions,
         )
     }

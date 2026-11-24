@@ -23,6 +23,7 @@ import androidx.compose.material3.FilledTonalIconButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.ListItemColors
+import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.ListItemShapes
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.SegmentedListItem
@@ -111,6 +112,7 @@ fun PixFoldSegmentedItem(
     overlineContent: (@Composable () -> Unit)? = null,
     supportingContent: (@Composable () -> Unit)? = null,
     colors: ListItemColors = pixFoldSegmentedColors(),
+    contentPadding: PaddingValues = ListItemDefaults.ContentPadding,
     content: @Composable () -> Unit,
 ) {
     SegmentedListItem(
@@ -122,6 +124,7 @@ fun PixFoldSegmentedItem(
         overlineContent = overlineContent,
         supportingContent = supportingContent,
         colors = colors,
+        contentPadding = contentPadding,
         content = content,
     )
 }
@@ -142,6 +145,7 @@ fun PixFoldSegmentedItem(
     onLongClick: (() -> Unit)? = null,
     onLongClickLabel: String? = null,
     colors: ListItemColors = pixFoldSegmentedColors(),
+    contentPadding: PaddingValues = ListItemDefaults.ContentPadding,
     content: @Composable () -> Unit,
 ) {
     SegmentedListItem(
@@ -156,6 +160,7 @@ fun PixFoldSegmentedItem(
         onLongClick = onLongClick,
         onLongClickLabel = onLongClickLabel,
         colors = colors,
+        contentPadding = contentPadding,
         content = content,
     )
 }
@@ -177,6 +182,7 @@ fun PixFoldSegmentedItem(
     onLongClick: (() -> Unit)? = null,
     onLongClickLabel: String? = null,
     colors: ListItemColors = pixFoldSegmentedColors(),
+    contentPadding: PaddingValues = ListItemDefaults.ContentPadding,
     content: @Composable () -> Unit,
 ) {
     val borderShape = if (selected) shapes.selectedShape else shapes.shape
@@ -193,6 +199,7 @@ fun PixFoldSegmentedItem(
         onLongClick = onLongClick,
         onLongClickLabel = onLongClickLabel,
         colors = colors,
+        contentPadding = contentPadding,
         content = content,
     )
 }
@@ -214,6 +221,7 @@ fun PixFoldSegmentedItem(
     onLongClick: (() -> Unit)? = null,
     onLongClickLabel: String? = null,
     colors: ListItemColors = pixFoldSegmentedColors(),
+    contentPadding: PaddingValues = ListItemDefaults.ContentPadding,
     content: @Composable () -> Unit,
 ) {
     val borderShape = if (checked) shapes.selectedShape else shapes.shape
@@ -230,6 +238,7 @@ fun PixFoldSegmentedItem(
         onLongClick = onLongClick,
         onLongClickLabel = onLongClickLabel,
         colors = colors,
+        contentPadding = contentPadding,
         content = content,
     )
 }
