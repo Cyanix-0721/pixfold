@@ -2,7 +2,7 @@
 
 > **性质**：调研与实证笔记（非产品权威；产品决策唯一权威仍以 [`docs/product/HANDBOOK.md`](../product/HANDBOOK.md) 为准）。
 > **分支与范围**：阶段分支 `d4/m3e-ui-polish`（基于 `dev` 的 M1–M9 合并基线 `d1dc9a3`），按 **U1 → U2 → U3 → U4** 四个切片完成 PixFold Android 原生 Compose UI 的 Material 3 Expressive（`material3 1.5.0-rc01`）全面打磨。
-> **真机核对状态（重要）**：**真机核对待补** —— 本轮 U1–U4 全部通过纯 JVM `@GraphicsMode(NATIVE)` 布局/无障碍守卫、Roborazzi 25 张黄金图视觉回归与定向语义变异验证，**尚未在真机上实测**，将与 M1–M9（`d4/opt-and-non-adb-tests`）一并真机联合核对（详见 §5）。
+> **真机核对状态（重要）**：**真机核对待补（顺延至另一台机器与 M1–M9 一并真机核对）** —— 本轮 U1–U4 全部通过纯 JVM `@GraphicsMode(NATIVE)` 布局/无障碍守卫、Roborazzi 25 张黄金图视觉回归与定向语义变异验证，**尚未在真机上实测**，顺延至另一台机器与 M1–M9（`d4/opt-and-non-adb-tests`）一并真机联合核对（详见 §5）。
 
 ---
 
@@ -31,7 +31,7 @@
 | **U1 — M3E 基础原语与纯黑规范** | `9b6b00a` | `Theme.kt`（`LocalIsPureBlack` + 纯黑描边/分段配色辅助）、新建 `ExpressivePrimitives.kt`（`PixFoldShapeBadge`/`PixFoldSegmentedItem`/`PixFoldStatusPill`/`PixFoldSectionCard`/`PixFoldEmptyState`/`PixFoldTopBar`）、`PixFoldDialog.kt`（纯黑 `1.dp` 描边、`heroBadge` 槽、`headlineSmallEmphasized`、形变按钮）、`PageActionBar.kt`（`surfaceContainer` 色调底 + 维持 56–64dp 高度） | 新增 `ExpressiveFoundationTest`；刷新底栏与撤销弹窗 4 张黄金图 |
 | **U2 — 首页、工作区与设置/许可页** | `2d010ce` | `HomeScreen.kt`（`Cookie9Sided` / `Clover4Leaf` 徽章 + `headlineMediumEmphasized` + tonal 设置按钮）、`WorkspaceBar.kt`（从属紧凑胶囊 + 扫描态 `LoadingIndicator`）、`WorkspaceListDialog.kt`（分段工作区项 + `FilledTonalIconToggleButton` 图钉）、`SettingsScreen.kt`（`PixFoldTopBar` + 4 分组分段卡片 + 连接式主题切换 + `Cookie9Sided` 强调色色块预览 + 保留色彩标准弹窗裁决）、`LicensesScreen.kt` | 新增 5 枚 Material Symbols Rounded 24dp 矢量图（`ic_photo_library`、`ic_auto_stories`、`ic_folder_open`、`ic_chevron_right`、`ic_check`）；新增 `M3eHomeWorkspaceSettingsTest`；刷新 6 张 + 新增 3 张黄金图 |
 | **U3 — 工作流 A / B / C 进度、步进与卡片** | `1709e28` | `TaskProgressBar`（`LinearWavyProgressIndicator`）、`PackProgressDialog`（双层同心 `CircularWavyProgressIndicator` 136dp/96dp）、`CbzUpdateDialogs`（确定态 `CircularWavyProgressIndicator` 88dp / 不确定态 `ContainedLoadingIndicator` 88dp）、`OrganizeSteps`/`LibrarySteps`（色调页签 + `PixFoldEmptyState`）、`ResetAllButton`/`DirMetaButton`/`MetaActionButton`/`ScrollToTopButton`（形变 tonal 图标按钮）、`SortAndPreviewPage`（连接式网格/列表切换 + 色调规则摘要）、`DraggableThumbCard`/`ThumbRow`、`SortRuleEditor`/`NamingPage`/`SchemeEditor`/`ProposalTable`、`LibraryPage`/`MetadataPage`/`PackPreviewPage`（分段卷项、色调卡片、`surfaceContainerHighest` XML 块；保持 `PlanRow` LazyColumn 虚拟化） | 更新 `SortPagePolishTest`（1 处旧 `SegmentedButton` 源码守卫改对齐 `FilledTonalToggleButton`）；新增 `M3eWorkflowsProgressControlsTest`；新增 5 张黄金图 |
-| **U4 — 计划报告、撤销/确认弹窗、芯片与预览浮条** | 本次提交（`d4/m3e-ui-polish`） | `IssueFilterRow.kt`（连接式 2 按钮 `FilledTonalToggleButton` 组 + 纯黑未选中描边）、`PlanComponents.kt`（`PlanHeader` 色调摘要卡+状态胶囊、`PlanRow` `PixFoldSegmentedItem`、`ConfirmDialog` 危险步居中 `SoftBurst` 徽章+形变按钮）、`RenamePlanPage.kt`（分段计划行 + 色调危险开关卡）、`ExecutionReportPage.kt`（色调报告摘要卡+三态计数胶囊、分段报告行、`UndoScopeDialog` 居中 56dp `SoftBurst` 警示徽章+干净标题+三档形变按钮）、`CbzUpdateDialogs.kt`（`CbzUpdateConfirmDialog` `Cookie9Sided` 徽章+形变主按钮）、`SingleSelectChipRow.kt`（仅选中芯片用 `labelLargeEmphasized`，零芯片硬规则回退）、`ImagePreview.kt`（底部 M3E 活力 `HorizontalFloatingToolbar` + 顶部文件名胶囊与 48dp tonal 关闭按钮）、删除因关闭图标化而不再使用的 `R.string.common_close`（中英同步） | 新增 `ic_chevron_left.xml`；新增 `M3ePlanReportPreviewTest`（8 条用例）；刷新 4 张 + 新增 3 张黄金图（总计 **25 张**） |
+| **U4 — 计划报告、撤销/确认弹窗、芯片与预览浮条** | `ce5d3d3` | `IssueFilterRow.kt`（连接式 2 按钮 `FilledTonalToggleButton` 组 + 纯黑未选中描边）、`PlanComponents.kt`（`PlanHeader` 色调摘要卡+状态胶囊、`PlanRow` `PixFoldSegmentedItem`、`ConfirmDialog` 危险步居中 `SoftBurst` 徽章+形变按钮）、`RenamePlanPage.kt`（分段计划行 + 色调危险开关卡）、`ExecutionReportPage.kt`（色调报告摘要卡+三态计数胶囊、分段报告行、`UndoScopeDialog` 居中 56dp `SoftBurst` 警示徽章+干净标题+三档形变按钮）、`CbzUpdateDialogs.kt`（`CbzUpdateConfirmDialog` `Cookie9Sided` 徽章+形变主按钮）、`SingleSelectChipRow.kt`（仅选中芯片用 `labelLargeEmphasized`，零芯片硬规则回退）、`ImagePreview.kt`（底部 M3E 活力 `HorizontalFloatingToolbar` + 顶部文件名胶囊与 48dp tonal 关闭按钮）、删除因关闭图标化而不再使用的 `R.string.common_close`（中英同步） | 新增 `ic_chevron_left.xml`；新增 `M3ePlanReportPreviewTest`（8 条用例）；刷新 4 张 + 新增 3 张黄金图（总计 **25 张**） |
 
 ---
 
@@ -62,7 +62,7 @@
 
 ## 5. 待真机联合核对清单（M1–M9 + U1–U4 · 真机核对待补）
 
-> **状态：真机核对待补**。以下 11 项合并了 `docs/notes/d4-optimization-and-non-adb-testing.md` §3.2（M1–M9）与本轮 `d4/m3e-ui-polish`（U1–U4）中依赖真实硬件、ColorOS OEM 字体/SAF/SystemUI 或 60/120Hz 肉眼观感的核验项，待用户授权后在真机（PJX110 / Android 16）一次性联合核对并留证：
+> **状态：真机核对待补（顺延至另一台机器与 M1–M9 一并真机核对）**。以下 11 项合并了 `docs/notes/d4-optimization-and-non-adb-testing.md` §3.2（M1–M9）与本轮 `d4/m3e-ui-polish`（U1–U4）中依赖真实硬件、ColorOS OEM 字体/SAF/SystemUI 或 60/120Hz 肉眼观感的核验项，顺延至另一台机器待用户授权后在真机（PJX110 / Android 16）一次性联合核对并留证：
 
 ### A. 性能、SAF 闭环与 R8 运行期（承自 M1–M9）
 - [ ] **屏幕旋转 / 分屏配置变更状态保活**：验证 `PixFoldSessionViewModel` 跨配置变更保留手工排序、改名覆盖、元数据草稿与缩略图缓存，不重置工作流进度。
