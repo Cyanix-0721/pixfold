@@ -4,13 +4,18 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material3.ButtonColors
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.ListItemColors
+import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialExpressiveTheme
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.MotionScheme
 import androidx.compose.material3.dynamicDarkColorScheme
 import androidx.compose.material3.dynamicLightColorScheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.staticCompositionLocalOf
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalContext
@@ -18,6 +23,17 @@ import androidx.compose.ui.unit.dp
 import com.cyanix.pixfold.domain.settings.AccentChoice
 import com.cyanix.pixfold.domain.settings.PixFoldSettings
 import com.cyanix.pixfold.domain.settings.ThemeMode
+
+/**
+ * 当前主题是否处于「纯黑模式」（`settings.pureBlack && dark`）。
+ *
+ * 纯黑模式下 [ColorScheme.withPureBlack] 会把 `surfaceContainer*` 全部压成 `#000000`，
+ * 与 `background` 同色；容器/弹窗/分段列表通过本 Local 获知当前处于纯黑态，
+ * 从而补上 `1.dp` `outlineVariant` 描边来维持层级边界。
+ */
+val LocalIsPureBlack = staticCompositionLocalOf { false }
+
+private const val DISABLED_BORDER_ALPHA = 0.4f
 
 /**
  * PixFold 主题(HANDBOOK §6.5「UI 须符合最新 Material Design」)。
@@ -84,12 +100,59 @@ fun PixFoldTheme(
         if (settings.pureBlack && dark) base.withPureBlack() else base
     }
 
-    MaterialExpressiveTheme(
-        colorScheme = scheme,
-        motionScheme = MotionScheme.expressive(),
-        content = content,
-    )
+    val isPureBlack = settings.pureBlack && dark
+    CompositionLocalProvider(LocalIsPureBlack provides isPureBlack) {
+        MaterialExpressiveTheme(
+            colorScheme = scheme,
+            motionScheme = MotionScheme.expressive(),
+            content = content,
+        )
+    }
 }
+
+/**
+ * 纯黑模式下的表面描边：处于纯黑模式时返回 `1.dp` `outlineVariant`（禁用态按 `0.4f` 降权），
+ * 非纯黑模式返回 `null`（交由 `surfaceContainer*` 色阶区分层级）。
+ */
+@Composable
+fun pixFoldSurfaceBorder(enabled: Boolean = true): BorderStroke? =
+    if (LocalIsPureBlack.current) {
+        pixFoldCardBorder(enabled = enabled)
+    } else {
+        null
+    }
+
+/**
+ * 始终可见的 `1.dp` `outlineVariant` 卡片描边（供首页大卡等需要在所有模式下都显式勾勒边界的容器使用）。
+ */
+@Composable
+fun pixFoldCardBorder(enabled: Boolean = true): BorderStroke =
+    BorderStroke(
+        width = 1.dp,
+        color = if (enabled) {
+            MaterialTheme.colorScheme.outlineVariant
+        } else {
+            MaterialTheme.colorScheme.outlineVariant.copy(alpha = DISABLED_BORDER_ALPHA)
+        },
+    )
+
+/** M3E 分组卡片与分段列表项的统一色调底色（浅/深色下浮于 `background`，纯黑下由描边表达层次）。 */
+@Composable
+fun pixFoldCardContainerColor(): Color = MaterialTheme.colorScheme.surfaceContainerLow
+
+/**
+ * M3E [androidx.compose.material3.SegmentedListItem] 统一配色。
+ *
+ * `material3 1.5.0-rc01` 的 `ListItemDefaults.segmentedColors()` 默认将 `containerColor`
+ * 设为 `surface`，会与 PixFold 的 `background`/`surface` 画布融为一体；此处统一抬升至
+ * `surfaceContainerLow`，并在禁用态保持同底色，避免分段列表出现视觉空洞。
+ */
+@Composable
+fun pixFoldSegmentedColors(): ListItemColors =
+    ListItemDefaults.segmentedColors(
+        containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
+        disabledContainerColor = MaterialTheme.colorScheme.surfaceContainerLow,
+    )
 
 /**
  * 「危险动作」按钮配色(破坏性 / 回退类动作,如报告页的「撤销本次执行」)。

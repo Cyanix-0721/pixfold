@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
@@ -219,6 +220,7 @@ fun ExecutionReportPage(
                         // 有覆盖项 ⇒ 先问范围,不直接执行(用户 m04079 第③项)。
                         if (report.needsUndoWarning) scopeDialogOpen = true else onUndoScope(UndoScope.ThisRun)
                     },
+                    shapes = ButtonDefaults.shapes(),
                     enabled = report.canUndo && !undoing,
                     colors = dangerActionButtonColors(),
                     modifier = Modifier
@@ -234,6 +236,7 @@ fun ExecutionReportPage(
                 val done = stringResource(R.string.report_done)
                 Button(
                     onClick = onDone,
+                    shapes = ButtonDefaults.shapes(),
                     modifier = Modifier
                         .testTag(TAG_REPORT_DONE)
                         .semantics { contentDescription = done },

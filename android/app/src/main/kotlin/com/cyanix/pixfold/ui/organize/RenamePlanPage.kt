@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
@@ -226,6 +227,7 @@ fun RenamePlanPage(
                     if (back != null) {
                         FilledTonalButton(
                             onClick = back,
+                            shapes = ButtonDefaults.shapes(),
                             modifier = Modifier
                                 .testTag(TAG_STEP_BACK)
                                 .semantics { contentDescription = backCd },
@@ -235,6 +237,7 @@ fun RenamePlanPage(
                 trailing = {
                     Button(
                         onClick = onStartConfirm,
+                        shapes = ButtonDefaults.shapes(),
                         modifier = Modifier
                             .testTag(TAG_A_PLAN_CONFIRM)
                             .semantics { contentDescription = confirmCd },
