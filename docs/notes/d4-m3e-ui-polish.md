@@ -1,7 +1,7 @@
 # D4 Material 3 Expressive UI 全面升级笔记（U1–U4，2026-11-24）
 
 > **性质**：调研与实证笔记（非产品权威；产品决策唯一权威仍以 [`docs/product/HANDBOOK.md`](../product/HANDBOOK.md) 为准）。
-> **分支与范围**：阶段分支 `d4/m3e-ui-polish`（基于 `dev` 的 M1–M9 合并基线 `d1dc9a3`），按 **U1 → U2 → U3 → U4** 四个切片完成 PixFold Android 原生 Compose UI 的 Material 3 Expressive（`material3 1.5.0-rc01`）全面打磨。
+> **分支与范围**：阶段分支 `d4/m3e-ui-polish`（基于 `dev` 的 M1–M9 合并基线 `d1dc9a3`；已以合并提交 `60b6016` 合回 `dev` 并删除），按 **U1 → U2 → U3 → U4** 四个切片完成 PixFold Android 原生 Compose UI 的 Material 3 Expressive（`material3 1.5.0-rc01`）全面打磨。
 > **真机核对状态（重要）**：**真机核对待补（顺延至另一台机器与 M1–M9 一并真机核对）** —— 本轮 U1–U4 全部通过纯 JVM `@GraphicsMode(NATIVE)` 布局/无障碍守卫、Roborazzi 25 张黄金图视觉回归与定向语义变异验证，**尚未在真机上实测**，顺延至另一台机器与 M1–M9（`d4/opt-and-non-adb-tests`）一并真机联合核对（详见 §5）。
 
 ---
