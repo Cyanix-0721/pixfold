@@ -8,6 +8,11 @@ plugins {
     alias(libs.plugins.roborazzi)
 }
 
+val previewOutDir = providers.systemProperty("pixfold.preview.outDir")
+    .orNull
+    ?.trim()
+    ?.takeIf { it.isNotEmpty() }
+
 android {
     namespace = "com.cyanix.pixfold"
     compileSdk = 37
@@ -69,6 +74,10 @@ android {
                 // 即**每个** Robolectric 用例都会撞上 ⇒ 不修则 616 个用例全红。
                 // 只给测试 JVM 开这个口子:不影响生产字节码,也不进 APK。
                 with(it) {
+                    if (previewOutDir != null) {
+                        systemProperty("pixfold.preview.outDir", previewOutDir)
+                        outputs.upToDateWhen { false }
+                    }
                     jvmArgs(
                         "--add-exports=java.base/jdk.internal.access=ALL-UNNAMED",
                         "--add-opens=java.base/jdk.internal.access=ALL-UNNAMED",
