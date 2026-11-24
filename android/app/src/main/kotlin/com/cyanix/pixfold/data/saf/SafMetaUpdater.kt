@@ -65,16 +65,25 @@ class SafMetaUpdater(
      * 传 null ⇒ 用默认的 SAF 查找。
      */
     private val lookupTarget: ((ComicVolume) -> Uri?)? = null,
+    /**
+     * 卷 → `(父目录 URI, 目标包 URI)`。抽成参数**只为可测**：允许在 Robolectric 中
+     * 校验 `update()` 复用已解析的目标 URI 做空间预检，而不再发起第二次 SAF 遍历。
+     * 传 null ⇒ 用默认的 SAF 查找。
+     */
+    private val lookupParentAndTarget: ((ComicVolume) -> Pair<Uri, Uri>?)? = null,
     private val spillDir: File? = context.applicationContext.cacheDir,
 ) : CbzMetaUpdater {
 
     private val resolver: ContentResolver = context.applicationContext.contentResolver
 
-    /** 目标包是否还在。确认框据此提示「包不见了」。 */
+    /** 目标包是否还在。 */
     override fun targetExists(volume: ComicVolume): Boolean = findTarget(volume) != null
 
     /**
-     * 空间预检。
+     * 存在性 + 空间预检合并入口。
+     *
+     * 目标包不存在直接返回 [UpdatePreflight.TargetMissing]，调用方不必再额外调一次
+     * [targetExists] 触发双倍 SAF 目录树遍历。
      *
      * `required = 包大小 + 32 MiB 余量`：转写期间磁盘上同时存在原包与临时包
      * （备份是改名得来的，不占额外空间）。32 MiB 是给「写临时包时 provider 自己的元数据
@@ -84,15 +93,8 @@ class SafMetaUpdater(
      * 拿不到就说不知道，比「假装够用」和「直接拒绝」都诚实（与 `PackUiPreflight` 一致）。
      */
     override fun preflight(plan: CbzMetaUpdatePlan, volume: ComicVolume): UpdatePreflight {
-        val target = findTarget(volume) ?: return UpdatePreflight.Unknown
-        val inputBytes = documentSizeOf(resolver, target) ?: return UpdatePreflight.Unknown
-        val available = spaceBytesOf(treeUri) ?: return UpdatePreflight.Unknown
-        val required = inputBytes + SAFETY_MARGIN_BYTES
-        return if (available < required) {
-            UpdatePreflight.NoSpace(requiredBytes = required, availableBytes = available)
-        } else {
-            UpdatePreflight.Ready(estimatedReadBytes = inputBytes, estimatedWriteBytes = required)
-        }
+        val target = findTarget(volume) ?: return UpdatePreflight.TargetMissing
+        return checkSpaceForTarget(target)
     }
 
     override fun update(
@@ -101,14 +103,23 @@ class SafMetaUpdater(
         shouldStop: () -> Boolean,
         onProgress: (done: Int, total: Int) -> Unit,
     ): CbzMetaUpdateOutcome {
-        val parentUri = safParentDocumentUri(resolver, treeUri, dirOfVolume(volume))
-            ?: return CbzMetaUpdateOutcome.Failed(UpdateFailure.TargetMissing, "找不到输出目录")
-        val target = safFindChild(resolver, treeUri, parentUri, volume.cbzFileName)
-            ?: return CbzMetaUpdateOutcome.Failed(UpdateFailure.TargetMissing, volume.cbzFileName)
+        val parentUri: Uri
+        val target: Uri
+        if (lookupParentAndTarget != null) {
+            val resolved = lookupParentAndTarget.invoke(volume)
+                ?: return CbzMetaUpdateOutcome.Failed(UpdateFailure.TargetMissing, volume.cbzFileName)
+            parentUri = resolved.first
+            target = resolved.second
+        } else {
+            parentUri = safParentDocumentUri(resolver, treeUri, dirOfVolume(volume))
+                ?: return CbzMetaUpdateOutcome.Failed(UpdateFailure.TargetMissing, "找不到输出目录")
+            target = safFindChild(resolver, treeUri, parentUri, volume.cbzFileName)
+                ?: return CbzMetaUpdateOutcome.Failed(UpdateFailure.TargetMissing, volume.cbzFileName)
+        }
 
-        // 空间预检在这里再问一次：预检与执行之间有窗口期（用户在确认框上停留），
-        // 期间别的应用可能把空间吃光。不能信任调用方「我已经预检过」。
-        val pre = preflight(plan, volume)
+        // 空间预检在这里再问一次（预检与执行之间有窗口期），但直接复用刚解析出的 target URI，
+        // 不再重新走一遍 SAF 目录树遍历（将工作流 C 全程遍历从 4 次降至 2 次）。
+        val pre = checkSpaceForTarget(target)
         if (pre is UpdatePreflight.NoSpace) {
             return CbzMetaUpdateOutcome.Failed(
                 UpdateFailure.NoSpace,
@@ -255,6 +266,17 @@ class SafMetaUpdater(
     private fun deleteIfExists(parentUri: Uri, displayName: String) {
         val existing = safFindChild(resolver, treeUri, parentUri, displayName) ?: return
         deleteQuietly(existing)
+    }
+
+    private fun checkSpaceForTarget(target: Uri): UpdatePreflight {
+        val inputBytes = documentSizeOf(resolver, target) ?: return UpdatePreflight.Unknown
+        val available = spaceBytesOf(treeUri) ?: return UpdatePreflight.Unknown
+        val required = inputBytes + SAFETY_MARGIN_BYTES
+        return if (available < required) {
+            UpdatePreflight.NoSpace(requiredBytes = required, availableBytes = available)
+        } else {
+            UpdatePreflight.Ready(estimatedReadBytes = inputBytes, estimatedWriteBytes = required)
+        }
     }
 
     private fun findTarget(volume: ComicVolume): Uri? =

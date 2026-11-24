@@ -192,6 +192,8 @@ fun DragReorderGrid(
     // 拖动中按 **id** 记住"手里是哪一项",不记下标 —— 实时重排会不断改变下标,
     // 记下标就得在每个重排点同步改写,漏一处就变成"浮层里是别人"。
     var draggingId by remember { mutableStateOf<String?>(null) }
+    // 起拖瞬间缓存浮层项引用，避免拖拽每帧在列表中做 O(N) `firstOrNull { it.id == ghostId }` 线性扫描（P1 #8）。
+    var draggingItem by remember { mutableStateOf<SourceItem?>(null) }
     // 起拖时该项在**原始列表**里的下标:松手时只需比较"最终下标是否已变",
     // 变了才提交(拖回原位 -> 不提交,与领域层 moveItemTo 的 from==target 早退一致)。
     var dragStartIndex by remember { mutableIntStateOf(-1) }
@@ -245,7 +247,9 @@ fun DragReorderGrid(
                         if (index != null && index < currentItems.size) {
                             dragStartIndex = index
                             dragItems = currentItems
-                            draggingId = currentItems[index].id
+                            val started = currentItems[index]
+                            draggingId = started.id
+                            draggingItem = started
                             pointerInRoot = root
                             dragSize = bounds[index]?.size ?: Size.Zero
                             edgeBurst = 0
@@ -303,6 +307,7 @@ fun DragReorderGrid(
                         val id = draggingId
                         val finalIndex = dragItems?.indexOfFirst { it.id == id } ?: -1
                         draggingId = null
+                        draggingItem = null
                         dragItems = null
                         edgeBurst = 0
                         // **数据只在松手时提交一次**:按最终索引提交。拖动中一次都没提交过,
@@ -313,6 +318,7 @@ fun DragReorderGrid(
                     },
                     onDragCancel = {
                         draggingId = null
+                        draggingItem = null
                         dragItems = null
                         edgeBurst = 0
                     },
@@ -394,17 +400,16 @@ fun DragReorderGrid(
 
         // 跟手浮层:拖动中手里的那张图跟着指针走(用户 2026-10-14 保留此视觉,
         // 只把"松手才重排"改成"实时让位")。只画不参与命中判定。
-        val ghostId = draggingId
-        if (ghostId != null) {
-            (dragItems ?: items).firstOrNull { it.id == ghostId }?.let { ghostItem ->
-                DragGhost(
-                    item = ghostItem,
-                    pointerInRoot = pointerInRoot,
-                    containerInRoot = containerInRoot,
-                    sizeInRoot = dragSize,
-                    style = DragGhostStyle.Card,
-                )
-            }
+        // 传入 lambda 由 `DragGhost` 在 draw-phase `graphicsLayer { ... }` 中读取，避免每帧触发组合期重组（P1 #8）。
+        val ghostItem = draggingItem
+        if (ghostItem != null) {
+            DragGhost(
+                item = ghostItem,
+                pointerInRoot = { pointerInRoot },
+                containerInRoot = { containerInRoot },
+                sizeInRoot = dragSize,
+                style = DragGhostStyle.Card,
+            )
         }
 
         // W2:下滑后显示回顶按钮(右下角)。判据同时要求"下方还有内容"与"确实下滑过",

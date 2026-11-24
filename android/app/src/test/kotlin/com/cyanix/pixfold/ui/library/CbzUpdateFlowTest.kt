@@ -225,10 +225,30 @@ class CbzUpdateFlowTest {
         goToMetadata()
         selectArchiveVolume()
         rule.onNodeWithTag(TAG_METADATA_UPDATE).performClick()
-        rule.waitForIdle()
-        // 包都不在了，还让人确认一次再报错是骗人的 —— 直接给结果。
+        awaitResultDialog()
+        // 包都不在了，还让人确认一次再报错是骗人的 —— 直接给结果，且不经由额外的 targetExists 遍历。
         rule.onNodeWithTag(TAG_UPDATE_CONFIRM_DIALOG).assertDoesNotExist()
         rule.onNodeWithTag(TAG_UPDATE_RESULT_DIALOG).assertIsDisplayed()
+        assertEquals(TestText.of(R.string.domain_update_fail_target_missing), resultBody().lineSequence().first())
         assertEquals(0, fake.updateCalls)
+        assertEquals(0, fake.targetExistsCalls, "存在性判定应折叠进 preflight，不再单独调用 targetExists")
+        assertEquals(1, fake.preflightCalls, "缺失判断应由单次 preflight 完成")
+    }
+
+    @Test
+    fun `successful update avoids duplicate targetExists traversal before preflight`() {
+        val fake = FakeCbzMetaUpdater()
+        show(fake)
+        goToMetadata()
+        selectArchiveVolume()
+
+        rule.onNodeWithTag(TAG_METADATA_UPDATE).performClick()
+        rule.waitForIdle()
+        confirmInDialog()
+        awaitResultDialog()
+
+        assertEquals(0, fake.targetExistsCalls, "确认前不应单独调用 targetExists 做额外 SAF 遍历")
+        assertEquals(1, fake.preflightCalls, "确认前只做一次 preflight")
+        assertEquals(1, fake.updateCalls)
     }
 }

@@ -71,6 +71,7 @@ import com.cyanix.pixfold.nav.popTo
 import com.cyanix.pixfold.nav.popWorkflowStep
 import com.cyanix.pixfold.nav.organizeStepIndex
 import com.cyanix.pixfold.ui.components.ResetAllButton
+import com.cyanix.pixfold.ui.task.withCancellationToken
 import com.cyanix.pixfold.ui.workspace.WorkspaceBar
 import com.cyanix.pixfold.ui.workspace.WorkspaceState
 import com.cyanix.pixfold.ui.workspace.showsWorkspaceBar
@@ -519,11 +520,14 @@ fun OrganizeSteps(
                                     // 往返），与执行同源风险：**不能在主线程上跑**。
                                     val platformUndo = undoActions
                                     if (platformUndo != null) {
+                                        val undoToken = CancellationToken()
                                         undoing = true
                                         scope.launch {
                                             try {
-                                                val applied = withContext(Dispatchers.IO) {
-                                                    performUndoReal(record, platformUndo)
+                                                val applied = withCancellationToken(undoToken) {
+                                                    withContext(Dispatchers.IO) {
+                                                        performUndoReal(record, platformUndo, token = undoToken)
+                                                    }
                                                 }
                                                 undoMessage = applied.message
                                             } finally {
@@ -584,17 +588,19 @@ fun OrganizeSteps(
                                             progress = TaskProgress(total = plan.ops.size)
                                             scope.launch {
                                                 val finished = try {
-                                                    withContext(Dispatchers.IO) {
-                                                        executeRenamePlanReal(
-                                                            plan.ops,
-                                                            platformActions,
-                                                            token = token,
-                                                            // 回调在 IO 线程上。`mutableStateOf` 的写入
-                                                            // 本身线程安全（写快照 + 通知全局版本），
-                                                            // 与库侧 `LibrarySteps` 的进度回调同一种做法 ——
-                                                            // 那里已在真机上验证进度条会走字。
-                                                            onProgress = { p -> progress = p },
-                                                        )
+                                                    withCancellationToken(token) {
+                                                        withContext(Dispatchers.IO) {
+                                                            executeRenamePlanReal(
+                                                                plan.ops,
+                                                                platformActions,
+                                                                token = token,
+                                                                // 回调在 IO 线程上。`mutableStateOf` 的写入
+                                                                // 本身线程安全（写快照 + 通知全局版本），
+                                                                // 与库侧 `LibrarySteps` 的进度回调同一种做法 ——
+                                                                // 那里已在真机上验证进度条会走字。
+                                                                onProgress = { p -> progress = p },
+                                                            )
+                                                        }
                                                     }
                                                 } finally {
                                                     // 无论成功、取消还是异常都必须复位 ——

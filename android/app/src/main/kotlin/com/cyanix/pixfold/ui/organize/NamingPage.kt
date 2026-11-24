@@ -137,15 +137,21 @@ fun NamingPage(
     // 生效结构 = 批次级 scheme,但根目录名默认**跟随当前集合**
     // (用户 2026-09-18 指定);用户改过则以用户的为准(effectiveScheme 内聚该判定)。
     val pageOrder: List<SourceItem> = order.order
-    val effective = effectiveScheme(state, collection)
-    val proposals = buildProposals(pageOrder, effective, overrides = state.overrides)
-    val plan = buildRenamePlan(proposals)
-    val skipped = plan.count { it.isSkipped }
-    val conflictCount = proposals.count { it.hasConflict }
-    val warningOnlyCount = proposals.count { !it.hasConflict && it.hasWarningOnly }
+    val effective = remember(state, collection) { effectiveScheme(state, collection) }
+    val proposals = remember(pageOrder, effective, state.overrides) {
+        buildProposals(pageOrder, effective, overrides = state.overrides)
+    }
+    val plan = remember(proposals) { buildRenamePlan(proposals) }
+    val skipped = remember(plan) { plan.count { it.isSkipped } }
+    val conflictCount = remember(proposals) { proposals.count { it.hasConflict } }
+    val warningOnlyCount = remember(proposals) {
+        proposals.count { !it.hasConflict && it.hasWarningOnly }
+    }
 
     var conflictOnly by remember { mutableStateOf(false) }
-    val shown = if (conflictOnly) proposals.filter { it.warnings.isNotEmpty() } else proposals
+    val shown = remember(conflictOnly, proposals) {
+        if (conflictOnly) proposals.filter { it.warnings.isNotEmpty() } else proposals
+    }
 
     // 展开态**hoist 到本页**(而非编辑器内部):编辑器整体是 LazyColumn 的一个 item,
     // 状态放在 item 里会随回收一起丢失。`rememberSaveable` 让它还能扛住进程重建。
@@ -265,7 +271,7 @@ fun NamingPage(
                 }
             }
 
-            items(shown, key = { it.image.id }) { proposal ->
+            items(shown, key = { it.image.id }, contentType = { "proposal" }) { proposal ->
                 ProposalRow(
                     proposal = proposal,
                     overrideText = state.overrides[proposal.image.id],

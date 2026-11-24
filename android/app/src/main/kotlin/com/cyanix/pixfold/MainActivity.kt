@@ -7,8 +7,15 @@ import androidx.activity.compose.setContent
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import androidx.lifecycle.ViewModelProvider
 
 class MainActivity : ComponentActivity() {
+    /**
+     * 跨配置变更（旋转 / 分屏 / 动态取色切换）持有应用级会话与未保存工作流状态（P1 #7）。
+     */
+    private val sessionViewModel: PixFoldSessionViewModel by lazy {
+        ViewModelProvider(this)[PixFoldSessionViewModel::class.java]
+    }
     /**
      * 这次启动是否应当直接落到「打包漫画 · 步骤 3」。
      *
@@ -30,6 +37,7 @@ class MainActivity : ComponentActivity() {
             openPackOnStart = intent?.getBooleanExtra(EXTRA_OPEN_LIBRARY_PACK, false) == true
             intent?.removeExtra(EXTRA_OPEN_LIBRARY_PACK)
         }
+        val session = sessionViewModel.session
         setContent {
             PixFoldApp(
                 openPackOnStart = openPackOnStart,
@@ -39,6 +47,7 @@ class MainActivity : ComponentActivity() {
                 // 触发 `LaunchedEffect(openPackOnStart)` 的 key 变化。
                 // 不清零的话第二次点通知静默失效（真机第二轮实测）。
                 onPackRouteHandled = { openPackOnStart = false },
+                session = session,
             )
         }
     }

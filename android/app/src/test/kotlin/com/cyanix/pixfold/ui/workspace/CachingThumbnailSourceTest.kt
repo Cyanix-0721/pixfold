@@ -5,15 +5,21 @@ import androidx.compose.ui.graphics.ImageBitmapConfig
 import androidx.compose.ui.graphics.colorspace.ColorSpace
 import androidx.compose.ui.graphics.colorspace.ColorSpaces
 import com.cyanix.pixfold.domain.thumb.ThumbBudget
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import org.junit.Test
 import java.util.concurrent.CopyOnWriteArrayList
 import java.util.concurrent.atomic.AtomicInteger
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
@@ -251,5 +257,116 @@ class CachingThumbnailSourceTest {
             "缓存条目 ${source.cachedCount} 超过上限 4",
         )
         assertEquals(4L * 256L * 256L * 4L, source.cachedBytes)
+    }
+
+    // ==================== 取消传播与并发在途安全 ====================
+
+    @Test
+    fun `等待者协程取消时必须重抛 CancellationException 且不影响其他并发等待者`() = runTest {
+        val gate = CompletableDeferred<ImageBitmap?>()
+        val started = CompletableDeferred<Unit>()
+        val delegate = object : ThumbnailSource {
+            override suspend fun thumbnail(uri: String, widthPx: Int, heightPx: Int): ImageBitmap? {
+                started.complete(Unit)
+                return gate.await()
+            }
+        }
+        val source = CachingThumbnailSource(delegate, budget(concurrent = 4, entries = 8))
+
+        val owner = async { source.thumbnail("content://doc/shared", 256, 256) }
+        started.await()
+
+        var waiter1RethrewCancel = false
+        var waiter1ReturnedNormally = false
+        val waiter1 = launch {
+            try {
+                source.thumbnail("content://doc/shared", 256, 256)
+                waiter1ReturnedNormally = true
+            } catch (e: CancellationException) {
+                waiter1RethrewCancel = true
+                throw e
+            }
+        }
+        val waiter2 = async { source.thumbnail("content://doc/shared", 256, 256) }
+        runCurrent()
+
+        waiter1.cancelAndJoin()
+        assertTrue(
+            waiter1RethrewCancel,
+            "调用方协程取消时不得吞掉 CancellationException，否则会破坏结构化并发",
+        )
+        assertFalse(waiter1ReturnedNormally, "被取消的等待者不该以返回 null 的形式正常结束")
+
+        val expected = FakeBitmap(256, 256)
+        gate.complete(expected)
+        assertEquals(expected, owner.await(), "owner 不应受单个等待者取消影响")
+        assertEquals(expected, waiter2.await(), "其余存活等待者应正常拿到共享结果")
+    }
+
+    @Test
+    fun `owner 取消时存活等待者安全回退 null 而不崩溃`() = runTest {
+        val gate = CompletableDeferred<ImageBitmap?>()
+        val started = CompletableDeferred<Unit>()
+        val delegate = object : ThumbnailSource {
+            override suspend fun thumbnail(uri: String, widthPx: Int, heightPx: Int): ImageBitmap? {
+                started.complete(Unit)
+                return gate.await()
+            }
+        }
+        val source = CachingThumbnailSource(delegate, budget(concurrent = 4, entries = 8))
+
+        val owner = launch { source.thumbnail("content://doc/owner-cancel", 256, 256) }
+        started.await()
+
+        val activeWaiter = async { source.thumbnail("content://doc/owner-cancel", 256, 256) }
+        runCurrent()
+
+        owner.cancelAndJoin()
+        assertNull(activeWaiter.await(), "owner 被取消时存活的等待者应安全回退 null")
+    }
+
+    // ==================== 同步 peek 命中（P1 #8 零闪烁） ====================
+
+    @Test
+    fun `peek returns null before load, cached bitmap synchronously after load, and null after clear`() = runTest {
+        val platform = RecordingSource()
+        val source = CachingThumbnailSource(platform, budget())
+
+        assertNull(source.peek("content://doc/a"), "未加载前 peek 必须返回 null")
+
+        val loaded = source.thumbnail("content://doc/a", 256, 256)
+        assertNotNull(loaded)
+        assertEquals(loaded, source.peek("content://doc/a"), "缓存命中后 peek 必须同步返回同一张位图")
+        assertEquals(1, platform.calls.size, "peek 不得触发底层平台加载")
+
+        source.clearCache()
+        assertNull(source.peek("content://doc/a"), "clearCache 后 peek 必须返回 null")
+    }
+
+    // ==================== PreviewImageCacheSource 有界 LRU ====================
+
+    @Test
+    fun `PreviewImageCacheSource caches up to 3 entries and preserves non-square request dimensions`() = runTest {
+        val platform = RecordingSource(px = 256)
+        val preview = PreviewImageCacheSource(platform, maxEntries = 3)
+
+        val first = preview.thumbnail("content://doc/p1", 1200, 2400)
+        val again = preview.thumbnail("content://doc/p1", 1200, 2400)
+
+        assertNotNull(first)
+        assertEquals(first, again, "相同 uri 与尺寸应命中预览缓存")
+        assertEquals(1, platform.calls.size, "命中预览缓存不得重解码")
+        assertEquals(1200, platform.calls[0].second, "预览缓存不得把非方形宽度裁成方形")
+        assertEquals(2400, platform.calls[0].third, "预览缓存不得把非方形高度裁成方形")
+
+        // 装满 3 条再加第 4 条，淘汰最久未用的 p1
+        preview.thumbnail("content://doc/p2", 1200, 2400)
+        preview.thumbnail("content://doc/p3", 1200, 2400)
+        preview.thumbnail("content://doc/p4", 1200, 2400)
+        assertEquals(3, preview.cachedCount, "预览缓存条目数必须受 3 条上界约束")
+
+        // p1 已被淘汰，再次请求会回源
+        preview.thumbnail("content://doc/p1", 1200, 2400)
+        assertEquals(5, platform.calls.size, "淘汰后的条目再次请求应重新解码")
     }
 }

@@ -12,7 +12,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.widthIn
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -139,7 +138,8 @@ fun <T> SingleSelectChipRow(
     // 列表内容是同一批 id,只是实例换了。用户在展开态里上下找某一卷,一次后台刷新
     // 就把它收起来,是很莫名的体验。
     // 反过来,换工作区 / 换系列时 id 序列必然变 ⇒ 该复位。用 id 序列两边都对。
-    var expanded by remember(items.map(idOf)) { mutableStateOf(false) }
+    val itemIds = remember(items) { items.map(idOf) }
+    var expanded by remember(itemIds) { mutableStateOf(false) }
     val total = items.size
     val scrollState = rememberScrollState()
     val scope = rememberCoroutineScope()
@@ -164,7 +164,7 @@ fun <T> SingleSelectChipRow(
                         color = MaterialTheme.colorScheme.surfaceVariant.copy(
                             alpha = if (emphasized) 0.45f else 0.18f,
                         ),
-                        shape = RoundedCornerShape(12.dp),
+                        shape = MaterialTheme.shapes.medium,
                     )
                 } else {
                     Modifier
@@ -356,28 +356,47 @@ internal fun ChipFlow(
         //   ② 决定 shownCount 之后,只为**真正要显示的**那些重新 subcompose([ChipSlot.Item])。
         // 两个槽位必须是不同的 key —— 同 key 会让 subcomposition 复用,清理语义的
         // 包装就会漏到真实那一份上,芯片连 testTag 都没了。
-        val probePlaceables = List(count) { index ->
-            subcompose(ChipSlot.Probe(index)) {
-                Box(Modifier.clearAndSetSemantics {}) { item(index) }
-            }.first().measure(probeConstraints)
-        }
-        val naturalRows = rowsOf(probePlaceables.map { it.width })
-        val overLines = collapseLines < Int.MAX_VALUE && naturalRows.size > collapseLines
-        val collapsing = overLines && !expanded
+        // 单趟快速路径（P1 #8）：当已展开（`expanded == true`）或不收口（`collapseLines == Int.MAX_VALUE`，
+        // 如全部二级系列浮层）时，所有 `0 until count` 条目都会被放置、不存在任何被隐藏的条目，
+        // 无需先 subcompose `ChipSlot.Probe` 去遮蔽隐藏项语义，直接 1 趟测量 `ChipSlot.Item` 减半子组合开销。
+        val canSkipProbe = expanded || collapseLines == Int.MAX_VALUE
+        val shown: List<androidx.compose.ui.layout.Placeable>
+        val overLines: Boolean
+        val collapsing: Boolean
+        val shownCount: Int
+        if (canSkipProbe) {
+            shown = List(count) { index ->
+                subcompose(ChipSlot.Item(index)) { item(index) }.first().measure(probeConstraints)
+            }
+            val naturalRows = rowsOf(shown.map { it.width })
+            overLines = collapseLines < Int.MAX_VALUE && naturalRows.size > collapseLines
+            collapsing = false
+            shownCount = count
+        } else {
+            val probePlaceables = List(count) { index ->
+                subcompose(ChipSlot.Probe(index)) {
+                    Box(Modifier.clearAndSetSemantics {}) { item(index) }
+                }.first().measure(probeConstraints)
+            }
+            val naturalRows = rowsOf(probePlaceables.map { it.width })
+            overLines = naturalRows.size > collapseLines
+            collapsing = overLines
 
-        var shownCount = count
-        if (collapsing) {
-            // 收口芯片宽度按上限预留 —— 文案里的计数会影响宽度,但宽度恒在
-            // [CHIP_MIN_WIDTH]..[CHIP_MAX_WIDTH] 内,按上限算是保守且稳定的。
-            val reserve = CHIP_MAX_WIDTH.roundToPx()
-            val capacity = naturalRows.take(collapseLines).sumOf { it.size }
-            shownCount = (capacity downTo 0).firstOrNull { candidate ->
-                rowsOf(probePlaceables.take(candidate).map { it.width } + reserve).size <= collapseLines
-            } ?: 0
-        }
+            shownCount = if (collapsing) {
+                // 收口芯片宽度按上限预留 —— 文案里的计数会影响宽度,但宽度恒在
+                // [CHIP_MIN_WIDTH]..[CHIP_MAX_WIDTH] 内,按上限算是保守且稳定的。
+                val reserve = CHIP_MAX_WIDTH.roundToPx()
+                val capacity = naturalRows.take(collapseLines).sumOf { it.size }
+                (capacity downTo 0).firstOrNull { candidate ->
+                    rowsOf(probePlaceables.take(candidate).map { it.width } + reserve).size <= collapseLines
+                } ?: 0
+            } else {
+                count
+            }
 
-        val shown = List(shownCount) { index ->
-            subcompose(ChipSlot.Item(index)) { item(index) }.first().measure(probeConstraints)
+            shown = List(shownCount) { index ->
+                subcompose(ChipSlot.Item(index)) { item(index) }.first().measure(probeConstraints)
+            }
         }
         val hidden = count - shownCount
         // 收口芯片出现的条件:
@@ -456,6 +475,7 @@ private fun CollapseChip(
     onClick: () -> Unit,
 ) {
     val borderColor = MaterialTheme.colorScheme.outline
+    val chipShape = MaterialTheme.shapes.small
     Box(
         // 外层:触摸目标 / 点击 / 语义。**宽度不定**,由内层的 widthIn 决定,
         // 因此二者恒等宽 —— 触摸区与视觉块左右对齐。
@@ -465,7 +485,7 @@ private fun CollapseChip(
             // 只给到 36dp。§2.7 是硬约束,不能靠一条会失效的隐式规则。
             .heightIn(min = 48.dp)
             .minimumInteractiveComponentSize()
-            .clip(RoundedCornerShape(8.dp))
+            .clip(chipShape)
             .clickable(onClick = onClick)
             .testTag(tag)
             .semantics(mergeDescendants = true) {
@@ -479,11 +499,11 @@ private fun CollapseChip(
             modifier = Modifier
                 .widthIn(min = CHIP_MIN_WIDTH, max = CHIP_MAX_WIDTH)
                 .heightIn(min = 32.dp)
-                .clip(RoundedCornerShape(8.dp))
+                .clip(chipShape)
                 .drawBehind {
                     drawRoundRect(
                         color = borderColor,
-                        cornerRadius = CornerRadius(8.dp.toPx()),
+                        cornerRadius = CornerRadius(chipShape.topStart.toPx(size, this)),
                         style = Stroke(
                             width = 1.dp.toPx(),
                             pathEffect = PathEffect.dashPathEffect(

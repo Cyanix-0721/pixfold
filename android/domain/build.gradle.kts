@@ -2,6 +2,7 @@ import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 
 plugins {
     alias(libs.plugins.kotlin.jvm)
+    alias(libs.plugins.pitest)
 }
 
 // 工具链 21、字节码 17:
@@ -29,4 +30,14 @@ dependencies {
 
 tasks.test {
     useJUnitPlatform()
+}
+
+pitest {
+    pitestVersion.set("1.22.1")
+    junit5PluginVersion.set("1.2.1")
+    targetClasses.set(setOf("com.cyanix.pixfold.domain.*"))
+    avoidCallsTo.set(setOf("kotlin.jvm.internal.Intrinsics"))
+    outputFormats.set(setOf("HTML", "XML"))
+    threads.set(4)
+    timestampedReports.set(false)
 }

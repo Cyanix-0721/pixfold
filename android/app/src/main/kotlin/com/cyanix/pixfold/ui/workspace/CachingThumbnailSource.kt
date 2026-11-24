@@ -2,7 +2,10 @@ package com.cyanix.pixfold.ui.workspace
 
 import androidx.compose.ui.graphics.ImageBitmap
 import com.cyanix.pixfold.domain.thumb.ThumbBudget
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withPermit
 
@@ -11,9 +14,8 @@ import kotlinx.coroutines.sync.withPermit
  *
  * ## 为什么要单独一个装饰器
  *
- * 平台实现 [com.cyanix.pixfold.data.saf.AndroidThumbnailSource] 只有「调一次
- * `ContentResolver.loadThumbnail`、失败返回 null」这一件事，没有任何可单测的逻辑；
- * 而缓存与并发恰恰是**最容易写错、又最难在真机上看出来**的部分：
+ * 平台解码实现 [com.cyanix.pixfold.data.coil.CoilThumbnailSource] 只管取图与解码，
+ * 不掺杂缓存账目；而缓存与并发恰恰是**最容易写错、又最难在真机上看出来**的部分：
  *
  * - LRU 顺序错了 → 滚动时反复重载同一张，表现为「卡」；
  * - 字节账目错了 → 内存悄悄超预算，表现为「偶发 OOM」；
@@ -66,6 +68,12 @@ class CachingThumbnailSource(
     val cachedCount: Int get() = cache.size
 
     /**
+     * 同步查询内存缓存中是否已有 [uri] 的缩略图（零阻塞、线程安全，P1 #8）。
+     * 命中时由 `ItemThumb` 首帧直接渲染，消除 1 帧程序化占位闪烁。
+     */
+    override fun peek(uri: String): ImageBitmap? = cache.get(uri)
+
+    /**
      * **在途请求合并表**：uri → 正在进行的加载。
      *
      * 必须有它，「双检」是不够的：`gate` 的许可数是 `cpuCores + 1`（通常 8），
@@ -95,11 +103,13 @@ class CachingThumbnailSource(
         }
 
         if (!owner) {
-            // 等待者拿到 owner 的结果。owner 被取消时这里是 CancellationException ——
-            // 吞掉并返回 null（回退程序化缩略图），比让整屏协程一起崩要好。
+            // 等待者拿到 owner 的结果。
+            // 若是调用方自身协程被取消（!isActive），必须重抛 CancellationException 维持结构化并发；
+            // 若等待者自身仍存活而仅 owner 被取消，则安全回退 null（回退程序化缩略图，不连带打崩整屏）。
             return try {
                 request.await()
-            } catch (e: kotlinx.coroutines.CancellationException) {
+            } catch (e: CancellationException) {
+                if (!currentCoroutineContext().isActive) throw e
                 null
             }
         }
@@ -125,7 +135,11 @@ class CachingThumbnailSource(
             request.completeExceptionally(e)
             throw e
         } finally {
-            synchronized(inFlight) { inFlight.remove(uri) }
+            synchronized(inFlight) {
+                if (inFlight[uri] === request) {
+                    inFlight.remove(uri)
+                }
+            }
         }
     }
 

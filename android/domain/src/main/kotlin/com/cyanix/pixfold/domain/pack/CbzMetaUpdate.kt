@@ -133,6 +133,9 @@ sealed interface UpdatePreflight {
 
     /** 无法判定（拿不到包大小或拿不到剩余空间）⇒ **不阻断**，与打包页一致。 */
     data object Unknown : UpdatePreflight
+
+    /** 目标包不存在（已被删或改名）⇒ 直接报失败，不弹确认框（避免额外 targetExists 遍历）。 */
+    data object TargetMissing : UpdatePreflight
 }
 
 /**

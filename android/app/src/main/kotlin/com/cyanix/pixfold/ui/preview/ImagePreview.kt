@@ -19,16 +19,21 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
@@ -48,6 +53,9 @@ const val TAG_PREVIEW_PAGE_LABEL = "preview-page-label"
 const val TAG_PREVIEW_NEXT = "preview-next"
 const val TAG_PREVIEW_PREV = "preview-prev"
 const val TAG_PREVIEW_CLOSE = "preview-close"
+
+/** 仅供测试观测 [ImagePreview] 的重组次数；生产环境下为 null，零运行时开销。 */
+internal val LocalPreviewRecompositionObserver = staticCompositionLocalOf<((String) -> Unit)?> { null }
 
 /**
  * 用于可测的状态描述:把当前缩放写成可断言的语义值(避免只测内部数据)。
@@ -110,6 +118,9 @@ fun ImagePreview(
     rename: PreviewRename? = null,
     imageSource: ThumbnailSource? = null,
 ) {
+    LocalPreviewRecompositionObserver.current?.let { observe ->
+        SideEffect { observe("ImagePreview") }
+    }
     // 预览专用的图片来源（App 传入不走 512px 缩略图缓存的全尺寸解码源）。
     // 为 null 时退回全局缩略图源：既有 UI 测试与 D1 演示路径行为不变。
     val source = imageSource ?: LocalThumbnailSource.current
@@ -120,18 +131,42 @@ fun ImagePreview(
         return
     }
 
-    var state by remember { mutableStateOf(previewStateOf(initialIndex, items.size)) }
-    val current = items[state.index.coerceIn(0, items.size - 1)]
+    // 页码与缩放/平移状态分离并 keyed on `items.size`（P1 #8）：
+    // - `items.size` 变化（工作区实时刷新增删图片）时重算页数上限，防止 `count` 过期；
+    // - 缩放与平移只在 draw-phase `graphicsLayer { ... }` 与 `semantics { ... }` 读取，
+    //   双指缩放、双击放大与拖拽平移期间零组合 phase 重组。
+    var pageIndex by remember(items.size) {
+        mutableIntStateOf(initialIndex.coerceIn(0, (items.size - 1).coerceAtLeast(0)))
+    }
+    var viewScale by remember(items.size) { mutableFloatStateOf(MIN_SCALE) }
+    var viewOffsetX by remember(items.size) { mutableFloatStateOf(0f) }
+    var viewOffsetY by remember(items.size) { mutableFloatStateOf(0f) }
+    fun currentPreviewState(): PreviewState = PreviewState(
+        index = pageIndex,
+        count = items.size,
+        scale = viewScale,
+        offsetX = viewOffsetX,
+        offsetY = viewOffsetY,
+    )
+    fun applyPreviewState(next: PreviewState) {
+        pageIndex = next.index
+        viewScale = next.scale
+        viewOffsetX = next.offsetX
+        viewOffsetY = next.offsetY
+    }
+
+    val safeIndex = pageIndex.coerceIn(0, items.size - 1)
+    val current = items[safeIndex]
+    val hasPrevious = safeIndex > 0
+    val hasNext = safeIndex < items.size - 1
     var renameOpen by remember { mutableStateOf(false) }
 
-    // 无障碍/语义文案须在 `semantics {}` 之外取好(`stringResource` 不能在非 composable lambda 里调);
-    // 同理,页码在 UI 层解析而不放在 `PreviewState` 上 —— 那个类取不到资源。
-    val zoomCd = stringResource(R.string.preview_zoom_cd, zoomAmount(state.scale))
     // 语义里带上**当前图片的文件名**:否则"预览显示的到底是哪一张"在测试里无法断言
     // (`ItemThumb` 回退到 `ProceduralThumb` 时只把文件名画进 Canvas,不产生任何 semantics)。
     // 这是本页能被证伪的前提,不是装饰。
+    val resources = LocalResources.current
     val imageCd = stringResource(R.string.preview_image_cd, current.fileName)
-    val pageLabel = stringResource(R.string.preview_page_label, state.index + 1, state.count)
+    val pageLabel = stringResource(R.string.preview_page_label, safeIndex + 1, items.size)
     val closeCd = stringResource(R.string.preview_close_cd)
     val prevCd = stringResource(R.string.preview_previous)
     val nextCd = stringResource(R.string.preview_next)
@@ -142,6 +177,9 @@ fun ImagePreview(
             .testTag(TAG_PREVIEW)
             .background(Color.Black),
     ) {
+        LocalPreviewRecompositionObserver.current?.let { observe ->
+            SideEffect { observe("ImagePreviewContent") }
+        }
         // 取图尺寸至少是显示区域的 2 倍，双击放大后才不会发糊；
         // 长边由 MAX_PREVIEW_REQUEST_PX 封顶，ContentScale.Fit 再保证整张图都看得见（不裁边）。
         val requestWidthPx = previewRequestPx(constraints.maxWidth)
@@ -160,32 +198,36 @@ fun ImagePreview(
             modifier = Modifier
                 .fillMaxSize()
                 .testTag(TAG_PREVIEW_IMAGE)
-                .graphicsLayer(
-                    scaleX = state.scale,
-                    scaleY = state.scale,
-                    translationX = state.offsetX,
-                    translationY = state.offsetY,
-                )
+                .graphicsLayer {
+                    scaleX = viewScale
+                    scaleY = viewScale
+                    translationX = viewOffsetX
+                    translationY = viewOffsetY
+                }
                 .semantics {
-                    stateDescription = zoomCd
+                    stateDescription = resources.getString(R.string.preview_zoom_cd, zoomAmount(viewScale))
                     contentDescription = imageCd
                 }
-                .pointerInput(Unit) {
+                .pointerInput(items.size) {
                     detectTransformGestures { _, pan, zoom, _ ->
-                        state = if (zoom != 1f) state.zoomed(zoom) else state
-                        if (state.scale > MIN_SCALE && (pan.x != 0f || pan.y != 0f)) {
-                            state = state.panned(pan.x, pan.y)
+                        var next = currentPreviewState()
+                        if (zoom != 1f) next = next.zoomed(zoom)
+                        if (next.scale > MIN_SCALE && (pan.x != 0f || pan.y != 0f)) {
+                            next = next.panned(pan.x, pan.y)
                         }
+                        applyPreviewState(next)
                     }
                 }
-                .pointerInput(Unit) {
+                .pointerInput(items.size) {
                     detectTapGestures(
                         onDoubleTap = {
-                            state = if (state.scale > MIN_SCALE) {
-                                state.resetZoom()
+                            val currentState = currentPreviewState()
+                            val next = if (currentState.scale > MIN_SCALE) {
+                                currentState.resetZoom()
                             } else {
-                                state.copy(scale = DOUBLE_TAP_SCALE)
+                                currentState.copy(scale = DOUBLE_TAP_SCALE)
                             }
+                            applyPreviewState(next)
                         },
                     )
                 },
@@ -265,13 +307,13 @@ fun ImagePreview(
                 horizontalArrangement = Arrangement.spacedBy(16.dp),
             ) {
                 Button(
-                    onClick = { state = state.previous() },
-                    enabled = state.hasPrevious,
+                    onClick = { applyPreviewState(currentPreviewState().previous()) },
+                    enabled = hasPrevious,
                     modifier = Modifier.testTag(TAG_PREVIEW_PREV).semantics { contentDescription = prevCd },
                 ) { Text(stringResource(R.string.preview_previous)) }
                 Button(
-                    onClick = { state = state.next() },
-                    enabled = state.hasNext,
+                    onClick = { applyPreviewState(currentPreviewState().next()) },
+                    enabled = hasNext,
                     modifier = Modifier.testTag(TAG_PREVIEW_NEXT).semantics { contentDescription = nextCd },
                 ) { Text(stringResource(R.string.preview_next)) }
             }

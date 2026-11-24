@@ -1,6 +1,7 @@
 package com.cyanix.pixfold.domain.pack
 
 import java.io.BufferedInputStream
+import java.io.BufferedOutputStream
 import java.io.ByteArrayOutputStream
 import java.io.File
 import java.io.FileInputStream
@@ -96,7 +97,7 @@ object CbzMetaRewriter {
 
         // 探测必须在建 ZipOutputStream 之前：一旦开始写，非 ZIP 输入就会
         // 静默产出一个只含 ComicInfo 的包（真机缺陷，见 NotAZipException）。
-        val source = BufferedInputStream(input)
+        val source = BufferedInputStream(input, BUFFER_BYTES)
         val head = ByteArray(ZIP_MAGIC_BYTES)
         source.mark(ZIP_MAGIC_BYTES)
         val headLen = source.read(head)
@@ -105,7 +106,7 @@ object CbzMetaRewriter {
             throw NotAZipException("文件头不是 ZIP：" + hexOf(head, headLen))
         }
 
-        val zip = ZipOutputStream(out)
+        val zip = ZipOutputStream(BufferedOutputStream(out, BUFFER_BYTES))
         zip.setLevel(0)
 
         var written = 0
@@ -115,6 +116,9 @@ object CbzMetaRewriter {
         zip.closeEntry()
         written++
         onEntryWritten(written, 0)
+
+        // 单个 64 KiB 缓冲提到条目循环外复用，消除逐条目分配。
+        val buffer = ByteArray(BUFFER_BYTES)
 
         // ZipInputStream.close() 会关掉底层 input —— 所有权在调用方，故不用 use。
         val zin = ZipInputStream(source)
@@ -130,12 +134,12 @@ object CbzMetaRewriter {
                 zin.closeEntry()
                 continue
             }
-            copyEntry(zin, entry, zip, timeMillis, spillDir)
+            copyEntry(zin, entry, zip, timeMillis, spillDir, buffer)
             written++
             onEntryWritten(written, 0)
         }
 
-        // finish() 而非 close()：写出中央目录但不关闭调用方的流。
+        // finish() + flush() 而非 close()：写出中央目录并刷空缓冲流，不关闭调用方的流。
         zip.finish()
         zip.flush()
         return written
@@ -147,10 +151,23 @@ object CbzMetaRewriter {
         zip: ZipOutputStream,
         timeMillis: Long,
         spillDir: File?,
+        buffer: ByteArray,
     ) {
-        val crc = CRC32()
-        var size = 0L
-        val buffer = ByteArray(BUFFER_BYTES)
+        // 直通流式透传（复核约束 #5）：必须显式同时守卫 STORED 且本地头给出非负 size 与 crc。
+        // 满足时直接 zin -> zip 流式拷贝，不分配 ByteArrayOutputStream 也不创建 spill 文件；
+        // JDK ZipOutputStream.closeEntry() 仍会校验实际写入的字节数与 CRC32。
+        if (source.method == ZipEntry.STORED && source.size >= 0L && source.crc >= 0L) {
+            val entry = stored(source.name, source.size, source.crc, timeMillis)
+            zip.putNextEntry(entry)
+            while (true) {
+                val n = zin.read(buffer)
+                if (n < 0) break
+                zip.write(buffer, 0, n)
+            }
+            zin.closeEntry()
+            zip.closeEntry()
+            return
+        }
 
         // 大小未知（DEFLATED 的 ZipInputStream 给 -1）时，落盘是唯一安全选择 ——
         // 不能先把未知大小的东西读进内存再判断，那正是 OOM 的触发方式。
@@ -160,7 +177,13 @@ object CbzMetaRewriter {
             )
         }
 
-        val mem = ByteArrayOutputStream()
+        val crc = CRC32()
+        var size = 0L
+        val initialCapacity = when {
+            source.size in 1L..INLINE_LIMIT_BYTES -> source.size.toInt()
+            else -> BUFFER_BYTES
+        }
+        val mem = ByteArrayOutputStream(initialCapacity)
         var spill: File? = null
         var spillOut: OutputStream? = null
         try {
@@ -178,7 +201,7 @@ object CbzMetaRewriter {
                         }
                         val f = File.createTempFile("cbzmeta-", ".bin", spillDir)
                         spill = f
-                        val fo = FileOutputStream(f)
+                        val fo = BufferedOutputStream(FileOutputStream(f), BUFFER_BYTES)
                         mem.writeTo(fo)
                         mem.reset()
                         spillOut = fo
@@ -190,6 +213,7 @@ object CbzMetaRewriter {
                     spillOut.write(buffer, 0, n)
                 }
             }
+            zin.closeEntry()
 
             val entry = stored(source.name, size, crc.value, timeMillis)
             zip.putNextEntry(entry)
@@ -197,7 +221,13 @@ object CbzMetaRewriter {
                 spillOut?.flush()
                 spillOut?.close()
                 spillOut = null
-                FileInputStream(spill).use { it.copyTo(zip, BUFFER_BYTES) }
+                FileInputStream(spill).use { fin ->
+                    while (true) {
+                        val n = fin.read(buffer)
+                        if (n < 0) break
+                        zip.write(buffer, 0, n)
+                    }
+                }
             } else {
                 mem.writeTo(zip)
             }

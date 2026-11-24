@@ -14,7 +14,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -248,7 +247,7 @@ fun PixFoldDialogShell(
                 .widthIn(max = maxWidth)
                 .fillMaxWidth(DialogFillFraction)
                 .then(if (tag != null) Modifier.testTag(tag) else Modifier),
-            shape = DialogShape,
+            shape = MaterialTheme.shapes.extraLarge,
             color = MaterialTheme.colorScheme.surfaceContainerHigh,
             tonalElevation = DialogElevation,
             shadowElevation = DialogElevation,
@@ -283,9 +282,6 @@ val DialogMaxWidth: Dp = 320.dp
 
 /** 弹窗占屏宽的比例；窄屏上 `widthIn` 先命中，所以两者不冲突。 */
 private const val DialogFillFraction = 0.92f
-
-/** 弹窗圆角 —— 28dp 与 Material3 的 `extraLarge` 一致。 */
-private val DialogShape = RoundedCornerShape(28.dp)
 
 /** 弹窗表面高度。tonal 与 shadow 同值，避免叠出两道边。 */
 private val DialogElevation: Dp = 6.dp
