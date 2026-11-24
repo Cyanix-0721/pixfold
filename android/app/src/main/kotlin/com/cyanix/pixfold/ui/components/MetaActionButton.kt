@@ -1,9 +1,9 @@
 package com.cyanix.pixfold.ui.components
 
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilledTonalIconButton
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.PlainTooltip
 import androidx.compose.material3.Text
 import androidx.compose.material3.TooltipAnchorPosition
@@ -72,8 +72,9 @@ fun MetaActionButton(
         },
         state = rememberTooltipState(),
     ) {
-        IconButton(
+        FilledTonalIconButton(
             onClick = onClick,
+            shapes = IconButtonDefaults.shapes(),
             enabled = enabled,
             modifier = modifier
                 .testTag(tag)
@@ -82,11 +83,6 @@ fun MetaActionButton(
             Icon(
                 imageVector = icon,
                 contentDescription = null,
-                tint = if (enabled) {
-                    MaterialTheme.colorScheme.onSurfaceVariant
-                } else {
-                    MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.38f)
-                },
             )
         }
     }

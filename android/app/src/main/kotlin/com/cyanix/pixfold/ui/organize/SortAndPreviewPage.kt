@@ -5,27 +5,33 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.IntrinsicSize
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.ButtonGroupDefaults
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.FilledTonalIconButton
+import androidx.compose.material3.FilledTonalToggleButton
+import androidx.compose.material3.FilledTonalToggleButtonDefaults
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
+import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.PlainTooltip
-import androidx.compose.material3.SegmentedButton
-import androidx.compose.material3.SegmentedButtonDefaults
-import androidx.compose.material3.SingleChoiceSegmentedButtonRow
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -69,11 +75,14 @@ import com.cyanix.pixfold.ui.components.DragReorderList
 import com.cyanix.pixfold.ui.components.LANDSCAPE_MAX_COLUMNS
 import com.cyanix.pixfold.ui.components.PORTRAIT_MAX_COLUMNS
 import com.cyanix.pixfold.ui.components.PageActionBar
+import com.cyanix.pixfold.ui.components.PixFoldStatusPill
 import com.cyanix.pixfold.ui.components.adaptiveColumnCount
 import com.cyanix.pixfold.ui.components.columnOptions
 import com.cyanix.pixfold.ui.components.isPortraitOrientation
 import com.cyanix.pixfold.ui.components.orientationWidth
 import com.cyanix.pixfold.ui.text.textOf
+import com.cyanix.pixfold.ui.theme.pixFoldCardContainerColor
+import com.cyanix.pixfold.ui.theme.pixFoldSurfaceBorder
 
 const val TAG_SORT_PAGE = "sort-page"
 const val TAG_GRID = "view-grid"
@@ -365,23 +374,26 @@ fun SortAndPreviewPage(
         ) {
             Text(
                 text = pluralStringResource(R.plurals.a_image_count, order.order.size, order.order.size),
-                style = MaterialTheme.typography.labelLarge,
+                style = MaterialTheme.typography.titleSmallEmphasized,
                 color = MaterialTheme.colorScheme.onBackground,
             )
-            Row(verticalAlignment = Alignment.CenterVertically) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(4.dp),
+            ) {
                 // 人工调整标记 + 一键重置(验收第 5 项)
                 if (order.hasManual) {
-                    Text(
+                    PixFoldStatusPill(
                         text = pluralStringResource(R.plurals.a_manual_count, order.manualCount, order.manualCount),
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.padding(end = 4.dp),
+                        containerColor = MaterialTheme.colorScheme.primaryContainer,
+                        contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
                     )
                 }
                 TextButton(
                     onClick = {
                         updateState(updatePageOrder(state, activeId, resetToAuto(order)))
                     },
+                    shapes = ButtonDefaults.shapes(),
                     enabled = order.hasManual,
                     modifier = Modifier
                         .testTag(TAG_RESET_MANUAL)
@@ -395,18 +407,15 @@ fun SortAndPreviewPage(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 12.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
+                .padding(horizontal = 12.dp, vertical = 2.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            // 左侧:视图切换 + 列数按钮**同一行**(用户 2026-09-26 第二轮指令:
-            // 「因为只有一个图标所以可以放在网格/列表的切换按钮右边而不用单独占用一行」)。
-            // 第一轮它是 4 个数字按钮、361dp 下切换行塞不下才单独占一行;改成纯图标后
-            // 只占 48dp(IconButton 触控下限),宽度账已重新算:切换按钮约 128dp + 4dp
-            // 间距 + 48dp ≈ 180dp,而右侧「本组独立 + 开关」约 108dp,361dp − 24dp(左右
-            // padding) = 337dp 足够。⚠️ 这仍是**估算**:Robolectric 不做真实文本测量,
-            // "是否真的放得下"属于 §7.4 表里只能真机核对的一类。
-            Row(verticalAlignment = Alignment.CenterVertically) {
+            // 左侧:视图切换 + 列数按钮**同一行**(用户 2026-09-26 第二轮指令)。
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(4.dp),
+            ) {
                 ModeToggle(mode = mode, onChange = { mode = it })
                 // 仅网格模式显示:列表模式没有"列数"这个概念。
                 if (mode == ViewMode.Grid) {
@@ -417,12 +426,19 @@ fun SortAndPreviewPage(
                 }
             }
 
-            Row(verticalAlignment = Alignment.CenterVertically) {
+            Row(
+                modifier = Modifier.weight(1f),
+                horizontalArrangement = Arrangement.End,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
                 // "本组独立"开关(验收第 7 项后半:此前该能力在界面上不存在)
                 Text(
                     text = customRuleLabel,
                     style = MaterialTheme.typography.labelMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f, fill = false),
                 )
                 Switch(
                     checked = isCustom,
@@ -522,6 +538,7 @@ fun SortAndPreviewPage(
                 trailing = {
                     Button(
                         onClick = next,
+                        shapes = ButtonDefaults.shapes(),
                         modifier = Modifier
                             .testTag(TAG_NEXT_STEP)
                             .semantics { contentDescription = nextCd },
@@ -568,10 +585,14 @@ private fun RuleSummaryBar(
     val toggleCd = stringResource(
         if (expanded) R.string.a_rule_summary_collapse_cd else R.string.a_rule_summary_expand_cd,
     )
-    Column(
+    Surface(
         modifier = Modifier
             .fillMaxWidth()
+            .padding(horizontal = 12.dp, vertical = 4.dp)
             .testTag(TAG_RULE_SUMMARY_BAR),
+        shape = MaterialTheme.shapes.large,
+        color = pixFoldCardContainerColor(),
+        border = pixFoldSurfaceBorder(),
     ) {
         Row(
             modifier = Modifier
@@ -579,29 +600,30 @@ private fun RuleSummaryBar(
                 // 触控目标 ≥48dp(约束 7);内容只有一行文字,靠最小高度撑开
                 .heightIn(min = 48.dp)
                 .clickable(onClick = onToggle)
-                .padding(horizontal = 12.dp)
+                .padding(horizontal = 12.dp, vertical = 8.dp)
                 .testTag(TAG_RULE_SUMMARY_TOGGLE)
                 .semantics {
                     contentDescription = toggleCd
                 },
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(4.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            Column(modifier = Modifier.weight(1f)) {
+            Column(
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.spacedBy(4.dp),
+            ) {
                 Text(
                     text = summary,
-                    style = MaterialTheme.typography.titleSmall,
-                    color = MaterialTheme.colorScheme.onBackground,
+                    style = MaterialTheme.typography.titleSmallEmphasized,
+                    color = MaterialTheme.colorScheme.onSurface,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
                 if (scopeLabel != null) {
-                    Text(
+                    PixFoldStatusPill(
                         text = scopeLabel,
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.primary,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
+                        containerColor = MaterialTheme.colorScheme.secondaryContainer,
+                        contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
                     )
                 }
             }
@@ -614,7 +636,6 @@ private fun RuleSummaryBar(
                 tint = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
-        HorizontalDivider()
     }
 }
 
@@ -628,28 +649,50 @@ private fun ModeToggle(mode: ViewMode, onChange: (ViewMode) -> Unit) {
     val listLabel = stringResource(R.string.a_view_list)
     val gridCd = stringResource(R.string.a_view_cd, gridLabel)
     val listCd = stringResource(R.string.a_view_cd, listLabel)
-    SingleChoiceSegmentedButtonRow(modifier = Modifier.testTag(TAG_MODE_TOGGLE)) {
+    val colors = FilledTonalToggleButtonDefaults.colors(
+        containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
+        contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+        checkedContainerColor = MaterialTheme.colorScheme.secondaryContainer,
+        checkedContentColor = MaterialTheme.colorScheme.onSecondaryContainer,
+    )
+    // M3E Connected Toggle Group: 2 颗相连 tonal 切换按钮，选中态仅由容器高亮 + 强调字重表达，无默认对勾。
+    Row(
+        modifier = Modifier
+            .height(IntrinsicSize.Min)
+            .testTag(TAG_MODE_TOGGLE),
+        horizontalArrangement = Arrangement.spacedBy(ButtonGroupDefaults.ConnectedSpaceBetween),
+    ) {
         options.forEachIndexed { index, option ->
             val isGrid = option == ViewMode.Grid
-            SegmentedButton(
-                selected = mode == option,
-                onClick = { onChange(option) },
-                shape = SegmentedButtonDefaults.itemShape(index = index, count = options.size),
-                // 去掉选中态的对勾(用户 2026-09-26:「网格/列表切换按钮选中有高亮所以不需要"✔"」)。
-                //
-                // `SegmentedButton` 的 `icon` 默认是 `SegmentedButtonDefaults.Icon(selected)`,
-                // 选中时画 `Icons.Filled.Check`。传空 lambda 后:
-                //  - 对勾消失(material3 1.4.0 `SegmentedButton.kt` 的测量里 icon 宽度算成 0);
-                //  - **总宽度不变** —— 那个 26dp(IconSize 18 + IconSpacing 8)槽位是硬编码的,
-                //    任何参数都去不掉(只有 contentPadding 可调);
-                //  - 标签因此被 `offsetX = -13dp` 重新居中(此前有图标时它被右推 26dp)。
-                // 选中态仍有容器高亮色,故"选中/未选中"依旧一眼可辨。
-                icon = {},
+            val checked = mode == option
+            val shapes = if (index == 0) {
+                ButtonGroupDefaults.connectedLeadingButtonShapes()
+            } else {
+                ButtonGroupDefaults.connectedTrailingButtonShapes()
+            }
+            FilledTonalToggleButton(
+                checked = checked,
+                onCheckedChange = { onChange(option) },
+                shapes = shapes,
+                colors = colors,
+                border = if (!checked) pixFoldSurfaceBorder() else null,
+                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 10.dp),
                 modifier = Modifier
+                    .fillMaxHeight()
+                    .heightIn(min = 48.dp)
                     .testTag(if (isGrid) TAG_MODE_GRID_OPTION else TAG_MODE_LIST_OPTION)
                     .semantics { contentDescription = if (isGrid) gridCd else listCd },
             ) {
-                Text(text = if (isGrid) gridLabel else listLabel)
+                Text(
+                    text = if (isGrid) gridLabel else listLabel,
+                    style = if (checked) {
+                        MaterialTheme.typography.labelLargeEmphasized
+                    } else {
+                        MaterialTheme.typography.labelLarge
+                    },
+                    maxLines = 1,
+                    softWrap = false,
+                )
             }
         }
     }
@@ -747,8 +790,9 @@ private fun ColumnCountButton(columns: Int, onSelect: (Int) -> Unit) {
             },
             state = rememberTooltipState(),
         ) {
-            IconButton(
+            FilledTonalIconButton(
                 onClick = { expanded = true },
+                shapes = IconButtonDefaults.shapes(),
                 modifier = Modifier
                     .testTag(TAG_COLUMN_BUTTON)
                     // 纯图标 => 无障碍描述必须自己给:读屏用户看不到"几列",只能听。
@@ -757,7 +801,6 @@ private fun ColumnCountButton(columns: Int, onSelect: (Int) -> Unit) {
                 Icon(
                     painter = painterResource(R.drawable.ic_view_column),
                     contentDescription = null,
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
         }

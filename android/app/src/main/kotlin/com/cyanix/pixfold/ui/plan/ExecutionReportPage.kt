@@ -2,17 +2,24 @@ package com.cyanix.pixfold.ui.plan
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.material3.Button
-import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
+import androidx.compose.material3.ListItemDefaults
+import androidx.compose.material3.MaterialShapes
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
@@ -29,6 +36,8 @@ import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.cyanix.pixfold.R
 import com.cyanix.pixfold.domain.plan.ExecEntry
@@ -36,16 +45,20 @@ import com.cyanix.pixfold.domain.plan.ExecOutcome
 import com.cyanix.pixfold.domain.plan.ExecutionReport
 import com.cyanix.pixfold.domain.plan.UndoScope
 import com.cyanix.pixfold.domain.text.Msg
-import com.cyanix.pixfold.ui.components.PixFoldDialogShell
 import com.cyanix.pixfold.ui.components.IssueFilterRow
 import com.cyanix.pixfold.ui.components.PageActionBar
-import com.cyanix.pixfold.ui.text.WarnLine
+import com.cyanix.pixfold.ui.components.PixFoldDialogShell
+import com.cyanix.pixfold.ui.components.PixFoldSectionCard
+import com.cyanix.pixfold.ui.components.PixFoldSegmentedItem
+import com.cyanix.pixfold.ui.components.PixFoldShapeBadge
+import com.cyanix.pixfold.ui.components.PixFoldStatusPill
 import com.cyanix.pixfold.ui.text.textOf
 import com.cyanix.pixfold.ui.text.textOfOrNull
 import com.cyanix.pixfold.ui.text.warnIcon
 import com.cyanix.pixfold.ui.theme.dangerActionButtonColors
 import com.cyanix.pixfold.ui.theme.dangerOutlineBorder
 import com.cyanix.pixfold.ui.theme.dangerOutlineButtonColors
+import com.cyanix.pixfold.ui.theme.pixFoldSurfaceBorder
 
 const val TAG_REPORT_PAGE = "report-page"
 const val TAG_REPORT_LIST = "report-list"
@@ -58,6 +71,7 @@ const val TAG_REPORT_FILTER_ALL = "report-filter-all"
 const val TAG_REPORT_FILTER_ISSUES = "report-filter-issues"
 const val TAG_REPORT_FILTER_NONE = "report-filter-none"
 const val TAG_UNDO_SCOPE_DIALOG = "undo-scope-dialog"
+const val TAG_UNDO_SCOPE_HERO_BADGE = "undo-scope-hero-badge"
 const val TAG_UNDO_SCOPE_THIS_RUN = "undo-scope-this-run"
 const val TAG_UNDO_SCOPE_EVERYTHING = "undo-scope-everything"
 const val TAG_UNDO_SCOPE_CANCEL = "undo-scope-cancel"
@@ -140,19 +154,60 @@ fun ExecutionReportPage(
             .windowInsetsPadding(contentInsets)
             .testTag(TAG_REPORT_PAGE),
     ) {
-        Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 6.dp)) {
-            Text(
-                text = textOf(report.kind.titleKey),
-                style = MaterialTheme.typography.titleMedium,
-                color = MaterialTheme.colorScheme.onBackground,
-            )
-            Text(
-                text = textOf(report.summary),
-                style = MaterialTheme.typography.titleSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.testTag(TAG_REPORT_SUMMARY),
-            )
-            HorizontalDivider(modifier = Modifier.padding(top = 4.dp))
+        PixFoldSectionCard(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 12.dp, vertical = 8.dp),
+            contentPadding = PaddingValues(14.dp),
+        ) {
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                Text(
+                    text = textOf(report.kind.titleKey),
+                    style = MaterialTheme.typography.titleLargeEmphasized,
+                    color = MaterialTheme.colorScheme.onSurface,
+                )
+                Text(
+                    text = textOf(report.summary),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.testTag(TAG_REPORT_SUMMARY),
+                )
+                FlowRow(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    verticalArrangement = Arrangement.spacedBy(6.dp),
+                ) {
+                    PixFoldStatusPill(
+                        text = "${textOf(ExecOutcome.Succeeded.textKey)} ${report.succeededCount}",
+                        containerColor = MaterialTheme.colorScheme.primaryContainer,
+                        contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                        iconRes = R.drawable.ic_check,
+                    )
+                    PixFoldStatusPill(
+                        text = "${textOf(ExecOutcome.Skipped.textKey)} ${report.skippedCount}",
+                        containerColor = MaterialTheme.colorScheme.secondaryContainer,
+                        contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
+                    )
+                    PixFoldStatusPill(
+                        text = "${textOf(ExecOutcome.Failed.textKey)} ${report.failedCount}",
+                        containerColor = if (report.failedCount > 0) {
+                            MaterialTheme.colorScheme.errorContainer
+                        } else {
+                            MaterialTheme.colorScheme.surfaceContainerHighest
+                        },
+                        contentColor = if (report.failedCount > 0) {
+                            MaterialTheme.colorScheme.onErrorContainer
+                        } else {
+                            MaterialTheme.colorScheme.onSurfaceVariant
+                        },
+                        iconRes = if (report.failedCount > 0) R.drawable.ic_warning_triangle else null,
+                        border = if (report.failedCount == 0) pixFoldSurfaceBorder() else null,
+                    )
+                }
+            }
         }
 
         // 筛选条常驻(与计划页同一形态):报告 56 行,滚到一半想改筛选不该被迫滚回顶部。
@@ -183,6 +238,8 @@ fun ExecutionReportPage(
                 .fillMaxWidth()
                 .weight(1f)
                 .testTag(TAG_REPORT_LIST),
+            contentPadding = PaddingValues(top = 4.dp, bottom = 8.dp),
+            verticalArrangement = Arrangement.spacedBy(ListItemDefaults.SegmentedGap),
         ) {
             if (issuesOnly && shown.isEmpty()) {
                 // 全绿时点「仅问题」会得到空列表。必须说清是**筛空了**而不是报告丢了。
@@ -197,8 +254,14 @@ fun ExecutionReportPage(
                     )
                 }
             }
-            items(shown, key = { it.index }) { indexed ->
-                ReportRow(indexed.value, indexed.index)
+            val shownCount = shown.size.coerceAtLeast(1)
+            itemsIndexed(shown, key = { _, it -> it.index }) { visibleIndex, indexed ->
+                ReportRow(
+                    entry = indexed.value,
+                    index = indexed.index,
+                    visibleIndex = visibleIndex,
+                    visibleCount = shownCount,
+                )
             }
         }
 
@@ -219,6 +282,7 @@ fun ExecutionReportPage(
                         // 有覆盖项 ⇒ 先问范围,不直接执行(用户 m04079 第③项)。
                         if (report.needsUndoWarning) scopeDialogOpen = true else onUndoScope(UndoScope.ThisRun)
                     },
+                    shapes = ButtonDefaults.shapes(),
                     enabled = report.canUndo && !undoing,
                     colors = dangerActionButtonColors(),
                     modifier = Modifier
@@ -234,6 +298,7 @@ fun ExecutionReportPage(
                 val done = stringResource(R.string.report_done)
                 Button(
                     onClick = onDone,
+                    shapes = ButtonDefaults.shapes(),
                     modifier = Modifier
                         .testTag(TAG_REPORT_DONE)
                         .semantics { contentDescription = done },
@@ -327,16 +392,16 @@ private fun UndoScopeDialog(
     PixFoldDialogShell(
         onDismissRequest = onCancel,
         tag = TAG_UNDO_SCOPE_DIALOG,
+        heroBadge = { UndoScopeHeroBadge() },
         title = {
-            // 警示由矢量图标承担(2026-10-05 用户要求,资源里已无 ⚠️ 前缀)。
-            // 标题是 `headlineSmall`,故图标放大到 24dp 与之齐平;`Text` 节点本身
-            // 仍只含标题文本,`UndoScopeDialogTest` 的 `onNodeWithText` 不受影响。
-            WarnLine(
-                icon = warnIcon(R.string.report_undo_warning_title) ?: R.drawable.ic_warning_triangle,
+            // 警示由居中的 M3E SoftBurst 徽章承载，标题保持干净居中的 headlineSmallEmphasized；
+            // `Text` 节点本身仍只含标题文本，`UndoScopeDialogTest` 的 `onNodeWithText` 不受影响。
+            Text(
                 text = title,
-                style = MaterialTheme.typography.headlineSmall,
-                color = MaterialTheme.colorScheme.error,
-                iconSize = 24.dp,
+                style = MaterialTheme.typography.headlineSmallEmphasized,
+                color = MaterialTheme.colorScheme.onSurface,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.fillMaxWidth(),
             )
         },
         buttons = {
@@ -344,6 +409,7 @@ private fun UndoScopeDialog(
             // 安全档只删**本次产物**,故用描边(透明底)而非填充 —— 与危险档分级(O1)。
             OutlinedButton(
                 onClick = { onChoose(UndoScope.ThisRun) },
+                shapes = ButtonDefaults.shapes(),
                 colors = dangerOutlineButtonColors(),
                 border = dangerOutlineBorder(),
                 modifier = Modifier
@@ -351,16 +417,20 @@ private fun UndoScopeDialog(
                     .testTag(TAG_UNDO_SCOPE_THIS_RUN)
                     .semantics { contentDescription = thisRun },
             ) { Text(thisRun) }
+            Spacer(Modifier.height(6.dp))
             Button(
                 onClick = { onChoose(UndoScope.Everything) },
+                shapes = ButtonDefaults.shapes(),
                 colors = dangerActionButtonColors(),
                 modifier = Modifier
                     .fillMaxWidth()
                     .testTag(TAG_UNDO_SCOPE_EVERYTHING)
                     .semantics { contentDescription = everything },
             ) { Text(everything) }
+            Spacer(Modifier.height(4.dp))
             TextButton(
                 onClick = onCancel,
+                shapes = ButtonDefaults.shapes(),
                 modifier = Modifier
                     .fillMaxWidth()
                     .testTag(TAG_UNDO_SCOPE_CANCEL)
@@ -368,53 +438,102 @@ private fun UndoScopeDialog(
             ) { Text(cancel) }
         },
     ) {
-        Text(text = body, style = MaterialTheme.typography.bodyMedium)
+        Text(
+            text = body,
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
     }
 }
 
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
-private fun ReportRow(entry: ExecEntry, index: Int) {
+private fun UndoScopeHeroBadge() {
+    PixFoldShapeBadge(
+        polygon = MaterialShapes.SoftBurst,
+        containerColor = MaterialTheme.colorScheme.errorContainer,
+        contentColor = MaterialTheme.colorScheme.onErrorContainer,
+        iconRes = warnIcon(R.string.report_undo_warning_title) ?: R.drawable.ic_warning_triangle,
+        size = 56.dp,
+        iconSize = 28.dp,
+        modifier = Modifier.testTag(TAG_UNDO_SCOPE_HERO_BADGE),
+    )
+}
+
+@Composable
+private fun ReportRow(
+    entry: ExecEntry,
+    index: Int,
+    visibleIndex: Int,
+    visibleCount: Int,
+) {
     // ⚠️ `semantics {}` 的 lambda 不是 `@Composable`,故无障碍文案必须在外面取好。
     val outcomeCd = stringResource(R.string.report_outcome_cd, textOf(entry.outcome.textKey))
-    Column(
+    val (pillContainer, pillContent, pillIcon) = when (entry.outcome) {
+        ExecOutcome.Succeeded -> Triple(
+            MaterialTheme.colorScheme.primaryContainer,
+            MaterialTheme.colorScheme.onPrimaryContainer,
+            R.drawable.ic_check,
+        )
+        ExecOutcome.Skipped -> Triple(
+            MaterialTheme.colorScheme.secondaryContainer,
+            MaterialTheme.colorScheme.onSecondaryContainer,
+            R.drawable.ic_forbidden,
+        )
+        ExecOutcome.Failed -> Triple(
+            MaterialTheme.colorScheme.errorContainer,
+            MaterialTheme.colorScheme.onErrorContainer,
+            R.drawable.ic_warning_triangle,
+        )
+    }
+    PixFoldSegmentedItem(
+        shapes = ListItemDefaults.segmentedShapes(index = visibleIndex, count = visibleCount),
+        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 10.dp),
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 12.dp, vertical = 4.dp)
+            .padding(horizontal = 12.dp)
             .testTag(reportRowTag(index)),
     ) {
-        Row(
+        Column(
             modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(6.dp),
-            verticalAlignment = Alignment.CenterVertically,
+            verticalArrangement = Arrangement.spacedBy(4.dp),
         ) {
-            Text(
-                text = textOf(entry.outcome.textKey),
-                style = MaterialTheme.typography.labelMedium,
-                color = outcomeColor(entry.outcome),
-                modifier = Modifier
-                    .testTag(reportOutcomeTag(index))
-                    .semantics { contentDescription = outcomeCd },
-            )
-            Text(
-                text = entry.label,
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onBackground,
-                modifier = Modifier.weight(1f),
-            )
-        }
-        textOfOrNull(entry.reason)?.let { reason ->
-            Text(
-                text = stringResource(R.string.report_reason, reason),
-                style = MaterialTheme.typography.labelSmall,
-                color = outcomeColor(entry.outcome),
-            )
-        }
-        if (entry.createdPath != null) {
-            Text(
-                text = "→ ${entry.createdPath}",
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                PixFoldStatusPill(
+                    text = textOf(entry.outcome.textKey),
+                    containerColor = pillContainer,
+                    contentColor = pillContent,
+                    iconRes = pillIcon,
+                    modifier = Modifier
+                        .semantics(mergeDescendants = true) { contentDescription = outcomeCd }
+                        .testTag(reportOutcomeTag(index)),
+                )
+                Text(
+                    text = entry.label,
+                    style = MaterialTheme.typography.titleSmallEmphasized,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    modifier = Modifier.weight(1f),
+                )
+            }
+            textOfOrNull(entry.reason)?.let { reason ->
+                Text(
+                    text = stringResource(R.string.report_reason, reason),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = outcomeColor(entry.outcome),
+                )
+            }
+            if (entry.createdPath != null) {
+                Text(
+                    text = "→ ${entry.createdPath}",
+                    style = MaterialTheme.typography.bodySmall,
+                    fontFamily = FontFamily.Monospace,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
         }
     }
 }

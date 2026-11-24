@@ -2,9 +2,12 @@ package com.cyanix.pixfold.ui.organize
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
@@ -13,8 +16,8 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.res.pluralStringResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
@@ -23,6 +26,8 @@ import com.cyanix.pixfold.R
 import com.cyanix.pixfold.domain.model.NameProposal
 import com.cyanix.pixfold.domain.model.ProposalWarningType
 import com.cyanix.pixfold.ui.components.IssueFilterRow
+import com.cyanix.pixfold.ui.components.PixFoldSegmentedItem
+import com.cyanix.pixfold.ui.components.PixFoldStatusPill
 import com.cyanix.pixfold.ui.text.textOf
 
 /**
@@ -72,7 +77,7 @@ fun ProposalSummary(
     ) {
         Text(
             text = pluralStringResource(R.plurals.a_table_summary, total, total, conflictCount, warningOnlyCount),
-            style = MaterialTheme.typography.labelMedium,
+            style = MaterialTheme.typography.labelMediumEmphasized,
             color = if (conflictCount > 0) {
                 MaterialTheme.colorScheme.error
             } else {
@@ -105,84 +110,121 @@ fun ProposalRow(
     overrideText: String?,
     onOverride: (String, String) -> Unit,
     onResetOverride: (String) -> Unit,
+    index: Int = 0,
+    count: Int = 1,
 ) {
     val id = proposal.image.id
     val hasConflict = proposal.hasConflict
+    val isRenamed = proposal.finalName != proposal.image.fileName
     // 要进 semantics{},故先在组合上下文里解析
     val resetCd = stringResource(R.string.a_table_restore_cd, id)
 
-    Column(
+    PixFoldSegmentedItem(
+        shapes = ListItemDefaults.segmentedShapes(index = index, count = count.coerceAtLeast(1)),
+        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp),
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 12.dp, vertical = 6.dp)
+            .padding(horizontal = 12.dp)
             .testTag(proposalRowTag(id)),
     ) {
-        Text(
-            text = proposal.image.relPath,
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-        )
-
-        Row(
+        Column(
             modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(6.dp),
+            verticalArrangement = Arrangement.spacedBy(4.dp),
         ) {
-            OutlinedTextField(
-                value = overrideText ?: proposal.proposedName,
-                onValueChange = { onOverride(id, it) },
-                singleLine = true,
-                isError = hasConflict,
-                label = {
-                    Text(
-                        stringResource(
-                            if (proposal.isOverridden) {
-                                R.string.a_table_new_name_overridden
-                            } else {
-                                R.string.a_table_new_name
-                            },
-                        ),
-                    )
-                },
-                modifier = Modifier
-                    .weight(1f)
-                    .testTag(proposalFieldTag(id)),
-            )
-
-            TextButton(
-                onClick = { onResetOverride(id) },
-                enabled = proposal.isOverridden,
-                modifier = Modifier
-                    .testTag(proposalResetTag(id))
-                    .semantics { contentDescription = resetCd },
-            ) { Text(stringResource(R.string.a_table_restore)) }
-        }
-
-        if (proposal.warnings.isNotEmpty()) {
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(start = 4.dp, top = 2.dp)
-                    .testTag(proposalWarningTag(id)),
-                verticalArrangement = Arrangement.spacedBy(1.dp),
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
-                proposal.warnings.forEach { w ->
-                    Text(
-                        // 「· 」是符号前缀,不属于文案 —— 与已删除的 `plan_skip_reason_prefix`
-                        // 同一判法(那两处改用了矢量图标,这里保留文字圆点,故仍拼接)。
-                        text = "· ${textOf(w.message)}",
-                        style = MaterialTheme.typography.labelSmall,
-                        // 会导致跳过 -> error 色;仅警告 -> 次级色(视觉分级)
-                        color = if (w.type == ProposalWarningType.Duplicate ||
-                            w.type == ProposalWarningType.IllegalChar
-                        ) {
-                            MaterialTheme.colorScheme.error
-                        } else {
-                            MaterialTheme.colorScheme.onSurfaceVariant
-                        },
+                Text(
+                    text = proposal.image.relPath,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f),
+                )
+                when {
+                    hasConflict -> PixFoldStatusPill(
+                        text = stringResource(R.string.a_plan_status_skip),
+                        containerColor = MaterialTheme.colorScheme.errorContainer,
+                        contentColor = MaterialTheme.colorScheme.onErrorContainer,
+                        iconRes = R.drawable.ic_warning_triangle,
                     )
+                    isRenamed -> PixFoldStatusPill(
+                        text = stringResource(R.string.a_plan_status_rename),
+                        containerColor = MaterialTheme.colorScheme.secondaryContainer,
+                        contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
+                    )
+                    else -> PixFoldStatusPill(
+                        text = stringResource(R.string.domain_case_policy_keep),
+                        containerColor = MaterialTheme.colorScheme.surfaceContainerHighest,
+                        contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+            ) {
+                OutlinedTextField(
+                    value = overrideText ?: proposal.proposedName,
+                    onValueChange = { onOverride(id, it) },
+                    singleLine = true,
+                    isError = hasConflict,
+                    label = {
+                        Text(
+                            stringResource(
+                                if (proposal.isOverridden) {
+                                    R.string.a_table_new_name_overridden
+                                } else {
+                                    R.string.a_table_new_name
+                                },
+                            ),
+                        )
+                    },
+                    modifier = Modifier
+                        .weight(1f)
+                        .testTag(proposalFieldTag(id)),
+                )
+
+                TextButton(
+                    onClick = { onResetOverride(id) },
+                    shapes = ButtonDefaults.shapes(),
+                    enabled = proposal.isOverridden,
+                    modifier = Modifier
+                        .testTag(proposalResetTag(id))
+                        .semantics { contentDescription = resetCd },
+                ) { Text(stringResource(R.string.a_table_restore)) }
+            }
+
+            if (proposal.warnings.isNotEmpty()) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(start = 4.dp, top = 2.dp)
+                        .semantics(mergeDescendants = true) {}
+                        .testTag(proposalWarningTag(id)),
+                    verticalArrangement = Arrangement.spacedBy(1.dp),
+                ) {
+                    proposal.warnings.forEach { w ->
+                        Text(
+                            // 「· 」是符号前缀,不属于文案 —— 与已删除的 `plan_skip_reason_prefix`
+                            // 同一判法(那两处改用了矢量图标,这里保留文字圆点,故仍拼接)。
+                            text = "· ${textOf(w.message)}",
+                            style = MaterialTheme.typography.labelSmall,
+                            // 会导致跳过 -> error 色;仅警告 -> 次级色(视觉分级)
+                            color = if (w.type == ProposalWarningType.Duplicate ||
+                                w.type == ProposalWarningType.IllegalChar
+                            ) {
+                                MaterialTheme.colorScheme.error
+                            } else {
+                                MaterialTheme.colorScheme.onSurfaceVariant
+                            },
+                        )
+                    }
                 }
             }
         }

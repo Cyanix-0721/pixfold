@@ -15,9 +15,14 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ProvideTextStyle
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
@@ -34,6 +39,9 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
+import com.cyanix.pixfold.ui.theme.LocalIsPureBlack
+import com.cyanix.pixfold.ui.theme.dangerActionButtonColors
+import com.cyanix.pixfold.ui.theme.pixFoldSurfaceBorder
 
 /**
  * 全站统一弹窗的**背景模糊控制器**。
@@ -227,12 +235,14 @@ fun PixFoldDialogShell(
     dismissOnOutside: Boolean = true,
     tag: String? = TAG_PIXFOLD_DIALOG,
     contentScrollable: Boolean = true,
+    heroBadge: (@Composable () -> Unit)? = null,
     title: (@Composable () -> Unit)? = null,
     content: @Composable ColumnScope.() -> Unit,
 ) {
     // 模糊注册放在所有弹窗的唯一出入口：以前每层各自调一次，
     // 新增一个弹窗就多一个「忘了调」的机会。
     DialogBlurRegistration()
+    val isPureBlack = LocalIsPureBlack.current
 
     Dialog(
         onDismissRequest = { if (dismissOnOutside) onDismissRequest() },
@@ -249,12 +259,31 @@ fun PixFoldDialogShell(
                 .then(if (tag != null) Modifier.testTag(tag) else Modifier),
             shape = MaterialTheme.shapes.extraLarge,
             color = MaterialTheme.colorScheme.surfaceContainerHigh,
-            tonalElevation = DialogElevation,
+            // 纯黑模式下 surfaceContainerHigh 与 surface 同为 Color.Black，
+            // M3 Surface 会因此叠上一层 surfaceTint 灰底；此处关闭 tonalElevation
+            // 并改用 1dp outlineVariant 描边勾勒边界，与全站纯黑策略一致。
+            tonalElevation = if (isPureBlack) 0.dp else DialogElevation,
             shadowElevation = DialogElevation,
+            border = pixFoldSurfaceBorder(),
         ) {
             Column(modifier = Modifier.padding(DialogPadding)) {
+                if (heroBadge != null) {
+                    Box(
+                        modifier = Modifier.fillMaxWidth(),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        heroBadge()
+                    }
+                    Spacer(Modifier.height(DialogTitleGap))
+                }
                 if (title != null) {
-                    title()
+                    CompositionLocalProvider(
+                        LocalContentColor provides MaterialTheme.colorScheme.onSurface,
+                    ) {
+                        ProvideTextStyle(MaterialTheme.typography.headlineSmallEmphasized) {
+                            title()
+                        }
+                    }
                     Spacer(Modifier.height(DialogTitleGap))
                 }
                 // ⚠️ 嵌套滚动会崩：内容本身是 `LazyColumn` 时不能再包 `verticalScroll`
@@ -326,6 +355,7 @@ fun PixFoldDialog(
     confirmButton: @Composable () -> Unit,
     modifier: Modifier = Modifier,
     title: String? = null,
+    heroBadge: (@Composable () -> Unit)? = null,
     dismissButton: (@Composable () -> Unit)? = null,
     dismissOnOutside: Boolean = true,
     content: @Composable ColumnScope.() -> Unit,
@@ -334,11 +364,12 @@ fun PixFoldDialog(
         onDismissRequest = onDismissRequest,
         modifier = modifier,
         dismissOnOutside = dismissOnOutside,
+        heroBadge = heroBadge,
         title = title?.let {
             {
                 Text(
                     text = it,
-                    style = MaterialTheme.typography.headlineSmall,
+                    style = MaterialTheme.typography.headlineSmallEmphasized,
                     color = MaterialTheme.colorScheme.onSurface,
                 )
             }
@@ -382,7 +413,10 @@ fun PixFoldInfoDialog(
         title = title,
         dismissOnOutside = dismissOnOutside,
         confirmButton = {
-            androidx.compose.material3.TextButton(onClick = onDismissRequest) {
+            TextButton(
+                onClick = onDismissRequest,
+                shapes = ButtonDefaults.shapes(),
+            ) {
                 Text(confirmText)
             }
         },
@@ -398,7 +432,7 @@ fun PixFoldInfoDialog(
  * 「有一处忘了给取消按钮」这类不一致。
  *
  * @param confirmText 主按钮文案；危险动作应配合 `isDangerous = true`
- * @param isDangerous `true` 时主按钮用错误色 —— 删除类操作不能长得跟「确定」一样
+ * @param isDangerous `true` 时主按钮使用 [dangerActionButtonColors] 暗红填充 —— 删除类操作不能长得跟「确定」一样
  */
 @Composable
 fun PixFoldConfirmDialog(
@@ -408,6 +442,7 @@ fun PixFoldConfirmDialog(
     confirmText: String,
     onConfirm: () -> Unit,
     modifier: Modifier = Modifier,
+    heroBadge: (@Composable () -> Unit)? = null,
     dismissText: String? = null,
     isDangerous: Boolean = false,
     confirmTag: String? = null,
@@ -417,25 +452,28 @@ fun PixFoldConfirmDialog(
         onDismissRequest = onDismissRequest,
         modifier = modifier,
         title = title,
+        heroBadge = heroBadge,
         dismissOnOutside = dismissOnOutside,
         confirmButton = {
-            androidx.compose.material3.TextButton(
+            Button(
                 onClick = onConfirm,
+                shapes = ButtonDefaults.shapes(),
+                colors = if (isDangerous) {
+                    dangerActionButtonColors()
+                } else {
+                    ButtonDefaults.buttonColors()
+                },
                 modifier = if (confirmTag != null) Modifier.testTag(confirmTag) else Modifier,
             ) {
-                Text(
-                    text = confirmText,
-                    color = if (isDangerous) {
-                        MaterialTheme.colorScheme.error
-                    } else {
-                        MaterialTheme.colorScheme.primary
-                    },
-                )
+                Text(text = confirmText)
             }
         },
         dismissButton = dismissText?.let {
             {
-                androidx.compose.material3.TextButton(onClick = onDismissRequest) {
+                TextButton(
+                    onClick = onDismissRequest,
+                    shapes = ButtonDefaults.shapes(),
+                ) {
                     Text(it)
                 }
             }
@@ -457,9 +495,10 @@ fun PixFoldConfirmDialog(
  * 「这个效果」只能有一个来源）。
  *
  * 现在外观只有一份：`PixFoldDialogShell`。本函数只负责把四个槽翻译成
- * 「标题 / 正文 / 右对齐按钮行」。
+ * 「可选顶部徽章 / 强调标题 / 正文 / 右对齐按钮行」。
  *
- * @param title 标题槽；`null` 时不占位
+ * @param title 标题槽；默认文本样式由 Shell 提供 `headlineSmallEmphasized`，`null` 时不占位
+ * @param heroBadge 标题上方居中的可选 M3E 徽章槽；`null` 时不占位
  * @param text 正文槽；`null` 时不占位
  */
 @Composable
@@ -468,6 +507,7 @@ fun PixFoldAlertDialog(
     confirmButton: @Composable () -> Unit,
     modifier: Modifier = Modifier,
     title: (@Composable () -> Unit)? = null,
+    heroBadge: (@Composable () -> Unit)? = null,
     text: (@Composable () -> Unit)? = null,
     dismissButton: (@Composable () -> Unit)? = null,
     dismissOnOutside: Boolean = true,
@@ -478,6 +518,7 @@ fun PixFoldAlertDialog(
         modifier = modifier,
         dismissOnOutside = dismissOnOutside,
         contentScrollable = textScrollable,
+        heroBadge = heroBadge,
         title = title,
         buttons = {
             Row(

@@ -1,22 +1,28 @@
 package com.cyanix.pixfold.ui.workspace
 
 import androidx.annotation.StringRes
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.FilledTonalButton
+import androidx.compose.material3.FilledTonalIconToggleButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.IconButtonDefaults
+import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -27,13 +33,16 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.cyanix.pixfold.R
 import com.cyanix.pixfold.domain.source.WorkspaceListing
-import com.cyanix.pixfold.ui.components.PinToggle
 import com.cyanix.pixfold.ui.components.PixFoldDialogShell
+import com.cyanix.pixfold.ui.components.PixFoldSegmentedItem
 import com.cyanix.pixfold.ui.components.pinTag
+import com.cyanix.pixfold.ui.theme.pixFoldSegmentedColors
 
 /** 弹窗容器 tag。 */
 const val TAG_WORKSPACE_DIALOG = "workspace-list-dialog"
@@ -47,10 +56,10 @@ const val TAG_WORKSPACE_RELEASE_SWITCH = "workspace-list-release"
 /**
  * 列表正文的高度上限。
  *
- * 取 300dp ≈ 视口 38%（361×794dp 屏）。不设上限时，8 条 × 56dp 行高 + 两个分区
- * 标题会把「添加文件夹…」和撤销开关挤出屏幕，而它们下面再没有别的落点。
+ * 取 380dp ≈ 视口 48%（361×794dp 屏），让常见 3~4 条目录与底部动作在无需滚动时
+ * 完整呈现，同时 8 条上限不会把标题或按钮挤出屏幕。
  */
-private val WORKSPACE_LIST_MAX_HEIGHT = 300.dp
+private val WORKSPACE_LIST_MAX_HEIGHT = 440.dp
 
 /** 单行 tag（按 treeUri 区分，便于测试点中具体某一条）。 */
 fun workspaceRowTag(treeUri: String): String = "workspace-row-$treeUri"
@@ -59,26 +68,17 @@ fun workspaceRowTag(treeUri: String): String = "workspace-row-$treeUri"
 fun workspaceRemoveTag(treeUri: String): String = "workspace-remove-$treeUri"
 
 /**
- * 行内 [PinToggle] 自身的 tag。
- *
- * 为什么不用 `PinToggle` 的默认 TAG_PIN_TOGGLE：列表里同时有多行，默认值会在同一棵
- * 语义树里重复出现多次，任何 `onNodeWithTag(TAG_PIN_TOGGLE)` 都会变成 ambiguous。
- * 对外可寻址的入口是 [pinTag]（挂在 48dp 触控容器上，见 [PinHitTarget]）。
- */
-private fun pinInnerTag(treeUri: String): String = "pin-inner-$treeUri"
-
-/**
  * 全钉住时给调用方的提示文案。
  *
  * 存在的第二个理由是 lint：`workspace_reject_all_pinned` 若在本模块里没有任何引用，
- * `UnusedResources` 会在 `warningsAsErrors = true` 下硬失败。调用方（Task 7）只需写
+ * `UnusedResources` 会在 `warningsAsErrors = true` 下硬失败。调用方只需写
  * `rejectHint = rejectAllPinnedHint()`，不必自己拼文案。
  */
 @Composable
 fun rejectAllPinnedHint(): String = stringResource(R.string.workspace_reject_all_pinned)
 
 /**
- * 工作区列表弹窗：两分区 + 图钉 + 拖拽排序 + 「移除时同时撤销授权」开关。
+ * 工作区列表弹窗：M3E 分段两分区 + 形变图钉按钮 + 长按拖拽排序 + 「移除时同时撤销授权」开关。
  *
  * ## 两个分区为什么按 `granted` 分，而不是按 `pinned`
  *
@@ -105,9 +105,7 @@ fun rejectAllPinnedHint(): String = stringResource(R.string.workspace_reject_all
  * 「关闭」按钮与每行的 ✕ 混淆。
  *
  * @param listings 存储层给出的完整列表（已按 granted 分两部分、区内已稳定排序）。
- *   **本组件不再排序、也不截断**：上限 8 条是存储层的事，UI 侧截断会让
- *   「列表里看不到的那条」变成无法解释的黑洞。
- * @param currentTreeUri 当前正在打开的工作区 treeUri；匹配的那条标「使用中」。
+ * @param currentTreeUri 当前正在打开的工作区 treeUri；匹配的那条标「使用中」并高亮。
  * @param onRemove 移除一条；[alsoRelease] 是底部开关的当前值（默认 false）。
  * @param onMove `(from, to)` 是**整表存储下标**（下分区已由本组件加上偏移），
  *   调用方直接交给 `WorkspaceController.move`。
@@ -126,17 +124,11 @@ fun WorkspaceListDialog(
     rejectHint: String? = null,
 ) {
     // 开关**不持久化**：它表达「这一次移除顺便撤销授权」的临时意图。
-    // 持久化会让下次手滑删掉一条就永久失去授权，而那是不可逆的
-    // （用户要重新走一次系统目录选择器）。
-    //
     // ⚠️ **调用方必须以 `if (show) { WorkspaceListDialog(...) }` 包裹整个组件**。
-    // 「每次重开复位」靠在隐藏时让这个 Composable 整个离开组合，`remember` 随之销毁；
-    // 若把 Dialog 常驻组合（只在 Shell 内部做 if），开关会残留上次的 true ——
-    // 于是下一次「删一条记录」会静默升级成「撤销系统授权」。全仓既有弹窗
-    // （DirMetaButton.kt:69/101、ResetAllButton.kt:68/94）都是 if 包裹的写法。
     var releaseGrant by remember { mutableStateOf(false) }
     val granted = listings.filter { it.granted }
     val stale = listings.filterNot { it.granted }
+    val releaseLabel = stringResource(R.string.workspace_release_switch)
 
     PixFoldDialogShell(
         onDismissRequest = onDismiss,
@@ -156,44 +148,87 @@ fun WorkspaceListDialog(
                     text = rejectHint,
                     color = MaterialTheme.colorScheme.error,
                     style = MaterialTheme.typography.bodySmall,
+                    modifier = Modifier.padding(bottom = 8.dp),
                 )
             }
             if (granted.isNotEmpty()) {
-                SectionLabel(R.string.workspace_section_granted)
-                // 上分区直接透传 f/t，**不加偏移**：这只在「上分区 == 整表头部」时成立，
-                // 而那个前提不是本组件建立的 —— 是 WorkspaceController 把 grantedPart
-                // 拼在 rememberedPart 前面（WorkspaceController.kt:554-561）。
-                // 若将来改成「单一列表 + 渲染期分区」，这里会静默错位：不崩、不报错，
-                // 只是拖了没反应。改动分区顺序或分区来源时，务必回来重看这两处。
-                WorkspaceDragList(granted, onMove = { f, t -> onMove(f, t) }) { entry ->
-                    WorkspaceRow(entry, currentTreeUri, releaseGrant, onOpen, onTogglePin, onRemove)
+                SectionLabel(R.string.workspace_section_granted, first = true)
+                // 上分区直接透传 f/t，**不加偏移**：与 WorkspaceController 拼表顺序一致。
+                WorkspaceDragList(granted, onMove = { f, t -> onMove(f, t) }) { index, entry ->
+                    WorkspaceRow(
+                        entry = entry,
+                        index = index,
+                        count = granted.size,
+                        currentTreeUri = currentTreeUri,
+                        releaseGrant = releaseGrant,
+                        onOpen = onOpen,
+                        onTogglePin = onTogglePin,
+                        onRemove = onRemove,
+                    )
                 }
             }
             if (stale.isNotEmpty()) {
-                SectionLabel(R.string.workspace_section_stale)
+                SectionLabel(R.string.workspace_section_stale, first = granted.isEmpty())
                 Text(
                     text = stringResource(R.string.workspace_section_stale_hint),
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(bottom = 6.dp),
                 )
                 // 分区内下标 → 整表下标：下分区要加 granted.size 偏移。
-                // 少了这一步拖拽会改错条目，而且不会崩，只是「拖了没反应」。
                 WorkspaceDragList(
                     stale,
                     onMove = { f, t -> onMove(granted.size + f, granted.size + t) },
-                ) { entry ->
-                    WorkspaceRow(entry, currentTreeUri, releaseGrant, onOpen, onTogglePin, onRemove)
+                ) { index, entry ->
+                    WorkspaceRow(
+                        entry = entry,
+                        index = index,
+                        count = stale.size,
+                        currentTreeUri = currentTreeUri,
+                        releaseGrant = releaseGrant,
+                        onOpen = onOpen,
+                        onTogglePin = onTogglePin,
+                        onRemove = onRemove,
+                    )
                 }
             }
-            TextButton(onClick = onAdd, modifier = Modifier.testTag(TAG_WORKSPACE_ADD)) {
-                Text(stringResource(R.string.workspace_list_add))
+            FilledTonalButton(
+                onClick = onAdd,
+                shapes = ButtonDefaults.shapes(),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 12.dp)
+                    .testTag(TAG_WORKSPACE_ADD),
+            ) {
+                Icon(
+                    painter = painterResource(R.drawable.ic_folder_open),
+                    contentDescription = null,
+                    modifier = Modifier.size(18.dp),
+                )
+                Spacer(Modifier.size(8.dp))
+                Text(
+                    text = stringResource(R.string.workspace_list_add),
+                    style = MaterialTheme.typography.labelLargeEmphasized,
+                )
             }
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(stringResource(R.string.workspace_release_switch), Modifier.weight(1f))
-                Switch(
-                    checked = releaseGrant,
-                    onCheckedChange = { releaseGrant = it },
-                    modifier = Modifier.testTag(TAG_WORKSPACE_RELEASE_SWITCH),
+            PixFoldSegmentedItem(
+                shapes = ListItemDefaults.segmentedShapes(index = 0, count = 1),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 8.dp),
+                trailingContent = {
+                    Switch(
+                        checked = releaseGrant,
+                        onCheckedChange = { releaseGrant = it },
+                        modifier = Modifier
+                            .testTag(TAG_WORKSPACE_RELEASE_SWITCH)
+                            .semantics { contentDescription = releaseLabel },
+                    )
+                },
+            ) {
+                Text(
+                    text = releaseLabel,
+                    style = MaterialTheme.typography.bodyMedium,
                 )
             }
         }
@@ -202,23 +237,23 @@ fun WorkspaceListDialog(
 
 /** 分区标题。 */
 @Composable
-private fun SectionLabel(@StringRes id: Int) {
+private fun SectionLabel(@StringRes id: Int, first: Boolean) {
     Text(
         text = stringResource(id),
-        style = MaterialTheme.typography.titleSmall,
+        style = MaterialTheme.typography.titleSmallEmphasized,
         color = MaterialTheme.colorScheme.primary,
+        modifier = Modifier.padding(top = if (first) 0.dp else 12.dp, bottom = 6.dp),
     )
 }
 
 /**
- * 单行：目录名（+ 使用中）· 图钉 · ✕。
- *
- * 整行 `clickable` ⇒ 点击行本体就是「切换到这个工作区」，这是列表里最高频的动作，
- * 不该要求用户瞄准某颗按钮。
+ * 单行：M3E 分段列表项承载「目录名（+ 选中勾与使用中）· 形变图钉 · 移除按钮」。
  */
 @Composable
 private fun WorkspaceRow(
     entry: WorkspaceListing,
+    index: Int,
+    count: Int,
     currentTreeUri: String?,
     releaseGrant: Boolean,
     onOpen: (String) -> Unit,
@@ -226,88 +261,122 @@ private fun WorkspaceRow(
     onRemove: (treeUri: String, alsoRelease: Boolean) -> Unit,
 ) {
     val treeUri = entry.entry.handle.treeUri
-    Row(
-        Modifier
-            .fillMaxWidth()
-            .testTag(workspaceRowTag(treeUri))
-            .clickable { onOpen(treeUri) }
-            .padding(horizontal = 4.dp),
-        verticalAlignment = Alignment.CenterVertically,
+    val isCurrent = treeUri == currentTreeUri
+    val colors = if (isCurrent) {
+        ListItemDefaults.segmentedColors(
+            containerColor = MaterialTheme.colorScheme.secondaryContainer,
+            contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
+            supportingContentColor = MaterialTheme.colorScheme.onSecondaryContainer,
+            trailingContentColor = MaterialTheme.colorScheme.onSecondaryContainer,
+            selectedContainerColor = MaterialTheme.colorScheme.secondaryContainer,
+            selectedContentColor = MaterialTheme.colorScheme.onSecondaryContainer,
+            selectedSupportingContentColor = MaterialTheme.colorScheme.onSecondaryContainer,
+            selectedTrailingContentColor = MaterialTheme.colorScheme.onSecondaryContainer,
+        )
+    } else {
+        pixFoldSegmentedColors()
+    }
+
+    PixFoldSegmentedItem(
+        selected = isCurrent,
+        onClick = { onOpen(treeUri) },
+        shapes = ListItemDefaults.segmentedShapes(index = index, count = count),
+        colors = colors,
+        contentPadding = PaddingValues(start = 14.dp, end = 4.dp, top = 6.dp, bottom = 6.dp),
+        modifier = Modifier
+            .fillMaxSize()
+            .testTag(workspaceRowTag(treeUri)),
+        trailingContent = {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                PinToggleButton(entry = entry, onTogglePin = onTogglePin)
+                IconButton(
+                    onClick = { onRemove(treeUri, releaseGrant) },
+                    shapes = IconButtonDefaults.shapes(),
+                    modifier = Modifier
+                        .testTag(workspaceRemoveTag(treeUri))
+                        // 显式 48dp 触控尺寸（AGENTS.md §2.7）。
+                        .size(48.dp),
+                ) {
+                    Icon(
+                        painter = painterResource(R.drawable.ic_close),
+                        contentDescription = stringResource(
+                            R.string.workspace_remove_cd,
+                            entry.entry.handle.displayName,
+                        ),
+                    )
+                }
+            }
+        },
     ) {
-        Column(Modifier.weight(1f)) {
+        Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
             Text(
                 text = entry.entry.handle.displayName,
+                style = if (isCurrent) {
+                    MaterialTheme.typography.titleSmallEmphasized
+                } else {
+                    MaterialTheme.typography.bodyLarge
+                },
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
-            if (treeUri == currentTreeUri) {
-                Text(
-                    text = stringResource(R.string.workspace_in_use),
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.primary,
-                )
+            if (isCurrent) {
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(4.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Icon(
+                        painter = painterResource(R.drawable.ic_check),
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.onSecondaryContainer,
+                        modifier = Modifier.size(14.dp),
+                    )
+                    Text(
+                        text = stringResource(R.string.workspace_in_use),
+                        style = MaterialTheme.typography.labelSmallEmphasized,
+                        color = MaterialTheme.colorScheme.onSecondaryContainer,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
             }
-        }
-        PinHitTarget(entry, onTogglePin)
-        IconButton(
-            onClick = { onRemove(treeUri, releaseGrant) },
-            modifier = Modifier
-                .testTag(workspaceRemoveTag(treeUri))
-                // 显式 48dp：`IconButton` 的 `minimumInteractiveComponentSize()` 不可依赖
-                // （chip v4 的教训：Robolectric 下量到 36dp）。
-                .size(48.dp),
-        ) {
-            Icon(
-                // 图标来源见 `res/drawable/ic_close.xml` 的注释：官方矢量几何 +
-                // painterResource；本项目没有 material-icons 依赖，
-                // 故不能写 `Icons.Default.Close`（编译不过）。
-                painter = painterResource(R.drawable.ic_close),
-                contentDescription = stringResource(
-                    R.string.workspace_remove_cd,
-                    entry.entry.handle.displayName,
-                ),
-            )
         }
     }
 }
 
 /**
- * 图钉的**触控容器**：视觉 32dp，触控 48dp。
- *
- * ## 为什么是两层而不是一层
- *
- * `PinToggle` 的 `size = 32.dp` 是**视觉**尺寸，且用户 2026-09-26 明确要求保持
- * （它被 6 处复用，改默认值会静默改变那些界面的密度）。但 AGENTS.md §2.7 要求
- * 触控目标 ≥48dp，而 `PinToggle` 内部是 `Surface`、**没有**
- * `minimumInteractiveComponentSize()` 兜底 ⇒ 只包一层 32dp 时真实可点区只有 32dp。
- *
- * ## 两层为什么不会双触发
- *
- * 内层 `PinToggle` 的 `clickable` 会消费 down 事件，外层的 `clickable` 走
- * `detectTapGestures` 的 `awaitFirstDown(requireUnconsumed = true)` ⇒ 收到已消费的
- * down 时不响应。于是：点中心 = 内层处理一次；点 32~48dp 的环带 = 外层处理一次。
- * 两个回调都指向同一个 `onTogglePin`，语义一致。
- *
- * 这条「不双触发」不是推理就算数：`WorkspaceListDialogTest` 的
- * `点图钉回调 togglePin` 断言了回调计数恰为 1。
+ * M3E 形变图钉按钮：使用 [FilledTonalIconToggleButton] + [IconButtonDefaults.toggleableShapes]，
+ * 外层保留 48dp 触控容器并通过 4dp 内缩呈现 40dp 视觉容器，单回调无双触发风险。
  */
 @Composable
-private fun PinHitTarget(entry: WorkspaceListing, onTogglePin: (String) -> Unit) {
+private fun PinToggleButton(entry: WorkspaceListing, onTogglePin: (String) -> Unit) {
     val treeUri = entry.entry.handle.treeUri
-    Box(
-        Modifier
-            .size(48.dp)
-            // 对外可寻址的 tag 挂在 48dp 容器上：这样 `getUnclippedBoundsInRoot()`
-            // 量到的就是真实触控区，而不是 32dp 的视觉尺寸。
+    val isPinned = entry.entry.pinned
+    val pinCd = if (isPinned) {
+        stringResource(R.string.pin_toggle_pinned, entry.entry.handle.displayName)
+    } else {
+        stringResource(R.string.pin_toggle_unpinned, entry.entry.handle.displayName)
+    }
+    FilledTonalIconToggleButton(
+        checked = isPinned,
+        onCheckedChange = { onTogglePin(treeUri) },
+        shapes = IconButtonDefaults.toggleableShapes(),
+        colors = IconButtonDefaults.filledTonalIconToggleButtonColors(
+            containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+            contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+            checkedContainerColor = MaterialTheme.colorScheme.primary,
+            checkedContentColor = MaterialTheme.colorScheme.onPrimary,
+        ),
+        modifier = Modifier
             .testTag(pinTag(treeUri))
-            .clickable { onTogglePin(treeUri) },
-        contentAlignment = Alignment.Center,
+            .size(48.dp)
+            .semantics { contentDescription = pinCd },
     ) {
-        PinToggle(
-            isPinned = entry.entry.pinned,
-            itemName = entry.entry.handle.displayName,
-            onClick = { onTogglePin(treeUri) },
-            tag = pinInnerTag(treeUri),
+        Icon(
+            painter = painterResource(
+                if (isPinned) R.drawable.ic_push_pin_filled else R.drawable.ic_push_pin_outlined,
+            ),
+            contentDescription = null,
+            modifier = Modifier.size(20.dp),
         )
     }
 }

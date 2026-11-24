@@ -1,9 +1,9 @@
 package com.cyanix.pixfold.ui.components
 
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilledTonalIconButton
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.PlainTooltip
 import androidx.compose.material3.Text
 import androidx.compose.material3.TooltipAnchorPosition
@@ -77,8 +77,9 @@ fun DirMetaButton(
         },
         state = rememberTooltipState(),
     ) {
-        IconButton(
+        FilledTonalIconButton(
             onClick = { showDialog = true },
+            shapes = IconButtonDefaults.shapes(),
             enabled = enabled,
             modifier = modifier
                 .testTag(TAG_DIR_META)
@@ -88,12 +89,6 @@ fun DirMetaButton(
             Icon(
                 painter = painterResource(R.drawable.ic_account_tree),
                 contentDescription = null,
-                tint = if (enabled) {
-                    MaterialTheme.colorScheme.onSurfaceVariant
-                } else {
-                    // 与 M3 IconButton 的禁用色一致:保持元素可见但不诱导点击
-                    MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.38f)
-                },
             )
         }
     }

@@ -264,6 +264,7 @@ fun DragReorderList(
                         isDragging = draggingId == item.id,
                         onClick = { onClick(index) },
                         onPin = { onPin(item.id) },
+                        pageIndex = index + 1,
                     )
                 }
             }

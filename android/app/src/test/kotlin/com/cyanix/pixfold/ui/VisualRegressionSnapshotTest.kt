@@ -18,8 +18,13 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.unit.dp
+import com.cyanix.pixfold.domain.library.libraryStateOf
 import com.cyanix.pixfold.domain.mock.MockData
 import com.cyanix.pixfold.domain.mock.MockDataB
+import com.cyanix.pixfold.domain.model.NamingScheme
+import com.cyanix.pixfold.domain.model.NamingState
+import com.cyanix.pixfold.domain.naming.setOverride
+import com.cyanix.pixfold.domain.plan.ConfirmFlowState
 import com.cyanix.pixfold.domain.plan.OutputConflictPolicy
 import com.cyanix.pixfold.domain.plan.buildPackagePlans
 import com.cyanix.pixfold.domain.plan.executePackagePlans
@@ -28,15 +33,29 @@ import com.cyanix.pixfold.domain.settings.ColorSpecVersion
 import com.cyanix.pixfold.domain.settings.ColorStyle
 import com.cyanix.pixfold.domain.settings.PixFoldSettings
 import com.cyanix.pixfold.domain.settings.ThemeMode
+import com.cyanix.pixfold.domain.source.WorkspaceEntry
 import com.cyanix.pixfold.domain.source.WorkspaceHandle
+import com.cyanix.pixfold.domain.source.WorkspaceListing
+import com.cyanix.pixfold.domain.task.TaskProgress
 import com.cyanix.pixfold.ui.components.ChipRowTags
+import com.cyanix.pixfold.ui.components.PackProgressDialog
 import com.cyanix.pixfold.ui.components.SingleSelectChipRow
+import com.cyanix.pixfold.ui.components.TAG_PACK_PROGRESS_DIALOG
 import com.cyanix.pixfold.ui.components.TwoLevelChipRows
 import com.cyanix.pixfold.ui.components.TwoLevelGroup
+import com.cyanix.pixfold.ui.library.LibraryPage
+import com.cyanix.pixfold.ui.library.MetadataPage
+import com.cyanix.pixfold.ui.library.PackPreviewPage
+import com.cyanix.pixfold.ui.organize.RenamePlanPage
+import com.cyanix.pixfold.ui.organize.SortAndPreviewPage
 import com.cyanix.pixfold.ui.plan.ExecutionReportPage
 import com.cyanix.pixfold.ui.plan.TAG_REPORT_UNDO
 import com.cyanix.pixfold.ui.plan.TAG_UNDO_SCOPE_DIALOG
+import com.cyanix.pixfold.ui.preview.ImagePreview
+import com.cyanix.pixfold.ui.preview.PreviewRename
 import com.cyanix.pixfold.ui.settings.SettingsScreen
+import com.cyanix.pixfold.ui.workspace.TAG_WORKSPACE_DIALOG
+import com.cyanix.pixfold.ui.workspace.WorkspaceListDialog
 import com.cyanix.pixfold.ui.workspace.WorkspaceState
 import com.github.takahirom.roborazzi.ExperimentalRoborazziApi
 import com.github.takahirom.roborazzi.RoborazziOptions
@@ -365,6 +384,101 @@ class VisualRegressionSnapshotTest {
         )
     }
 
+    @Test
+    fun settingsScreen_light() {
+        renderSettingsScreen(
+            PixFoldSettings(
+                themeMode = ThemeMode.Light,
+                accent = AccentChoice.Default,
+                colorStyle = ColorStyle.Expressive,
+                colorSpec = ColorSpecVersion.V2025,
+                pureBlack = false,
+            ),
+        )
+        rule.onRoot().captureRoboImage(
+            filePath = snapshotPath("settings_light"),
+            roborazziOptions = roborazziOptions,
+        )
+    }
+
+    @Test
+    fun settingsScreen_pureBlack() {
+        renderSettingsScreen(
+            PixFoldSettings(
+                themeMode = ThemeMode.Dark,
+                accent = AccentChoice.Default,
+                colorStyle = ColorStyle.Expressive,
+                colorSpec = ColorSpecVersion.V2025,
+                pureBlack = true,
+            ),
+        )
+        rule.onRoot().captureRoboImage(
+            filePath = snapshotPath("settings_pure_black"),
+            roborazziOptions = roborazziOptions,
+        )
+    }
+
+    @Test
+    fun workspaceListDialog_dark() {
+        val listings = listOf(
+            WorkspaceListing(
+                entry = WorkspaceEntry(
+                    handle = WorkspaceHandle(
+                        treeUri = "content://com.cyanix.pixfold.test/tree/comics",
+                        displayName = "漫画书库工作区",
+                    ),
+                    pinned = true,
+                ),
+                granted = true,
+            ),
+            WorkspaceListing(
+                entry = WorkspaceEntry(
+                    handle = WorkspaceHandle(
+                        treeUri = "content://com.cyanix.pixfold.test/tree/photos",
+                        displayName = "旅行照片整理",
+                    ),
+                    pinned = false,
+                ),
+                granted = true,
+            ),
+            WorkspaceListing(
+                entry = WorkspaceEntry(
+                    handle = WorkspaceHandle(
+                        treeUri = "content://com.cyanix.pixfold.test/tree/archive",
+                        displayName = "旧版归档目录",
+                    ),
+                    pinned = false,
+                ),
+                granted = false,
+            ),
+        )
+        rule.setContent {
+            PixFoldNativeTestHost(
+                settings = PixFoldSettings(
+                    themeMode = ThemeMode.Dark,
+                    accent = AccentChoice.Default,
+                    pureBlack = false,
+                ),
+            ) {
+                WorkspaceListDialog(
+                    listings = listings,
+                    currentTreeUri = "content://com.cyanix.pixfold.test/tree/comics",
+                    onDismiss = {},
+                    onOpen = {},
+                    onRemove = { _, _ -> },
+                    onTogglePin = {},
+                    onMove = { _, _ -> },
+                    onAdd = {},
+                )
+            }
+        }
+        rule.waitForIdle()
+        rule.onNodeWithTag(TAG_WORKSPACE_DIALOG).captureRoboImage(
+            filePath = snapshotPath("workspace_list_dialog_dark"),
+            roborazziOptions = roborazziOptions,
+        )
+    }
+
     private fun renderSettingsScreen(settings: PixFoldSettings) {
         rule.setContent {
             PixFoldNativeTestHost(settings = settings) {
@@ -432,6 +546,254 @@ class VisualRegressionSnapshotTest {
         rule.waitForIdle()
         rule.onNodeWithTag(TAG_REPORT_UNDO).performClick()
         rule.waitForIdle()
+    }
+
+    // ================= f) Workflow A / B / C & Wavy Progress (Slice U3) =================
+
+    @Test
+    fun sortPage_dark() {
+        rule.setContent {
+            PixFoldNativeTestHost(
+                settings = PixFoldSettings(
+                    themeMode = ThemeMode.Dark,
+                    accent = AccentChoice.Default,
+                    pureBlack = false,
+                ),
+            ) {
+                SortAndPreviewPage(
+                    collections = MockData.workspaceA.collections,
+                    contentInsets = WindowInsets(0, 0, 0, 0),
+                    onNext = {},
+                )
+            }
+        }
+        rule.waitForIdle()
+        rule.onRoot().captureRoboImage(
+            filePath = snapshotPath("sort_page_dark"),
+            roborazziOptions = roborazziOptions,
+        )
+    }
+
+    @Test
+    fun libraryPage_dark() {
+        val base = MockDataB.library
+        val volumes = base.volumes.mapIndexed { idx, v ->
+            if (idx == 0) v.copy(outputExists = true) else v
+        }
+        rule.setContent {
+            PixFoldNativeTestHost(
+                settings = PixFoldSettings(
+                    themeMode = ThemeMode.Dark,
+                    accent = AccentChoice.Default,
+                    pureBlack = false,
+                ),
+            ) {
+                var state by remember { mutableStateOf(libraryStateOf(base.rootPath, volumes)) }
+                LibraryPage(
+                    state = state,
+                    onStateChange = { state = it },
+                    contentInsets = WindowInsets(0, 0, 0, 0),
+                    onNext = {},
+                    onUpdateMeta = {},
+                )
+            }
+        }
+        rule.waitForIdle()
+        rule.onRoot().captureRoboImage(
+            filePath = snapshotPath("library_page_dark"),
+            roborazziOptions = roborazziOptions,
+        )
+    }
+
+    @Test
+    fun metadataPage_light() {
+        val base = MockDataB.library
+        val volumes = base.volumes.mapIndexed { idx, v ->
+            if (idx == 0) v.copy(outputExists = true) else v
+        }
+        rule.setContent {
+            PixFoldNativeTestHost(
+                settings = PixFoldSettings(
+                    themeMode = ThemeMode.Light,
+                    accent = AccentChoice.Default,
+                    pureBlack = false,
+                ),
+            ) {
+                var state by remember { mutableStateOf(libraryStateOf(base.rootPath, volumes)) }
+                MetadataPage(
+                    libraryState = state,
+                    onLibraryChange = { state = it },
+                    contentInsets = WindowInsets(0, 0, 0, 0),
+                    onBack = {},
+                    onNext = {},
+                    onUpdateMeta = {},
+                )
+            }
+        }
+        rule.waitForIdle()
+        rule.onRoot().captureRoboImage(
+            filePath = snapshotPath("metadata_page_light"),
+            roborazziOptions = roborazziOptions,
+        )
+    }
+
+    @Test
+    fun packPreview_dark() {
+        val base = MockDataB.library
+        rule.setContent {
+            PixFoldNativeTestHost(
+                settings = PixFoldSettings(
+                    themeMode = ThemeMode.Dark,
+                    accent = AccentChoice.Default,
+                    pureBlack = false,
+                ),
+            ) {
+                var state by remember { mutableStateOf(libraryStateOf(base.rootPath, base.volumes)) }
+                PackPreviewPage(
+                    libraryState = state,
+                    onLibraryChange = { state = it },
+                    contentInsets = WindowInsets(0, 0, 0, 0),
+                    showPlanSection = true,
+                    onBack = {},
+                )
+            }
+        }
+        rule.waitForIdle()
+        rule.onRoot().captureRoboImage(
+            filePath = snapshotPath("pack_preview_dark"),
+            roborazziOptions = roborazziOptions,
+        )
+    }
+
+    @Test
+    fun packProgressDialog_dark() {
+        rule.setContent {
+            PixFoldNativeTestHost(
+                settings = PixFoldSettings(
+                    themeMode = ThemeMode.Dark,
+                    accent = AccentChoice.Default,
+                    pureBlack = false,
+                ),
+            ) {
+                PackProgressDialog(
+                    progress = TaskProgress(total = 4, done = 1, failed = 0, skipped = 0),
+                    pageDone = 62,
+                    pageTotal = 100,
+                    volumeLabel = "[Cior (Ken-1)] 彼女がボクの知らないところで",
+                    onCancel = {},
+                )
+            }
+        }
+        rule.waitForIdle()
+        rule.onNodeWithTag(TAG_PACK_PROGRESS_DIALOG).captureRoboImage(
+            filePath = snapshotPath("pack_progress_dialog_dark"),
+            roborazziOptions = roborazziOptions,
+        )
+    }
+
+    // ================= g) Plan, Execution Report & ImagePreview Floating Toolbar (Slice U4) =================
+
+    @Test
+    fun renamePlan_dark() {
+        val misc = MockData.workspaceA.collections.filter { it.id == "misc" }
+        val naming = NamingState(NamingScheme(rootDirName = "杂图"))
+            .let { setOverride(it, "misc-2", "dup.jpg") }
+            .let { setOverride(it, "misc-3", "dup.jpg") }
+        rule.setContent {
+            PixFoldNativeTestHost(
+                settings = PixFoldSettings(
+                    themeMode = ThemeMode.Dark,
+                    accent = AccentChoice.Default,
+                    pureBlack = false,
+                ),
+            ) {
+                RenamePlanPage(
+                    collections = misc,
+                    orders = emptyMap(),
+                    namingState = naming,
+                    cleanEmptyDirs = false,
+                    onCleanEmptyDirsChange = {},
+                    flow = ConfirmFlowState(),
+                    onStartConfirm = {},
+                    onConfirmStep = {},
+                    onCancelConfirm = {},
+                    onExecute = {},
+                    contentInsets = WindowInsets(0, 0, 0, 0),
+                    onBack = {},
+                )
+            }
+        }
+        rule.waitForIdle()
+        rule.onRoot().captureRoboImage(
+            filePath = snapshotPath("rename_plan_dark"),
+            roborazziOptions = roborazziOptions,
+        )
+    }
+
+    @Test
+    fun executionReport_dark() {
+        val library = MockDataB.library
+        val aot1 = library.volumes.first { it.id == "aot-1" }
+        val op102 = library.volumes.first { it.id == "op-102" }
+        val noPages = aot1.copy(pageOrder = aot1.pageOrder.copy(order = emptyList()))
+        val report = executePackagePlans(
+            buildPackagePlans(
+                listOf(library.volumes[1], op102, noPages),
+                conflictPolicy = OutputConflictPolicy.Skip,
+            ),
+        )
+        rule.setContent {
+            PixFoldNativeTestHost(
+                settings = PixFoldSettings(
+                    themeMode = ThemeMode.Dark,
+                    accent = AccentChoice.Default,
+                    pureBlack = false,
+                ),
+            ) {
+                ExecutionReportPage(
+                    report = report,
+                    undoMessage = null,
+                    onUndoScope = {},
+                    onDone = {},
+                    contentInsets = WindowInsets(0, 0, 0, 0),
+                )
+            }
+        }
+        rule.waitForIdle()
+        rule.onRoot().captureRoboImage(
+            filePath = snapshotPath("execution_report_dark"),
+            roborazziOptions = roborazziOptions,
+        )
+    }
+
+    @Test
+    fun imagePreview_dark() {
+        val images = MockData.workspaceA.collections.first().images.take(5)
+        rule.setContent {
+            PixFoldNativeTestHost(
+                settings = PixFoldSettings(
+                    themeMode = ThemeMode.Dark,
+                    accent = AccentChoice.Default,
+                    pureBlack = false,
+                ),
+            ) {
+                ImagePreview(
+                    items = images,
+                    initialIndex = 1,
+                    onClose = {},
+                    rename = PreviewRename(
+                        overrides = emptyMap(),
+                        finalNameOf = { it.fileName },
+                        onRename = { _, _ -> },
+                    ),
+                )
+            }
+        }
+        rule.waitForIdle()
+        rule.onRoot().captureRoboImage(
+            filePath = snapshotPath("image_preview_dark"),
+            roborazziOptions = roborazziOptions,
+        )
     }
 
     private companion object {

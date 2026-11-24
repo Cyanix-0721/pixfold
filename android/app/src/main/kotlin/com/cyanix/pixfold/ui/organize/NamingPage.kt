@@ -1,6 +1,8 @@
 package com.cyanix.pixfold.ui.organize
 
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -8,11 +10,13 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -192,7 +196,7 @@ fun NamingPage(
                 collection.derived.title,
                 pageOrder.size,
             ),
-            style = MaterialTheme.typography.titleMedium,
+            style = MaterialTheme.typography.titleMediumEmphasized,
             color = MaterialTheme.colorScheme.onBackground,
             modifier = Modifier
                 .padding(horizontal = 12.dp, vertical = 6.dp)
@@ -231,7 +235,7 @@ fun NamingPage(
             onConflictOnlyChange = { conflictOnly = it },
         )
 
-        HorizontalDivider()
+        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
 
         // ---- 唯一滚动容器:展开态的编辑器(可达) + 建议行 ----
         LazyColumn(
@@ -240,17 +244,16 @@ fun NamingPage(
                 .fillMaxWidth()
                 .weight(1f)
                 .testTag(TAG_PROPOSAL_LIST),
+            contentPadding = PaddingValues(vertical = 6.dp),
+            verticalArrangement = Arrangement.spacedBy(ListItemDefaults.SegmentedGap),
         ) {
             if (editorExpanded) {
                 item(key = "editor") {
-                    Column(modifier = Modifier.fillMaxWidth()) {
-                        SchemeEditor(
-                            state = state,
-                            effective = effective,
-                            onChange = { update(it) },
-                        )
-                        HorizontalDivider()
-                    }
+                    SchemeEditor(
+                        state = state,
+                        effective = effective,
+                        onChange = { update(it) },
+                    )
                 }
             }
 
@@ -271,12 +274,18 @@ fun NamingPage(
                 }
             }
 
-            items(shown, key = { it.image.id }, contentType = { "proposal" }) { proposal ->
+            itemsIndexed(
+                items = shown,
+                key = { _, it -> it.image.id },
+                contentType = { _, _ -> "proposal" },
+            ) { index, proposal ->
                 ProposalRow(
                     proposal = proposal,
                     overrideText = state.overrides[proposal.image.id],
                     onOverride = { id, name -> update(setOverride(state, id, name)) },
                     onResetOverride = { id -> update(clearOverride(state, id)) },
+                    index = index,
+                    count = shown.size,
                 )
             }
         }
@@ -294,6 +303,7 @@ fun NamingPage(
                     if (back != null) {
                         FilledTonalButton(
                             onClick = back,
+                            shapes = ButtonDefaults.shapes(),
                             modifier = Modifier
                                 .testTag(TAG_STEP_BACK)
                                 .semantics { contentDescription = backCd },
@@ -304,6 +314,7 @@ fun NamingPage(
                     if (next != null) {
                         Button(
                             onClick = next,
+                            shapes = ButtonDefaults.shapes(),
                             modifier = Modifier
                                 .testTag(TAG_TO_PLAN)
                                 .semantics { contentDescription = nextCd },

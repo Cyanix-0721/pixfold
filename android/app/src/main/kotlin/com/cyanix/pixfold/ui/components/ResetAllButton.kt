@@ -1,13 +1,11 @@
 package com.cyanix.pixfold.ui.components
 
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilledTonalIconButton
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.PlainTooltip
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.material3.TooltipAnchorPosition
 import androidx.compose.material3.TooltipBox
 import androidx.compose.material3.TooltipDefaults
@@ -23,7 +21,6 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
-import com.cyanix.pixfold.ui.components.PixFoldConfirmDialog
 import com.cyanix.pixfold.R
 
 const val TAG_RESET_ALL = "reset-all"
@@ -76,8 +73,9 @@ fun ResetAllButton(
         },
         state = rememberTooltipState(),
     ) {
-        IconButton(
+        FilledTonalIconButton(
             onClick = { showDialog = true },
+            shapes = IconButtonDefaults.shapes(),
             modifier = modifier
                 .testTag(TAG_RESET_ALL)
                 // 纯图标 => 无障碍描述必须自己给(约束 7)
@@ -86,7 +84,6 @@ fun ResetAllButton(
             Icon(
                 painter = painterResource(R.drawable.ic_restart_alt),
                 contentDescription = null,
-                tint = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
     }

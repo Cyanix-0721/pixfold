@@ -4,32 +4,32 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.ExposedDropdownMenu
 import androidx.compose.material3.ExposedDropdownMenuAnchorType
 import androidx.compose.material3.ExposedDropdownMenuBox
 import androidx.compose.material3.ExposedDropdownMenuDefaults
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.FilterChip
-import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.MaterialShapes
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -39,33 +39,35 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.res.vectorResource
-import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.cyanix.pixfold.R
 import com.cyanix.pixfold.domain.comic.defaultCbzName
 import com.cyanix.pixfold.domain.comic.setMetaValue
 import com.cyanix.pixfold.domain.comic.useSuggestion
-import com.cyanix.pixfold.domain.model.ComicVolume
-import com.cyanix.pixfold.domain.model.LangChoice
-import com.cyanix.pixfold.domain.model.MetaField
-import com.cyanix.pixfold.domain.model.MetaValue
-import com.cyanix.pixfold.domain.text.TextKey
 import com.cyanix.pixfold.domain.library.LibraryState
 import com.cyanix.pixfold.domain.library.batchApplyToLibrary
 import com.cyanix.pixfold.domain.library.selectVolume
 import com.cyanix.pixfold.domain.library.setVolumeIncluded
 import com.cyanix.pixfold.domain.library.updateVolume
+import com.cyanix.pixfold.domain.model.ComicVolume
+import com.cyanix.pixfold.domain.model.LangChoice
+import com.cyanix.pixfold.domain.model.MetaField
+import com.cyanix.pixfold.domain.model.MetaValue
+import com.cyanix.pixfold.domain.text.TextKey
 import com.cyanix.pixfold.ui.components.ChipRowTags
 import com.cyanix.pixfold.ui.components.MetaActionButton
 import com.cyanix.pixfold.ui.components.PageActionBar
+import com.cyanix.pixfold.ui.components.PixFoldEmptyState
+import com.cyanix.pixfold.ui.components.PixFoldSectionCard
+import com.cyanix.pixfold.ui.components.PixFoldStatusPill
 import com.cyanix.pixfold.ui.components.VolumeChipRows
 import com.cyanix.pixfold.ui.text.textOf
-import com.cyanix.pixfold.ui.text.textOfOrNull
+import com.cyanix.pixfold.ui.theme.pixFoldSurfaceBorder
 
 /**
  * 字段编辑器的最大显示行数。
@@ -272,6 +274,7 @@ fun MetadataPage(
                 .fillMaxWidth()
                 .weight(1f)
                 .testTag(TAG_METADATA_LIST),
+            contentPadding = PaddingValues(vertical = 4.dp),
         ) {
             item(key = "volume-header") {
                 VolumeHeader(
@@ -283,106 +286,98 @@ fun MetadataPage(
             }
 
             item(key = "fields") {
-                Column(
+                PixFoldSectionCard(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = 12.dp),
-                    verticalArrangement = Arrangement.spacedBy(4.dp),
+                        .padding(horizontal = 12.dp, vertical = 6.dp),
+                    contentPadding = PaddingValues(12.dp),
                 ) {
-                    TextFieldRow(
-                        field = MetaField.Title,
-                        value = volume.title,
-                        volume = volume,
-                        suggestionText = stringResource(
-                            R.string.meta_suggestion_with_source,
-                            volume.titleSug.value.orEmpty(),
-                            volume.titleSug.source,
-                        ),
-                        onValue = { update(updateVolume(state, setMetaValue(volume, MetaField.Title, MetaValue.Text(it)))) },
-                        onReset = { update(updateVolume(state, useSuggestion(volume, MetaField.Title))) },
-                    )
-                    TextFieldRow(
-                        field = MetaField.Series,
-                        value = volume.series,
-                        volume = volume,
-                        suggestionText = stringResource(
-                            R.string.meta_suggestion_with_source,
-                            volume.seriesSug.value.orEmpty(),
-                            volume.seriesSug.source,
-                        ),
-                        onValue = { update(updateVolume(state, setMetaValue(volume, MetaField.Series, MetaValue.Text(it)))) },
-                        onReset = { update(updateVolume(state, useSuggestion(volume, MetaField.Series))) },
-                    )
-                    TextFieldRow(
-                        field = MetaField.Writer,
-                        value = volume.writer,
-                        volume = volume,
-                        suggestionText = stringResource(
-                            R.string.meta_suggestion_with_source,
-                            volume.writerSug.value.orEmpty(),
-                            volume.writerSug.source,
-                        ),
-                        // 「按目录结构获取」已上移到**页签行**右侧(作用于当前卷全部字段,
-                        // 不只作者) —— 用户 2026-10-22 裁决。本行只留「恢复建议值」。
-                        onValue = { update(updateVolume(state, setMetaValue(volume, MetaField.Writer, MetaValue.Text(it)))) },
-                        onReset = { update(updateVolume(state, useSuggestion(volume, MetaField.Writer))) },
-                    )
-                    VolumeNumberRow(
-                        volume = volume,
-                        onValue = { update(updateVolume(state, setMetaValue(volume, MetaField.Volume, MetaValue.Number(it)))) },
-                        onReset = { update(updateVolume(state, useSuggestion(volume, MetaField.Volume))) },
-                    )
-                    LanguageRow(
-                        volume = volume,
-                        onChoice = { choice ->
-                            update(
-                                updateVolume(
-                                    state,
-                                    setMetaValue(
-                                        volume,
-                                        MetaField.Language,
-                                        MetaValue.Language(choice),
+                    Column(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        TextFieldRow(
+                            field = MetaField.Title,
+                            value = volume.title,
+                            volume = volume,
+                            suggestionText = stringResource(
+                                R.string.meta_suggestion_with_source,
+                                volume.titleSug.value.orEmpty(),
+                                volume.titleSug.source,
+                            ),
+                            onValue = { update(updateVolume(state, setMetaValue(volume, MetaField.Title, MetaValue.Text(it)))) },
+                            onReset = { update(updateVolume(state, useSuggestion(volume, MetaField.Title))) },
+                        )
+                        TextFieldRow(
+                            field = MetaField.Series,
+                            value = volume.series,
+                            volume = volume,
+                            suggestionText = stringResource(
+                                R.string.meta_suggestion_with_source,
+                                volume.seriesSug.value.orEmpty(),
+                                volume.seriesSug.source,
+                            ),
+                            onValue = { update(updateVolume(state, setMetaValue(volume, MetaField.Series, MetaValue.Text(it)))) },
+                            onReset = { update(updateVolume(state, useSuggestion(volume, MetaField.Series))) },
+                        )
+                        TextFieldRow(
+                            field = MetaField.Writer,
+                            value = volume.writer,
+                            volume = volume,
+                            suggestionText = stringResource(
+                                R.string.meta_suggestion_with_source,
+                                volume.writerSug.value.orEmpty(),
+                                volume.writerSug.source,
+                            ),
+                            // 「按目录结构获取」已上移到**页签行**右侧(作用于当前卷全部字段,
+                            // 不只作者) —— 用户 2026-10-22 裁决。本行只留「恢复建议值」。
+                            onValue = { update(updateVolume(state, setMetaValue(volume, MetaField.Writer, MetaValue.Text(it)))) },
+                            onReset = { update(updateVolume(state, useSuggestion(volume, MetaField.Writer))) },
+                        )
+                        VolumeNumberRow(
+                            volume = volume,
+                            onValue = { update(updateVolume(state, setMetaValue(volume, MetaField.Volume, MetaValue.Number(it)))) },
+                            onReset = { update(updateVolume(state, useSuggestion(volume, MetaField.Volume))) },
+                        )
+                        LanguageRow(
+                            volume = volume,
+                            onChoice = { choice ->
+                                update(
+                                    updateVolume(
+                                        state,
+                                        setMetaValue(
+                                            volume,
+                                            MetaField.Language,
+                                            MetaValue.Language(choice),
+                                        ),
                                     ),
-                                ),
-                            )
-                        },
-                        onReset = { update(updateVolume(state, useSuggestion(volume, MetaField.Language))) },
-                    )
-                    TextFieldRow(
-                        field = MetaField.CbzName,
-                        value = volume.cbzFileName,
-                        volume = volume,
-                        // 提示行必须直接给出**恢复后真正会得到的那个文件名**，
-                        // 不能自己拼一个「看起来像」的。
-                        //
-                        // 2026-10-19 真实缺陷：这里原先传的是 `titleSug.value`，
-                        // 而「恢复建议值」实际走 `defaultCbzName(..., cbzBaseSug)`——
-                        // 后者**保留 `[作者]` 前缀**且带「第NN卷」后缀。真实素材下
-                        // 提示显示「彼女がボクの知らないところで」而恢复得到
-                        // 「[Cior (Ken-1)] 彼女がボクの知らないところで 第01卷.cbz」，
-                        // 用户照着提示改反而改错。
-                        //
-                        // 唯一不会漂移的写法是调同一个函数（domain 的唯一权威），
-                        // 只把「同一个函数」写两遍就等于日后两处会分叉。
-                        // 文案键只做包装，值仍来自 `defaultCbzName(volume)`。
-                        suggestionText = stringResource(
-                            R.string.meta_cbz_name_hint,
-                            defaultCbzName(volume),
-                        ),
-                        onValue = { update(updateVolume(state, setMetaValue(volume, MetaField.CbzName, MetaValue.Text(it)))) },
-                        onReset = { update(updateVolume(state, useSuggestion(volume, MetaField.CbzName))) },
-                    )
-                    TextFieldRow(
-                        field = MetaField.OutputDir,
-                        value = volume.outputDir,
-                        volume = volume,
-                        suggestionText = stringResource(
-                            R.string.meta_output_dir_hint,
-                            volume.outputDirSug,
-                        ),
-                        onValue = { update(updateVolume(state, setMetaValue(volume, MetaField.OutputDir, MetaValue.Text(it)))) },
-                        onReset = { update(updateVolume(state, useSuggestion(volume, MetaField.OutputDir))) },
-                    )
+                                )
+                            },
+                            onReset = { update(updateVolume(state, useSuggestion(volume, MetaField.Language))) },
+                        )
+                        TextFieldRow(
+                            field = MetaField.CbzName,
+                            value = volume.cbzFileName,
+                            volume = volume,
+                            suggestionText = stringResource(
+                                R.string.meta_cbz_name_hint,
+                                defaultCbzName(volume),
+                            ),
+                            onValue = { update(updateVolume(state, setMetaValue(volume, MetaField.CbzName, MetaValue.Text(it)))) },
+                            onReset = { update(updateVolume(state, useSuggestion(volume, MetaField.CbzName))) },
+                        )
+                        TextFieldRow(
+                            field = MetaField.OutputDir,
+                            value = volume.outputDir,
+                            volume = volume,
+                            suggestionText = stringResource(
+                                R.string.meta_output_dir_hint,
+                                volume.outputDirSug,
+                            ),
+                            onValue = { update(updateVolume(state, setMetaValue(volume, MetaField.OutputDir, MetaValue.Text(it)))) },
+                            onReset = { update(updateVolume(state, useSuggestion(volume, MetaField.OutputDir))) },
+                        )
+                    }
                 }
             }
 
@@ -412,6 +407,7 @@ fun MetadataPage(
                     if (back != null) {
                         FilledTonalButton(
                             onClick = back,
+                            shapes = ButtonDefaults.shapes(),
                             modifier = Modifier
                                 .testTag(TAG_B_STEP_BACK)
                                 .semantics { contentDescription = backCd },
@@ -422,6 +418,7 @@ fun MetadataPage(
                     if (next != null) {
                         Button(
                             onClick = next,
+                            shapes = ButtonDefaults.shapes(),
                             modifier = Modifier
                                 .testTag(TAG_METADATA_NEXT)
                                 .semantics { contentDescription = nextCd },
@@ -433,8 +430,9 @@ fun MetadataPage(
                 // 「推进流程」，就地更新是**另一种终局**，挤进去会让人以为它也能推进。
                 extraContent = {
                     if (updateCb != null) {
-                        OutlinedButton(
+                        FilledTonalButton(
                             onClick = { updateCb(volume) },
+                            shapes = ButtonDefaults.shapes(),
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .testTag(TAG_METADATA_UPDATE),
@@ -456,12 +454,16 @@ fun MetadataPage(
  * 这样返回按钮落在与正常态完全相同的位置 —— 用户在两种状态下不用重新找它。
  * 「下一步」不渲染:没有卷可编辑,推进没有意义。
  */
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 private fun MetadataEmptyState(
     modifier: Modifier,
     contentInsets: WindowInsets,
     onBack: (() -> Unit)?,
 ) {
+    val raw = stringResource(R.string.b_meta_empty)
+    val title = raw.substringBefore('\n')
+    val subtitle = raw.substringAfter('\n', "")
     Column(
         modifier = modifier
             .fillMaxSize()
@@ -474,14 +476,12 @@ private fun MetadataEmptyState(
                 .weight(1f),
             contentAlignment = Alignment.Center,
         ) {
-            Text(
-                text = stringResource(R.string.b_meta_empty),
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                textAlign = TextAlign.Center,
-                modifier = Modifier
-                    .padding(horizontal = 24.dp, vertical = 16.dp)
-                    .testTag(TAG_META_EMPTY),
+            PixFoldEmptyState(
+                polygon = MaterialShapes.SoftBurst,
+                iconRes = R.drawable.ic_edit_note,
+                title = title,
+                subtitle = subtitle,
+                modifier = Modifier.testTag(TAG_META_EMPTY),
             )
         }
 
@@ -493,6 +493,7 @@ private fun MetadataEmptyState(
                 leading = {
                     FilledTonalButton(
                         onClick = onBack,
+                        shapes = ButtonDefaults.shapes(),
                         modifier = Modifier
                             .testTag(TAG_B_STEP_BACK)
                             .semantics { contentDescription = backCd },
@@ -527,46 +528,75 @@ private fun VolumeHeader(volume: ComicVolume, onToggleIncluded: (Boolean) -> Uni
     // `map` 必须内联 —— `joinToString` 的 transform 是普通 lambda,里面不能调 @Composable。
     val issuesText = volume.pendingIssues.map { textOf(it) }.joinToString(" / ")
 
-    Column(
+    PixFoldSectionCard(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 12.dp, vertical = 4.dp),
+            .padding(horizontal = 12.dp, vertical = 6.dp),
+        contentPadding = PaddingValues(14.dp),
     ) {
-        Text(
-            text = volume.dirPath,
-            style = MaterialTheme.typography.titleSmall,
-            color = MaterialTheme.colorScheme.onBackground,
-        )
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Checkbox(
-                checked = volume.included,
-                onCheckedChange = onToggleIncluded,
-                modifier = Modifier
-                    .testTag(volumeIncludedTag(volume.id))
-                    .semantics { contentDescription = includeCd },
-            )
+        Column(
+            modifier = Modifier.fillMaxWidth(),
+            verticalArrangement = Arrangement.spacedBy(6.dp),
+        ) {
             Text(
-                text = statusText,
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                text = volume.dirPath,
+                style = MaterialTheme.typography.titleMediumEmphasized,
+                color = MaterialTheme.colorScheme.onSurface,
             )
+            if (volume.series.isNotEmpty()) {
+                PixFoldStatusPill(
+                    text = volume.series,
+                    containerColor = MaterialTheme.colorScheme.secondaryContainer,
+                    contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
+                )
+            }
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Checkbox(
+                    checked = volume.included,
+                    onCheckedChange = onToggleIncluded,
+                    modifier = Modifier
+                        .testTag(volumeIncludedTag(volume.id))
+                        .semantics { contentDescription = includeCd },
+                )
+                Text(
+                    text = statusText,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            if (volume.outputExists) {
+                Surface(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = MaterialTheme.shapes.medium,
+                    color = MaterialTheme.colorScheme.errorContainer,
+                    border = pixFoldSurfaceBorder(),
+                ) {
+                    Text(
+                        text = conflictText,
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onErrorContainer,
+                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                    )
+                }
+            }
+            if (volume.pendingIssues.isNotEmpty()) {
+                Surface(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = MaterialTheme.shapes.medium,
+                    color = MaterialTheme.colorScheme.tertiaryContainer,
+                    border = pixFoldSurfaceBorder(),
+                ) {
+                    Text(
+                        text = stringResource(R.string.meta_pending_prefix) + issuesText,
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onTertiaryContainer,
+                        modifier = Modifier
+                            .padding(horizontal = 10.dp, vertical = 6.dp)
+                            .testTag(TAG_PENDING_ISSUES),
+                    )
+                }
+            }
         }
-        if (volume.outputExists) {
-            Text(
-                text = conflictText,
-                style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.error,
-            )
-        }
-        if (volume.pendingIssues.isNotEmpty()) {
-            Text(
-                text = stringResource(R.string.meta_pending_prefix) + issuesText,
-                style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.tertiary,
-                modifier = Modifier.testTag(TAG_PENDING_ISSUES),
-            )
-        }
-        HorizontalDivider(modifier = Modifier.padding(top = 4.dp))
     }
 }
 
@@ -818,87 +848,92 @@ private fun BatchSection(
     val applyCd = stringResource(R.string.meta_batch_apply_cd)
     val forceCd = stringResource(R.string.meta_batch_force_cd)
 
-    Column(
+    PixFoldSectionCard(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 12.dp, vertical = 8.dp)
+            .padding(horizontal = 12.dp, vertical = 6.dp)
             .testTag(TAG_BATCH_ROW),
-        verticalArrangement = Arrangement.spacedBy(4.dp),
+        contentPadding = PaddingValues(14.dp),
     ) {
-        HorizontalDivider()
-        Text(
-            text = stringResource(R.string.meta_batch_title),
-            style = MaterialTheme.typography.titleSmall,
-            color = MaterialTheme.colorScheme.onBackground,
-        )
-        // 批量字段芯片行:同样改 FlowRow(3 个字段在 361dp 下本就会挤到边缘,
-        // 与卷切换行/集合行同源缺陷)。
-        FlowRow(
+        Column(
             modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(6.dp),
-            verticalArrangement = Arrangement.spacedBy(4.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            // 只开放文本类字段给批量(Number/Language 的取值形态不同,留给逐卷编辑器,
-            // 避免把"批量语言"做成能一键把整库设成同一个语言的静默覆盖入口)
-            listOf(MetaField.Series, MetaField.Writer, MetaField.OutputDir).forEach { f ->
-                val fLabel = textOf(f.textKey)
-                val fCd = stringResource(R.string.meta_batch_field_cd, fLabel)
-                FilterChip(
-                    selected = field == f,
-                    onClick = { field = f },
-                    label = { Text(fLabel) },
+            Text(
+                text = stringResource(R.string.meta_batch_title),
+                style = MaterialTheme.typography.titleMediumEmphasized,
+                color = MaterialTheme.colorScheme.onSurface,
+            )
+            // 批量字段芯片行:同样改 FlowRow(3 个字段在 361dp 下本就会挤到边缘,
+            // 与卷切换行/集合行同源缺陷)。
+            FlowRow(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                verticalArrangement = Arrangement.spacedBy(4.dp),
+            ) {
+                // 只开放文本类字段给批量(Number/Language 的取值形态不同,留给逐卷编辑器,
+                // 避免把"批量语言"做成能一键把整库设成同一个语言的静默覆盖入口)
+                listOf(MetaField.Series, MetaField.Writer, MetaField.OutputDir).forEach { f ->
+                    val fLabel = textOf(f.textKey)
+                    val fCd = stringResource(R.string.meta_batch_field_cd, fLabel)
+                    FilterChip(
+                        selected = field == f,
+                        onClick = { field = f },
+                        label = { Text(fLabel) },
+                        modifier = Modifier
+                            .testTag("$TAG_BATCH_FIELD-${f.name}")
+                            .semantics { contentDescription = fCd },
+                    )
+                }
+            }
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+            ) {
+                OutlinedTextField(
+                    value = text,
+                    // 与字段编辑器同因:单行横向滚动下拖拽手柄够不到视口外的字符
+                    onValueChange = { text = it.replace("\n", "").replace("\r", "") },
+                    label = { Text(valueLabel) },
+                    maxLines = META_FIELD_MAX_LINES,
                     modifier = Modifier
-                        .testTag("$TAG_BATCH_FIELD-${f.name}")
-                        .semantics { contentDescription = fCd },
+                        .weight(1f)
+                        .testTag(TAG_BATCH_VALUE),
+                )
+                FilledTonalButton(
+                    onClick = { onApply(field, MetaValue.Text(text), force) },
+                    shapes = ButtonDefaults.shapes(),
+                    enabled = text.isNotEmpty(),
+                    modifier = Modifier
+                        .testTag(TAG_BATCH_APPLY)
+                        .semantics { contentDescription = applyCd },
+                ) { Text(stringResource(R.string.meta_batch_apply)) }
+            }
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                FilterChip(
+                    selected = force,
+                    onClick = { force = !force },
+                    label = {
+                        Text(
+                            stringResource(
+                                if (force) R.string.meta_batch_force_on else R.string.meta_batch_force_off,
+                            ),
+                        )
+                    },
+                    modifier = Modifier
+                        .testTag(TAG_BATCH_FORCE)
+                        .semantics { contentDescription = forceCd },
                 )
             }
-        }
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(6.dp),
-        ) {
-            OutlinedTextField(
-                value = text,
-                // 与字段编辑器同因:单行横向滚动下拖拽手柄够不到视口外的字符
-                onValueChange = { text = it.replace("\n", "").replace("\r", "") },
-                label = { Text(valueLabel) },
-                maxLines = META_FIELD_MAX_LINES,
-                modifier = Modifier
-                    .weight(1f)
-                    .testTag(TAG_BATCH_VALUE),
-            )
-            TextButton(
-                onClick = { onApply(field, MetaValue.Text(text), force) },
-                enabled = text.isNotEmpty(),
-                modifier = Modifier
-                    .testTag(TAG_BATCH_APPLY)
-                    .semantics { contentDescription = applyCd },
-            ) { Text(stringResource(R.string.meta_batch_apply)) }
-        }
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            FilterChip(
-                selected = force,
-                onClick = { force = !force },
-                label = {
-                    Text(
-                        stringResource(
-                            if (force) R.string.meta_batch_force_on else R.string.meta_batch_force_off,
-                        ),
-                    )
-                },
-                modifier = Modifier
-                    .testTag(TAG_BATCH_FORCE)
-                    .semantics { contentDescription = forceCd },
-            )
-        }
-        if (message != null) {
-            Text(
-                text = message,
-                style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.testTag(TAG_BATCH_RESULT),
-            )
+            if (message != null) {
+                PixFoldStatusPill(
+                    text = message,
+                    containerColor = MaterialTheme.colorScheme.primaryContainer,
+                    contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                    modifier = Modifier.testTag(TAG_BATCH_RESULT),
+                )
+            }
         }
     }
 }

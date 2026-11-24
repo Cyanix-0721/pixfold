@@ -6,7 +6,6 @@
 
     <!-- ============ 通用动作 ============ -->
     <string name="common_back">返回</string>
-    <string name="common_close">关闭</string>
 
     <!-- ============ 卷切换(工作流 B 步骤 2/3 共用 VolumeChipRow) ============ -->
     <plurals name="volume_all">
@@ -113,6 +112,12 @@
     <string name="workspace_failed">无法读取该文件夹,请重新选择或换一个。</string>
     <string name="workspace_empty">这个文件夹里没有图片</string>
     <string name="workspace_empty_hint">换一个文件夹开始整理。</string>
+    <plurals name="workspace_summary_folders">
+        <item quantity="other">%1$d 个目录</item>
+    </plurals>
+    <plurals name="workspace_summary_images">
+        <item quantity="other">%1$d 张图片</item>
+    </plurals>
     <string name="workspace_demo_note">当前显示演示数据 —— 选择文件夹即可操作真实文件</string>
     <!-- ============ 工作区列表弹窗(D4 · 最近 8 条 + 图钉 + 拖拽) ============ -->
     <string name="workspace_list_title">工作区文件夹</string>

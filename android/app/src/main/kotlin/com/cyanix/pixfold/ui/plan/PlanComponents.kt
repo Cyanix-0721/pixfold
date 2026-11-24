@@ -2,24 +2,31 @@ package com.cyanix.pixfold.ui.plan
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
+import androidx.compose.material3.ListItemDefaults
+import androidx.compose.material3.MaterialShapes
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.res.pluralStringResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import com.cyanix.pixfold.ui.components.PixFoldAlertDialog
 import com.cyanix.pixfold.R
 import com.cyanix.pixfold.domain.plan.ConfirmStep
 import com.cyanix.pixfold.domain.plan.DangerAction
@@ -27,10 +34,18 @@ import com.cyanix.pixfold.domain.plan.PlanCounts
 import com.cyanix.pixfold.domain.plan.VolumePackPlan
 import com.cyanix.pixfold.domain.plan.describe
 import com.cyanix.pixfold.domain.text.TextKey
+import com.cyanix.pixfold.ui.components.PixFoldAlertDialog
+import com.cyanix.pixfold.ui.components.PixFoldSectionCard
+import com.cyanix.pixfold.ui.components.PixFoldSegmentedItem
+import com.cyanix.pixfold.ui.components.PixFoldShapeBadge
+import com.cyanix.pixfold.ui.components.PixFoldStatusPill
+import com.cyanix.pixfold.ui.text.TAG_WARN_ICON
 import com.cyanix.pixfold.ui.text.WarnLine
 import com.cyanix.pixfold.ui.text.textOf
 import com.cyanix.pixfold.ui.text.textOfOrNull
 import com.cyanix.pixfold.ui.text.warnIcon
+import com.cyanix.pixfold.ui.theme.dangerActionButtonColors
+import com.cyanix.pixfold.ui.theme.pixFoldSurfaceBorder
 
 const val TAG_PLAN_LIST = "plan-list"
 const val TAG_PLAN_SUMMARY = "plan-summary"
@@ -64,37 +79,85 @@ fun PlanHeader(
     dangers: List<DangerAction>,
     modifier: Modifier = Modifier,
 ) {
-    Column(
+    val summaryText =
+        pluralStringResource(R.plurals.plan_summary_title, counts.total, counts.total, counts.runnable) +
+            if (counts.skipped > 0) stringResource(R.string.plan_summary_skipped, counts.skipped) else ""
+
+    PixFoldSectionCard(
         modifier = modifier
             .fillMaxWidth()
             .padding(horizontal = 12.dp, vertical = 6.dp),
+        contentPadding = PaddingValues(14.dp),
     ) {
-        Text(
-            text = pluralStringResource(R.plurals.plan_summary_title, counts.total, counts.total, counts.runnable) +
-                if (counts.skipped > 0) stringResource(R.string.plan_summary_skipped, counts.skipped) else "",
-            style = MaterialTheme.typography.titleSmall,
-            color = MaterialTheme.colorScheme.onBackground,
-            modifier = Modifier.testTag(TAG_PLAN_SUMMARY),
-        )
-        if (dangers.isEmpty()) {
+        Column(
+            modifier = Modifier.fillMaxWidth(),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
             Text(
-                text = stringResource(R.string.plan_no_danger),
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                text = summaryText,
+                style = MaterialTheme.typography.titleLargeEmphasized,
+                color = MaterialTheme.colorScheme.onSurface,
+                modifier = Modifier.testTag(TAG_PLAN_SUMMARY),
             )
-        } else {
-            dangers.forEach { d ->
-                // 警示靠矢量图标承担(2026-10-05 用户要求),文案里不再有 emoji 前缀。
-                // `plan_danger_action` 是纯资源键(不是 `TextKey`),故按资源 id 查表。
-                WarnLine(
-                    icon = warnIcon(R.string.plan_danger_action) ?: return@forEach,
-                    text = stringResource(R.string.plan_danger_action, textOf(d.labelKey)),
-                    style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.error,
+            FlowRow(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                verticalArrangement = Arrangement.spacedBy(6.dp),
+            ) {
+                PixFoldStatusPill(
+                    text = "${stringResource(R.string.plan_will_run)} ${counts.runnable}",
+                    containerColor = MaterialTheme.colorScheme.primaryContainer,
+                    contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                    iconRes = R.drawable.ic_check,
+                )
+                PixFoldStatusPill(
+                    text = "${stringResource(R.string.domain_op_status_skip)} ${counts.skipped}",
+                    containerColor = if (counts.skipped > 0) {
+                        MaterialTheme.colorScheme.errorContainer
+                    } else {
+                        MaterialTheme.colorScheme.secondaryContainer
+                    },
+                    contentColor = if (counts.skipped > 0) {
+                        MaterialTheme.colorScheme.onErrorContainer
+                    } else {
+                        MaterialTheme.colorScheme.onSecondaryContainer
+                    },
+                    iconRes = if (counts.skipped > 0) R.drawable.ic_forbidden else null,
                 )
             }
+            if (dangers.isEmpty()) {
+                Text(
+                    text = stringResource(R.string.plan_no_danger),
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            } else {
+                Surface(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = MaterialTheme.shapes.medium,
+                    color = MaterialTheme.colorScheme.errorContainer,
+                    border = pixFoldSurfaceBorder(),
+                ) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 10.dp, vertical = 8.dp),
+                        verticalArrangement = Arrangement.spacedBy(4.dp),
+                    ) {
+                        dangers.forEach { d ->
+                            // 警示靠矢量图标承担(2026-10-05 用户要求),文案里不再有 emoji 前缀。
+                            // `plan_danger_action` 是纯资源键(不是 `TextKey`),故按资源 id 查表。
+                            WarnLine(
+                                icon = warnIcon(R.string.plan_danger_action) ?: return@forEach,
+                                text = stringResource(R.string.plan_danger_action, textOf(d.labelKey)),
+                                style = MaterialTheme.typography.labelMedium,
+                                color = MaterialTheme.colorScheme.onErrorContainer,
+                            )
+                        }
+                    }
+                }
+            }
         }
-        HorizontalDivider(modifier = Modifier.padding(top = 4.dp))
     }
 }
 
@@ -109,58 +172,80 @@ fun PlanRow(
     plan: VolumePackPlan,
     index: Int,
     modifier: Modifier = Modifier,
+    count: Int = 1,
 ) {
-    Column(
+    PixFoldSegmentedItem(
+        shapes = ListItemDefaults.segmentedShapes(index = index, count = count.coerceAtLeast(1)),
+        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 10.dp),
         modifier = modifier
             .fillMaxWidth()
-            .padding(horizontal = 12.dp, vertical = 4.dp)
+            .padding(horizontal = 12.dp)
             .testTag(planRowTag(index)),
     ) {
-        Row(
+        Column(
             modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(6.dp),
-            verticalAlignment = Alignment.CenterVertically,
+            verticalArrangement = Arrangement.spacedBy(4.dp),
         ) {
-            Text(
-                text = plan.volume.dirPath,
-                style = MaterialTheme.typography.bodyMedium,
-                color = if (plan.skipped) {
-                    MaterialTheme.colorScheme.error
-                } else {
-                    MaterialTheme.colorScheme.onBackground
-                },
-                modifier = Modifier.weight(1f),
-            )
-            Text(
-                text = if (plan.skipped) stringResource(R.string.domain_op_status_skip) else stringResource(R.string.plan_will_run),
-                style = MaterialTheme.typography.labelSmall,
-                color = if (plan.skipped) {
-                    MaterialTheme.colorScheme.error
-                } else {
-                    MaterialTheme.colorScheme.primary
-                },
-            )
-        }
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    text = plan.volume.dirPath,
+                    style = MaterialTheme.typography.titleSmallEmphasized,
+                    color = if (plan.skipped) {
+                        MaterialTheme.colorScheme.error
+                    } else {
+                        MaterialTheme.colorScheme.onSurface
+                    },
+                    modifier = Modifier.weight(1f),
+                )
+                PixFoldStatusPill(
+                    text = if (plan.skipped) {
+                        stringResource(R.string.domain_op_status_skip)
+                    } else {
+                        stringResource(R.string.plan_will_run)
+                    },
+                    containerColor = if (plan.skipped) {
+                        MaterialTheme.colorScheme.errorContainer
+                    } else {
+                        MaterialTheme.colorScheme.primaryContainer
+                    },
+                    contentColor = if (plan.skipped) {
+                        MaterialTheme.colorScheme.onErrorContainer
+                    } else {
+                        MaterialTheme.colorScheme.onPrimaryContainer
+                    },
+                    iconRes = if (plan.skipped) R.drawable.ic_forbidden else R.drawable.ic_check,
+                )
+            }
 
-        plan.describe().forEachIndexed { j, line ->
-            Text(
-                text = "· ${textOf(line)}",
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.testTag(planLineTag(index, j)),
-            )
-        }
+            plan.describe().forEachIndexed { j, line ->
+                Text(
+                    text = "· ${textOf(line)}",
+                    style = MaterialTheme.typography.bodySmall,
+                    fontFamily = FontFamily.Monospace,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier
+                        .semantics(mergeDescendants = true) {}
+                        .testTag(planLineTag(index, j)),
+                )
+            }
 
-        if (plan.skipped) {
-            // 原 `plan_skip_reason_prefix`(⛔ + 裸占位符)已整键删除 —— 去掉符号前缀后
-            // 它不承载任何文案。禁止语义改由 `ic_forbidden` 承担(与 `⚠️` 系区分)。
-            WarnLine(
-                icon = R.drawable.ic_forbidden,
-                text = textOfOrNull(plan.skipReason).orEmpty(),
-                style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.error,
-                modifier = Modifier.testTag(planSkipTag(index)),
-            )
+            if (plan.skipped) {
+                // 原 `plan_skip_reason_prefix`(⛔ + 裸占位符)已整键删除 —— 去掉符号前缀后
+                // 它不承载任何文案。禁止语义改由 `ic_forbidden` 承担(与 `⚠️` 系区分)。
+                WarnLine(
+                    icon = R.drawable.ic_forbidden,
+                    text = textOfOrNull(plan.skipReason).orEmpty(),
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.error,
+                    modifier = Modifier
+                        .semantics(mergeDescendants = true) {}
+                        .testTag(planSkipTag(index)),
+                )
+            }
         }
     }
 }
@@ -193,7 +278,7 @@ fun ConfirmDialog(
                 onDismissRequest = onCancel,
                 title = { Text(stringResource(R.string.domain_general_confirm_title)) },
                 text = {
-                    Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                         ConfirmStepLabel(stepIndex, totalSteps)
                         step.summaryLines.forEach { line ->
                             // 警示行由图标标注,且**不再叠加 `"· "`**(图标就是它的符号前缀)。
@@ -213,8 +298,9 @@ fun ConfirmDialog(
                     }
                 },
                 confirmButton = {
-                    TextButton(
+                    Button(
                         onClick = onConfirm,
+                        shapes = ButtonDefaults.shapes(),
                         modifier = Modifier
                             .testTag(TAG_CONFIRM_OK)
                             .semantics { contentDescription = ok },
@@ -223,6 +309,7 @@ fun ConfirmDialog(
                 dismissButton = {
                     TextButton(
                         onClick = onCancel,
+                        shapes = ButtonDefaults.shapes(),
                         modifier = Modifier
                             .testTag(TAG_CONFIRM_CANCEL)
                             .semantics { contentDescription = cancel },
@@ -238,20 +325,20 @@ fun ConfirmDialog(
             val cancel = stringResource(R.string.common_cancel)
             PixFoldAlertDialog(
                 onDismissRequest = onCancel,
+                heroBadge = { DangerConfirmHeroBadge() },
                 title = {
-                    // `domain_danger_dialog_title` 去 emoji 后由矢量图标承担警示;图标放在
-                    // `Text` 外面的 `Row` 里,而 testTag 经 `textModifier` 仍钉在 `Text` 上 ——
-                    // 因为 `TAG_CONFIRM_DANGER_TITLE` 是**唯一**要求按文本断言的 tag
-                    // (`PlanUiTest` 的 `assertTextEquals`),tag 挪到 `Row` 会让它找不到文本节点。
-                    WarnLine(
-                        icon = warnIcon(R.string.domain_danger_dialog_title) ?: R.drawable.ic_warning_triangle,
+                    Text(
                         text = stringResource(R.string.domain_danger_dialog_title),
-                        color = MaterialTheme.colorScheme.error,
-                        textModifier = Modifier.testTag(TAG_CONFIRM_DANGER_TITLE),
+                        style = MaterialTheme.typography.headlineSmallEmphasized,
+                        color = MaterialTheme.colorScheme.onSurface,
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .testTag(TAG_CONFIRM_DANGER_TITLE),
                     )
                 },
                 text = {
-                    Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                         ConfirmStepLabel(stepIndex, totalSteps)
                         // 原 `"⛔ $body"` 里的字形前缀改由 `ic_forbidden` 承担。
                         WarnLine(
@@ -262,8 +349,10 @@ fun ConfirmDialog(
                     }
                 },
                 confirmButton = {
-                    TextButton(
+                    Button(
                         onClick = onConfirm,
+                        shapes = ButtonDefaults.shapes(),
+                        colors = dangerActionButtonColors(),
                         modifier = Modifier
                             .testTag(TAG_CONFIRM_OK)
                             .semantics { contentDescription = confirm },
@@ -272,6 +361,7 @@ fun ConfirmDialog(
                 dismissButton = {
                     TextButton(
                         onClick = onCancel,
+                        shapes = ButtonDefaults.shapes(),
                         modifier = Modifier
                             .testTag(TAG_CONFIRM_CANCEL)
                             .semantics { contentDescription = cancel },
@@ -281,6 +371,20 @@ fun ConfirmDialog(
             )
         }
     }
+}
+
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
+@Composable
+private fun DangerConfirmHeroBadge() {
+    PixFoldShapeBadge(
+        polygon = MaterialShapes.SoftBurst,
+        containerColor = MaterialTheme.colorScheme.errorContainer,
+        contentColor = MaterialTheme.colorScheme.onErrorContainer,
+        iconRes = warnIcon(R.string.domain_danger_dialog_title) ?: R.drawable.ic_warning_triangle,
+        size = 56.dp,
+        iconSize = 28.dp,
+        modifier = Modifier.testTag(TAG_WARN_ICON),
+    )
 }
 
 @Composable

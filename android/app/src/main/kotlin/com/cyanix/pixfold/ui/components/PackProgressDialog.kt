@@ -7,8 +7,8 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.size
-import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.CircularWavyProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -19,12 +19,13 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import com.cyanix.pixfold.ui.components.PixFoldAlertDialog
 import com.cyanix.pixfold.R
 import com.cyanix.pixfold.domain.task.TaskProgress
 
@@ -113,18 +114,36 @@ fun PackProgressDialog(
                         confirming = false
                         onCancel()
                     },
+                    shapes = ButtonDefaults.shapes(),
                     modifier = Modifier.testTag(TAG_PACK_PROGRESS_CANCEL_CONFIRM),
                 ) {
                     Text(stringResource(R.string.pack_progress_cancel_confirm_ok))
                 }
             },
             dismissButton = {
-                TextButton(onClick = { confirming = false }) {
+                TextButton(
+                    onClick = { confirming = false },
+                    shapes = ButtonDefaults.shapes(),
+                ) {
                     Text(stringResource(R.string.pack_progress_cancel_confirm_dismiss))
                 }
             },
         )
         return
+    }
+
+    val density = LocalDensity.current
+    val outerStroke = remember(density) {
+        Stroke(width = with(density) { 5.dp.toPx() }, cap = StrokeCap.Round)
+    }
+    val outerTrackStroke = remember(density) {
+        Stroke(width = with(density) { 4.dp.toPx() }, cap = StrokeCap.Round)
+    }
+    val innerStroke = remember(density) {
+        Stroke(width = with(density) { 4.dp.toPx() }, cap = StrokeCap.Round)
+    }
+    val innerTrackStroke = remember(density) {
+        Stroke(width = with(density) { 3.dp.toPx() }, cap = StrokeCap.Round)
     }
 
     PixFoldAlertDialog(
@@ -135,7 +154,6 @@ fun PackProgressDialog(
                 text = stringResource(
                     if (cancelling) R.string.pack_progress_cancelling else R.string.pack_progress_title,
                 ),
-                style = MaterialTheme.typography.titleMedium,
             )
         },
         text = {
@@ -156,9 +174,9 @@ fun PackProgressDialog(
                     // 弹窗换形态不该让那批断言的语义失效。
                     modifier = Modifier.testTag(TAG_TASK_PROGRESS),
                 ) {
-                    // 外环（大圈）：当前这一卷的**页**进度。
+                    // 外环（大圈 136dp）：当前这一卷的**页**进度（M3E 波浪圆环）。
                     // 页进度变化细密（一卷可上千页），放在周长更长的外圈读数更平滑。
-                    CircularProgressIndicator(
+                    CircularWavyProgressIndicator(
                         progress = {
                             if (pageDone == null || pageTotal == null || pageTotal <= 0) {
                                 // 不确定态：不知道就别画假的百分比。
@@ -168,21 +186,25 @@ fun PackProgressDialog(
                             }
                         },
                         modifier = Modifier
-                            .size(120.dp)
+                            .size(136.dp)
                             .testTag(TAG_PACK_PROGRESS_OUTER),
-                        strokeWidth = 6.dp,
-                        trackColor = MaterialTheme.colorScheme.surfaceVariant,
+                        color = MaterialTheme.colorScheme.primary,
+                        trackColor = MaterialTheme.colorScheme.surfaceContainerHighest,
+                        stroke = outerStroke,
+                        trackStroke = outerTrackStroke,
+                        wavelength = 18.dp,
                     )
-                    // 内环（小圈）：整批的**卷**进度。比外圈小、更细，视觉上明确是
-                    // 「里面这一层」—— 用户原话「内层打包数量进度」。
-                    CircularProgressIndicator(
+                    // 内环（小圈 96dp）：整批的**卷**进度，与外环留出 ~20dp 径向间距避免波峰重叠。
+                    CircularWavyProgressIndicator(
                         progress = { progress.fraction },
                         modifier = Modifier
-                            .size(88.dp)
+                            .size(96.dp)
                             .testTag(TAG_PACK_PROGRESS_INNER),
-                        strokeWidth = 4.dp,
-                        color = MaterialTheme.colorScheme.secondary,
-                        trackColor = MaterialTheme.colorScheme.surfaceVariant,
+                        color = MaterialTheme.colorScheme.tertiary,
+                        trackColor = MaterialTheme.colorScheme.surfaceContainerHighest,
+                        stroke = innerStroke,
+                        trackStroke = innerTrackStroke,
+                        wavelength = 16.dp,
                     )
                     // 中心读数：**两层合并**的百分比，不是只按卷算。
                     // 只按卷算的话，一卷 1599 页的整个过程中数字一直是 0%，
@@ -191,8 +213,8 @@ fun PackProgressDialog(
                     // 不如外圈没转完进度一直 0」）。
                     Text(
                         text = "${progress.percentWithPage(pageDone, pageTotal)}%",
-                        style = MaterialTheme.typography.titleLarge,
-                        fontWeight = FontWeight.SemiBold,
+                        style = MaterialTheme.typography.headlineSmallEmphasized,
+                        color = MaterialTheme.colorScheme.onSurface,
                         modifier = Modifier.testTag(TAG_PACK_PROGRESS_PERCENT),
                     )
                 }
@@ -204,7 +226,8 @@ fun PackProgressDialog(
                         progress.processed,
                         progress.total,
                     ),
-                    style = MaterialTheme.typography.bodyMedium,
+                    style = MaterialTheme.typography.titleSmallEmphasized,
+                    color = MaterialTheme.colorScheme.onSurface,
                 )
                 if (pageDone != null && pageTotal != null && pageTotal > 0) {
                     Spacer(Modifier.height(4.dp))
@@ -237,6 +260,7 @@ fun PackProgressDialog(
         confirmButton = {
             TextButton(
                 onClick = { confirming = true },
+                shapes = ButtonDefaults.shapes(),
                 enabled = !cancelling,
                 modifier = Modifier.testTag(TAG_TASK_CANCEL),
             ) {

@@ -9,6 +9,8 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -66,29 +68,32 @@ fun PageActionBar(
     trailing: (@Composable RowScope.() -> Unit)? = null,
     extraContent: (@Composable ColumnScope.() -> Unit)? = null,
 ) {
-    Column(
+    Surface(
         modifier = modifier
             .fillMaxWidth()
             .testTag(TAG_PAGE_ACTION_BAR),
+        color = MaterialTheme.colorScheme.surfaceContainer,
     ) {
-        HorizontalDivider()
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 12.dp, vertical = 6.dp),
-            verticalArrangement = Arrangement.spacedBy(4.dp),
-        ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalAlignment = Alignment.CenterVertically,
+        Column(modifier = Modifier.fillMaxWidth()) {
+            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 12.dp, vertical = 6.dp),
+                verticalArrangement = Arrangement.spacedBy(4.dp),
             ) {
-                if (leading != null) leading()
-                // 单侧按钮时保证它仍贴自己那一侧(见上方 KDoc)
-                Spacer(Modifier.weight(1f))
-                if (trailing != null) trailing()
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    if (leading != null) leading()
+                    // 单侧按钮时保证它仍贴自己那一侧(见上方 KDoc)
+                    Spacer(Modifier.weight(1f))
+                    if (trailing != null) trailing()
+                }
+                if (extraContent != null) extraContent()
             }
-            if (extraContent != null) extraContent()
         }
     }
 }
