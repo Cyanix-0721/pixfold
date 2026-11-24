@@ -297,9 +297,11 @@
 
 ---
 
-## 三、按序实施清单与落地实证（分支 `d4/opt-and-non-adb-tests`，M1–M9 全部完成）
+## 三、按序实施清单与落地实证（分支 `d4/opt-and-non-adb-tests`，M1–M9 离线闸门完成 · 真机核对待补）
 
 后续实施自 `dev`（`ad48f1d`）切出阶段分支 `d4/opt-and-non-adb-tests`，按 **M1 → M9** 顺序全部落地；每步均按「先红后绿 → 四道/五道闸门非缓存全绿（`gate-last.rc=0` + `--rerun-tasks`）→ 变异验证」推进。
+
+> **真机核对状态（重要）**：M1–M9 **尚未在真机上核对**（**真机核对待补** — 将与下一轮 Material 3 Expressive UI 优化一并真机核对，待核项见 §3.2）。
 
 | 里程碑 | 对应条目 | 提交 | 状态与核心交付物 |
 | --- | --- | --- | --- |
@@ -311,7 +313,7 @@
 | **M6** | **无 ADB Phase 1** | `fa9005f` | ✅ 建立 `PixFoldUiTestDefaults`（`junit4.v2`、`w361dp-h794dp-560dpi`、`Surface(background)`、视口与 48dp 无障碍断言），补齐芯片/元数据/预览/设置 `@GraphicsMode(NATIVE)` 多语言与 `fontScale` 测试，并同步 `pixfold-device-testing/SKILL.md`。**当场抓出并修复真实无障碍缺陷**：`SettingsScreen.kt` 中 `RadioRow` 与 `ChoiceRow` 对话框选项同时存在 `Row.clickable` 与子 `RadioButton(onClick = ...)`，导致 TalkBack 暴露缺少 `contentDescription` 的重复可点击节点；改为 M3 推荐的 `Row.heightIn(min = 48.dp).selectable(role = Role.RadioButton)` + `RadioButton(onClick = null)` |
 | **M7** | **无 ADB Phase 2** | `e13e3ad` | ✅ 接入 Roborazzi `1.79.0`（`layout.projectDirectory.dir("src/test/snapshots")`），落地 **14 张**核心页面与弹窗黄金图，验证 Configuration Cache 与 `:app:lintDebug` 零告警 |
 | **M8** | **无 ADB Phase 3** | `5b4ff71` | ✅ 搭建 `@TempDir` 驱动的 `FakeDocumentsProvider` 离线 SAF 测试底座，端到端覆盖 `AndroidSafSource`（含 400ms 防抖）、`SafPackPlatform`、`SafMetaUpdater`、`SafRenameActions`/`SafUndoActions` 与 `CoilThumbnailSource`（真实 `ZipFile` 校验） |
-| **M9** | **无 ADB Phase 4** | 本提交（M9） | ✅ `:domain` 接入 `info.solidsoft.pitest:1.19.0`（开源配置，PIT `1.22.1` + `junit5PluginVersion = "1.2.1"`、`threads = 4`），扩展 `android/gate.sh` 支持 `--visual` / `--record` / `--mutate`（保持默认四道闸门与显式参数 100% 向后兼容），同步 `pixfold-build-gates/SKILL.md` 与 `docs/INDEX.md` 台账 |
+| **M9** | **无 ADB Phase 4** | `202a0a9` | ✅ `:domain` 接入 `info.solidsoft.pitest:1.19.0`（开源配置，PIT `1.22.1` + `junit5PluginVersion = "1.2.1"`、`threads = 4`），扩展 `android/gate.sh` 支持 `--visual` / `--record` / `--mutate`（保持默认四道闸门与显式参数 100% 向后兼容），同步 `pixfold-build-gates/SKILL.md` 与 `docs/INDEX.md` 台账 |
 
 ### 3.1 M1–M9 实测总览（2026-11-24）
 
@@ -324,3 +326,14 @@
 | 五道闸门全量非缓存（`./gate.sh --visual --rerun-tasks`） | —（仅四道闸门） | **`gate-last.rc = 0`**、`BUILD SUCCESSFUL in 3m 30s`、`63 actionable tasks: 63 executed`、`:app:lintDebug` **0 告警**、`Configuration cache entry stored.` | `android/build/gate-last.rc`、`android/build/gate-last.log` |
 | Release R8 产物 | 未配置 minify/shrink | **3.59 MB**（启用 `isMinifyEnabled = true` + `isShrinkResources = true`） | M5（`3a50ba8`）实测 |
 | 真实缺陷捕获 | — | **1 条真实无障碍缺陷**：M6 无障碍守卫捕获 `SettingsScreen.kt` `RadioRow`/`ChoiceRow` 重复可点击 `RadioButton`（TalkBack 缺 `contentDescription`），已按 M3 `selectable` 规范修复 | M6（`fa9005f`） |
+| 真机核对状态 | — | **真机核对待补**（M1–M9 尚未经真机核对；将与下一轮 Material 3 Expressive UI 优化一并真机核对） | 见 §3.2 |
+
+### 3.2 待补真机核对清单（与下一轮 Material 3 Expressive UI 优化一并核对）
+
+M1–M9 均通过无 ADB 纯 JVM / Roborazzi / `FakeDocumentsProvider` / PITest 离线验证，但**尚未执行真机核对**。以下涉及真实设备配置变更、OEM SAF 行为、R8 运行期反射/序列化与 OLED/TalkBack 实感的 5 项须与下一轮 Material 3 Expressive UI 优化一并真机取证：
+
+- [ ] **屏幕旋转 / 分屏配置变更状态保活**：验证 `PixFoldSessionViewModel` 跨配置变更保留手工排序、改名覆盖、元数据草稿与缩略图缓存，不重置工作流进度。
+- [ ] **书架页 `LibraryRoute` 进页懒探测流畅度与大目录无卡顿**：验证 `LibraryVolumeLoader` + `SafVolumeProbeSession` 在大目录/多卷书库下按需异步探测无主线程掉帧或 ANR。
+- [ ] **真实 ColorOS SAF 下大体积 CBZ 打包流式写盘与工作流 C 就地重写**：验证 `CbzWriter`（≤ 8 MiB 有界单趟缓冲）、`CbzMetaRewriter`（`STORED` 透传）与 `SafMetaUpdater` 在真实 `ExternalStorageProvider` 下的大包写入、中断取消与产物完整性。
+- [ ] **Release R8 APK 安装与冷启冒烟（3.59 MB）**：真机安装并遍历核心路径，确认 Nav3 `@Serializable NavKey`、`AboutLibraries` 与 `PixFoldSessionViewModel` 混淆压缩后运行期无崩溃。
+- [ ] **设置页单选弹窗 TalkBack 无障碍聚焦与 OLED 纯黑观感**：验证 M6 修复后的 `RadioRow`/`ChoiceRow` 在 TalkBack 下单次聚焦播报选中态、无重复可点击节点，并复核 OLED 纯黑模式实机观感。
