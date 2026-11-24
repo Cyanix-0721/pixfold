@@ -576,6 +576,11 @@ private fun <T> SingleSelectChip(
         label = {
             Text(
                 text = label,
+                style = if (selected) {
+                    MaterialTheme.typography.labelLargeEmphasized
+                } else {
+                    MaterialTheme.typography.labelLarge
+                },
                 textAlign = TextAlign.Center,
                 // 显式给 softWrap:将来有人想改行数时,会先看到这一行注释,
                 // 知道它动的是「可换行」这条用户裁决,而不是排版微调。

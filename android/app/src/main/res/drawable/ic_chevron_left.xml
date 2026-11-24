@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Material Symbols "chevron_left" (rounded) — 大图预览浮条上一页图标。
+  Source : https://github.com/google/material-design-icons
+  License: Apache License 2.0
+-->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <path
+        android:fillColor="#FF000000"
+        android:pathData="M14.71,6.71c0.39,0.39 0.39,1.02 0,1.41L10.83,12l3.88,3.88c0.39,0.39 0.39,1.02 0,1.41c-0.39,0.39 -1.02,0.39 -1.41,0l-4.59,-4.59c-0.39,-0.39 -0.39,-1.02 0,-1.41L13.3,6.7c0.38,-0.38 1.02,-0.38 1.41,0.01z" />
+</vector>

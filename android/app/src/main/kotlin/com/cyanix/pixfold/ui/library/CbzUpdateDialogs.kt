@@ -7,10 +7,12 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.size
+import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularWavyProgressIndicator
 import androidx.compose.material3.ContainedLoadingIndicator
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
+import androidx.compose.material3.MaterialShapes
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -33,6 +35,7 @@ import com.cyanix.pixfold.domain.pack.CbzMetaUpdateOutcome
 import com.cyanix.pixfold.domain.pack.UpdateFailure
 import com.cyanix.pixfold.domain.text.TextKey
 import com.cyanix.pixfold.ui.components.PixFoldAlertDialog
+import com.cyanix.pixfold.ui.components.PixFoldShapeBadge
 import com.cyanix.pixfold.ui.text.textOf
 
 /** 确认框（工作流 C 唯一不可逆告知点）。 */
@@ -118,7 +121,14 @@ fun CbzUpdateConfirmDialog(
     PixFoldAlertDialog(
         onDismissRequest = onCancel,
         modifier = modifier.testTag(TAG_UPDATE_CONFIRM_DIALOG),
-        title = { Text(textOf(TextKey.UpdateMetaTitle)) },
+        heroBadge = { CbzUpdateConfirmHeroBadge() },
+        title = {
+            Text(
+                text = textOf(TextKey.UpdateMetaTitle),
+                textAlign = TextAlign.Center,
+                modifier = Modifier.fillMaxWidth(),
+            )
+        },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Text(
@@ -135,7 +145,7 @@ fun CbzUpdateConfirmDialog(
             }
         },
         confirmButton = {
-            TextButton(
+            Button(
                 onClick = onConfirm,
                 shapes = ButtonDefaults.shapes(),
             ) { Text(stringResource(R.string.update_meta_confirm)) }
@@ -146,6 +156,19 @@ fun CbzUpdateConfirmDialog(
                 shapes = ButtonDefaults.shapes(),
             ) { Text(stringResource(R.string.common_cancel)) }
         },
+    )
+}
+
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
+@Composable
+private fun CbzUpdateConfirmHeroBadge() {
+    PixFoldShapeBadge(
+        polygon = MaterialShapes.Cookie9Sided,
+        containerColor = MaterialTheme.colorScheme.secondaryContainer,
+        contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
+        iconRes = R.drawable.ic_edit_note,
+        size = 56.dp,
+        iconSize = 28.dp,
     )
 }
 

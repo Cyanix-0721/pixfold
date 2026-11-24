@@ -6,7 +6,6 @@
 
     <!-- ============ Common actions ============ -->
     <string name="common_back">Back</string>
-    <string name="common_close">Close</string>
 
     <!-- ============ 卷切换(工作流 B 步骤 2/3 共用 VolumeChipRow) ============ -->
     <plurals name="volume_all">

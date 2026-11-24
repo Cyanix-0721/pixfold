@@ -1,8 +1,17 @@
 package com.cyanix.pixfold.ui.components
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.IntrinsicSize
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
-import androidx.compose.material3.FilterChip
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.material3.ButtonGroupDefaults
+import androidx.compose.material3.FilledTonalToggleButton
+import androidx.compose.material3.FilledTonalToggleButtonDefaults
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -11,8 +20,10 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.cyanix.pixfold.R
+import com.cyanix.pixfold.ui.theme.pixFoldSurfaceBorder
 
 /**
  * 「全部 / 仅问题(N)」筛选条 —— **全站唯一实现**。
@@ -47,26 +58,70 @@ fun IssueFilterRow(
 ) {
     val allCd = stringResource(R.string.common_filter_all_cd)
     val issuesCd = stringResource(R.string.common_filter_issues_cd)
+    val allSelected = !issuesOnly
+    val colors = FilledTonalToggleButtonDefaults.colors(
+        containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
+        contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+        checkedContainerColor = MaterialTheme.colorScheme.secondaryContainer,
+        checkedContentColor = MaterialTheme.colorScheme.onSecondaryContainer,
+    )
+    // M3E Connected Toggle Group: 2 颗相连 tonal 切换按钮，纯黑模式未选中态补 1dp 描边。
     Row(
-        modifier = modifier,
-        horizontalArrangement = Arrangement.spacedBy(6.dp),
+        modifier = modifier.height(IntrinsicSize.Min),
+        horizontalArrangement = Arrangement.spacedBy(ButtonGroupDefaults.ConnectedSpaceBetween),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        FilterChip(
-            selected = !issuesOnly,
-            onClick = { onIssuesOnlyChange(false) },
-            label = { Text(stringResource(R.string.common_filter_all)) },
+        FilledTonalToggleButton(
+            checked = allSelected,
+            onCheckedChange = { onIssuesOnlyChange(false) },
+            shapes = ButtonGroupDefaults.connectedLeadingButtonShapes(),
+            colors = colors,
+            border = if (!allSelected) pixFoldSurfaceBorder() else null,
+            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 10.dp),
             modifier = Modifier
+                .fillMaxHeight()
+                .heightIn(min = 48.dp)
+                .widthIn(min = 48.dp)
                 .testTag(allTag)
                 .semantics { contentDescription = allCd },
-        )
-        FilterChip(
-            selected = issuesOnly,
-            onClick = { onIssuesOnlyChange(true) },
-            label = { Text(stringResource(R.string.common_filter_issues, issueCount)) },
+        ) {
+            Text(
+                text = stringResource(R.string.common_filter_all),
+                style = if (allSelected) {
+                    MaterialTheme.typography.labelLargeEmphasized
+                } else {
+                    MaterialTheme.typography.labelLarge
+                },
+                maxLines = 1,
+                softWrap = false,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
+        FilledTonalToggleButton(
+            checked = issuesOnly,
+            onCheckedChange = { onIssuesOnlyChange(true) },
+            shapes = ButtonGroupDefaults.connectedTrailingButtonShapes(),
+            colors = colors,
+            border = if (!issuesOnly) pixFoldSurfaceBorder() else null,
+            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 10.dp),
             modifier = Modifier
+                .fillMaxHeight()
+                .heightIn(min = 48.dp)
+                .widthIn(min = 48.dp)
                 .testTag(issuesTag)
                 .semantics { contentDescription = issuesCd },
-        )
+        ) {
+            Text(
+                text = stringResource(R.string.common_filter_issues, issueCount),
+                style = if (issuesOnly) {
+                    MaterialTheme.typography.labelLargeEmphasized
+                } else {
+                    MaterialTheme.typography.labelLarge
+                },
+                maxLines = 1,
+                softWrap = false,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
     }
 }

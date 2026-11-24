@@ -2,6 +2,7 @@ package com.cyanix.pixfold.ui.organize
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
@@ -10,12 +11,12 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.FilterChip
-import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -23,34 +24,36 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
 import com.cyanix.pixfold.R
 import com.cyanix.pixfold.domain.model.ImageCollection
 import com.cyanix.pixfold.domain.model.NamingState
 import com.cyanix.pixfold.domain.naming.RenameOp
-import com.cyanix.pixfold.domain.task.TaskProgress
 import com.cyanix.pixfold.domain.plan.ConfirmFlowState
 import com.cyanix.pixfold.domain.plan.ConfirmStep
-import com.cyanix.pixfold.domain.plan.DangerAction
 import com.cyanix.pixfold.domain.plan.buildLibraryRenamePlan
-import com.cyanix.pixfold.domain.plan.buildConfirmSequence
-import com.cyanix.pixfold.domain.plan.renameSummaryLines
 import com.cyanix.pixfold.domain.plan.organizeDangerActions
 import com.cyanix.pixfold.domain.sort.PageOrderState
+import com.cyanix.pixfold.domain.task.TaskProgress
 import com.cyanix.pixfold.ui.components.IssueFilterRow
 import com.cyanix.pixfold.ui.components.PageActionBar
+import com.cyanix.pixfold.ui.components.PixFoldSectionCard
+import com.cyanix.pixfold.ui.components.PixFoldSegmentedItem
+import com.cyanix.pixfold.ui.components.PixFoldStatusPill
 import com.cyanix.pixfold.ui.components.TaskProgressBar
 import com.cyanix.pixfold.ui.plan.ConfirmDialog
-import com.cyanix.pixfold.ui.text.WarnLine
 import com.cyanix.pixfold.ui.plan.PlanHeader
 import com.cyanix.pixfold.ui.plan.planLineTag
 import com.cyanix.pixfold.ui.plan.planRowTag
 import com.cyanix.pixfold.ui.plan.planSkipTag
+import com.cyanix.pixfold.ui.text.WarnLine
 import com.cyanix.pixfold.ui.text.textOfOrNull
 
 const val TAG_A_PLAN_PAGE = "organize-plan-page"
@@ -142,45 +145,52 @@ fun RenamePlanPage(
                 .fillMaxWidth()
                 .weight(1f)
                 .testTag(TAG_A_PLAN_LIST),
+            contentPadding = PaddingValues(bottom = 8.dp),
+            verticalArrangement = Arrangement.spacedBy(ListItemDefaults.SegmentedGap),
         ) {
             item(key = "header") {
-                Column(modifier = Modifier.fillMaxWidth()) {
+                Column(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalArrangement = Arrangement.spacedBy(4.dp),
+                ) {
                     PlanHeader(counts = plan.counts, dangers = dangers.toList())
 
                     // ---- 危险动作开关(默认关闭) ----
-                    Row(
+                    PixFoldSectionCard(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(horizontal = 12.dp),
-                        verticalAlignment = androidx.compose.ui.Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                            .padding(horizontal = 12.dp, vertical = 4.dp),
+                        contentPadding = PaddingValues(horizontal = 14.dp, vertical = 10.dp),
                     ) {
-                        FilterChip(
-                            selected = cleanEmptyDirs,
-                            onClick = { onCleanEmptyDirsChange(!cleanEmptyDirs) },
-                            label = {
-                                Text(
-                                    stringResource(
-                                        if (cleanEmptyDirs) {
-                                            R.string.a_plan_clean_empty_on
-                                        } else {
-                                            R.string.a_plan_clean_empty_off
-                                        },
-                                    ),
-                                )
-                            },
-                            modifier = Modifier
-                                .testTag(TAG_A_PLAN_CLEAN_TOGGLE)
-                                .semantics { contentDescription = cleanToggleCd },
-                        )
+                        Column(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalArrangement = Arrangement.spacedBy(4.dp),
+                        ) {
+                            FilterChip(
+                                selected = cleanEmptyDirs,
+                                onClick = { onCleanEmptyDirsChange(!cleanEmptyDirs) },
+                                label = {
+                                    Text(
+                                        stringResource(
+                                            if (cleanEmptyDirs) {
+                                                R.string.a_plan_clean_empty_on
+                                            } else {
+                                                R.string.a_plan_clean_empty_off
+                                            },
+                                        ),
+                                    )
+                                },
+                                modifier = Modifier
+                                    .testTag(TAG_A_PLAN_CLEAN_TOGGLE)
+                                    .semantics { contentDescription = cleanToggleCd },
+                            )
+                            Text(
+                                text = stringResource(R.string.a_plan_clean_empty_hint),
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
                     }
-                    Text(
-                        text = stringResource(R.string.a_plan_clean_empty_hint),
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.padding(horizontal = 12.dp),
-                    )
-                    HorizontalDivider(modifier = Modifier.padding(top = 4.dp))
                 }
             }
 
@@ -200,11 +210,14 @@ fun RenamePlanPage(
                 }
             }
 
-            items(shown, key = { it.index }) { indexed ->
+            val shownCount = shown.size.coerceAtLeast(1)
+            itemsIndexed(shown, key = { _, it -> it.index }) { visibleIndex, indexed ->
                 RenamePlanRow(
-                    indexed.value,
-                    indexed.index,
-                    plan.collectionNames[indexed.value.proposal.image.collectionId],
+                    op = indexed.value,
+                    index = indexed.index,
+                    collectionName = plan.collectionNames[indexed.value.proposal.image.collectionId],
+                    visibleIndex = visibleIndex,
+                    visibleCount = shownCount,
                 )
             }
         }
@@ -261,60 +274,85 @@ fun RenamePlanPage(
 }
 
 @Composable
-private fun RenamePlanRow(op: RenameOp, index: Int, collectionName: String?) {
+private fun RenamePlanRow(
+    op: RenameOp,
+    index: Int,
+    collectionName: String?,
+    visibleIndex: Int,
+    visibleCount: Int,
+) {
     // `reason` 是领域层的 `Msg`(语言无关),在此现场解析
     val reason = textOfOrNull(op.reason)
-    Column(
+    PixFoldSegmentedItem(
+        shapes = ListItemDefaults.segmentedShapes(index = visibleIndex, count = visibleCount),
+        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 10.dp),
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 12.dp, vertical = 4.dp)
+            .padding(horizontal = 12.dp)
             .testTag(planRowTag(index)),
     ) {
-        Row(
+        Column(
             modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(6.dp),
+            verticalArrangement = Arrangement.spacedBy(4.dp),
         ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    text = "${collectionName ?: ""} · ${op.proposal.image.relPath}",
+                    style = MaterialTheme.typography.bodySmall,
+                    fontFamily = FontFamily.Monospace,
+                    color = if (op.isSkipped) {
+                        MaterialTheme.colorScheme.error
+                    } else {
+                        MaterialTheme.colorScheme.onSurfaceVariant
+                    },
+                    modifier = Modifier.weight(1f),
+                )
+                PixFoldStatusPill(
+                    text = if (op.isSkipped) {
+                        stringResource(R.string.a_plan_status_skip)
+                    } else {
+                        stringResource(R.string.a_plan_status_rename)
+                    },
+                    containerColor = if (op.isSkipped) {
+                        MaterialTheme.colorScheme.errorContainer
+                    } else {
+                        MaterialTheme.colorScheme.primaryContainer
+                    },
+                    contentColor = if (op.isSkipped) {
+                        MaterialTheme.colorScheme.onErrorContainer
+                    } else {
+                        MaterialTheme.colorScheme.onPrimaryContainer
+                    },
+                    iconRes = if (op.isSkipped) R.drawable.ic_forbidden else R.drawable.ic_check,
+                )
+            }
             Text(
-                text = "${collectionName ?: ""} · ${op.proposal.image.relPath}",
-                style = MaterialTheme.typography.bodySmall,
-                color = if (op.isSkipped) {
-                    MaterialTheme.colorScheme.error
-                } else {
-                    MaterialTheme.colorScheme.onSurfaceVariant
-                },
-                modifier = Modifier.weight(1f),
+                text = "→ ${op.finalName}",
+                style = MaterialTheme.typography.bodyMedium,
+                fontFamily = FontFamily.Monospace,
+                color = MaterialTheme.colorScheme.onSurface,
+                modifier = Modifier
+                    .semantics(mergeDescendants = true) {}
+                    .testTag(planLineTag(index, 0)),
             )
-            Text(
-                text = if (op.isSkipped) {
-                    stringResource(R.string.a_plan_status_skip)
-                } else {
-                    stringResource(R.string.a_plan_status_rename)
-                },
-                style = MaterialTheme.typography.labelSmall,
-                color = if (op.isSkipped) {
-                    MaterialTheme.colorScheme.error
-                } else {
-                    MaterialTheme.colorScheme.primary
-                },
-            )
-        }
-        Text(
-            text = "→ ${op.finalName}",
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onBackground,
-            modifier = Modifier.testTag(planLineTag(index, 0)),
-        )
-        if (op.isSkipped && reason != null) {
-            // 原 `a_plan_skip_reason`(⛔ + 裸占位符)已整键删除 —— 去前缀后它不承载文案。
-            // 禁止语义改由 `ic_forbidden` 承担;tag 留在 `Text` 上(经 `textModifier`),
-            // 因为 `PlanUiTest` 只按 tag 断言"显示",而 `Row` 上挂 tag 也可,但 `Text` 上更稳。
-            WarnLine(
-                icon = R.drawable.ic_forbidden,
-                text = reason,
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.error,
-                modifier = Modifier.testTag(planSkipTag(index)),
-            )
+            if (op.isSkipped && reason != null) {
+                // 原 `a_plan_skip_reason`(⛔ + 裸占位符)已整键删除 —— 去前缀后它不承载文案。
+                // 禁止语义改由 `ic_forbidden` 承担;tag 留在 `Text` 上(经 `textModifier`),
+                // 因为 `PlanUiTest` 只按 tag 断言"显示",而 `Row` 上挂 tag 也可,但 `Text` 上更稳。
+                WarnLine(
+                    icon = R.drawable.ic_forbidden,
+                    text = reason,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.error,
+                    modifier = Modifier
+                        .semantics(mergeDescendants = true) {}
+                        .testTag(planSkipTag(index)),
+                )
+            }
         }
     }
 }

@@ -13,11 +13,18 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.windowInsetsPadding
-import androidx.compose.material3.Button
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material3.FilledTonalIconButton
+import androidx.compose.material3.FloatingToolbarDefaults
+import androidx.compose.material3.HorizontalFloatingToolbar
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
@@ -35,6 +42,7 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -44,12 +52,14 @@ import androidx.compose.ui.unit.dp
 import com.cyanix.pixfold.R
 import com.cyanix.pixfold.domain.model.SourceItem
 import com.cyanix.pixfold.ui.components.ItemThumb
+import com.cyanix.pixfold.ui.theme.pixFoldSurfaceBorder
 import com.cyanix.pixfold.ui.workspace.LocalThumbnailSource
 import com.cyanix.pixfold.ui.workspace.ThumbnailSource
 
 const val TAG_PREVIEW = "preview-root"
 const val TAG_PREVIEW_IMAGE = "preview-image"
 const val TAG_PREVIEW_PAGE_LABEL = "preview-page-label"
+const val TAG_PREVIEW_TOOLBAR = "preview-floating-toolbar"
 const val TAG_PREVIEW_NEXT = "preview-next"
 const val TAG_PREVIEW_PREV = "preview-prev"
 const val TAG_PREVIEW_CLOSE = "preview-close"
@@ -168,6 +178,7 @@ fun ImagePreview(
     val imageCd = stringResource(R.string.preview_image_cd, current.fileName)
     val pageLabel = stringResource(R.string.preview_page_label, safeIndex + 1, items.size)
     val closeCd = stringResource(R.string.preview_close_cd)
+    val renameCd = stringResource(R.string.preview_rename)
     val prevCd = stringResource(R.string.preview_previous)
     val nextCd = stringResource(R.string.preview_next)
 
@@ -233,89 +244,159 @@ fun ImagePreview(
                 },
         )
 
-        // 顶部:页码 + 重命名 + 关闭
+        // 顶部:干净的半透明文件名胶囊 + M3E 形变 tonal 关闭按钮
         Row(
             modifier = Modifier
                 .fillMaxWidth()
                 .windowInsetsPadding(WindowInsets.safeDrawing)
-                .padding(horizontal = 12.dp, vertical = 8.dp),
+                .padding(horizontal = 12.dp, vertical = 10.dp),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Text(
-                text = pageLabel,
-                modifier = Modifier.testTag(TAG_PREVIEW_PAGE_LABEL),
-                style = MaterialTheme.typography.titleMedium,
-                color = Color.White,
-            )
-            Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                // 改名入口(用户 2026-09-25 裁决):只在传了 `rename` 时出现。
-                // 这一层刻意不自己判断"能不能改名" —— 由调用方传入与否表达,
-                // 否则本页会有第二种"是否可改名"的真相。
-                if (rename != null) {
-                    TextButton(
-                        onClick = { renameOpen = true },
-                        modifier = Modifier.testTag(TAG_PREVIEW_RENAME),
-                    ) {
-                        Text(stringResource(R.string.preview_rename), color = Color.White)
-                    }
-                }
-                TextButton(
-                    onClick = onClose,
-                    modifier = Modifier
-                        .testTag(TAG_PREVIEW_CLOSE)
-                        .semantics { contentDescription = closeCd },
-                ) {
-                    Text(stringResource(R.string.common_close), color = Color.White)
-                }
+            Surface(
+                shape = CircleShape,
+                color = MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.86f),
+                contentColor = MaterialTheme.colorScheme.onSurface,
+                border = pixFoldSurfaceBorder(),
+                modifier = Modifier.weight(1f, fill = false),
+            ) {
+                Text(
+                    text = current.fileName,
+                    style = MaterialTheme.typography.titleSmallEmphasized,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp),
+                )
+            }
+            FilledTonalIconButton(
+                onClick = onClose,
+                shapes = IconButtonDefaults.shapes(),
+                modifier = Modifier
+                    .padding(start = 8.dp)
+                    .size(48.dp)
+                    .testTag(TAG_PREVIEW_CLOSE)
+                    .semantics { contentDescription = closeCd },
+            ) {
+                Icon(
+                    painter = painterResource(R.drawable.ic_close),
+                    contentDescription = null,
+                )
             }
         }
 
         // 改名反馈(仅有覆盖时出现):让"改完了没"这件事在界面上可见。
         // 不加提示的话,保存后画面毫无变化 —— 用户无从确认,UI 层也无从断言。
         if (rename != null && rename.isRenamed(current)) {
-            Text(
-                text = stringResource(R.string.preview_renamed, rename.finalNameOf(current)),
-                style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.primary,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
+            Surface(
+                shape = CircleShape,
+                color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.94f),
+                contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
                 modifier = Modifier
                     .align(Alignment.TopCenter)
                     .windowInsetsPadding(WindowInsets.safeDrawing)
-                    .padding(top = 56.dp, start = 16.dp, end = 16.dp)
-                    .testTag(TAG_PREVIEW_RENAMED),
-            )
+                    .padding(top = 68.dp, start = 16.dp, end = 16.dp),
+            ) {
+                Text(
+                    text = stringResource(R.string.preview_renamed, rename.finalNameOf(current)),
+                    style = MaterialTheme.typography.labelMediumEmphasized,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier
+                        .padding(horizontal = 12.dp, vertical = 6.dp)
+                        .testTag(TAG_PREVIEW_RENAMED),
+                )
+            }
         }
 
-        // 底部:上一页 / 缩放提示 / 下一页
+        // 底部:缩放提示 + M3E HorizontalFloatingToolbar（上一页 / 页码胶囊 / 重命名 / 下一页）
         Column(
             modifier = Modifier
                 .align(Alignment.BottomCenter)
                 .fillMaxWidth()
                 .windowInsetsPadding(WindowInsets.safeDrawing)
-                .padding(16.dp),
+                .padding(horizontal = 16.dp, vertical = 14.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
-            Text(
-                text = stringResource(R.string.preview_hint),
-                style = MaterialTheme.typography.labelSmall,
-                color = Color.White.copy(alpha = 0.7f),
-            )
-            Row(
-                modifier = Modifier.padding(top = 8.dp),
-                horizontalArrangement = Arrangement.spacedBy(16.dp),
+            Surface(
+                shape = CircleShape,
+                color = MaterialTheme.colorScheme.scrim.copy(alpha = 0.56f),
             ) {
-                Button(
+                Text(
+                    text = stringResource(R.string.preview_hint),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = Color.White.copy(alpha = 0.85f),
+                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp),
+                )
+            }
+            HorizontalFloatingToolbar(
+                expanded = true,
+                colors = FloatingToolbarDefaults.vibrantFloatingToolbarColors(),
+                modifier = Modifier.testTag(TAG_PREVIEW_TOOLBAR),
+            ) {
+                IconButton(
                     onClick = { applyPreviewState(currentPreviewState().previous()) },
+                    shapes = IconButtonDefaults.shapes(),
                     enabled = hasPrevious,
-                    modifier = Modifier.testTag(TAG_PREVIEW_PREV).semantics { contentDescription = prevCd },
-                ) { Text(stringResource(R.string.preview_previous)) }
-                Button(
+                    modifier = Modifier
+                        .size(48.dp)
+                        .testTag(TAG_PREVIEW_PREV)
+                        .semantics { contentDescription = prevCd },
+                ) {
+                    Icon(
+                        painter = painterResource(R.drawable.ic_chevron_left),
+                        contentDescription = null,
+                    )
+                }
+                Surface(
+                    shape = CircleShape,
+                    color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.12f),
+                    contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                    modifier = Modifier.padding(horizontal = 4.dp),
+                ) {
+                    Text(
+                        text = pageLabel,
+                        style = MaterialTheme.typography.labelLargeEmphasized,
+                        maxLines = 1,
+                        softWrap = false,
+                        modifier = Modifier
+                            .padding(horizontal = 12.dp, vertical = 6.dp)
+                            .semantics(mergeDescendants = true) {}
+                            .testTag(TAG_PREVIEW_PAGE_LABEL),
+                    )
+                }
+                // 改名入口(用户 2026-09-25 裁决):只在传了 `rename` 时出现。
+                // 这一层刻意不自己判断"能不能改名" —— 由调用方传入与否表达,
+                // 否则本页会有第二种"是否可改名"的真相。
+                if (rename != null) {
+                    IconButton(
+                        onClick = { renameOpen = true },
+                        shapes = IconButtonDefaults.shapes(),
+                        modifier = Modifier
+                            .size(48.dp)
+                            .testTag(TAG_PREVIEW_RENAME)
+                            .semantics { contentDescription = renameCd },
+                    ) {
+                        Icon(
+                            painter = painterResource(R.drawable.ic_edit_note),
+                            contentDescription = null,
+                        )
+                    }
+                }
+                IconButton(
                     onClick = { applyPreviewState(currentPreviewState().next()) },
+                    shapes = IconButtonDefaults.shapes(),
                     enabled = hasNext,
-                    modifier = Modifier.testTag(TAG_PREVIEW_NEXT).semantics { contentDescription = nextCd },
-                ) { Text(stringResource(R.string.preview_next)) }
+                    modifier = Modifier
+                        .size(48.dp)
+                        .testTag(TAG_PREVIEW_NEXT)
+                        .semantics { contentDescription = nextCd },
+                ) {
+                    Icon(
+                        painter = painterResource(R.drawable.ic_chevron_right),
+                        contentDescription = null,
+                    )
+                }
             }
         }
 

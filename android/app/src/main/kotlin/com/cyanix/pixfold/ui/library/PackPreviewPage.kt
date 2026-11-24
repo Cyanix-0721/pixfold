@@ -524,7 +524,7 @@ fun PackPreviewPage(
                     key = { _, plan -> "plan-row-${plan.volume.id}" },
                     contentType = { _, _ -> "plan-row" },
                 ) { i, plan ->
-                    PlanRow(plan, i)
+                    PlanRow(plan, i, count = plans.size)
                 }
             }
         }
