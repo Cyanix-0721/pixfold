@@ -13,6 +13,7 @@ import sys
 import tempfile
 import unittest
 from pathlib import Path
+from unittest import mock
 
 SCRIPTS_DIR = Path(__file__).resolve().parent
 if str(SCRIPTS_DIR) not in sys.path:
@@ -61,13 +62,33 @@ class LiveDeviceCoreTest(unittest.TestCase):
                 "theme": "pure_black",
                 "color_spec": "2021",
                 "accent": "system",
+                "color_style": "tonal_spot",
                 "font_scale": 1.3,
             },
         )
+        style_opts = live_device.validate_options(color_style=" Fruit_Salad ")
+        self.assertEqual(style_opts["color_style"], "fruit_salad")
+        for style_id in (
+            "tonal_spot",
+            "vibrant",
+            "expressive",
+            "neutral",
+            "monochrome",
+            "fidelity",
+            "content",
+            "rainbow",
+            "fruit_salad",
+        ):
+            with self.subTest(style_id=style_id):
+                self.assertEqual(
+                    live_device.validate_options(color_style=style_id)["color_style"],
+                    style_id,
+                )
         for kwargs in (
             {"theme": "neon"},
             {"color_spec": "2019"},
             {"accent": "gold"},
+            {"color_style": "pastel"},
             {"font_scale": 0.5},
             {"font_scale": 2.5},
         ):
@@ -254,6 +275,7 @@ class LiveDeviceCoreTest(unittest.TestCase):
             theme="pure_black",
             color_spec="2021",
             accent="system",
+            color_style="expressive",
             font_scale=1.3,
         )
         self.assertEqual(
@@ -282,11 +304,23 @@ class LiveDeviceCoreTest(unittest.TestCase):
                 "--es",
                 "pixfold_accent",
                 "system",
+                "--es",
+                "pixfold_color_style",
+                "expressive",
                 "--ef",
                 "pixfold_font_scale",
                 "1.30",
             ],
         )
+
+        default_cmd = live_device.build_am_start_cmd(
+            "adb.exe",
+            "192.168.43.1:4444",
+            "home",
+        )
+        self.assertIn("pixfold_color_style", default_cmd)
+        idx = default_cmd.index("pixfold_color_style")
+        self.assertEqual(default_cmd[idx + 1], "tonal_spot")
 
         exit_cmd = live_device.build_am_start_cmd(
             "adb.exe",
@@ -394,10 +428,44 @@ class LiveDeviceCoreTest(unittest.TestCase):
         out = buf.getvalue()
         self.assertIn("pack_progress", out)
         self.assertIn("undo_dialog", out)
+        self.assertIn("--style", out)
+        self.assertIn("tonal_spot", out)
 
         script_src = (SCRIPTS_DIR / "live_device.py").read_text(encoding="utf-8")
         self.assertNotIn("/sdcard", script_src)
         self.assertNotIn("/storage/emulated", script_src)
+
+    def test_cli_parser_supports_style_option(self) -> None:
+        recorded_cmds: list[list[str]] = []
+
+        def fake_run(cmd: list[str], **_: object) -> subprocess.CompletedProcess[str]:
+            recorded_cmds.append(list(cmd))
+            return subprocess.CompletedProcess(args=cmd, returncode=0, stdout="", stderr="")
+
+        with (
+            mock.patch.object(live_device, "_find_adb", return_value="adb.exe"),
+            mock.patch.object(live_device, "_detect_serial", return_value="192.168.43.1:4444"),
+            mock.patch.object(live_device, "_find_android_cli", return_value="android.exe"),
+            mock.patch.object(live_device, "_run_assemble_debug"),
+            mock.patch.object(live_device.subprocess, "run", side_effect=fake_run),
+        ):
+            self.assertEqual(live_device.main(["jump", "home"]), 0)
+            self.assertEqual(live_device.main(["jump", "home", "--style", "vibrant"]), 0)
+            self.assertEqual(live_device.main(["push", "settings", "--style", "monochrome"]), 0)
+
+        jump_default, jump_vibrant, _, push_monochrome = recorded_cmds
+        self.assertEqual(
+            jump_default[jump_default.index("pixfold_color_style") + 1],
+            "tonal_spot",
+        )
+        self.assertEqual(
+            jump_vibrant[jump_vibrant.index("pixfold_color_style") + 1],
+            "vibrant",
+        )
+        self.assertEqual(
+            push_monochrome[push_monochrome.index("pixfold_color_style") + 1],
+            "monochrome",
+        )
 
 
 if __name__ == "__main__":
