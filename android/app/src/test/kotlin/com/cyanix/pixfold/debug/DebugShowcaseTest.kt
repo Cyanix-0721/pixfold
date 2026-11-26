@@ -3,12 +3,14 @@ package com.cyanix.pixfold.debug
 import android.content.Intent
 import androidx.activity.ComponentActivity
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.isRoot
 import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import com.cyanix.pixfold.domain.settings.AccentChoice
 import com.cyanix.pixfold.domain.settings.ColorSpecVersion
@@ -17,12 +19,14 @@ import com.cyanix.pixfold.domain.settings.ThemeMode
 import com.cyanix.pixfold.ui.PixFoldUiTestDefaults
 import com.cyanix.pixfold.ui.assertAccessibleTargets
 import com.cyanix.pixfold.ui.assertAllNodesFitViewport
+import com.cyanix.pixfold.ui.settings.TAG_SETTINGS_PAGE
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
+import java.io.File
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
@@ -200,5 +204,43 @@ class DebugShowcaseTest {
                 "Scene $scene should render at least one semantics root",
             )
         }
+    }
+
+    @Test
+    fun compose_previews_render_core_screens_within_viewport() {
+        val previewFile = listOf(
+            File("src/debug/kotlin/com/cyanix/pixfold/debug/PixFoldComposePreviews.kt"),
+            File("app/src/debug/kotlin/com/cyanix/pixfold/debug/PixFoldComposePreviews.kt"),
+        ).firstOrNull { it.exists() }
+        assertNotNull(previewFile, "PixFoldComposePreviews.kt 应位于 debug 源集下")
+        assertTrue(previewFile.readText().contains("@Preview"))
+        val manifestFile = listOf(
+            File("src/debug/AndroidManifest.xml"),
+            File("app/src/debug/AndroidManifest.xml"),
+        ).firstOrNull { it.exists() }
+        assertNull(manifestFile, "不得新增 src/debug/AndroidManifest.xml")
+
+        var which by mutableIntStateOf(0)
+        rule.setContent {
+            when (which) {
+                0 -> HomeDarkPreview()
+                1 -> SettingsDarkPreview()
+                else -> PackProgressDialogPreview()
+            }
+        }
+
+        rule.waitForIdle()
+        rule.onNodeWithText("整理图片").assertIsDisplayed()
+        assertAllNodesFitViewport(rule)
+
+        rule.runOnUiThread { which = 1 }
+        rule.waitForIdle()
+        rule.onNodeWithTag(TAG_SETTINGS_PAGE).assertIsDisplayed()
+        assertAllNodesFitViewport(rule)
+
+        rule.runOnUiThread { which = 2 }
+        rule.waitForIdle()
+        rule.onNodeWithText("正在打包").assertIsDisplayed()
+        assertAllNodesFitViewport(rule)
     }
 }

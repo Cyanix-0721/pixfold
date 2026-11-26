@@ -41,6 +41,7 @@ pitest = { id = "info.solidsoft.pitest", version.ref = "pitest" }
 compose-bom = { group = "androidx.compose", name = "compose-bom", version.ref = "composeBom" }
 compose-ui = { group = "androidx.compose.ui", name = "ui" }
 compose-ui-graphics = { group = "androidx.compose.ui", name = "ui-graphics" }
+compose-ui-tooling = { group = "androidx.compose.ui", name = "ui-tooling" }
 compose-ui-tooling-preview = { group = "androidx.compose.ui", name = "ui-tooling-preview" }
 # 显式版本优先于 compose-bom 的约束,见 [versions] 里的说明。
 compose-material3 = { group = "androidx.compose.material3", name = "material3", version.ref = "material3" }
