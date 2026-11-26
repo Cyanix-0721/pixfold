@@ -1,7 +1,6 @@
 package com.cyanix.pixfold.ui
 
 import androidx.annotation.DrawableRes
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -286,18 +285,31 @@ private fun WorkflowEntry(
     onBoundsChange: (Rect?) -> Unit = {},
 ) {
     val contentAlpha = if (enabled) 1f else DISABLED_CONTENT_ALPHA
-    // enabled = false 走 clickable 的 enabled 参数，不是把 onClick 换成空 lambda：
-    // 只有前者会往语义树写 Disabled，读屏才知道「这个入口现在用不了」；
-    // 换成空 lambda 虽然点了没反应，但读屏照样报「按钮」，用户会一直点。
-    // 测试侧的 assertIsNotEnabled 也依赖这条语义。
+    val cardShape = MaterialTheme.shapes.extraLarge
+    val containerColor = pixFoldCardContainerColor()
+    // 使用 M3 原生 Card(onClick = ..., enabled = ...) 而非外层 Modifier.clickable：
+    // 1) enabled = false 时仍往语义树写 Disabled（读屏与 assertIsNotEnabled 依赖此语义）；
+    // 2) Material 焦点/悬停/按压状态层绘制在 Card 形状裁剪内，避免 28dp 圆角外漏出直角底色。
     Card(
+        onClick = onClick,
+        enabled = enabled,
         modifier = Modifier
             .fillMaxWidth()
             .onGloballyPositioned { onBoundsChange(it.boundsInRoot()) }
-            .clickable(enabled = enabled, onClick = onClick)
             .semantics { contentDescription = title },
-        shape = MaterialTheme.shapes.extraLarge,
-        colors = CardDefaults.cardColors(containerColor = pixFoldCardContainerColor()),
+        shape = cardShape,
+        colors = CardDefaults.cardColors(
+            containerColor = containerColor,
+            disabledContainerColor = containerColor,
+        ),
+        elevation = CardDefaults.cardElevation(
+            defaultElevation = 0.dp,
+            pressedElevation = 0.dp,
+            focusedElevation = 0.dp,
+            hoveredElevation = 0.dp,
+            draggedElevation = 0.dp,
+            disabledElevation = 0.dp,
+        ),
         border = pixFoldCardBorder(enabled = enabled),
     ) {
         Row(

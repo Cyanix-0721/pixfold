@@ -3,7 +3,9 @@ package com.cyanix.pixfold.ui
 import android.graphics.Bitmap
 import android.graphics.Color
 import androidx.activity.ComponentActivity
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
@@ -14,14 +16,19 @@ import androidx.compose.ui.test.captureToImage
 import androidx.compose.ui.test.getBoundsInRoot
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
+import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onRoot
+import androidx.compose.ui.test.performMouseInput
 import androidx.compose.ui.unit.DpRect
+import androidx.compose.ui.unit.dp
 import com.cyanix.pixfold.R
 import com.cyanix.pixfold.TestText
 import com.cyanix.pixfold.domain.settings.AccentChoice
 import com.cyanix.pixfold.domain.settings.PixFoldSettings
 import com.cyanix.pixfold.domain.settings.ThemeMode
+import com.cyanix.pixfold.ui.components.PinToggle
+import com.cyanix.pixfold.ui.components.TAG_PIN_TOGGLE
 import com.cyanix.pixfold.ui.theme.PixFoldTheme
 import org.junit.Rule
 import org.junit.Test
@@ -249,5 +256,83 @@ class HomeCardStyleTest {
 
         assertTrue(height >= 80f, "卡片应是大卡片(≥80dp),实测 $height dp —— 改造前为 64dp")
         assertTrue(height <= 200f, "卡片不应大到挤掉首屏其它内容,实测 $height dp")
+    }
+
+    // ================= 5. 圆角外侧不得漏出直角按压/焦点状态层 =================
+
+    @Test
+    fun `home card state layer stays clipped inside rounded corners`() {
+        home()
+
+        rule.onNodeWithText(titleA).performMouseInput { enter(center) }
+        rule.waitForIdle()
+
+        val cardA = cardBounds(titleA)
+        val cardB = cardBounds(titleB)
+        val bitmap = rootBitmap()
+
+        val leftPx = px(cardA.left.value)
+        val topPx = px(cardA.top.value)
+        val rightPx = px(cardA.right.value)
+        val bottomPx = px(cardA.bottom.value)
+        val background = bitmap.getPixel(px(180f), px((cardA.bottom + cardB.top).value / 2f))
+        val interior = bitmap.getPixel((leftPx + rightPx) / 2, topPx + 24)
+        assertTrue(
+            channelDistance(interior, background) > 0,
+            "悬停态卡内状态层应真实绘制（避免未起帧造成假绿）",
+        )
+
+        val corners = listOf(
+            "topLeft" to bitmap.getPixel(leftPx + 3, topPx + 3),
+            "topRight" to bitmap.getPixel(rightPx - 4, topPx + 3),
+            "bottomLeft" to bitmap.getPixel(leftPx + 3, bottomPx - 4),
+            "bottomRight" to bitmap.getPixel(rightPx - 4, bottomPx - 4),
+        )
+        corners.forEach { (name, pixel) ->
+            val distance = channelDistance(pixel, background)
+            assertTrue(
+                distance == 0,
+                "首页卡片圆角外侧($name)不应漏出直角状态层底色: pixel=${hex(pixel)} background=${hex(background)} distance=$distance",
+            )
+        }
+    }
+
+    @Test
+    fun `pin toggle state layer stays clipped inside small rounded corners`() {
+        setContentPureBlackDark {
+            Box(modifier = Modifier.padding(24.dp)) {
+                PinToggle(isPinned = false, itemName = "001.jpg", onClick = {})
+            }
+        }
+
+        rule.onNodeWithTag(TAG_PIN_TOGGLE).performMouseInput { enter(center) }
+        rule.waitForIdle()
+
+        val bounds = rule.onNodeWithTag(TAG_PIN_TOGGLE).getBoundsInRoot()
+        val bitmap = rootBitmap()
+        val leftPx = px(bounds.left.value)
+        val topPx = px(bounds.top.value)
+        val rightPx = px(bounds.right.value)
+        val bottomPx = px(bounds.bottom.value)
+        val background = bitmap.getPixel(4, 4)
+        val interior = bitmap.getPixel(leftPx + 12, (topPx + bottomPx) / 2)
+        assertTrue(
+            channelDistance(interior, background) > 0,
+            "PinToggle 悬停态状态层应真实绘制",
+        )
+
+        val corners = listOf(
+            "topLeft" to bitmap.getPixel(leftPx + 1, topPx + 1),
+            "topRight" to bitmap.getPixel(rightPx - 2, topPx + 1),
+            "bottomLeft" to bitmap.getPixel(leftPx + 1, bottomPx - 2),
+            "bottomRight" to bitmap.getPixel(rightPx - 2, bottomPx - 2),
+        )
+        corners.forEach { (name, pixel) ->
+            val distance = channelDistance(pixel, background)
+            assertTrue(
+                distance == 0,
+                "PinToggle 圆角外侧($name)不应漏出直角状态层底色: pixel=${hex(pixel)} background=${hex(background)} distance=$distance",
+            )
+        }
     }
 }

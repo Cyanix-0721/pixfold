@@ -9,6 +9,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
@@ -66,13 +67,15 @@ fun PinToggle(
         stringResource(R.string.pin_toggle_unpinned, itemName)
     }
 
+    val shape = MaterialTheme.shapes.small
     Surface(
         modifier = modifier
             .size(size)
             .testTag(tag)
+            .clip(shape)
             .clickable(onClick = onClick)
             .semantics { contentDescription = pinCd },
-        shape = MaterialTheme.shapes.small,
+        shape = shape,
         color = container,
     ) {
         Box(contentAlignment = Alignment.Center) {
