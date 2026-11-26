@@ -17,6 +17,7 @@ private fun PixFoldPreviewHost(
     scene: DebugScene,
     themeMode: ThemeMode = ThemeMode.Dark,
     pureBlack: Boolean = false,
+    colorStyle: ColorStyle = ColorStyle.TonalSpot,
     fontScale: Float = 1.0f,
 ) {
     DebugShowcaseScreen(
@@ -25,7 +26,7 @@ private fun PixFoldPreviewHost(
             settings = PixFoldSettings(
                 themeMode = themeMode,
                 accent = AccentChoice.Default,
-                colorStyle = ColorStyle.Expressive,
+                colorStyle = colorStyle,
                 colorSpec = ColorSpecVersion.V2025,
                 pureBlack = pureBlack,
             ),

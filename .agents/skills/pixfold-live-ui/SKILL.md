@@ -27,7 +27,7 @@ description: PixFold 三轨实时 UI 预览与真机直达调试——(1) 修改
 | --- | --- |
 | 列出全部 15 个可直达场景与外观参数（离线） | `uv run scripts/live_device.py scenes` |
 | 拉起置顶 `scrcpy` 投屏小窗 | `uv run scripts/live_device.py mirror [--serial ...]` |
-| 增量编译 + `android install --use-delta-install` + 直达场景 | `uv run scripts/live_device.py push [scene] [--theme dark\|light\|pure_black] [--spec 2025\|2021] [--accent default\|system\|...] [--font-scale 1.0\|1.3]` |
+| 增量编译 + `android install --use-delta-install` + 直达场景 | `uv run scripts/live_device.py push [scene] [--theme dark\|light\|pure_black] [--spec 2025\|2021] [--accent default\|system\|...] [--style tonal_spot\|vibrant\|expressive\|...] [--font-scale 1.0\|1.3]` |
 | 不重装包，一秒热切场景或外观 | `uv run scripts/live_device.py jump [scene] [外观参数]` |
 | 监听 `src/main` 与 `src/debug` 自动 delta 推包 | `uv run scripts/live_device.py watch [scene] [外观参数]` |
 | 退出展示模式回到真实 `PixFoldApp` | `uv run scripts/live_device.py exit` |

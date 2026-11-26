@@ -35,10 +35,12 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
+import com.cyanix.pixfold.R
 import com.cyanix.pixfold.domain.library.libraryStateOf
 import com.cyanix.pixfold.domain.mock.MockData
 import com.cyanix.pixfold.domain.mock.MockDataB
@@ -51,6 +53,7 @@ import com.cyanix.pixfold.domain.plan.buildPackagePlans
 import com.cyanix.pixfold.domain.plan.executePackagePlans
 import com.cyanix.pixfold.domain.settings.AccentChoice
 import com.cyanix.pixfold.domain.settings.ColorSpecVersion
+import com.cyanix.pixfold.domain.settings.ColorStyle
 import com.cyanix.pixfold.domain.settings.PixFoldSettings
 import com.cyanix.pixfold.domain.settings.ThemeMode
 import com.cyanix.pixfold.domain.source.WorkspaceEntry
@@ -80,6 +83,7 @@ import com.cyanix.pixfold.ui.preview.ImagePreview
 import com.cyanix.pixfold.ui.preview.PreviewRename
 import com.cyanix.pixfold.ui.settings.SettingsScreen
 import com.cyanix.pixfold.ui.theme.PixFoldTheme
+import com.cyanix.pixfold.ui.theme.isAffectedByColorSpec
 import com.cyanix.pixfold.ui.theme.pixFoldSegmentedColors
 import com.cyanix.pixfold.ui.theme.pixFoldSurfaceBorder
 import com.cyanix.pixfold.ui.workspace.WorkspaceListDialog
@@ -88,6 +92,11 @@ import kotlinx.coroutines.delay
 
 internal const val TAG_DEBUG_SHOWCASE_CATALOG = "debug-showcase-catalog"
 internal const val TAG_DEBUG_SHOWCASE_EXIT = "debug-showcase-exit"
+internal const val TAG_DEBUG_SHOWCASE_SPEC_2025 = "debug-showcase-spec-2025"
+internal const val TAG_DEBUG_SHOWCASE_SPEC_2021 = "debug-showcase-spec-2021"
+
+internal fun debugShowcaseColorStyleTag(style: ColorStyle): String =
+    "debug-showcase-color-style-${style.name.lowercase()}"
 
 @Composable
 internal fun DebugShowcaseScreen(
@@ -233,7 +242,7 @@ private fun DebugShowcaseCatalog(
         ) {
             item {
                 PixFoldSectionCard(modifier = Modifier.fillMaxWidth()) {
-                    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                         Text(
                             text = "快捷外观参数",
                             style = MaterialTheme.typography.titleMedium,
@@ -331,6 +340,48 @@ private fun DebugShowcaseCatalog(
                             }
                         }
 
+                        Text(
+                            text = "色彩风格",
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                            ColorStyle.entries.chunked(3).forEach { rowStyles ->
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.spacedBy(
+                                        ButtonGroupDefaults.ConnectedSpaceBetween,
+                                    ),
+                                ) {
+                                    rowStyles.forEachIndexed { idx, style ->
+                                        val shapes = when (idx) {
+                                            0 -> ButtonGroupDefaults.connectedLeadingButtonShapes()
+                                            rowStyles.lastIndex -> ButtonGroupDefaults.connectedTrailingButtonShapes()
+                                            else -> ButtonGroupDefaults.connectedMiddleButtonShapes()
+                                        }
+                                        FilledTonalToggleButton(
+                                            checked = settings.colorStyle == style,
+                                            onCheckedChange = {
+                                                onUpdateSettings(settings.copy(colorStyle = style))
+                                            },
+                                            shapes = shapes,
+                                            modifier = Modifier
+                                                .weight(1f)
+                                                .heightIn(min = 48.dp)
+                                                .testTag(debugShowcaseColorStyleTag(style)),
+                                        ) {
+                                            Text(
+                                                text = stringResource(showcaseColorStyleLabelRes(style)),
+                                                maxLines = 1,
+                                                overflow = TextOverflow.Ellipsis,
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+                        }
+
+                        val specEnabled = settings.colorStyle.isAffectedByColorSpec()
                         Row(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.spacedBy(ButtonGroupDefaults.ConnectedSpaceBetween),
@@ -341,10 +392,12 @@ private fun DebugShowcaseCatalog(
                                 onCheckedChange = {
                                     onUpdateSettings(settings.copy(colorSpec = ColorSpecVersion.V2025))
                                 },
+                                enabled = specEnabled,
                                 shapes = ButtonGroupDefaults.connectedLeadingButtonShapes(),
                                 modifier = Modifier
                                     .weight(1f)
-                                    .heightIn(min = 48.dp),
+                                    .heightIn(min = 48.dp)
+                                    .testTag(TAG_DEBUG_SHOWCASE_SPEC_2025),
                             ) {
                                 Text("2025 M3E", maxLines = 1, overflow = TextOverflow.Ellipsis)
                             }
@@ -353,10 +406,12 @@ private fun DebugShowcaseCatalog(
                                 onCheckedChange = {
                                     onUpdateSettings(settings.copy(colorSpec = ColorSpecVersion.V2021))
                                 },
+                                enabled = specEnabled,
                                 shapes = ButtonGroupDefaults.connectedTrailingButtonShapes(),
                                 modifier = Modifier
                                     .weight(1f)
-                                    .heightIn(min = 48.dp),
+                                    .heightIn(min = 48.dp)
+                                    .testTag(TAG_DEBUG_SHOWCASE_SPEC_2021),
                             ) {
                                 Text("2021 M3", maxLines = 1, overflow = TextOverflow.Ellipsis)
                             }
@@ -428,6 +483,18 @@ private fun DebugShowcaseCatalog(
             }
         }
     }
+}
+
+private fun showcaseColorStyleLabelRes(style: ColorStyle): Int = when (style) {
+    ColorStyle.TonalSpot -> R.string.style_tonal_spot
+    ColorStyle.Vibrant -> R.string.style_vibrant
+    ColorStyle.Expressive -> R.string.style_expressive
+    ColorStyle.Neutral -> R.string.style_neutral
+    ColorStyle.Monochrome -> R.string.style_monochrome
+    ColorStyle.Fidelity -> R.string.style_fidelity
+    ColorStyle.Content -> R.string.style_content
+    ColorStyle.Rainbow -> R.string.style_rainbow
+    ColorStyle.FruitSalad -> R.string.style_fruit_salad
 }
 
 @Composable

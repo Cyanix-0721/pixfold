@@ -49,6 +49,17 @@ SCENE_IDS: frozenset[str] = frozenset(item[0] for item in SCENES)
 
 VALID_THEMES: frozenset[str] = frozenset({"dark", "light", "pure_black", "system"})
 VALID_COLOR_SPECS: frozenset[str] = frozenset({"2025", "2021"})
+VALID_COLOR_STYLES: tuple[str, ...] = (
+    "tonal_spot",
+    "vibrant",
+    "expressive",
+    "neutral",
+    "monochrome",
+    "fidelity",
+    "content",
+    "rainbow",
+    "fruit_salad",
+)
 VALID_ACCENTS: frozenset[str] = frozenset({"default", "system", "blue", "green", "purple", "orange", "pink"})
 MIN_FONT_SCALE = 0.85
 MAX_FONT_SCALE = 2.0
@@ -74,6 +85,7 @@ def validate_options(
     theme: str = "dark",
     color_spec: str = "2025",
     accent: str = "default",
+    color_style: str = "tonal_spot",
     font_scale: float = 1.0,
 ) -> dict[str, object]:
     norm_theme = theme.strip().lower()
@@ -88,6 +100,12 @@ def validate_options(
     if norm_accent not in VALID_ACCENTS:
         raise ValueError(f"Invalid accent {accent!r}; expected one of {sorted(VALID_ACCENTS)}")
 
+    norm_style = color_style.strip().lower()
+    if norm_style not in VALID_COLOR_STYLES:
+        raise ValueError(
+            f"Invalid color_style {color_style!r}; expected one of {list(VALID_COLOR_STYLES)}"
+        )
+
     if not (MIN_FONT_SCALE <= font_scale <= MAX_FONT_SCALE):
         raise ValueError(
             f"font_scale={font_scale} out of range [{MIN_FONT_SCALE}, {MAX_FONT_SCALE}]"
@@ -97,6 +115,7 @@ def validate_options(
         "theme": norm_theme,
         "color_spec": norm_spec,
         "accent": norm_accent,
+        "color_style": norm_style,
         "font_scale": round(float(font_scale), 2),
     }
 
@@ -172,6 +191,7 @@ def build_am_start_cmd(
     theme: str = "dark",
     color_spec: str = "2025",
     accent: str = "default",
+    color_style: str = "tonal_spot",
     font_scale: float = 1.0,
     exit_showcase: bool = False,
 ) -> list[str]:
@@ -197,6 +217,7 @@ def build_am_start_cmd(
         theme=theme,
         color_spec=color_spec,
         accent=accent,
+        color_style=color_style,
         font_scale=font_scale,
     )
     return [
@@ -213,6 +234,9 @@ def build_am_start_cmd(
         "--es",
         "pixfold_accent",
         str(opts["accent"]),
+        "--es",
+        "pixfold_color_style",
+        str(opts["color_style"]),
         "--ef",
         "pixfold_font_scale",
         f"{float(opts['font_scale']):.2f}",
@@ -417,6 +441,7 @@ def _cmd_scenes() -> int:
     print("  --theme      dark | light | pure_black | system")
     print("  --spec       2025 | 2021")
     print("  --accent     default | system | blue | green | purple | orange | pink")
+    print(f"  --style      {' | '.join(VALID_COLOR_STYLES)} (默认 tonal_spot)")
     print("  --font-scale 0.85..2.0 (常用 1.0 / 1.3)")
     return 0
 
@@ -431,6 +456,7 @@ def _cmd_jump(args: argparse.Namespace) -> int:
         theme=args.theme,
         color_spec=args.spec,
         accent=args.accent,
+        color_style=args.style,
         font_scale=args.font_scale,
     )
     proc = subprocess.run(cmd, stdin=subprocess.DEVNULL, check=False)
@@ -474,6 +500,7 @@ def _cmd_push(args: argparse.Namespace) -> int:
         theme=args.theme,
         color_spec=args.spec,
         accent=args.accent,
+        color_style=args.style,
         font_scale=args.font_scale,
     )
     jump_proc = subprocess.run(jump_cmd, stdin=subprocess.DEVNULL, check=False)
@@ -501,6 +528,7 @@ def _cmd_watch(args: argparse.Namespace) -> int:
         theme=args.theme,
         color_spec=args.spec,
         accent=args.accent,
+        color_style=args.style,
         font_scale=args.font_scale,
     )
     if not args.no_initial:
@@ -531,6 +559,11 @@ def _add_scene_args(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("--theme", default="dark", help="dark | light | pure_black | system")
     parser.add_argument("--spec", default="2025", help="2025 | 2021")
     parser.add_argument("--accent", default="default", help="default | system | blue | green | purple | orange | pink")
+    parser.add_argument(
+        "--style",
+        default="tonal_spot",
+        help=f"{' | '.join(VALID_COLOR_STYLES)} (默认 tonal_spot)",
+    )
     parser.add_argument("--font-scale", type=float, default=1.0, help="字体倍率 0.85..2.0")
     parser.add_argument("--serial", default=None, help=SERIAL_ARG_HELP)
 

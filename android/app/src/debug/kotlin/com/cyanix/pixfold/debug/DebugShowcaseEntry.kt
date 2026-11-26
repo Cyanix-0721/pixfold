@@ -10,6 +10,7 @@ import com.cyanix.pixfold.domain.settings.ThemeMode
 internal const val EXTRA_DEBUG_SCENE = "pixfold_scene"
 internal const val EXTRA_DEBUG_THEME = "pixfold_theme"
 internal const val EXTRA_DEBUG_COLOR_SPEC = "pixfold_color_spec"
+internal const val EXTRA_DEBUG_COLOR_STYLE = "pixfold_color_style"
 internal const val EXTRA_DEBUG_ACCENT = "pixfold_accent"
 internal const val EXTRA_DEBUG_FONT_SCALE = "pixfold_font_scale"
 internal const val EXTRA_DEBUG_EXIT = "pixfold_exit_showcase"
@@ -51,6 +52,7 @@ internal fun parseDebugShowcaseParams(
     colorSpecRaw: String? = null,
     accentRaw: String? = null,
     fontScaleRaw: Float? = null,
+    colorStyleRaw: String? = null,
 ): DebugShowcaseRequest? {
     val sceneId = sceneRaw?.trim()?.lowercase().orEmpty()
     if (sceneId.isEmpty()) return null
@@ -66,6 +68,10 @@ internal fun parseDebugShowcaseParams(
         "2021" -> ColorSpecVersion.V2021
         else -> ColorSpecVersion.V2025
     }
+    val styleKey = colorStyleRaw?.trim()?.replace("_", "")?.replace("-", "").orEmpty()
+    val colorStyle = ColorStyle.entries.firstOrNull {
+        it.name.equals(styleKey, ignoreCase = true)
+    } ?: ColorStyle.TonalSpot
     val accentName = accentRaw?.trim().orEmpty()
     val accent = AccentChoice.entries.firstOrNull {
         it.name.equals(accentName, ignoreCase = true)
@@ -83,7 +89,7 @@ internal fun parseDebugShowcaseParams(
         settings = PixFoldSettings(
             themeMode = themeMode,
             accent = accent,
-            colorStyle = ColorStyle.Expressive,
+            colorStyle = colorStyle,
             colorSpec = colorSpec,
             pureBlack = pureBlack,
         ),
@@ -96,6 +102,7 @@ internal fun parseDebugShowcaseRequest(intent: Intent?): DebugShowcaseRequest? {
     val sceneRaw = intent.getStringExtra(EXTRA_DEBUG_SCENE)
     val themeRaw = intent.getStringExtra(EXTRA_DEBUG_THEME)
     val colorSpecRaw = intent.getStringExtra(EXTRA_DEBUG_COLOR_SPEC)
+    val colorStyleRaw = intent.getStringExtra(EXTRA_DEBUG_COLOR_STYLE)
     val accentRaw = intent.getStringExtra(EXTRA_DEBUG_ACCENT)
     val fontScaleRaw = intent.getStringExtra(EXTRA_DEBUG_FONT_SCALE)?.toFloatOrNull()
         ?: if (intent.hasExtra(EXTRA_DEBUG_FONT_SCALE)) {
@@ -109,6 +116,7 @@ internal fun parseDebugShowcaseRequest(intent: Intent?): DebugShowcaseRequest? {
         colorSpecRaw = colorSpecRaw,
         accentRaw = accentRaw,
         fontScaleRaw = fontScaleRaw,
+        colorStyleRaw = colorStyleRaw,
     )
 }
 
@@ -120,6 +128,7 @@ internal fun clearDebugShowcaseExtras(intent: Intent?) {
     intent.removeExtra(EXTRA_DEBUG_SCENE)
     intent.removeExtra(EXTRA_DEBUG_THEME)
     intent.removeExtra(EXTRA_DEBUG_COLOR_SPEC)
+    intent.removeExtra(EXTRA_DEBUG_COLOR_STYLE)
     intent.removeExtra(EXTRA_DEBUG_ACCENT)
     intent.removeExtra(EXTRA_DEBUG_FONT_SCALE)
     intent.removeExtra(EXTRA_DEBUG_EXIT)
