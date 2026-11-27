@@ -394,8 +394,12 @@ class ThemeTransitionHostTest {
         }
         stepFrameAndDraw()
 
-        // A) 非视觉改动（网格列数 / 浅色下切 pureBlack / 同极性下 System->Light）均不触发抓帧
+        // A) 非视觉改动（网格列数 / 刷新率 / 浅色下切 pureBlack / 同极性下 System->Light）均不触发抓帧
         currentSettings = currentSettings.copy(portraitDefaultColumns = 3)
+        stepFrameAndDraw()
+        assertEquals(0, latestSnapshot?.captureCount ?: 0)
+
+        currentSettings = currentSettings.copy(preferredRefreshRateHz = 120)
         stepFrameAndDraw()
         assertEquals(0, latestSnapshot?.captureCount ?: 0)
 

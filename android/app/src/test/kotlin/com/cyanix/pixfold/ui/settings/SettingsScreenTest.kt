@@ -57,7 +57,10 @@ class SettingsScreenTest {
     private var licensesOpened = false
     private var backPressed = false
 
-    private fun show(initial: PixFoldSettings = PixFoldSettings()) {
+    private fun show(
+        initial: PixFoldSettings = PixFoldSettings(),
+        supportedRefreshRates: List<Int> = listOf(60, 90, 120),
+    ) {
         latest = initial
         rule.setContent {
             var settings by remember { mutableStateOf(initial) }
@@ -68,6 +71,7 @@ class SettingsScreenTest {
                     onBack = { backPressed = true },
                     onOpenLicenses = { licensesOpened = true },
                     contentInsets = WindowInsets(0, 0, 0, 0),
+                    supportedRefreshRates = supportedRefreshRates,
                 )
             }
         }
@@ -112,6 +116,7 @@ class SettingsScreenTest {
             TAG_SETTINGS_COLUMNS_PORTRAIT,
             TAG_SETTINGS_COLUMNS_LANDSCAPE,
             TAG_SETTINGS_PREDICTIVE_BACK,
+            TAG_SETTINGS_REFRESH_RATE,
             TAG_SETTINGS_VERSION,
             TAG_SETTINGS_REPO,
             TAG_SETTINGS_RELEASE,
@@ -401,6 +406,50 @@ class SettingsScreenTest {
         assertFalse(latest.predictiveBackAnimation, "关掉后应上报 false")
         tap(TAG_SETTINGS_PREDICTIVE_BACK)
         assertTrue(latest.predictiveBackAnimation, "再次点击应能开回来")
+    }
+
+    @Test
+    fun `refresh rate choice menu selects target Hz and can return to follow system`() {
+        show(supportedRefreshRates = listOf(60, 90, 120))
+        assertNull(PixFoldSettings().preferredRefreshRateHz, "默认刷新率应跟随系统 (null)")
+        rule.onNodeWithTag(TAG_SETTINGS_REFRESH_RATE).assertIsEnabled()
+
+        // 选项 0 = 跟随系统，1 = 60 Hz，2 = 90 Hz，3 = 120 Hz
+        tap(TAG_SETTINGS_REFRESH_RATE)
+        chooseOption(TAG_SETTINGS_REFRESH_RATE, index = 3)
+        assertEquals(120, latest.preferredRefreshRateHz)
+
+        tap(TAG_SETTINGS_REFRESH_RATE)
+        chooseOption(TAG_SETTINGS_REFRESH_RATE, index = 0)
+        assertNull(latest.preferredRefreshRateHz, "选中跟随系统应回到 null")
+    }
+
+    @Test
+    fun `refresh rate row disables on single rate display unless stale fixed value needs reset`() {
+        var settingsState by mutableStateOf(PixFoldSettings(preferredRefreshRateHz = null))
+        rule.setContent {
+            PixFoldTheme(settings = settingsState) {
+                SettingsScreen(
+                    settings = settingsState,
+                    onChange = { settingsState = it },
+                    onBack = {},
+                    onOpenLicenses = {},
+                    contentInsets = WindowInsets(0, 0, 0, 0),
+                    supportedRefreshRates = listOf(60),
+                )
+            }
+        }
+        rule.waitForIdle()
+        rule.onNodeWithTag(TAG_SETTINGS_REFRESH_RATE).assertIsNotEnabled()
+
+        // 若旧备份或切换分辨率后仍残留非 null 锁定值，应保持可点击以便用户退回跟随系统
+        settingsState = settingsState.copy(preferredRefreshRateHz = 120)
+        rule.waitForIdle()
+        rule.onNodeWithTag(TAG_SETTINGS_REFRESH_RATE).assertIsEnabled()
+        tap(TAG_SETTINGS_REFRESH_RATE)
+        chooseOption(TAG_SETTINGS_REFRESH_RATE, index = 0)
+        assertNull(settingsState.preferredRefreshRateHz)
+        rule.onNodeWithTag(TAG_SETTINGS_REFRESH_RATE).assertIsNotEnabled()
     }
 
     @Test

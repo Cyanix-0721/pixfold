@@ -42,6 +42,7 @@ class SharedPrefsSettingsStoreTest {
         const val PREFS_NAME = "pixfold_settings"
         const val KEY_COLUMNS_PORTRAIT = "columns_portrait"
         const val KEY_COLUMNS_LANDSCAPE = "columns_landscape"
+        const val KEY_REFRESH_RATE_HZ = "refresh_rate_hz"
 
         /**
          * 每个构造参数一个**非默认**样本值,顺序 = [PixFoldSettings] 的声明顺序,
@@ -58,6 +59,7 @@ class SharedPrefsSettingsStoreTest {
             "portraitDefaultColumns" to 3,
             "landscapeDefaultColumns" to 7,
             "language" to AppLanguage.English,
+            "preferredRefreshRateHz" to 120,
         )
     }
 
@@ -95,6 +97,7 @@ class SharedPrefsSettingsStoreTest {
         portraitDefaultColumns = 3,
         landscapeDefaultColumns = 7,
         language = AppLanguage.English,
+        preferredRefreshRateHz = 120,
     )
 
     /**
@@ -234,5 +237,23 @@ class SharedPrefsSettingsStoreTest {
 
         store().save(sample)
         assertEquals(sample, store().load(), "每个构造参数都应存盘往返")
+    }
+
+    @Test
+    fun `refresh rate persists under own key removes absent null and rejects illegal values`() {
+        assertNull(store().load().preferredRefreshRateHz, "全新安装刷新率应默认跟随系统 (null)")
+
+        store().save(PixFoldSettings(preferredRefreshRateHz = 120))
+        assertEquals(120, prefs().getInt(KEY_REFRESH_RATE_HZ, 0), "刷新率应写入独立 key")
+        assertEquals(120, store().load().preferredRefreshRateHz)
+
+        store().save(PixFoldSettings(preferredRefreshRateHz = null))
+        assertNull(store().load().preferredRefreshRateHz, "改回跟随系统后应读回 null")
+        assertEquals(false, prefs().contains(KEY_REFRESH_RATE_HZ), "null 应移除 refresh_rate_hz key")
+
+        listOf(0, -60).forEach { illegal ->
+            prefs().edit().putInt(KEY_REFRESH_RATE_HZ, illegal).commit()
+            assertNull(store().load().preferredRefreshRateHz, "非法刷新率 $illegal 应回退为 null")
+        }
     }
 }

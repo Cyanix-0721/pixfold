@@ -70,6 +70,7 @@ import com.cyanix.pixfold.nav.LibraryRoute
 import com.cyanix.pixfold.ui.HomeScreen
 import com.cyanix.pixfold.ui.preview.ImagePreview
 import com.cyanix.pixfold.ui.preview.PreviewRename
+import com.cyanix.pixfold.ui.settings.ApplyPreferredRefreshRate
 import com.cyanix.pixfold.ui.settings.LicensesScreen
 import com.cyanix.pixfold.ui.settings.SettingsScreen
 import com.cyanix.pixfold.ui.theme.PixFoldTheme
@@ -184,6 +185,7 @@ fun PixFoldApp(
     // 语言必须**真正应用**到系统 per-app locale,否则只是存了个值、界面不变
     // (真机实测发现:选了 English 界面仍是中文 —— 此前完全漏了这一步)。
     ApplyAppLanguage(settings.language)
+    ApplyPreferredRefreshRate(settings.preferredRefreshRateHz)
 
     // ---- 应用级会话（P1 #7）：生产由 PixFoldSessionViewModel 跨配置变更持有；
     // 测试/独立调用（session == null）在本地 remember 独立会话并于离场时释放资源。
