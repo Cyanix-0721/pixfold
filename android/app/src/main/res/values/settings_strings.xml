@@ -65,6 +65,10 @@
     <string name="language_english">English</string>
     <string name="settings_predictive_back">Predictive back animation</string>
     <string name="settings_predictive_back_desc">Preview the exit while swiping back; off switches immediately</string>
+    <string name="settings_refresh_rate">Refresh rate</string>
+    <string name="settings_refresh_rate_system">Follow system</string>
+    <string name="settings_refresh_rate_hz">%1$d Hz</string>
+    <string name="settings_refresh_rate_system_current">Follow system (%1$d Hz)</string>
     <string name="settings_columns_portrait">Default columns (portrait)</string>
     <string name="settings_columns_landscape">Default columns (landscape)</string>
     <string name="settings_columns_adaptive_value">Auto (%1$d)</string>

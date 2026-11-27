@@ -134,6 +134,7 @@ const val TAG_SETTINGS_LANGUAGE = "settings-language"
 const val TAG_SETTINGS_COLUMNS_PORTRAIT = "settings-columns-portrait"
 const val TAG_SETTINGS_COLUMNS_LANDSCAPE = "settings-columns-landscape"
 const val TAG_SETTINGS_PREDICTIVE_BACK = "settings-predictive-back"
+const val TAG_SETTINGS_REFRESH_RATE = "settings-refresh-rate"
 const val TAG_SETTINGS_VERSION = "settings-version"
 const val TAG_SETTINGS_REPO = "settings-repo"
 const val TAG_SETTINGS_RELEASE = "settings-release"
@@ -173,6 +174,7 @@ fun SettingsScreen(
     contentInsets: WindowInsets = WindowInsets.safeDrawing,
     versionName: String = BuildConfig.VERSION_NAME,
     versionCode: Int = BuildConfig.VERSION_CODE,
+    supportedRefreshRates: List<Int> = rememberSupportedRefreshRates(),
 ) {
     val context = LocalContext.current
     val openFailedMessage = stringResource(R.string.settings_open_failed)
@@ -363,8 +365,32 @@ fun SettingsScreen(
                     iconTone = SettingIconTone.Behavior,
                     checked = settings.predictiveBackAnimation,
                     tag = TAG_SETTINGS_PREDICTIVE_BACK,
-                    shapes = ListItemDefaults.segmentedShapes(index = 0, count = 1),
+                    shapes = ListItemDefaults.segmentedShapes(index = 0, count = 2),
                     onCheckedChange = { onChange(settings.copy(predictiveBackAnimation = it)) },
+                )
+                val preferredHz = settings.preferredRefreshRateHz
+                val refreshCurrent = when {
+                    preferredHz != null ->
+                        stringResource(R.string.settings_refresh_rate_hz, preferredHz)
+                    supportedRefreshRates.size == 1 ->
+                        stringResource(R.string.settings_refresh_rate_system_current, supportedRefreshRates.first())
+                    else -> stringResource(R.string.settings_refresh_rate_system)
+                }
+                val refreshOptions: List<Pair<Int?, String>> =
+                    listOf<Pair<Int?, String>>(null to stringResource(R.string.settings_refresh_rate_system)) +
+                        supportedRefreshRates.map { hz ->
+                            hz to stringResource(R.string.settings_refresh_rate_hz, hz)
+                        }
+                ChoiceRow(
+                    label = stringResource(R.string.settings_refresh_rate),
+                    current = refreshCurrent,
+                    iconRes = R.drawable.ic_speed,
+                    iconTone = SettingIconTone.Behavior,
+                    tag = TAG_SETTINGS_REFRESH_RATE,
+                    shapes = ListItemDefaults.segmentedShapes(index = 1, count = 2),
+                    options = refreshOptions,
+                    enabled = supportedRefreshRates.size > 1 || preferredHz != null,
+                    onSelect = { onChange(settings.copy(preferredRefreshRateHz = it)) },
                 )
             }
 

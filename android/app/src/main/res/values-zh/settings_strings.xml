@@ -65,6 +65,10 @@
     <string name="language_english">English</string>
     <string name="settings_predictive_back">返回手势跟随动画</string>
     <string name="settings_predictive_back_desc">返回手势进行中实时预览退场；关闭则立即切走</string>
+    <string name="settings_refresh_rate">刷新率</string>
+    <string name="settings_refresh_rate_system">跟随系统</string>
+    <string name="settings_refresh_rate_hz">%1$d Hz</string>
+    <string name="settings_refresh_rate_system_current">跟随系统（%1$d Hz）</string>
     <string name="settings_columns_portrait">竖屏默认列数</string>
     <string name="settings_columns_landscape">横屏默认列数</string>
     <string name="settings_columns_adaptive_value">跟随自适应（%1$d）</string>

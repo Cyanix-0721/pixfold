@@ -126,6 +126,14 @@ data class PixFoldSettings(
     /** 网格视图的**横屏**默认列数。语义同 [portraitDefaultColumns]。 */
     val landscapeDefaultColumns: Int? = null,
     val language: AppLanguage = AppLanguage.System,
+    /**
+     * 期望屏幕刷新率（Hz）。
+     *
+     * `null` = **跟随系统**（由系统/厂商默认策略调度）；正整数 = 请求对应刷新率档位
+     * （由 `app` 层按当前分辨率匹配 `Display.supportedModes` 并写入窗口属性）。
+     * 与 [portraitDefaultColumns] 同理，纯领域层不写死具体机型档位，`null` 忠实表示「未固定」。
+     */
+    val preferredRefreshRateHz: Int? = null,
 ) {
     /**
      * 是否使用系统动态取色(Monet)。
