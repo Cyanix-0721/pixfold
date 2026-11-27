@@ -1,24 +1,18 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
-  自适应图标(三层:background 纯色、foreground 图形、monochrome 供系统做"主题化图标")。
+  自适应图标（三层：background 矢量渐变底色、foreground M3E 猫耳书图形、monochrome 单色主题蒙版）。
 
-  **本文件无版本限定符**(2026-09-22 起):自适应图标是 API 26 引入,而本模块 minSdk 已由 24
-  提到 **30**,故不存在 API 24/25 的旧系统 —— 原先用来兜底的「48dp 普通 vector」已删除。
-  若仍把 <adaptive-icon> 放在 mipmap-anydpi-v26/ 里,lint 会报 `ObsoleteSdkInt`/`UnnecessaryQualifier`
-  ("This folder configuration (v26) is unnecessary; minSdkVersion is 30") 而本项目
-  `warningsAsErrors = true` 会直接失败;合并到此目录才干净。
+  **本文件无版本限定符**（2026-09-22 起）：自适应图标是 API 26 引入，而本模块不存在旧版兜底，
+  保留无限定符目录即可避免 lint `ObsoleteSdkInt` / `UnnecessaryQualifier` 报错。
 
-  三层含义:
-    background  纯色底色。「亮/暗跟随」只落在这里 —— values/colors.xml 与
-                values-night/colors.xml 两档取色。
-    foreground  图形本体(108dp 视口,内容落在四边各留 18dp 的可见遮罩内,避免被
-                各厂商的圆形/方形遮罩裁边)。
-    monochrome  「主题化图标」的唯一开关:Android 13+ 跟随壁纸取色。
-                Android 16 QPR 2 起系统也会为**未提供**该层的应用自动着色,
-                这里显式提供以获得各版本一致的表现。
+  三层含义：
+    background  108dp 纯矢量底图，基础底色引用 @color/ic_launcher_background
+                （自动随 values / values-night 两档亮暗切换）并叠加柔和 M3E 层次。
+    foreground  图形本体（108dp 视口，核心元素收进中央 66dp 圆形安全区内）。
+    monochrome  「主题化图标」开关：Android 13+ 跟随壁纸动态取色。
 -->
 <adaptive-icon xmlns:android="http://schemas.android.com/apk/res/android">
-    <background android:drawable="@color/ic_launcher_background" />
+    <background android:drawable="@drawable/ic_launcher_background" />
     <foreground android:drawable="@drawable/ic_launcher_foreground" />
     <monochrome android:drawable="@drawable/ic_launcher_monochrome" />
 </adaptive-icon>

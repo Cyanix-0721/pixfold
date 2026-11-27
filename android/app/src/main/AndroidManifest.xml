@@ -56,7 +56,7 @@
       monochrome),由系统按厂商遮罩裁形、Android 13+ 用 monochrome 层做"主题化图标"
       (跟随壁纸取色)。资源只有一档 `mipmap-anydpi/`(无 `-v26`):自适应图标是 API 26 引入,
       而本项目当前 minSdk 为 **36**,不存在需要旧版回退的系统。
-      图形本身仍是原型占位(三条块),不是最终视觉设计。
+      图形为 M3E 现代双耳猫耳书（background/foreground/monochrome 三层纯矢量）。
     -->
     <application
         android:label="@string/app_name"
