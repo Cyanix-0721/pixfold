@@ -5,11 +5,17 @@ import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
+import com.cyanix.pixfold.domain.settings.AccentChoice
+import com.cyanix.pixfold.domain.settings.AppLanguage
 import com.cyanix.pixfold.domain.settings.ColorSpecVersion
 import com.cyanix.pixfold.domain.settings.ColorStyle
+import com.cyanix.pixfold.domain.settings.PixFoldSettings
+import com.cyanix.pixfold.domain.settings.ThemeMode
 import org.junit.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertNotEquals
+import kotlin.test.assertSame
 import kotlin.test.assertTrue
 
 /**
@@ -317,5 +323,31 @@ class ColorSchemesTest {
                     "(${hex(read(baselineLight))}) —— 说明该角色未映射到算法输出",
             )
         }
+    }
+
+    @Test
+    fun `fromSeed caches repeated lookups and separates light vs dark schemes`() {
+        val firstDark = ColorSchemes.fromSeed(seed, dark = true, ColorStyle.TonalSpot, ColorSpecVersion.V2025)
+        val cachedDark = ColorSchemes.fromSeed(seed, dark = true, ColorStyle.TonalSpot, ColorSpecVersion.V2025)
+        val cachedLight = ColorSchemes.fromSeed(seed, dark = false, ColorStyle.TonalSpot, ColorSpecVersion.V2025)
+
+        assertSame(firstDark, cachedDark, "相同参数的 ColorSchemes.fromSeed 应直接命中 LRU 缓存")
+        assertNotEquals(cachedDark.background, cachedLight.background, "深色与浅色应各自独立缓存")
+    }
+
+    @Test
+    fun `isThemeVisualChange tracks only visual theme fields`() {
+        val base = PixFoldSettings()
+        assertTrue(isThemeVisualChange(base, base.copy(themeMode = ThemeMode.Light)))
+        assertTrue(isThemeVisualChange(base, base.copy(pureBlack = true)))
+        assertTrue(isThemeVisualChange(base, base.withMonet(false)))
+        assertTrue(isThemeVisualChange(base, base.withAccent(AccentChoice.Purple)))
+        assertTrue(isThemeVisualChange(base, base.copy(colorStyle = ColorStyle.Expressive)))
+        assertTrue(isThemeVisualChange(base, base.copy(colorSpec = ColorSpecVersion.V2025)))
+
+        assertFalse(isThemeVisualChange(base, base.copy(portraitDefaultColumns = 3)))
+        assertFalse(isThemeVisualChange(base, base.copy(landscapeDefaultColumns = 5)))
+        assertFalse(isThemeVisualChange(base, base.copy(predictiveBackAnimation = false)))
+        assertFalse(isThemeVisualChange(base, base.copy(language = AppLanguage.English)))
     }
 }

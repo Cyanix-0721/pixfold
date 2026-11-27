@@ -4,9 +4,12 @@ import androidx.annotation.DrawableRes
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.size
@@ -44,6 +47,7 @@ import com.cyanix.pixfold.ui.workspace.WorkspaceBar
 import com.cyanix.pixfold.ui.workspace.WorkspaceState
 
 private const val DISABLED_CONTENT_ALPHA = 0.38f
+private val WORKFLOW_CARD_MIN_HEIGHT = 136.dp
 
 /**
  * 首页:两条工作流入口(验收第 19 项"从首页完整走通")。
@@ -111,7 +115,6 @@ fun HomeScreen(
             .fillMaxSize()
             .windowInsetsPadding(contentInsets)
             .padding(16.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         // 标题行:标题左对齐,设置入口在右上角。
         // 设置是**次要入口**,故用色调图标按钮而非等宽卡片 —— 不与两条工作流入口抢视觉重量。
@@ -140,6 +143,7 @@ fun HomeScreen(
                 )
             }
         }
+        Spacer(modifier = Modifier.height(16.dp))
         val canStart = canStartWorkflow(workspaceState)
         WorkflowEntry(
             title = organizeTitle,
@@ -153,6 +157,7 @@ fun HomeScreen(
             enabled = canStart,
             onBoundsChange = onOrganizeCardBounds,
         )
+        Spacer(modifier = Modifier.height(16.dp))
         WorkflowEntry(
             title = libraryTitle,
             subtitle = librarySubtitle,
@@ -166,37 +171,46 @@ fun HomeScreen(
             onBoundsChange = onLibraryCardBounds,
         )
 
-        // 两张卡都点不动时必须**说明为什么**,否则首屏就是一堵死墙。
-        // 只在真的被挡住时才出现,工作区就绪时这一行不存在。
-        if (!canStart) {
-            Surface(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .testTag(TAG_WORKSPACE_GATE_HINT),
-                shape = MaterialTheme.shapes.medium,
-                color = MaterialTheme.colorScheme.surfaceContainer,
-                border = pixFoldSurfaceBorder(),
-            ) {
-                Text(
-                    text = stringResource(R.string.home_workspace_gate_hint),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
-                )
-            }
-        }
-
         // 工作区条:两张大卡**之下**的从属层(HANDBOOK §4,2026-10-15 用户裁决:
         // 「Workspace 是范围,两个工作流是任务,层级不同」;摆成第三张等权卡会误导用户
         // 以为「选工作区」也是一件能做完的事)。
-        //
-        // 位置在卡之下、而不是标题行下方,是 `docs/product/HANDBOOK.md` 逐字定的形态。
-        if (workspaceState != null) {
-            WorkspaceBar(
-                state = workspaceState,
-                onPick = onPickWorkspace,
-                onOpenList = onOpenWorkspaceList,
-            )
+        // 沉底排布在首页下半区，使主视线聚焦在上方两条核心工作流大卡。
+        if (!canStart || workspaceState != null) {
+            Spacer(modifier = Modifier.weight(1f))
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 12.dp),
+                verticalArrangement = Arrangement.spacedBy(10.dp),
+            ) {
+                // 两张卡都点不动时必须**说明为什么**,否则首屏就是一堵死墙。
+                // 只在真的被挡住时才出现,工作区就绪时这一行不存在。
+                if (!canStart) {
+                    Surface(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .testTag(TAG_WORKSPACE_GATE_HINT),
+                        shape = MaterialTheme.shapes.medium,
+                        color = MaterialTheme.colorScheme.surfaceContainer,
+                        border = pixFoldSurfaceBorder(),
+                    ) {
+                        Text(
+                            text = stringResource(R.string.home_workspace_gate_hint),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+                        )
+                    }
+                }
+                if (workspaceState != null) {
+                    WorkspaceBar(
+                        state = workspaceState,
+                        onPick = onPickWorkspace,
+                        onOpenList = onOpenWorkspaceList,
+                    )
+                }
+            }
+            Spacer(modifier = Modifier.weight(0.45f))
         }
     }
 }
@@ -315,7 +329,8 @@ private fun WorkflowEntry(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(start = 16.dp, end = 12.dp, top = 20.dp, bottom = 20.dp),
+                .heightIn(min = WORKFLOW_CARD_MIN_HEIGHT)
+                .padding(start = 16.dp, end = 12.dp, top = 24.dp, bottom = 24.dp),
             horizontalArrangement = Arrangement.spacedBy(12.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
@@ -330,7 +345,7 @@ private fun WorkflowEntry(
             )
             Column(
                 modifier = Modifier.weight(1f),
-                verticalArrangement = Arrangement.spacedBy(4.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
                 Text(
                     text = title,

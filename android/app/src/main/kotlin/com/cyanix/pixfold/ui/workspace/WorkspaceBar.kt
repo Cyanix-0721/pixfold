@@ -35,7 +35,7 @@ import com.cyanix.pixfold.ui.theme.pixFoldSurfaceBorder
 /** 工作区状态条的根节点。 */
 const val TAG_WORKSPACE_BAR = "workspace-bar"
 
-/** 条上的动作按钮（选择 / 工作区）。 */
+/** 条上的动作按钮（选择 / 切换工作区）。 */
 const val TAG_WORKSPACE_ACTION = "workspace-action"
 
 /** 扫描中（[WorkspaceState.Loading]）前置 M3E 加载指示器。 */
@@ -60,7 +60,7 @@ const val TAG_WORKSPACE_LOADING = "workspace-loading"
  * | --- | --- | --- |
  * | [WorkspaceState.None] | 未选择工作区 | 选择文件夹 |
  * | [WorkspaceState.Loading] | 正在扫描文件夹… | （无，扫描中不给动作，左侧显示 M3E [LoadingIndicator]） |
- * | [WorkspaceState.Ready] | 当前工作区：{名字} + 目录/图片计数摘要 | 工作区（打开列表） |
+ * | [WorkspaceState.Ready] | 当前工作区：{名字} + 目录/图片计数摘要 | 切换工作区（打开列表） |
  * | [WorkspaceState.Denied] | 授权已失效，请重新选择 | 选择文件夹 |
  * | [WorkspaceState.Failed] | 无法读取该文件夹 | 选择文件夹 |
  *

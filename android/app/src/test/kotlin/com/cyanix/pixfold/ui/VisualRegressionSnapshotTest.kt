@@ -468,7 +468,7 @@ class VisualRegressionSnapshotTest {
                     currentTreeUri = "content://com.cyanix.pixfold.test/tree/comics",
                     onDismiss = {},
                     onOpen = {},
-                    onRemove = { _, _ -> },
+                    onRemove = {},
                     onTogglePin = {},
                     onMove = { _, _ -> },
                     onAdd = {},

@@ -571,7 +571,7 @@ private fun ShowcaseWorkspaceDialog(onDismiss: () -> Unit) {
             currentTreeUri = "content://com.cyanix.pixfold.debug/tree/comics",
             onDismiss = onDismiss,
             onOpen = {},
-            onRemove = { _, _ -> },
+            onRemove = {},
             onTogglePin = {},
             onMove = { _, _ -> },
             onAdd = {},

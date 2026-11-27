@@ -72,6 +72,10 @@ class WorkspaceController(
     var isRefreshing: Boolean by mutableStateOf(false)
         private set
 
+    /** 是否正在向工作区列表添加新文件夹（只在弹窗内展示加载态，不干扰首页工作区条）。 */
+    var isAddingWorkspace: Boolean by mutableStateOf(false)
+        private set
+
     /**
      * 列表快照。**含 granted 运行时判定**，每次 [openList] 与任何增删改后重算。
      *
@@ -96,6 +100,8 @@ class WorkspaceController(
         private set
 
     private var job: Job? = null
+    private var addJob: Job? = null
+    private var addGeneration: Int = 0
 
     /**
      * 正在 [load] 的那份授权。
@@ -182,11 +188,10 @@ class WorkspaceController(
     }
 
     /**
-     * 从列表移除一条。
+     * 从列表移除一条，并同步释放对应 SAF 树 URI 的持久授权。
      *
-     * [alsoRelease] 为 `true` 才撤销系统持久授权 —— 默认 `false`。
-     * 「从列表删掉」与「收回系统授权」是两件事：混成一件会让用户手滑就丢掉授权，
-     * 下次还得重新走系统选择器。
+     * 工作区访问本身依赖系统 SAF 目录授权：从列表移除记录后不再保留后台持久授权，
+     * 需要再次访问时重新通过系统目录选择器授予即可。
      *
      * ## 「是不是当前那条」为什么不能只看 [currentHandle]
      *
@@ -202,12 +207,12 @@ class WorkspaceController(
      *
      * 删除动作本身**与「当前是哪条」无关**：入参就是 treeUri。
      */
-    fun remove(treeUri: String, alsoRelease: Boolean) {
+    fun remove(treeUri: String) {
         val active = currentHandle() ?: loadingHandleOrNull()
         val wasCurrent = active?.treeUri == treeUri
 
         source.forgetWorkspace(treeUri)
-        if (alsoRelease) (source as? AndroidGrantReleaser)?.releasePersistentGrant(treeUri)
+        (source as? AndroidGrantReleaser)?.releasePersistentGrant(treeUri)
         // 评审 Minor-3：「列表满且全钉住」的被拒提示，指的是**上一次** remember 的结论。
         // 用户照着提示删掉一条之后这个前提已经不成立，提示却会一直挂到下次成功 remember
         // 为止（可能再也不发生）—— 所以移除动作本身要把它撤掉。
@@ -296,6 +301,39 @@ class WorkspaceController(
     }
 
     /**
+     * 从工作区列表弹窗中添加一个新文件夹。
+     *
+     * 与 [pick] 的区别：不打断当前活动工作区，也不把 [state] 切到 [WorkspaceState.Loading]
+     * 或触发全目录图片扫描；仅在 [ioDispatcher] 上解析显示名、持久化 SAF 授权并刷新 [listings]，
+     * 加载态通过 [isAddingWorkspace] 反映在弹窗内。仅当当前无工作区（[WorkspaceState.None]）
+     * 且添加未被拒时，才把主状态置为懒启动态 [WorkspaceState.Idle]。
+     */
+    fun addToList(treeUri: String) {
+        cancelAddJob()
+        isAddingWorkspace = true
+        val myAddGen = addGeneration
+        addJob = scope.launch {
+            try {
+                val (handle, rememberResult, grants) = withContext(ioDispatcher) {
+                    val name = nameResolver(treeUri)
+                    val resolved = WorkspaceHandle(treeUri = treeUri, displayName = name)
+                    val result = source.rememberWorkspace(resolved)
+                    Triple(resolved, result, source.persistentGrants())
+                }
+                listRejected = rememberResult == RememberResult.RejectedAllPinned
+                refreshListings(grants)
+                if (state is WorkspaceState.None && rememberResult != RememberResult.RejectedAllPinned) {
+                    state = WorkspaceState.Idle(handle)
+                }
+            } finally {
+                if (myAddGen == addGeneration) {
+                    isAddingWorkspace = false
+                }
+            }
+        }
+    }
+
+    /**
      * 释放本控制器持有的平台资源（变更监听）。
      *
      * 由界面层在 `DisposableEffect` 里调用。**必须存在**：`ContentObserver` 是注册在
@@ -304,7 +342,15 @@ class WorkspaceController(
      */
     fun close() {
         cancelJob()
+        cancelAddJob()
         closeWatcher()
+    }
+
+    private fun cancelAddJob() {
+        addJob?.cancel()
+        addJob = null
+        addGeneration++
+        isAddingWorkspace = false
     }
 
     /**

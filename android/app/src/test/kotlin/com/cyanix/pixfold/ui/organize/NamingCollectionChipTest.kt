@@ -5,9 +5,13 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.semantics.SemanticsProperties
+import androidx.compose.ui.semantics.getOrNull
+import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
+import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
 import androidx.activity.ComponentActivity
@@ -22,6 +26,7 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
+import kotlin.test.assertFalse
 
 /**
  * 步骤 2(命名页)的集合芯片行 —— 用户 2026-10-19 要求「整理图片的步骤2也加上芯片选取,
@@ -141,5 +146,51 @@ class NamingCollectionChipTest {
 
         rule.onNodeWithTag(TAG_COLLECTION_ROW).assertDoesNotExist()
         rule.onNodeWithTag(TAG_NAMING_PAGE).assertExists()
+    }
+
+    @Test
+    fun `工作流步骤标签不再包含步骤123前缀`() {
+        show()
+        listOf(TAG_STEP_SORT, TAG_STEP_NAMING, TAG_STEP_PLAN).forEach { tag ->
+            val label = rule.onNodeWithTag(tag)
+                .fetchSemanticsNode()
+                .config
+                .getOrNull(SemanticsProperties.Text)
+                ?.joinToString("") { it.text }
+                .orEmpty()
+            assertFalse(label.startsWith("步骤"), "步骤标签不应带「步骤」前缀: $label")
+            assertFalse(label.startsWith("Step ", ignoreCase = true), "Step tab不应带「Step 」前缀: $label")
+        }
+    }
+
+    @Test
+    fun `排序页收起瀑布流后切到命名页保持收起，在命名页展开后切回排序页也保持展开`() {
+        show()
+
+        // 1. 排序页初始展开：芯片与拉手横条均可见
+        rule.onNodeWithTag(TAG_COLLECTION_ROW).assertIsDisplayed()
+        rule.onNodeWithTag(TAG_COLLECTION_WATERFALL_HANDLE).performClick()
+        rule.waitForIdle()
+        assertFalse(
+            rule.onAllNodesWithTag(TAG_COLLECTION_ROW).fetchSemanticsNodes().isNotEmpty(),
+            "排序页收起瀑布流后，集合芯片应隐藏",
+        )
+
+        // 2. 切到命名页，应继承排序页的「已收起」状态
+        goToNamingStep()
+        assertFalse(
+            rule.onAllNodesWithTag(TAG_COLLECTION_ROW).fetchSemanticsNodes().isNotEmpty(),
+            "从已收起的排序页切到命名页时，顶部瀑布流应保持收起状态",
+        )
+        rule.onNodeWithTag(TAG_COLLECTION_WATERFALL_HANDLE).assertIsDisplayed()
+
+        // 3. 在命名页重新展开并切回排序页，排序页也应同步保持展开
+        rule.onNodeWithTag(TAG_COLLECTION_WATERFALL_HANDLE).performClick()
+        rule.waitForIdle()
+        rule.onNodeWithTag(TAG_COLLECTION_ROW).assertIsDisplayed()
+
+        rule.onNodeWithTag(TAG_STEP_SORT).performClick()
+        rule.waitForIdle()
+        rule.onNodeWithTag(TAG_COLLECTION_ROW).assertIsDisplayed()
     }
 }

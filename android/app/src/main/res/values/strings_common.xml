@@ -124,8 +124,8 @@
     <!-- Ready 态右侧按钮打开的是**列表**而非系统选择器，所以不能叫「Change」。
          原来那两条「更换」文案键随本次改判一并删除：留着即 lint UnusedResources
          （warningsAsErrors = true 下是硬失败）。 -->
-    <string name="workspace_button">Folders</string>
-    <string name="workspace_button_cd">Manage workspace folders</string>
+    <string name="workspace_button">Switch</string>
+    <string name="workspace_button_cd">Switch workspace</string>
     <string name="workspace_loading">Scanning folder…</string>
     <string name="workspace_denied">Access to %1$s was revoked. Pick the folder again.</string>
     <!-- 自动重试过仍失败：与「一次没试就放弃」是两种信号，措辞要如实。 -->
@@ -149,9 +149,9 @@
     <string name="workspace_section_stale">Path remembered only</string>
     <string name="workspace_section_stale_hint">Tap to re-grant access.</string>
     <string name="workspace_list_add">Add folder…</string>
+    <string name="workspace_list_adding">Adding folder…</string>
     <string name="workspace_in_use">In use</string>
     <string name="workspace_remove_cd">Remove %1$s from the list</string>
-    <string name="workspace_release_switch">Also revoke system access</string>
     <string name="workspace_reject_all_pinned">All folders are pinned. Unpin one to add another.</string>
 
 </resources>

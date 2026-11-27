@@ -104,7 +104,7 @@
     <string name="pack_output">Output: %1$s</string>
     <string name="pack_output_exists">\u0020(a file with the same name already exists)</string>
     <string name="pack_language_iso">LanguageISO: %1$s</string>
-    <string name="pack_excluded_warning">This volume is excluded and will not be packaged (re-include it from the volume header in step 1 or 2)</string>
+    <string name="pack_excluded_warning">This volume is excluded and will not be packaged (re-include it from the volume header in Library or Metadata)</string>
     <plurals name="pack_included_count">
         <item quantity="one">%1$d of %2$d volume will be packaged</item>
         <item quantity="other">%1$d of %2$d volumes will be packaged</item>

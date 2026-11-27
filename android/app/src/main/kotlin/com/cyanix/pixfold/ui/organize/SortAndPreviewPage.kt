@@ -231,6 +231,8 @@ fun SortAndPreviewPage(
     onNext: (() -> Unit)? = null,
     portraitDefaultColumns: Int? = null,
     landscapeDefaultColumns: Int? = null,
+    waterfallExpanded: Boolean? = null,
+    onWaterfallExpandedChange: ((Boolean) -> Unit)? = null,
 ) {
     var mode by remember { mutableStateOf(initialMode) }
     // 本地状态权威,初值取自 externalState,每次变更上报上层(理由同 NamingPage:
@@ -349,6 +351,8 @@ fun SortAndPreviewPage(
         CollectionChipRows(
             collections = collections,
             activeId = activeId,
+            waterfallExpanded = waterfallExpanded,
+            onWaterfallExpandedChange = onWaterfallExpandedChange,
             onSelect = { id ->
                 // W1(2026-09-17 实测缺陷):切集合必须**回到顶部**。
                 // 原因:切换集合的语义是"换一批图看",沿用上一个集合的滚动偏移

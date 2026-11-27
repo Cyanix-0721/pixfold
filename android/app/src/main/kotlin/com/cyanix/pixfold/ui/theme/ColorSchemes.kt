@@ -37,8 +37,19 @@ import com.cyanix.pixfold.domain.settings.ColorStyle
  */
 object ColorSchemes {
 
+    private data class CacheKey(
+        val seedArgb: Int,
+        val dark: Boolean,
+        val style: ColorStyle,
+        val spec: ColorSpecVersion,
+    )
+
+    private const val MAX_CACHE_ENTRIES = 32
+    private val schemeCache = HashMap<CacheKey, ColorScheme>(16)
+    private val cacheOrder = ArrayDeque<CacheKey>(MAX_CACHE_ENTRIES)
+
     /**
-     * 由种子色生成配色。
+     * 由种子色生成配色，结果按 `(seedArgb, dark, style, spec)` 做有界 LRU 缓存。
      *
      * @param seedArgb 种子色(ARGB)。可由预设给出,也可来自系统动态取色。
      * @param dark 是否深色。
@@ -51,8 +62,24 @@ object ColorSchemes {
         style: ColorStyle,
         spec: ColorSpecVersion,
     ): ColorScheme {
-        val scheme = dynamicSchemeOf(seedArgb, dark, style, spec.toAlgorithm())
-        return scheme.toColorScheme()
+        val key = CacheKey(seedArgb, dark, style, spec)
+        synchronized(schemeCache) {
+            schemeCache[key]?.let { cached ->
+                cacheOrder.remove(key)
+                cacheOrder.addLast(key)
+                return cached
+            }
+        }
+        val computed = dynamicSchemeOf(seedArgb, dark, style, spec.toAlgorithm()).toColorScheme()
+        synchronized(schemeCache) {
+            schemeCache[key]?.let { return it }
+            if (cacheOrder.size >= MAX_CACHE_ENTRIES) {
+                cacheOrder.removeFirstOrNull()?.let { oldest -> schemeCache.remove(oldest) }
+            }
+            cacheOrder.addLast(key)
+            schemeCache[key] = computed
+        }
+        return computed
     }
 
     /** 色彩风格 -> 算法库的 Scheme 变体。 */

@@ -19,6 +19,8 @@
     <string name="a_collection_chip">%1$s (%2$d)</string>
     <string name="a_collection_cd">Set %1$s</string>
     <string name="a_series_cd">Series %1$s</string>
+    <string name="a_chips_collapse_cd">Hide set list</string>
+    <string name="a_chips_expand_cd">Show set list</string>
     <plurals name="a_image_count">
         <item quantity="one">%1$d image</item>
         <item quantity="other">%1$d images</item>
@@ -125,7 +127,7 @@
     <string name="a_naming_empty_issues">No conflicts or warnings</string>
     <string name="a_naming_empty_images">No images to name</string>
     <string name="a_naming_back">← Back to sorting</string>
-    <string name="a_naming_back_cd">Back to step 1</string>
+    <string name="a_naming_back_cd">Back to sorting</string>
     <string name="a_naming_next">Next: execution plan</string>
     <string name="a_naming_next_cd">Next: execution plan</string>
 
@@ -135,16 +137,16 @@
     <string name="a_plan_clean_empty_cd">Clean empty folders toggle</string>
     <string name="a_plan_clean_empty_hint">Off by default; still needs another confirmation in the dialog</string>
     <string name="a_plan_back">← Back to naming structure</string>
-    <string name="a_plan_back_cd">Back to step 2</string>
+    <string name="a_plan_back_cd">Back to naming structure</string>
     <string name="a_plan_confirm">Confirm run</string>
     <string name="a_plan_confirm_cd">Confirm run</string>
     <string name="a_plan_status_rename">Will rename</string>
     <string name="a_plan_status_skip">Will skip</string>
     
     <!-- ============ Step container (OrganizeSteps) ============ -->
-    <string name="a_step_label_sort">Step 1 Sort and preview</string>
-    <string name="a_step_label_naming">Step 2 Naming structure</string>
-    <string name="a_step_label_plan">Step 3 Execution plan</string>
+    <string name="a_step_label_sort">Sort and preview</string>
+    <string name="a_step_label_naming">Naming structure</string>
+    <string name="a_step_label_plan">Execution plan</string>
     <string name="a_step_empty">No set to name</string>
 
 </resources>

@@ -24,6 +24,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -262,6 +263,8 @@ fun OrganizeSteps(
     var activeId by remember(collections) {
         mutableStateOf(initialActiveCollectionId ?: collections.firstOrNull()?.id.orEmpty())
     }
+    // 顶部集合瀑布流的展开/收起状态在「排序与预览」与「命名结构」间共享继承，切换页签不分裂。
+    var waterfallExpanded by rememberSaveable { mutableStateOf(true) }
     // 命名结构与覆盖是**批次级**(规格 §6.3:overrides 全局一份,不属于某个集合),
     // 故在此持有 —— 切集合、来回切 Tab 都不会丢失用户的覆盖。
     // 工作流 A 的危险动作(默认关闭)+ 确认流程 + 执行报告
@@ -477,6 +480,8 @@ fun OrganizeSteps(
                             onNext = { backStack.add(OrganizeNamingRoute) },
                             portraitDefaultColumns = portraitDefaultColumns,
                             landscapeDefaultColumns = landscapeDefaultColumns,
+                            waterfallExpanded = waterfallExpanded,
+                            onWaterfallExpandedChange = { waterfallExpanded = it },
                             modifier = Modifier.weight(1f),
                         )
                     }
@@ -511,6 +516,8 @@ fun OrganizeSteps(
                                         onActiveCollectionChange(id)
                                     }
                                 },
+                                waterfallExpanded = waterfallExpanded,
+                                onWaterfallExpandedChange = { waterfallExpanded = it },
                                 modifier = Modifier.weight(1f),
                             )
                         }

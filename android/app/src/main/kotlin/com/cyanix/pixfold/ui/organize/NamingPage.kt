@@ -121,6 +121,8 @@ fun NamingPage(
     // 于是「步骤 2 切了集合 → 回步骤 1 也是新选的」自然成立,不需要任何同步逻辑。
     collections: List<ImageCollection> = emptyList(),
     onSelectCollection: (String) -> Unit = {},
+    waterfallExpanded: Boolean? = null,
+    onWaterfallExpandedChange: ((Boolean) -> Unit)? = null,
 ) {
     // 状态模式:**本地状态权威,初值取自 initialState,每次变更上报上层**。
     // 不用 `initialState ?: local` —— 那样一旦上层传值,就地编辑就永不显示(实测踩过)。
@@ -185,6 +187,8 @@ fun NamingPage(
             collections = collections,
             activeId = collection.id,
             onSelect = onSelectCollection,
+            waterfallExpanded = waterfallExpanded,
+            onWaterfallExpandedChange = onWaterfallExpandedChange,
         )
 
         Text(

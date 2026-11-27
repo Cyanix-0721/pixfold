@@ -118,14 +118,13 @@ class AndroidSafSource(context: Context) : WorkspaceSource, AndroidGrantReleaser
     }
 
     /**
-     * 撤销这一条的系统持久授权。**只删列表不做这件事** —— 两者是不同强度的动作
-     * （[WorkspaceSource.forgetWorkspace] 只动记录，本方法才动系统授权）。
+     * 释放这一条对应的系统 SAF 持久授权。
      *
-     * 调用点只有 `WorkspaceController.remove(treeUri, alsoRelease = true)`：
-     * 用户在弹窗里明确勾了「同时撤销」才会走到这里。
+     * 调用点是 `WorkspaceController.remove(treeUri)`：移除工作区条目时顺带清理
+     * 持久授权记录。
      *
      * 失败只记日志不抛：列表条目已经先被移除，为一次撤销失败弹出崩溃与用户的
-     * 预期不符；下次打开列表时 [isPersistentGrant] 会把这条如实标成「只记住了路径」。
+     * 预期不符；若 URI 权限已失效，`releasePersistableUriPermission` 失败可安全忽略。
      */
     override fun releasePersistentGrant(treeUri: String) {
         try {

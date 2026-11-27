@@ -2,10 +2,12 @@ package com.cyanix.pixfold.ui.settings
 
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
@@ -23,6 +25,7 @@ import com.cyanix.pixfold.domain.settings.ColorStyle
 import com.cyanix.pixfold.domain.settings.PixFoldSettings
 import com.cyanix.pixfold.domain.settings.ThemeMode
 import com.cyanix.pixfold.ui.theme.PixFoldTheme
+import com.cyanix.pixfold.ui.theme.ThemeTransitionHost
 import com.cyanix.pixfold.ui.theme.isAffectedByColorSpec
 import org.junit.Rule
 import org.junit.Test
@@ -31,6 +34,7 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
+import kotlin.test.assertNotEquals
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
@@ -397,5 +401,64 @@ class SettingsScreenTest {
         assertFalse(latest.predictiveBackAnimation, "关掉后应上报 false")
         tap(TAG_SETTINGS_PREDICTIVE_BACK)
         assertTrue(latest.predictiveBackAnimation, "再次点击应能开回来")
+    }
+
+    @Test
+    fun `pure black choice menu uses true black container color`() {
+        var pureBlackMenuBg: Color? = null
+        var darkMenuBg: Color? = null
+        rule.setContent {
+            PixFoldTheme(
+                settings = PixFoldSettings(
+                    themeMode = ThemeMode.Dark,
+                    accent = AccentChoice.Default,
+                    pureBlack = true,
+                ),
+            ) {
+                pureBlackMenuBg = choiceMenuContainerColor()
+            }
+            PixFoldTheme(
+                settings = PixFoldSettings(
+                    themeMode = ThemeMode.Dark,
+                    accent = AccentChoice.Default,
+                    pureBlack = false,
+                ),
+            ) {
+                darkMenuBg = choiceMenuContainerColor()
+            }
+        }
+        rule.waitForIdle()
+        assertEquals(Color.Black, pureBlackMenuBg, "纯黑模式下选项弹窗底色应为真黑 #000000")
+        assertNotEquals(Color.Black, darkMenuBg, "普通深色模式下选项弹窗底色应使用 tonal surface")
+    }
+
+    @Test
+    fun `ThemeTransitionHost transitions between dark and light and applies non visual changes`() {
+        var currentSettings by mutableStateOf(
+            PixFoldSettings(
+                themeMode = ThemeMode.Dark,
+                accent = AccentChoice.Default,
+                pureBlack = true,
+            ),
+        )
+        var rendered: PixFoldSettings? = null
+        rule.setContent {
+            ThemeTransitionHost(targetSettings = currentSettings) { displayed ->
+                rendered = displayed
+                PixFoldTheme(settings = displayed) {
+                    Text(text = "${displayed.themeMode}-${displayed.portraitDefaultColumns}")
+                }
+            }
+        }
+        rule.waitForIdle()
+        assertEquals(ThemeMode.Dark, rendered?.themeMode)
+
+        currentSettings = currentSettings.copy(themeMode = ThemeMode.Light, pureBlack = false)
+        rule.waitForIdle()
+        assertEquals(ThemeMode.Light, rendered?.themeMode)
+
+        currentSettings = currentSettings.copy(portraitDefaultColumns = 3)
+        rule.waitForIdle()
+        assertEquals(3, rendered?.portraitDefaultColumns)
     }
 }

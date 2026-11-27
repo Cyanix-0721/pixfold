@@ -1,10 +1,13 @@
 package com.cyanix.pixfold.ui.workspace
 
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.SemanticsProperties
+import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
-import androidx.compose.ui.test.assertIsOff
-import androidx.compose.ui.test.assertIsOn
+import androidx.compose.ui.test.assertIsEnabled
+import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
@@ -41,8 +44,7 @@ import kotlin.test.assertTrue
  *     而实际上它只是被分到了另一个区；
  *  2. **点击各自带着自己的 treeUri 回调** —— 列表里有多条时，串了 uri 就会
  *     「点 A 打开了 B」，且不会有任何报错；
- *  3. **撤销授权开关默认关、且移除时如实回传** —— 默认开等于把「删一条记录」
- *     升格成「动系统授权」这种不可逆动作；
+ *  3. **移除按钮直接带着 treeUri 回调 onRemove，且弹窗不再包含撤销授权开关**；
  *  4. **图钉与移除按钮的触控区 ≥48dp**（AGENTS.md §2.7）。
  *
  * ## 为什么文案一律走 [TestText]
@@ -79,7 +81,7 @@ class WorkspaceListDialogTest {
     /** 回调捕获。带计数的原因见 `点图钉回调 togglePin` 的 KDoc。 */
     private class Captured {
         var opened: String? = null
-        var removed: Pair<String, Boolean>? = null
+        var removed: String? = null
         var pinned: String? = null
         var pinCalls = 0
         var added = 0
@@ -92,6 +94,7 @@ class WorkspaceListDialogTest {
         listings: List<WorkspaceListing>,
         current: String? = null,
         rejectHint: String? = null,
+        isAdding: Boolean = false,
     ): Captured {
         val c = Captured()
         rule.setContent {
@@ -101,11 +104,12 @@ class WorkspaceListDialogTest {
                     currentTreeUri = current,
                     onDismiss = {},
                     onOpen = { c.opened = it },
-                    onRemove = { treeUri, alsoRelease -> c.removed = treeUri to alsoRelease },
+                    onRemove = { treeUri -> c.removed = treeUri },
                     onTogglePin = { c.pinned = it; c.pinCalls++ },
                     onMove = { from, to -> c.move = from to to },
                     onAdd = { c.added++ },
                     rejectHint = rejectHint,
+                    isAdding = isAdding,
                 )
             }
         }
@@ -178,28 +182,13 @@ class WorkspaceListDialogTest {
         rule.onAllNodesWithText(TestText.of(R.string.workspace_in_use)).assertCountEquals(1)
     }
 
-    /**
-     * 默认关 + 移除时如实回传 false。
-     *
-     * 变异靶子：把 `releaseGrant` 初值改成 true，本条即红。
-     * 为什么这条重要：默认开会让「从列表删一条记录」静默升级成「撤销系统授权」，
-     * 而后者对用户是不可逆的（要重新走一次系统目录选择器）。
-     */
     @Test
-    fun `撤销开关默认关，移除时回传 false`() {
+    fun `点移除按钮直接回传 treeUri 且弹窗不再显示撤销开关`() {
         val c = show(listOf(listing("a", granted = true)))
-        rule.onNodeWithTag(TAG_WORKSPACE_RELEASE_SWITCH).assertIsOff()
+        rule.onAllNodes(SemanticsMatcher.expectValue(SemanticsProperties.Role, Role.Switch))
+            .assertCountEquals(0)
         rule.onNodeWithTag(workspaceRemoveTag("content://tree/a")).performClick()
-        assertEquals("content://tree/a" to false, c.removed)
-    }
-
-    @Test
-    fun `打开撤销开关后移除会回传 true`() {
-        val c = show(listOf(listing("a", granted = true)))
-        rule.onNodeWithTag(TAG_WORKSPACE_RELEASE_SWITCH).performClick()
-        rule.onNodeWithTag(TAG_WORKSPACE_RELEASE_SWITCH).assertIsOn()
-        rule.onNodeWithTag(workspaceRemoveTag("content://tree/a")).performClick()
-        assertEquals("content://tree/a" to true, c.removed)
+        assertEquals("content://tree/a", c.removed)
     }
 
     /**
@@ -224,6 +213,22 @@ class WorkspaceListDialogTest {
         val c = show(listOf(listing("a", granted = true)))
         rule.onNodeWithTag(TAG_WORKSPACE_ADD).performClick()
         assertEquals(1, c.added)
+    }
+
+    @Test
+    fun `isAdding 为 true 时在弹窗内展示加载指示器并禁用添加按钮`() {
+        val c = show(listOf(listing("a", granted = true)), isAdding = true)
+        rule.onNodeWithTag(TAG_WORKSPACE_ADD_LOADING, useUnmergedTree = true).assertIsDisplayed()
+        rule.onNodeWithTag(TAG_WORKSPACE_ADD).assertIsNotEnabled()
+        rule.onNodeWithTag(TAG_WORKSPACE_ADD).performClick()
+        assertEquals(0, c.added)
+    }
+
+    @Test
+    fun `isAdding 为 false 时不展示添加加载指示器`() {
+        show(listOf(listing("a", granted = true)), isAdding = false)
+        rule.onNodeWithTag(TAG_WORKSPACE_ADD_LOADING, useUnmergedTree = true).assertDoesNotExist()
+        rule.onNodeWithTag(TAG_WORKSPACE_ADD).assertIsEnabled()
     }
 
     @Test

@@ -28,7 +28,7 @@
         <item quantity="other">%1$d 卷写到了同一个文件：%2$s</item>
     </plurals>
 
-    <string name="pack_error_collision_hint">请回到步骤 2 改掉其中一本的 CBZ 文件名，再试一次。</string>
+    <string name="pack_error_collision_hint">请回到元数据改掉其中一本的 CBZ 文件名，再试一次。</string>
 
     <string name="pack_error_unknown">打包被阻断，但原因未知。请反馈这个问题。</string>
 
