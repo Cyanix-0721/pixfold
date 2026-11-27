@@ -97,7 +97,7 @@
     <string name="pack_output">输出：%1$s</string>
     <string name="pack_output_exists">（已存在同名文件）</string>
     <string name="pack_language_iso">LanguageISO：%1$s</string>
-    <string name="pack_excluded_warning">本卷未勾选，本次不会打包（在步骤 1 或步骤 2 的卷头可重新勾选）</string>
+    <string name="pack_excluded_warning">本卷未勾选，本次不会打包（在漫画库或元数据的卷头可重新勾选）</string>
     <plurals name="pack_included_count">
         <item quantity="other">本次将打包 %1$d / %2$d 卷</item>
     </plurals>

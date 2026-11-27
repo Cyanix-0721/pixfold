@@ -1,5 +1,10 @@
 package com.cyanix.pixfold.ui.theme
 
+import android.app.Activity
+import android.content.Context
+import android.content.ContextWrapper
+import androidx.compose.animation.core.FiniteAnimationSpec
+import androidx.compose.animation.core.snap
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material3.ButtonColors
@@ -13,16 +18,23 @@ import androidx.compose.material3.dynamicDarkColorScheme
 import androidx.compose.material3.dynamicLightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.SideEffect
+import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.staticCompositionLocalOf
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.unit.dp
+import androidx.core.view.WindowCompat
 import com.cyanix.pixfold.domain.settings.AccentChoice
 import com.cyanix.pixfold.domain.settings.PixFoldSettings
 import com.cyanix.pixfold.domain.settings.ThemeMode
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 
 /**
  * 当前主题是否处于「纯黑模式」（`settings.pureBlack && dark`）。
@@ -31,7 +43,10 @@ import com.cyanix.pixfold.domain.settings.ThemeMode
  * 与 `background` 同色；容器/弹窗/分段列表通过本 Local 获知当前处于纯黑态，
  * 从而补上 `1.dp` `outlineVariant` 描边来维持层级边界。
  */
-val LocalIsPureBlack = staticCompositionLocalOf { false }
+val LocalIsPureBlack = compositionLocalOf { false }
+
+/** 当前主题解析得到的种子色 ARGB；`null` 表示尚未由外层 [PixFoldTheme] 注入。 */
+val LocalThemeSeedArgb = compositionLocalOf<Int?> { null }
 
 private const val DISABLED_BORDER_ALPHA = 0.4f
 
@@ -59,7 +74,7 @@ private const val DISABLED_BORDER_ALPHA = 0.4f
 @Composable
 fun PixFoldTheme(
     settings: PixFoldSettings,
-    systemDark: Boolean = isSystemInDarkTheme(),
+    systemDark: Boolean = LocalThemeTransitionSystemDark.current ?: isSystemInDarkTheme(),
     content: @Composable () -> Unit,
 ) {
     val dark = when (settings.themeMode) {
@@ -69,7 +84,7 @@ fun PixFoldTheme(
     }
 
     val context = LocalContext.current
-    val scheme = remember(
+    val (seedArgb, scheme) = remember(
         dark,
         settings.monetEnabled,
         settings.accent,
@@ -78,36 +93,111 @@ fun PixFoldTheme(
         settings.pureBlack,
         context,
     ) {
-        val seedArgb = if (settings.monetEnabled) {
-            // 取系统动态配色的 primary 作种子:深浅两种模式下它都来自同一套壁纸色调。
-            val systemScheme = if (dark) {
-                dynamicDarkColorScheme(context)
-            } else {
-                dynamicLightColorScheme(context)
-            }
-            systemScheme.primary.toArgb()
-        } else {
-            // 含 AccentChoice.System 但 API < 31 的情况(回退到内置默认种子)。
-            AccentPresets.seedOf(settings.accent).toArgb()
-        }
+        val resolvedSeed = resolveSeedArgb(context, settings, dark)
 
         val base = ColorSchemes.fromSeed(
-            seedArgb = seedArgb,
+            seedArgb = resolvedSeed,
             dark = dark,
             style = settings.colorStyle,
             spec = settings.colorSpec,
         )
-        if (settings.pureBlack && dark) base.withPureBlack() else base
+        resolvedSeed to if (settings.pureBlack && dark) base.withPureBlack() else base
     }
 
+    LaunchedEffect(
+        context,
+        settings.monetEnabled,
+        settings.accent,
+        settings.colorStyle,
+        settings.colorSpec,
+        dark,
+    ) {
+        // 首帧完成后后台预热相反极性的配色，避免首次切深浅色时在主线程现算整套 HCT 色板。
+        withFrameNanos { }
+        val oppositeDark = !dark
+        val oppositeSeed = resolveSeedArgb(context, settings, oppositeDark)
+        withContext(Dispatchers.Default) {
+            ColorSchemes.fromSeed(
+                seedArgb = oppositeSeed,
+                dark = oppositeDark,
+                style = settings.colorStyle,
+                spec = settings.colorSpec,
+            )
+        }
+    }
+
+    SyncSystemBarsPolarity(dark = dark)
+
     val isPureBlack = settings.pureBlack && dark
-    CompositionLocalProvider(LocalIsPureBlack provides isPureBlack) {
+    val motionScheme = if (LocalSnapThemeMotion.current) {
+        SnapThemeMotionScheme
+    } else {
+        MotionScheme.expressive()
+    }
+    CompositionLocalProvider(
+        LocalIsPureBlack provides isPureBlack,
+        LocalThemeSeedArgb provides seedArgb,
+    ) {
         MaterialExpressiveTheme(
             colorScheme = scheme,
-            motionScheme = MotionScheme.expressive(),
+            motionScheme = motionScheme,
             content = content,
         )
     }
+}
+
+@Composable
+private fun SyncSystemBarsPolarity(dark: Boolean) {
+    val view = LocalView.current
+    val isEditMode = view.isInEditMode
+    val isTransitionSettling = LocalThemeTransitionSettling.current
+    val activity = remember(view, isEditMode) {
+        if (isEditMode) null else view.context.findActivity()
+    }
+    SideEffect {
+        if (isTransitionSettling) return@SideEffect
+        val window = activity?.window ?: return@SideEffect
+        val controller = WindowCompat.getInsetsController(window, window.decorView)
+        val wantLightBars = !dark
+        if (controller.isAppearanceLightStatusBars != wantLightBars) {
+            controller.isAppearanceLightStatusBars = wantLightBars
+        }
+        if (controller.isAppearanceLightNavigationBars != wantLightBars) {
+            controller.isAppearanceLightNavigationBars = wantLightBars
+        }
+    }
+}
+
+private object SnapThemeMotionScheme : MotionScheme {
+    override fun <T> defaultSpatialSpec(): FiniteAnimationSpec<T> = snap()
+    override fun <T> fastSpatialSpec(): FiniteAnimationSpec<T> = snap()
+    override fun <T> slowSpatialSpec(): FiniteAnimationSpec<T> = snap()
+    override fun <T> defaultEffectsSpec(): FiniteAnimationSpec<T> = snap()
+    override fun <T> fastEffectsSpec(): FiniteAnimationSpec<T> = snap()
+    override fun <T> slowEffectsSpec(): FiniteAnimationSpec<T> = snap()
+}
+
+internal tailrec fun Context.findActivity(): Activity? = when (this) {
+    is Activity -> this
+    is ContextWrapper -> baseContext.findActivity()
+    else -> null
+}
+
+internal fun resolveSeedArgb(
+    context: Context,
+    settings: PixFoldSettings,
+    dark: Boolean,
+): Int = if (settings.monetEnabled) {
+    // 取系统动态配色的 primary 作种子:深浅两种模式下它都来自同一套壁纸色调。
+    val systemScheme = if (dark) {
+        dynamicDarkColorScheme(context)
+    } else {
+        dynamicLightColorScheme(context)
+    }
+    systemScheme.primary.toArgb()
+} else {
+    // 含 AccentChoice.System 但 API < 31 的情况(回退到内置默认种子)。
+    AccentPresets.seedOf(settings.accent).toArgb()
 }
 
 /**

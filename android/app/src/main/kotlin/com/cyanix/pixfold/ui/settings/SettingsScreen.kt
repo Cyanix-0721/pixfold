@@ -2,8 +2,10 @@ package com.cyanix.pixfold.ui.settings
 
 import android.content.Intent
 import android.widget.Toast
+import androidx.annotation.DrawableRes
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -21,11 +23,15 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ButtonGroupDefaults
+import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.FilledTonalToggleButton
 import androidx.compose.material3.FilledTonalToggleButtonDefaults
@@ -35,9 +41,10 @@ import androidx.compose.material3.ListItemShapes
 import androidx.compose.material3.MaterialShapes
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
+import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.material3.toShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -47,6 +54,9 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.LayoutCoordinates
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
@@ -55,11 +65,13 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.toggleableState
 import androidx.compose.ui.state.ToggleableState
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.DpOffset
 import androidx.compose.ui.unit.dp
 import androidx.core.net.toUri
 import com.cyanix.pixfold.BuildConfig
@@ -72,7 +84,6 @@ import com.cyanix.pixfold.domain.settings.PixFoldSettings
 import com.cyanix.pixfold.domain.settings.ThemeMode
 import com.cyanix.pixfold.ui.components.LANDSCAPE_MAX_COLUMNS
 import com.cyanix.pixfold.ui.components.PORTRAIT_MAX_COLUMNS
-import com.cyanix.pixfold.ui.components.PixFoldAlertDialog
 import com.cyanix.pixfold.ui.components.PixFoldConfirmDialog
 import com.cyanix.pixfold.ui.components.PixFoldSegmentedItem
 import com.cyanix.pixfold.ui.components.PixFoldTopBar
@@ -80,17 +91,25 @@ import com.cyanix.pixfold.ui.components.adaptiveColumnCount
 import com.cyanix.pixfold.ui.components.columnOptions
 import com.cyanix.pixfold.ui.components.orientationWidth
 import com.cyanix.pixfold.ui.theme.AccentPresets
+import com.cyanix.pixfold.ui.theme.ColorSchemes
+import com.cyanix.pixfold.ui.theme.LocalIsPureBlack
+import com.cyanix.pixfold.ui.theme.LocalThemeSeedArgb
+import com.cyanix.pixfold.ui.theme.LocalThemeTransitionController
+import com.cyanix.pixfold.ui.theme.LocalThemeTransitionSystemDark
 import com.cyanix.pixfold.ui.theme.dangerOutlineBorder
 import com.cyanix.pixfold.ui.theme.dangerOutlineButtonColors
 import com.cyanix.pixfold.ui.theme.isAffectedByColorSpec
-import com.cyanix.pixfold.ui.theme.pixFoldSegmentedColors
 import com.cyanix.pixfold.ui.theme.pixFoldSurfaceBorder
+import com.cyanix.pixfold.ui.theme.resolveSeedArgb
 
 /**
  * M3 禁用态内容的不透明度(Material Design 规范值 38%)。
  * 用于「色彩标准」在该风格下无效时的置灰。
  */
 private const val DISABLED_CONTENT_ALPHA = 0.38f
+private val SETTINGS_ROW_PADDING = PaddingValues(horizontal = 16.dp, vertical = 14.dp)
+internal val CHOICE_MENU_MIN_WIDTH = 112.dp
+internal val CHOICE_MENU_MAX_WIDTH = 280.dp
 
 // ---- 测试 tag(集中定义,便于测试与实现同步) ----
 const val TAG_SETTINGS_PAGE = "settings-page"
@@ -159,6 +178,15 @@ fun SettingsScreen(
     val openFailedMessage = stringResource(R.string.settings_open_failed)
     // `stringResource` 不能在 `semantics {}` 里调用(非 @Composable lambda),先取出。
     val backCd = stringResource(R.string.common_back)
+    val isDark = when (settings.themeMode) {
+        ThemeMode.System -> LocalThemeTransitionSystemDark.current ?: isSystemInDarkTheme()
+        ThemeMode.Light -> false
+        ThemeMode.Dark -> true
+    }
+    val providedSeed = LocalThemeSeedArgb.current
+    val seedArgb = remember(providedSeed, settings.monetEnabled, settings.accent, isDark, context) {
+        providedSeed ?: resolveSeedArgb(context, settings, isDark)
+    }
 
     Column(
         modifier = modifier
@@ -185,12 +213,6 @@ fun SettingsScreen(
             // ================= 外观 =================
             SectionHeader(stringResource(R.string.settings_section_appearance), first = true)
 
-            Text(
-                text = stringResource(R.string.settings_theme_mode),
-                style = MaterialTheme.typography.labelLargeEmphasized,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(start = 12.dp, bottom = 8.dp),
-            )
             ThemeModeToggleGroup(
                 current = settings.themeMode,
                 onSelect = { onChange(settings.copy(themeMode = it)) },
@@ -200,9 +222,12 @@ fun SettingsScreen(
                 SwitchRow(
                     label = stringResource(R.string.settings_monet),
                     description = stringResource(R.string.settings_monet_desc),
+                    iconRes = R.drawable.ic_auto_awesome,
+                    iconTone = SettingIconTone.Appearance,
                     checked = settings.monetEnabled,
                     tag = TAG_SETTINGS_MONET,
                     shapes = ListItemDefaults.segmentedShapes(index = 0, count = 5),
+                    recordThemeTransitionOrigin = true,
                     // 走 withMonet 而不是 copy(accent=...) —— 由模型统一维护
                     // "开 Monet 即强调色跟随系统"的不变式(见 PixFoldSettings)。
                     onCheckedChange = { onChange(settings.withMonet(it)) },
@@ -211,9 +236,12 @@ fun SettingsScreen(
                 ChoiceRow(
                     label = stringResource(R.string.settings_accent),
                     current = stringResource(accentLabel(settings.accent)),
+                    iconRes = R.drawable.ic_palette,
+                    iconTone = SettingIconTone.Appearance,
                     tag = TAG_SETTINGS_ACCENT,
                     shapes = ListItemDefaults.segmentedShapes(index = 1, count = 5),
                     options = AccentChoice.entries.map { it to stringResource(accentLabel(it)) },
+                    recordThemeTransitionOrigin = true,
                     onSelect = { onChange(settings.withAccent(it)) },
                     trailingPreview = {
                         AccentSwatch(
@@ -232,19 +260,41 @@ fun SettingsScreen(
                 ChoiceRow(
                     label = stringResource(R.string.settings_color_style),
                     current = stringResource(colorStyleLabel(settings.colorStyle)),
+                    iconRes = R.drawable.ic_tune,
+                    iconTone = SettingIconTone.Appearance,
                     tag = TAG_SETTINGS_COLOR_STYLE,
                     shapes = ListItemDefaults.segmentedShapes(index = 2, count = 5),
                     options = ColorStyle.entries.map { it to stringResource(colorStyleLabel(it)) },
+                    recordThemeTransitionOrigin = true,
                     onSelect = { onChange(settings.copy(colorStyle = it)) },
+                    optionLeading = { style ->
+                        PaletteDotsPreview(
+                            seedArgb = seedArgb,
+                            dark = isDark,
+                            style = style,
+                            spec = settings.colorSpec,
+                        )
+                    },
                 )
 
                 ChoiceRow(
                     label = stringResource(R.string.settings_color_spec),
                     current = stringResource(colorSpecLabel(settings.colorSpec)),
+                    iconRes = R.drawable.ic_layers,
+                    iconTone = SettingIconTone.Appearance,
                     tag = TAG_SETTINGS_COLOR_SPEC,
                     shapes = ListItemDefaults.segmentedShapes(index = 3, count = 5),
                     options = ColorSpecVersion.entries.map { it to stringResource(colorSpecLabel(it)) },
+                    recordThemeTransitionOrigin = true,
                     onSelect = { onChange(settings.copy(colorSpec = it)) },
+                    optionLeading = { spec ->
+                        PaletteDotsPreview(
+                            seedArgb = seedArgb,
+                            dark = isDark,
+                            style = settings.colorStyle,
+                            spec = spec,
+                        )
+                    },
                     // 如实反映能力边界(2026-09-21 用户裁决「置灰」):
                     // 算法库里 2025 规范只重写 4 个变体,其余 5 个风格下两套规范产出
                     // 逐字节相同的结果 —— 置灰而非隐藏:值仍可见,用户能看出"设过,只是现在不生效"。
@@ -254,9 +304,12 @@ fun SettingsScreen(
                 SwitchRow(
                     label = stringResource(R.string.settings_pure_black),
                     description = stringResource(R.string.settings_pure_black_desc),
+                    iconRes = R.drawable.ic_invert_colors,
+                    iconTone = SettingIconTone.Appearance,
                     checked = settings.pureBlack,
                     tag = TAG_SETTINGS_PURE_BLACK,
                     shapes = ListItemDefaults.segmentedShapes(index = 4, count = 5),
+                    recordThemeTransitionOrigin = true,
                     onCheckedChange = { onChange(settings.copy(pureBlack = it)) },
                 )
             }
@@ -267,6 +320,8 @@ fun SettingsScreen(
                 ChoiceRow(
                     label = stringResource(R.string.settings_language),
                     current = stringResource(languageLabel(settings.language)),
+                    iconRes = R.drawable.ic_translate,
+                    iconTone = SettingIconTone.Language,
                     tag = TAG_SETTINGS_LANGUAGE,
                     shapes = ListItemDefaults.segmentedShapes(index = 0, count = 1),
                     options = AppLanguage.entries.map { it to stringResource(languageLabel(it)) },
@@ -279,6 +334,8 @@ fun SettingsScreen(
             SegmentedGroup {
                 DefaultColumnsRow(
                     label = stringResource(R.string.settings_columns_portrait),
+                    iconRes = R.drawable.ic_stay_current_portrait,
+                    iconTone = SettingIconTone.Behavior,
                     tag = TAG_SETTINGS_COLUMNS_PORTRAIT,
                     shapes = ListItemDefaults.segmentedShapes(index = 0, count = 2),
                     current = settings.portraitDefaultColumns,
@@ -287,6 +344,8 @@ fun SettingsScreen(
                 )
                 DefaultColumnsRow(
                     label = stringResource(R.string.settings_columns_landscape),
+                    iconRes = R.drawable.ic_stay_current_landscape,
+                    iconTone = SettingIconTone.Behavior,
                     tag = TAG_SETTINGS_COLUMNS_LANDSCAPE,
                     shapes = ListItemDefaults.segmentedShapes(index = 1, count = 2),
                     current = settings.landscapeDefaultColumns,
@@ -300,6 +359,8 @@ fun SettingsScreen(
                 SwitchRow(
                     label = stringResource(R.string.settings_predictive_back),
                     description = stringResource(R.string.settings_predictive_back_desc),
+                    iconRes = R.drawable.ic_dynamic_feed,
+                    iconTone = SettingIconTone.Behavior,
                     checked = settings.predictiveBackAnimation,
                     tag = TAG_SETTINGS_PREDICTIVE_BACK,
                     shapes = ListItemDefaults.segmentedShapes(index = 0, count = 1),
@@ -313,12 +374,16 @@ fun SettingsScreen(
                 InfoRow(
                     label = stringResource(R.string.settings_version),
                     value = "$versionName ($versionCode) · ${stringResource(R.string.settings_dev_suffix)}",
+                    iconRes = R.drawable.ic_info,
+                    iconTone = SettingIconTone.About,
                     tag = TAG_SETTINGS_VERSION,
                     shapes = ListItemDefaults.segmentedShapes(index = 0, count = 5),
                 )
                 ActionRow(
                     label = stringResource(R.string.settings_repo),
                     description = stringResource(R.string.settings_repo_desc),
+                    iconRes = R.drawable.ic_code,
+                    iconTone = SettingIconTone.About,
                     tag = TAG_SETTINGS_REPO,
                     shapes = ListItemDefaults.segmentedShapes(index = 1, count = 5),
                     onClick = { openUrl(context, URL_REPO, openFailedMessage) },
@@ -326,6 +391,8 @@ fun SettingsScreen(
                 ActionRow(
                     label = stringResource(R.string.settings_release),
                     description = stringResource(R.string.settings_release_desc),
+                    iconRes = R.drawable.ic_new_releases,
+                    iconTone = SettingIconTone.About,
                     tag = TAG_SETTINGS_RELEASE,
                     shapes = ListItemDefaults.segmentedShapes(index = 2, count = 5),
                     onClick = { openUrl(context, URL_RELEASES, openFailedMessage) },
@@ -333,12 +400,16 @@ fun SettingsScreen(
                 InfoRow(
                     label = stringResource(R.string.settings_author),
                     value = AUTHOR,
+                    iconRes = R.drawable.ic_person,
+                    iconTone = SettingIconTone.About,
                     tag = TAG_SETTINGS_AUTHOR,
                     shapes = ListItemDefaults.segmentedShapes(index = 3, count = 5),
                 )
                 ActionRow(
                     label = stringResource(R.string.settings_licenses),
                     description = null,
+                    iconRes = R.drawable.ic_description,
+                    iconTone = SettingIconTone.About,
                     tag = TAG_SETTINGS_LICENSES,
                     shapes = ListItemDefaults.segmentedShapes(index = 4, count = 5),
                     onClick = onOpenLicenses,
@@ -355,11 +426,17 @@ fun SettingsScreen(
                 border = dangerOutlineBorder(),
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(top = 20.dp)
+                    .padding(top = 24.dp)
                     .heightIn(min = 48.dp)
                     .testTag(TAG_SETTINGS_RESET)
                     .semantics { contentDescription = resetLabel },
             ) {
+                Icon(
+                    painter = painterResource(R.drawable.ic_restart_alt),
+                    contentDescription = null,
+                    modifier = Modifier.size(18.dp),
+                )
+                Spacer(Modifier.width(8.dp))
                 Text(
                     text = resetLabel,
                     style = MaterialTheme.typography.labelLargeEmphasized,
@@ -390,6 +467,52 @@ fun SettingsScreen(
 
 // ---------------- 组件 ----------------
 
+private enum class SettingIconTone {
+    Appearance,
+    Language,
+    Behavior,
+    About,
+}
+
+@Composable
+private fun SettingLeadingIcon(
+    @DrawableRes iconRes: Int,
+    tone: SettingIconTone,
+    enabled: Boolean = true,
+) {
+    val scheme = MaterialTheme.colorScheme
+    val (baseContainer, baseContent) = when (tone) {
+        SettingIconTone.Appearance -> scheme.primaryContainer to scheme.onPrimaryContainer
+        SettingIconTone.Language -> scheme.tertiaryContainer to scheme.onTertiaryContainer
+        SettingIconTone.Behavior -> scheme.secondaryContainer to scheme.onSecondaryContainer
+        SettingIconTone.About -> {
+            val container = if (LocalIsPureBlack.current) {
+                scheme.surfaceVariant
+            } else {
+                scheme.surfaceContainerHigh
+            }
+            container to scheme.onSurfaceVariant
+        }
+    }
+    val containerColor = if (enabled) baseContainer else baseContainer.copy(alpha = DISABLED_CONTENT_ALPHA)
+    val contentColor = if (enabled) baseContent else baseContent.copy(alpha = DISABLED_CONTENT_ALPHA)
+
+    Box(
+        modifier = Modifier
+            .size(38.dp)
+            .clip(CircleShape)
+            .background(containerColor),
+        contentAlignment = Alignment.Center,
+    ) {
+        Icon(
+            painter = painterResource(iconRes),
+            contentDescription = null,
+            tint = contentColor,
+            modifier = Modifier.size(20.dp),
+        )
+    }
+}
+
 @Composable
 private fun SectionHeader(text: String, first: Boolean = false) {
     Text(
@@ -398,8 +521,8 @@ private fun SectionHeader(text: String, first: Boolean = false) {
         color = MaterialTheme.colorScheme.primary,
         modifier = Modifier.padding(
             start = 12.dp,
-            top = if (first) 8.dp else 20.dp,
-            bottom = 8.dp,
+            top = if (first) 10.dp else 24.dp,
+            bottom = 10.dp,
         ),
     )
 }
@@ -419,7 +542,7 @@ private fun Note(text: String) {
         text = text,
         style = MaterialTheme.typography.bodySmall,
         color = MaterialTheme.colorScheme.onSurfaceVariant,
-        modifier = Modifier.padding(start = 12.dp, top = 6.dp, bottom = 10.dp),
+        modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 14.dp),
     )
 }
 
@@ -436,22 +559,26 @@ private fun ThemeModeToggleGroup(
     onSelect: (ThemeMode) -> Unit,
 ) {
     val modes = ThemeMode.entries
+    val groupCd = stringResource(R.string.settings_theme_mode)
+    val transitionController = LocalThemeTransitionController.current
     val colors = FilledTonalToggleButtonDefaults.colors(
         containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
         contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
-        checkedContainerColor = MaterialTheme.colorScheme.secondaryContainer,
-        checkedContentColor = MaterialTheme.colorScheme.onSecondaryContainer,
+        checkedContainerColor = MaterialTheme.colorScheme.primaryContainer,
+        checkedContentColor = MaterialTheme.colorScheme.onPrimaryContainer,
     )
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .height(IntrinsicSize.Min)
-            .padding(bottom = 12.dp),
+            .padding(bottom = 14.dp)
+            .semantics { contentDescription = groupCd },
         horizontalArrangement = Arrangement.spacedBy(ButtonGroupDefaults.ConnectedSpaceBetween),
     ) {
         modes.forEachIndexed { index, mode ->
             val checked = current == mode
             val label = stringResource(themeModeLabel(mode))
+            var buttonCoords by remember { mutableStateOf<LayoutCoordinates?>(null) }
             val shapes = when (index) {
                 0 -> ButtonGroupDefaults.connectedLeadingButtonShapes()
                 modes.lastIndex -> ButtonGroupDefaults.connectedTrailingButtonShapes()
@@ -459,28 +586,42 @@ private fun ThemeModeToggleGroup(
             }
             FilledTonalToggleButton(
                 checked = checked,
-                onCheckedChange = { onSelect(mode) },
+                onCheckedChange = {
+                    transitionController?.recordOriginFrom(buttonCoords)
+                    onSelect(mode)
+                },
                 shapes = shapes,
                 colors = colors,
                 border = if (!checked) pixFoldSurfaceBorder() else null,
-                contentPadding = PaddingValues(horizontal = 6.dp, vertical = 10.dp),
+                contentPadding = PaddingValues(horizontal = 8.dp, vertical = 14.dp),
                 modifier = Modifier
                     .weight(1f)
                     .fillMaxHeight()
-                    .heightIn(min = 48.dp)
+                    .heightIn(min = 72.dp)
+                    .onGloballyPositioned { buttonCoords = it }
                     .testTag(themeOptionTag(mode)),
             ) {
-                Text(
-                    text = label,
-                    style = if (checked) {
-                        MaterialTheme.typography.labelLargeEmphasized
-                    } else {
-                        MaterialTheme.typography.labelLarge
-                    },
-                    textAlign = TextAlign.Center,
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis,
-                )
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(6.dp),
+                ) {
+                    Icon(
+                        painter = painterResource(themeModeIcon(mode)),
+                        contentDescription = null,
+                        modifier = Modifier.size(20.dp),
+                    )
+                    Text(
+                        text = label,
+                        style = if (checked) {
+                            MaterialTheme.typography.labelLargeEmphasized
+                        } else {
+                            MaterialTheme.typography.labelLarge
+                        },
+                        textAlign = TextAlign.Center,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
             }
         }
     }
@@ -512,22 +653,38 @@ private fun AccentSwatch(
 private fun SwitchRow(
     label: String,
     description: String,
+    @DrawableRes iconRes: Int,
+    iconTone: SettingIconTone,
     checked: Boolean,
     tag: String,
     shapes: ListItemShapes,
     onCheckedChange: (Boolean) -> Unit,
+    recordThemeTransitionOrigin: Boolean = false,
 ) {
+    val transitionController = LocalThemeTransitionController.current
+    var rowCoords by remember { mutableStateOf<LayoutCoordinates?>(null) }
+
     PixFoldSegmentedItem(
-        onClick = { onCheckedChange(!checked) },
+        onClick = {
+            if (recordThemeTransitionOrigin) {
+                transitionController?.recordOriginFrom(rowCoords)
+            }
+            onCheckedChange(!checked)
+        },
         shapes = shapes,
+        contentPadding = SETTINGS_ROW_PADDING,
         modifier = Modifier
             .fillMaxWidth()
+            .onGloballyPositioned { rowCoords = it }
             .testTag(tag)
             .semantics {
                 contentDescription = label
                 role = Role.Switch
                 toggleableState = ToggleableState(checked)
             },
+        leadingContent = {
+            SettingLeadingIcon(iconRes = iconRes, tone = iconTone)
+        },
         supportingContent = {
             Text(
                 text = description,
@@ -540,19 +697,30 @@ private fun SwitchRow(
             Switch(
                 checked = checked,
                 onCheckedChange = null,
+                thumbContent = if (checked) {
+                    {
+                        Icon(
+                            painter = painterResource(R.drawable.ic_check),
+                            contentDescription = null,
+                            modifier = Modifier.size(SwitchDefaults.IconSize),
+                        )
+                    }
+                } else {
+                    null
+                },
             )
         },
     ) {
         Text(
             text = label,
-            style = MaterialTheme.typography.bodyLarge,
+            style = MaterialTheme.typography.titleMedium,
             color = MaterialTheme.colorScheme.onSurface,
         )
     }
 }
 
 /**
- * 多选一:点击弹 M3E 分段列表对话框选择。
+ * 多选一:点击从行尾弹出右侧 M3E 悬浮下拉菜单选择。
  *
  * `enabled = false` 时**整行置灰且不可点开** —— 用于如实反映"该设置在当前组合下无效"。
  */
@@ -560,15 +728,20 @@ private fun SwitchRow(
 private fun <T> ChoiceRow(
     label: String,
     current: String,
+    @DrawableRes iconRes: Int,
+    iconTone: SettingIconTone,
     tag: String,
     shapes: ListItemShapes,
     options: List<Pair<T, String>>,
     onSelect: (T) -> Unit,
     enabled: Boolean = true,
+    recordThemeTransitionOrigin: Boolean = false,
     trailingPreview: (@Composable () -> Unit)? = null,
     optionLeading: (@Composable (T) -> Unit)? = null,
 ) {
     var open by remember { mutableStateOf(false) }
+    val transitionController = LocalThemeTransitionController.current
+    var rowCoords by remember { mutableStateOf<LayoutCoordinates?>(null) }
 
     val labelColor = if (enabled) {
         MaterialTheme.colorScheme.onSurface
@@ -581,123 +754,187 @@ private fun <T> ChoiceRow(
         MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = DISABLED_CONTENT_ALPHA)
     }
 
-    PixFoldSegmentedItem(
-        onClick = { open = true },
-        shapes = shapes,
-        enabled = enabled,
+    Box(
         modifier = Modifier
             .fillMaxWidth()
-            .testTag(tag)
-            .semantics { contentDescription = label },
-        supportingContent = {
-            Text(
-                text = current,
-                style = MaterialTheme.typography.bodyMedium,
-                color = valueColor,
-            )
-        },
-        trailingContent = {
-            Row(
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                if (trailingPreview != null) {
-                    trailingPreview()
+            .onGloballyPositioned { rowCoords = it },
+    ) {
+        PixFoldSegmentedItem(
+            onClick = { open = true },
+            shapes = shapes,
+            enabled = enabled,
+            contentPadding = SETTINGS_ROW_PADDING,
+            modifier = Modifier
+                .fillMaxWidth()
+                .testTag(tag)
+                .semantics { contentDescription = label },
+            leadingContent = {
+                SettingLeadingIcon(
+                    iconRes = iconRes,
+                    tone = iconTone,
+                    enabled = enabled,
+                )
+            },
+            supportingContent = {
+                Text(
+                    text = current,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = valueColor,
+                )
+            },
+            trailingContent = {
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    if (trailingPreview != null) {
+                        trailingPreview()
+                    }
+                    Icon(
+                        painter = painterResource(R.drawable.ic_chevron_right),
+                        contentDescription = null,
+                        tint = valueColor,
+                        modifier = Modifier.size(20.dp),
+                    )
                 }
-                Icon(
-                    painter = painterResource(R.drawable.ic_chevron_right),
-                    contentDescription = null,
-                    tint = valueColor,
-                    modifier = Modifier.size(20.dp),
+            },
+        ) {
+            Text(
+                text = label,
+                style = MaterialTheme.typography.titleMedium,
+                color = labelColor,
+            )
+        }
+
+        Box(
+            modifier = Modifier
+                .align(Alignment.BottomEnd)
+                .size(0.dp),
+        ) {
+            val isPureBlack = LocalIsPureBlack.current
+            DropdownMenu(
+                expanded = open && enabled,
+                onDismissRequest = { open = false },
+                offset = DpOffset(x = 0.dp, y = 4.dp),
+                shape = MaterialTheme.shapes.largeIncreased,
+                containerColor = choiceMenuContainerColor(),
+                tonalElevation = if (isPureBlack) 0.dp else 6.dp,
+                shadowElevation = 8.dp,
+                border = pixFoldSurfaceBorder(),
+                modifier = Modifier
+                    .widthIn(min = CHOICE_MENU_MIN_WIDTH, max = CHOICE_MENU_MAX_WIDTH)
+                    .testTag(TAG_CHOICE_DIALOG),
+            ) {
+                SettingsChoiceMenuOptions(
+                    options = options,
+                    current = current,
+                    tag = tag,
+                    onSelect = { selectedValue ->
+                        open = false
+                        if (recordThemeTransitionOrigin) {
+                            transitionController?.recordOriginFrom(rowCoords)
+                        }
+                        onSelect(selectedValue)
+                    },
+                    optionLeading = optionLeading,
                 )
             }
-        },
-    ) {
-        Text(
-            text = label,
-            style = MaterialTheme.typography.bodyLarge,
-            color = labelColor,
-        )
+        }
     }
+}
 
-    if (open && enabled) {
-        PixFoldAlertDialog(
-            onDismissRequest = { open = false },
-            // 选项列表自己带 `verticalScroll`，Shell 不能再套一层 ——
-            // 嵌套滚动会抛 `measured with an infinity maximum height constraints`。
-            textScrollable = false,
-            title = { Text(label) },
-            text = {
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .verticalScroll(rememberScrollState()),
-                    verticalArrangement = Arrangement.spacedBy(ListItemDefaults.SegmentedGap),
-                ) {
-                    options.forEachIndexed { index, (value, text) ->
-                        val selected = text == current
-                        val itemColors = if (selected) {
-                            ListItemDefaults.segmentedColors(
-                                containerColor = MaterialTheme.colorScheme.secondaryContainer,
-                                contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
-                                trailingContentColor = MaterialTheme.colorScheme.onSecondaryContainer,
-                                selectedContainerColor = MaterialTheme.colorScheme.secondaryContainer,
-                                selectedContentColor = MaterialTheme.colorScheme.onSecondaryContainer,
-                                selectedTrailingContentColor = MaterialTheme.colorScheme.onSecondaryContainer,
-                            )
-                        } else {
-                            pixFoldSegmentedColors()
-                        }
-                        PixFoldSegmentedItem(
-                            selected = selected,
-                            onClick = {
-                                open = false
-                                onSelect(value)
-                            },
-                            shapes = ListItemDefaults.segmentedShapes(index = index, count = options.size),
-                            colors = itemColors,
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .testTag(choiceOptionTag("$tag-$index"))
-                                .semantics { contentDescription = text },
-                            leadingContent = optionLeading?.let { leading ->
-                                { leading(value) }
-                            },
-                            trailingContent = if (selected) {
-                                {
-                                    Icon(
-                                        painter = painterResource(R.drawable.ic_check),
-                                        contentDescription = null,
-                                        tint = MaterialTheme.colorScheme.onSecondaryContainer,
-                                        modifier = Modifier.size(20.dp),
-                                    )
-                                }
-                            } else {
-                                null
-                            },
-                        ) {
-                            Text(
-                                text = text,
-                                style = if (selected) {
-                                    MaterialTheme.typography.titleSmallEmphasized
-                                } else {
-                                    MaterialTheme.typography.bodyLarge
-                                },
-                            )
-                        }
-                    }
-                }
-            },
-            confirmButton = {
-                TextButton(
-                    onClick = { open = false },
-                    shapes = ButtonDefaults.shapes(),
-                ) {
-                    Text(stringResource(R.string.settings_reset_cancel))
-                }
-            },
-            modifier = Modifier.testTag(TAG_CHOICE_DIALOG),
+@Composable
+internal fun choiceMenuContainerColor(): Color = MaterialTheme.colorScheme.surfaceContainerHigh
+
+@Composable
+internal fun PaletteDotsPreview(
+    seedArgb: Int,
+    dark: Boolean,
+    style: ColorStyle,
+    spec: ColorSpecVersion,
+) {
+    val dots = remember(seedArgb, dark, style, spec) {
+        val scheme = ColorSchemes.fromSeed(
+            seedArgb = seedArgb,
+            dark = dark,
+            style = style,
+            spec = spec,
         )
+        listOf(scheme.primary, scheme.secondary, scheme.tertiary)
+    }
+    Row(
+        horizontalArrangement = Arrangement.spacedBy(4.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        dots.forEach { dotColor ->
+            Box(
+                modifier = Modifier
+                    .size(10.dp)
+                    .clip(CircleShape)
+                    .background(dotColor)
+                    .border(
+                        width = 0.5.dp,
+                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.18f),
+                        shape = CircleShape,
+                    ),
+            )
+        }
+    }
+}
+
+@Composable
+internal fun <T> SettingsChoiceMenuOptions(
+    options: List<Pair<T, String>>,
+    current: String,
+    tag: String,
+    onSelect: (T) -> Unit,
+    optionLeading: (@Composable (T) -> Unit)? = null,
+) {
+    options.forEachIndexed { index, (value, text) ->
+        val isSelected = text == current
+        Surface(
+            onClick = { onSelect(value) },
+            shape = MaterialTheme.shapes.large,
+            color = if (isSelected) {
+                MaterialTheme.colorScheme.primaryFixed
+            } else {
+                Color.Transparent
+            },
+            contentColor = if (isSelected) {
+                MaterialTheme.colorScheme.onPrimaryFixed
+            } else {
+                MaterialTheme.colorScheme.onSurface
+            },
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 6.dp, vertical = 1.dp)
+                .testTag(choiceOptionTag("$tag-$index"))
+                .semantics {
+                    selected = isSelected
+                    contentDescription = text
+                },
+        ) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(min = 48.dp)
+                    .padding(horizontal = 16.dp, vertical = 12.dp),
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                if (optionLeading != null) {
+                    optionLeading(value)
+                }
+                Text(
+                    text = text,
+                    style = if (isSelected) {
+                        MaterialTheme.typography.titleSmallEmphasized
+                    } else {
+                        MaterialTheme.typography.bodyLarge
+                    },
+                )
+            }
+        }
     }
 }
 
@@ -707,6 +944,8 @@ private fun <T> ChoiceRow(
 @Composable
 private fun DefaultColumnsRow(
     label: String,
+    @DrawableRes iconRes: Int,
+    iconTone: SettingIconTone,
     tag: String,
     shapes: ListItemShapes,
     current: Int?,
@@ -722,6 +961,8 @@ private fun DefaultColumnsRow(
     ChoiceRow(
         label = label,
         current = if (current == null) adaptiveText else stringResource(R.string.a_cols_cd, current),
+        iconRes = iconRes,
+        iconTone = iconTone,
         tag = tag,
         shapes = shapes,
         options = listOf<Pair<Int?, String>>(null to adaptiveText) +
@@ -734,15 +975,21 @@ private fun DefaultColumnsRow(
 private fun InfoRow(
     label: String,
     value: String,
+    @DrawableRes iconRes: Int,
+    iconTone: SettingIconTone,
     tag: String,
     shapes: ListItemShapes,
 ) {
     PixFoldSegmentedItem(
         shapes = shapes,
+        contentPadding = SETTINGS_ROW_PADDING,
         modifier = Modifier
             .fillMaxWidth()
             .testTag(tag)
             .semantics { contentDescription = label },
+        leadingContent = {
+            SettingLeadingIcon(iconRes = iconRes, tone = iconTone)
+        },
         supportingContent = {
             Text(
                 text = value,
@@ -753,7 +1000,7 @@ private fun InfoRow(
     ) {
         Text(
             text = label,
-            style = MaterialTheme.typography.bodyLarge,
+            style = MaterialTheme.typography.titleMedium,
             color = MaterialTheme.colorScheme.onSurface,
         )
     }
@@ -763,6 +1010,8 @@ private fun InfoRow(
 private fun ActionRow(
     label: String,
     description: String?,
+    @DrawableRes iconRes: Int,
+    iconTone: SettingIconTone,
     tag: String,
     shapes: ListItemShapes,
     onClick: () -> Unit,
@@ -770,10 +1019,14 @@ private fun ActionRow(
     PixFoldSegmentedItem(
         onClick = onClick,
         shapes = shapes,
+        contentPadding = SETTINGS_ROW_PADDING,
         modifier = Modifier
             .fillMaxWidth()
             .testTag(tag)
             .semantics { contentDescription = label },
+        leadingContent = {
+            SettingLeadingIcon(iconRes = iconRes, tone = iconTone)
+        },
         supportingContent = description?.let { desc ->
             {
                 Text(
@@ -794,7 +1047,7 @@ private fun ActionRow(
     ) {
         Text(
             text = label,
-            style = MaterialTheme.typography.bodyLarge,
+            style = MaterialTheme.typography.titleMedium,
             color = MaterialTheme.colorScheme.onSurface,
         )
     }
@@ -817,7 +1070,13 @@ private fun openUrl(context: android.content.Context, url: String, failedMessage
     }
 }
 
-// ---------------- 枚举 -> 文案(集中在一处,避免散落) ----------------
+// ---------------- 枚举 -> 文案 / 图标(集中在一处,避免散落) ----------------
+
+private fun themeModeIcon(mode: ThemeMode): Int = when (mode) {
+    ThemeMode.System -> R.drawable.ic_contrast
+    ThemeMode.Light -> R.drawable.ic_light_mode
+    ThemeMode.Dark -> R.drawable.ic_dark_mode
+}
 
 private fun themeModeLabel(mode: ThemeMode): Int = when (mode) {
     ThemeMode.System -> R.string.settings_theme_system
@@ -835,7 +1094,7 @@ private fun accentLabel(choice: AccentChoice): Int = when (choice) {
     AccentChoice.Pink -> R.string.accent_pink
 }
 
-private fun colorStyleLabel(style: ColorStyle): Int = when (style) {
+internal fun colorStyleLabel(style: ColorStyle): Int = when (style) {
     ColorStyle.TonalSpot -> R.string.style_tonal_spot
     ColorStyle.Vibrant -> R.string.style_vibrant
     ColorStyle.Expressive -> R.string.style_expressive

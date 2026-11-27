@@ -103,8 +103,8 @@
     <string name="workspace_current_cd">当前工作区 %1$s,点按管理工作区文件夹</string>
     <string name="workspace_pick">选择文件夹</string>
     <string name="workspace_pick_cd">选择一个文件夹读取图片</string>
-    <string name="workspace_button">工作区</string>
-    <string name="workspace_button_cd">管理工作区文件夹</string>
+    <string name="workspace_button">切换工作区</string>
+    <string name="workspace_button_cd">切换工作区</string>
     <string name="workspace_loading">正在扫描文件夹…</string>
     <string name="workspace_denied">对 %1$s 的授权已失效,请重新选择该文件夹。</string>
     <string name="workspace_denied_retried">重试后仍无法访问 %1$s,请重新选择该文件夹。</string>
@@ -125,9 +125,9 @@
     <string name="workspace_section_stale">只记住了路径</string>
     <string name="workspace_section_stale_hint">点按可重新授权。</string>
     <string name="workspace_list_add">添加文件夹…</string>
+    <string name="workspace_list_adding">正在添加文件夹…</string>
     <string name="workspace_in_use">使用中</string>
     <string name="workspace_remove_cd">从列表移除 %1$s</string>
-    <string name="workspace_release_switch">同时撤销系统授权</string>
     <string name="workspace_reject_all_pinned">全部文件夹都已钉住，先取消一个图钉再加。</string>
 
 </resources>

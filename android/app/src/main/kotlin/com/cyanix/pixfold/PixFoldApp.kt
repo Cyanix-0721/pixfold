@@ -73,6 +73,7 @@ import com.cyanix.pixfold.ui.preview.PreviewRename
 import com.cyanix.pixfold.ui.settings.LicensesScreen
 import com.cyanix.pixfold.ui.settings.SettingsScreen
 import com.cyanix.pixfold.ui.theme.PixFoldTheme
+import com.cyanix.pixfold.ui.theme.ThemeTransitionHost
 import com.cyanix.pixfold.ui.workspace.LocalThumbnailSource
 import com.cyanix.pixfold.ui.workspace.WorkspaceListDialog
 import com.cyanix.pixfold.ui.workspace.WorkspaceState
@@ -282,12 +283,13 @@ fun PixFoldApp(
     ) { uri ->
         // uri == null 表示用户取消了选择 —— 保持现状，不动已有授权。
         if (uri != null) {
-            // **顺序不能反**（规格 §7.3 + R26）：`pick()` 才会把新目录
-            // `rememberWorkspace` 进列表，`openList()` 才读得到它；
-            // 先 openList 再 pick 等于「加完文件夹，列表里看不到新的那条」。
-            workspaceController.pick(uri.toString())
-            // 弹窗是从弹窗内部拉起的，回来时**不关**（规格 §7.3「加完继续在列表里」）。
-            if (showWorkspaceList) workspaceController.openList()
+            // 弹窗从工作区列表内部拉起时只走 addToList：加载态反映在选择框内、解析完直接入列，
+            // 不把首页工作区条切到 Loading，也不干扰当前正在使用的工作区。
+            if (showWorkspaceList) {
+                workspaceController.addToList(uri.toString())
+            } else {
+                workspaceController.pick(uri.toString())
+            }
         }
     }
 
@@ -350,7 +352,8 @@ fun PixFoldApp(
         )
     }
 
-    PixFoldTheme(settings = settings) {
+    ThemeTransitionHost(targetSettings = settings) { displayedSettings ->
+    PixFoldTheme(settings = displayedSettings) {
         // Surface 提供 M3 语义背景色 —— 深色模式下不会透出窗口白底(真机实证修复)。
         Surface(
             modifier = Modifier.fillMaxSize(),
@@ -606,7 +609,7 @@ fun PixFoldApp(
                 composable<SettingsRoute> {
                     DestinationSurface {
                         SettingsScreen(
-                            settings = settings,
+                            settings = displayedSettings,
                             onChange = updateSettings,
                             onBack = { backStack.popOne() },
                             onOpenLicenses = { backStack.add(LicensesRoute) },
@@ -855,9 +858,7 @@ fun PixFoldApp(
             //     主题/缩略图上下文，不会出现「弹窗里取不到主题色」；
             //  3. 与全站弹窗同一套模糊宿主（`DialogBlurHost`），背景虚化自动生效。
             //
-            // **必须用 `if (showWorkspaceList) { … }` 包裹，不许改成常驻组合（R24）**：
-            // `WorkspaceListDialog` 内部 `releaseGrant` 是 `remember`，只在**离开组合**时
-            // 销毁；常驻会让「移除顺便撤销授权」这种不可逆意图残留在下一次打开里。
+            // 弹窗通过 `if (showWorkspaceList)` 按需进入组合：
             if (showWorkspaceList) {
                 WorkspaceListDialog(
                     listings = workspaceController.listings,
@@ -867,8 +868,8 @@ fun PixFoldApp(
                         showWorkspaceList = false
                         workspaceController.open(treeUri)
                     },
-                    onRemove = { treeUri, alsoRelease ->
-                        workspaceController.remove(treeUri, alsoRelease)
+                    onRemove = { treeUri ->
+                        workspaceController.remove(treeUri)
                     },
                     onTogglePin = { treeUri -> workspaceController.togglePin(treeUri) },
                     // 弹窗给的是**整表下标**（两分区拼起来的顺序），而
@@ -888,11 +889,13 @@ fun PixFoldApp(
                     onAdd = { pickWorkspaceFolder.launch(null) },
                     // 全钉住时「加不进」到不了 pick()，得在弹窗里说清楚为什么。
                     rejectHint = if (workspaceController.listRejected) rejectAllPinnedHint() else null,
+                    isAdding = workspaceController.isAddingWorkspace,
                 )
             }
             }
             }
         }
+    }
     }
 }
 

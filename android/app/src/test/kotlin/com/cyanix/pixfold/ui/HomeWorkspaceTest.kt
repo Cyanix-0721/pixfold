@@ -241,6 +241,45 @@ class HomeWorkspaceTest {
     }
 
     @Test
+    fun `工作区条位于屏幕约五分之四处并留出底部呼吸空间`() {
+        home(state = WorkspaceState.Ready(handle, MockData.workspaceA.collections))
+
+        val cardB = rule.onNodeWithText(libraryTitle).getBoundsInRoot()
+        val bar = rule.onNodeWithTag(TAG_WORKSPACE_BAR).getBoundsInRoot()
+
+        assertTrue(
+            bar.top.value >= cardB.bottom.value + 120f,
+            "工作区条应与上方工作流大卡拉开明显空间（bar.top=${bar.top} cardB.bottom=${cardB.bottom}）",
+        )
+        assertTrue(
+            bar.bottom.value in 620f..740f && 794f - bar.bottom.value >= 54f,
+            "工作区条应位于屏幕下半区且保留底部抬升空间（bar.bottom=${bar.bottom}）",
+        )
+    }
+
+    @Test
+    fun `未选工作区时提示条紧贴抬升后工作区条上方`() {
+        home(state = WorkspaceState.None)
+
+        val cardB = rule.onNodeWithText(libraryTitle).getBoundsInRoot()
+        val hint = rule.onNodeWithTag(TAG_WORKSPACE_GATE_HINT).getBoundsInRoot()
+        val bar = rule.onNodeWithTag(TAG_WORKSPACE_BAR).getBoundsInRoot()
+
+        assertTrue(
+            hint.top.value >= cardB.bottom.value + 80f,
+            "未选工作区时提示条应随工作区条一起下移至下半区（hint.top=${hint.top} cardB.bottom=${cardB.bottom}）",
+        )
+        assertTrue(
+            bar.top.value >= hint.bottom.value && bar.top.value - hint.bottom.value <= 20f,
+            "提示条应紧贴在工作区条上方（hint.bottom=${hint.bottom} bar.top=${bar.top}）",
+        )
+        assertTrue(
+            bar.bottom.value in 620f..750f,
+            "未选工作区时工作区条仍应位于下半区抬升位置且不溢出视口（bar.bottom=${bar.bottom}）",
+        )
+    }
+
+    @Test
     fun `工作区条显示当前目录名`() {
         home(state = WorkspaceState.Ready(handle, MockData.workspaceA.collections))
         rule.onNodeWithText(TestText.of(R.string.workspace_current, "照片库")).assertIsDisplayed()

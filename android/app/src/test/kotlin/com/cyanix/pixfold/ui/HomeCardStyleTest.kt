@@ -258,6 +258,35 @@ class HomeCardStyleTest {
         assertTrue(height <= 200f, "卡片不应大到挤掉首屏其它内容,实测 $height dp")
     }
 
+    @Test
+    fun `home cards have taller hero height after layout polish`() {
+        home()
+
+        val heightA = cardBounds(titleA).let { (it.bottom - it.top).value }
+        val heightB = cardBounds(titleB).let { (it.bottom - it.top).value }
+        assertTrue(
+            heightA >= 132f && heightA <= 200f,
+            "整理图片大卡增高后应 >= 132dp 且 <= 200dp，实测 ${heightA}dp",
+        )
+        assertTrue(
+            heightB >= 132f && heightB <= 200f,
+            "打包漫画大卡增高后应 >= 132dp 且 <= 200dp，实测 ${heightB}dp",
+        )
+    }
+
+    @Test
+    fun `home card title and subtitle have breathable vertical spacing`() {
+        home()
+
+        val title = rule.onNodeWithText(titleA, useUnmergedTree = true).getBoundsInRoot()
+        val subtitle = rule.onNodeWithText(subtitleA, useUnmergedTree = true).getBoundsInRoot()
+        val gap = subtitle.top.value - title.bottom.value
+        assertTrue(
+            gap in 10f..24f,
+            "卡片标题与副标题间距应拉开（实测 ${gap}dp）",
+        )
+    }
+
     // ================= 5. 圆角外侧不得漏出直角按压/焦点状态层 =================
 
     @Test

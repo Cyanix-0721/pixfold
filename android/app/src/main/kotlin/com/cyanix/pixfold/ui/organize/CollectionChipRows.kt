@@ -1,11 +1,42 @@
 package com.cyanix.pixfold.ui.organize
 
-import androidx.compose.material3.Text
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectVerticalDragGestures
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.unit.dp
 import com.cyanix.pixfold.R
 import com.cyanix.pixfold.domain.model.ImageCollection
 import com.cyanix.pixfold.domain.source.groupCollections
@@ -24,6 +55,12 @@ const val TAG_COLLECTION_BOOK_ROW = "collection-book-row"
 
 /** 2 级芯片「全部 N 项」入口的 testTag。 */
 const val TAG_COLLECTION_BOOK_ALL = "collection-book-all"
+
+/** 集合瀑布流底部的可下拉/上拉收起小横条 testTag。 */
+const val TAG_COLLECTION_WATERFALL_HANDLE = "collection-waterfall-handle"
+
+private val WATERFALL_HANDLE_HEIGHT = 24.dp
+private val WATERFALL_DRAG_THRESHOLD = 16.dp
 
 /**
  * 集合切换芯片行 —— **两级**(用户 2026-10-19 裁决,原话「芯片分2级别,series或单本作为
@@ -54,6 +91,8 @@ fun CollectionChipRows(
     activeId: String,
     onSelect: (String) -> Unit,
     modifier: Modifier = Modifier,
+    waterfallExpanded: Boolean? = null,
+    onWaterfallExpandedChange: ((Boolean) -> Unit)? = null,
 ) {
     val groups = remember(collections) {
         groupCollections(collections).map { group ->
@@ -65,49 +104,158 @@ fun CollectionChipRows(
             )
         }
     }
+    if (groups.sumOf { it.members.size } <= 1) return
 
-    TwoLevelChipRows(
-        groups = groups,
-        activeItemId = activeId,
-        idOf = { it.id },
-        onSelect = onSelect,
-        topTags = ChipRowTags(
-            selectorTag = TAG_COLLECTION_ROW,
-            chipTag = ::groupTag,
-            allEntryTag = TAG_COLLECTION_GROUP_ALL,
-        ),
-        childTags = ChipRowTags(
-            selectorTag = TAG_COLLECTION_BOOK_ROW,
-            chipTag = ::collectionTag,
-            allEntryTag = TAG_COLLECTION_BOOK_ALL,
-        ),
-        singleTopChipTag = ::collectionTag,
-        topChipDescription = { group ->
-            if (group.isSeries) {
-                stringResource(R.string.a_series_cd, group.name)
-            } else {
-                stringResource(R.string.a_collection_cd, group.name)
-            }
-        },
-        topChipLabel = { group ->
-            stringResource(
-                R.string.a_collection_chip,
-                group.name,
-                group.members.sumOf { it.images.size },
+    var localExpanded by rememberSaveable { mutableStateOf(true) }
+    val isExpanded = waterfallExpanded ?: localExpanded
+    val setExpanded: (Boolean) -> Unit = { next ->
+        localExpanded = next
+        onWaterfallExpandedChange?.invoke(next)
+    }
+
+    Column(modifier = modifier.fillMaxWidth()) {
+        AnimatedVisibility(
+            visible = isExpanded,
+            enter = expandVertically(expandFrom = Alignment.Top) + fadeIn(),
+            exit = shrinkVertically(shrinkTowards = Alignment.Top) + fadeOut(),
+        ) {
+            TwoLevelChipRows(
+                groups = groups,
+                activeItemId = activeId,
+                idOf = { it.id },
+                onSelect = onSelect,
+                topTags = ChipRowTags(
+                    selectorTag = TAG_COLLECTION_ROW,
+                    chipTag = ::groupTag,
+                    allEntryTag = TAG_COLLECTION_GROUP_ALL,
+                ),
+                childTags = ChipRowTags(
+                    selectorTag = TAG_COLLECTION_BOOK_ROW,
+                    chipTag = ::collectionTag,
+                    allEntryTag = TAG_COLLECTION_BOOK_ALL,
+                ),
+                singleTopChipTag = ::collectionTag,
+                topChipDescription = { group ->
+                    if (group.isSeries) {
+                        stringResource(R.string.a_series_cd, group.name)
+                    } else {
+                        stringResource(R.string.a_collection_cd, group.name)
+                    }
+                },
+                topChipLabel = { group ->
+                    stringResource(
+                        R.string.a_collection_chip,
+                        group.name,
+                        group.members.sumOf { it.images.size },
+                    )
+                },
+                topAllEntryText = { n -> pluralsAllEntry(n) },
+                childChipDescription = { collection -> stringResource(R.string.a_collection_cd, collection.name) },
+                childChipLabel = { collection ->
+                    stringResource(
+                        R.string.a_collection_chip,
+                        collection.name,
+                        collection.images.size,
+                    )
+                },
+                childAllEntryText = { n -> pluralsAllEntry(n) },
+                modifier = Modifier.fillMaxWidth(),
             )
-        },
-        topAllEntryText = { n -> pluralsAllEntry(n) },
-        childChipDescription = { collection -> stringResource(R.string.a_collection_cd, collection.name) },
-        childChipLabel = { collection ->
-            stringResource(
-                R.string.a_collection_chip,
-                collection.name,
-                collection.images.size,
-            )
-        },
-        childAllEntryText = { n -> pluralsAllEntry(n) },
-        modifier = modifier,
+        }
+        CollectionWaterfallHandle(
+            expanded = isExpanded,
+            onExpand = { setExpanded(true) },
+            onCollapse = { setExpanded(false) },
+            onToggle = { setExpanded(!isExpanded) },
+        )
+    }
+}
+
+/**
+ * 集合瀑布流底部的收放拉手横条：上拉或轻点隐藏瀑布流为下方网格/列表腾出显示空间，
+ * 下拉或轻点重新展开。
+ */
+@Composable
+private fun CollectionWaterfallHandle(
+    expanded: Boolean,
+    onExpand: () -> Unit,
+    onCollapse: () -> Unit,
+    onToggle: () -> Unit,
+) {
+    val density = LocalDensity.current
+    val dragThresholdPx = remember(density) { with(density) { WATERFALL_DRAG_THRESHOLD.toPx() } }
+    val currentExpanded by rememberUpdatedState(expanded)
+    val currentOnExpand by rememberUpdatedState(onExpand)
+    val currentOnCollapse by rememberUpdatedState(onCollapse)
+    var isDragging by remember { mutableStateOf(false) }
+    val pillWidth by animateDpAsState(targetValue = if (isDragging) 52.dp else 40.dp)
+    val cd = stringResource(if (expanded) R.string.a_chips_collapse_cd else R.string.a_chips_expand_cd)
+    val trackColor = MaterialTheme.colorScheme.surfaceVariant.copy(
+        alpha = if (expanded) 0.18f else 0.36f,
     )
+
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 8.dp, vertical = 2.dp)
+            .clip(MaterialTheme.shapes.small)
+            .background(trackColor)
+            .height(WATERFALL_HANDLE_HEIGHT)
+            .pointerInput(dragThresholdPx) {
+                var accumulatedDragPx = 0f
+                var toggledThisGesture = false
+                detectVerticalDragGestures(
+                    onDragStart = {
+                        accumulatedDragPx = 0f
+                        toggledThisGesture = false
+                        isDragging = true
+                    },
+                    onDragEnd = {
+                        accumulatedDragPx = 0f
+                        toggledThisGesture = false
+                        isDragging = false
+                    },
+                    onDragCancel = {
+                        accumulatedDragPx = 0f
+                        toggledThisGesture = false
+                        isDragging = false
+                    },
+                    onVerticalDrag = { change, dragAmount ->
+                        change.consume()
+                        if (toggledThisGesture) return@detectVerticalDragGestures
+                        accumulatedDragPx += dragAmount
+                        if (currentExpanded && accumulatedDragPx <= -dragThresholdPx) {
+                            toggledThisGesture = true
+                            currentOnCollapse()
+                        } else if (!currentExpanded && accumulatedDragPx >= dragThresholdPx) {
+                            toggledThisGesture = true
+                            currentOnExpand()
+                        }
+                    },
+                )
+            }
+            .clickable(
+                interactionSource = remember { MutableInteractionSource() },
+                indication = null,
+                role = Role.Button,
+                onClick = onToggle,
+            )
+            .semantics { contentDescription = cd }
+            .testTag(TAG_COLLECTION_WATERFALL_HANDLE),
+        contentAlignment = Alignment.Center,
+    ) {
+        Box(
+            modifier = Modifier
+                .width(pillWidth)
+                .height(4.dp)
+                .clip(CircleShape)
+                .background(
+                    MaterialTheme.colorScheme.onSurfaceVariant.copy(
+                        alpha = if (isDragging) 0.72f else 0.42f,
+                    ),
+                ),
+        )
+    }
 }
 
 /**

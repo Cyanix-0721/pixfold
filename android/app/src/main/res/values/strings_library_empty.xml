@@ -43,7 +43,7 @@
         <item quantity="other">%1$d volumes write to the same file: %2$s</item>
     </plurals>
 
-    <string name="pack_error_collision_hint">Change the CBZ name of one of them in step 2, then try again.</string>
+    <string name="pack_error_collision_hint">Change the CBZ name of one of them in Metadata, then try again.</string>
 
     <string name="pack_error_unknown">Packing was blocked for an unknown reason. Please report this.</string>
 

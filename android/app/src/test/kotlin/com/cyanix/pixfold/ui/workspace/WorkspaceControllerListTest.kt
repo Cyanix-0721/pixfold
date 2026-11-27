@@ -11,6 +11,7 @@ import com.cyanix.pixfold.domain.source.WorkspaceSource
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.runTest
@@ -54,6 +55,7 @@ class WorkspaceControllerListTest {
 
         var rememberCalls = 0
         var persistentGrantsCalls = 0
+        var loadCalls = 0
         var rejectRemember = false
         val released = mutableListOf<String>()
 
@@ -97,10 +99,13 @@ class WorkspaceControllerListTest {
          */
         val script = ArrayDeque<LoadResult>()
 
-        override fun loadCollections(handle: WorkspaceHandle): LoadResult = when {
-            script.isEmpty() -> result
-            script.size > 1 -> script.removeFirst()
-            else -> script.first()
+        override fun loadCollections(handle: WorkspaceHandle): LoadResult {
+            loadCalls++
+            return when {
+                script.isEmpty() -> result
+                script.size > 1 -> script.removeFirst()
+                else -> script.first()
+            }
         }
 
         override fun readBytes(item: com.cyanix.pixfold.domain.model.SourceItem): ByteArray? = null
@@ -317,7 +322,7 @@ class WorkspaceControllerListTest {
         controller.pick("content://tree/new")
         assertTrue(controller.listRejected)
 
-        controller.remove(entries.first().handle.treeUri, alsoRelease = false)
+        controller.remove(entries.first().handle.treeUri)
 
         assertFalse(controller.listRejected, "列表不再满了，提示必须跟着撤掉")
     }
@@ -350,7 +355,7 @@ class WorkspaceControllerListTest {
         controller.open(a.handle.treeUri)
         assertIs<WorkspaceState.Ready>(controller.state)
 
-        controller.remove(a.handle.treeUri, alsoRelease = false)
+        controller.remove(a.handle.treeUri)
 
         assertEquals(WorkspaceState.None, controller.state, "不能还停在一个已不在列表里的目录上")
         assertTrue(controller.listings.isEmpty())
@@ -366,7 +371,7 @@ class WorkspaceControllerListTest {
         val controller = controller(source, testScope())
         controller.open(a.handle.treeUri)
 
-        controller.remove("content://tree/b", alsoRelease = false)
+        controller.remove("content://tree/b")
 
         assertIs<WorkspaceState.Ready>(controller.state)
         assertEquals(listOf("a"), controller.listings.map { it.entry.handle.displayName })
@@ -386,7 +391,7 @@ class WorkspaceControllerListTest {
         controller.open(a.handle.treeUri)
         assertIs<WorkspaceState.Failed>(controller.state)
 
-        controller.remove(a.handle.treeUri, alsoRelease = false)
+        controller.remove(a.handle.treeUri)
 
         assertTrue(
             source.entries.none { it.handle.treeUri == a.handle.treeUri },
@@ -411,7 +416,7 @@ class WorkspaceControllerListTest {
         controller.open(a.handle.treeUri)
         assertIs<WorkspaceState.Failed>(controller.state)
 
-        controller.remove("content://tree/b", alsoRelease = false)
+        controller.remove("content://tree/b")
 
         assertEquals(
             a.handle,
@@ -442,46 +447,36 @@ class WorkspaceControllerListTest {
         assertIs<WorkspaceState.Ready>(controller.state)
         source.entries.removeAll { it.handle.treeUri == a.handle.treeUri }
 
-        controller.remove(b.handle.treeUri, alsoRelease = false)
+        controller.remove(b.handle.treeUri)
 
         assertEquals(WorkspaceState.None, controller.state)
         assertTrue(controller.listings.isEmpty())
     }
 
-    // ---- T10：release 只在 alsoRelease=true 时发生 ----
+    // ---- T10：移除工作区条目时默认释放系统持久授权 ----
 
     @Test
-    fun `默认移除不撤销系统授权`() = runTest {
+    fun `移除条目时同步清除记录并释放系统持久授权`() = runTest {
         val a = WorkspaceEntry(handle("a"))
         val source = ListSource(mutableListOf(a), granted = setOf(a.handle.treeUri))
         val controller = controller(source, testScope())
 
-        controller.remove(a.handle.treeUri, alsoRelease = false)
+        controller.remove(a.handle.treeUri)
 
-        assertEquals(0, source.released.size, "只删记录不该动系统授权")
-    }
-
-    @Test
-    fun `勾了同时撤销才真的撤销`() = runTest {
-        val a = WorkspaceEntry(handle("a"))
-        val source = ListSource(mutableListOf(a), granted = setOf(a.handle.treeUri))
-        val controller = controller(source, testScope())
-
-        controller.remove(a.handle.treeUri, alsoRelease = true)
-
+        assertTrue(controller.listings.isEmpty())
         assertEquals(listOf(a.handle.treeUri), source.released)
     }
 
     @Test
     fun `不支持撤销授权的来源不会崩`() = runTest {
         // 能力面（[AndroidGrantReleaser]）是**可选**的：只读测试替身、未来的只读实现
-        // 都不实现它。此时 alsoRelease=true 必须是「做不到」而不是「炸掉」。
+        // 都不实现它。此时 releasePersistentGrant 不应崩。
         val a = WorkspaceEntry(handle("a"))
         val delegate = ListSource(mutableListOf(a))
         val source = object : WorkspaceSource by delegate {}
         val controller = controller(source, testScope())
 
-        controller.remove(a.handle.treeUri, alsoRelease = true)
+        controller.remove(a.handle.treeUri)
 
         assertTrue(controller.listings.isEmpty())
     }
@@ -608,5 +603,115 @@ class WorkspaceControllerListTest {
 
         assertEquals(1, source.persistentGrantsCalls, "跨分区判定应复用单次 persistentGrants 快照")
         assertEquals(listOf("a", "b"), source.entries.map { it.handle.displayName })
+    }
+
+    // ---- addToList：从列表弹窗添加文件夹，加载态不打断当前工作区 ----
+
+    @Test
+    fun `addToList 期间置 isAddingWorkspace 而不打断当前工作区，完成后直接入列且不触发扫描`() = runTest {
+        val a = WorkspaceEntry(handle("a"))
+        val newUri = "content://tree/b"
+        val source = ListSource(
+            mutableListOf(a),
+            granted = setOf(a.handle.treeUri, newUri),
+            result = LoadResult.Success(collections()),
+        )
+        val controller = WorkspaceController(
+            source = source,
+            scope = testScope(),
+            nameResolver = { uri -> uri.substringAfterLast('/') },
+            ioDispatcher = StandardTestDispatcher(testScheduler),
+        )
+        controller.open(a.handle.treeUri)
+        testScheduler.advanceUntilIdle()
+        assertIs<WorkspaceState.Ready>(controller.state)
+        source.loadCalls = 0
+
+        controller.addToList(newUri)
+
+        // IO 尚未完成：弹窗内正在加载，但主状态仍停在 Ready(a)，绝不打回 Loading。
+        assertTrue(controller.isAddingWorkspace)
+        assertIs<WorkspaceState.Ready>(controller.state)
+        assertEquals("a", controller.state.handleOrNull()?.displayName)
+
+        testScheduler.advanceUntilIdle()
+
+        assertFalse(controller.isAddingWorkspace)
+        assertEquals(0, source.loadCalls, "从选择框添加新文件夹不应触发全目录扫描")
+        assertIs<WorkspaceState.Ready>(controller.state)
+        assertEquals("a", controller.state.handleOrNull()?.displayName)
+        assertTrue(
+            newUri in controller.listings.map { it.entry.handle.treeUri },
+            "加载完成后应直接出现在工作区列表里",
+        )
+    }
+
+    @Test
+    fun `addToList 被全钉住拒绝时置 listRejected 且复位 isAddingWorkspace`() = runTest {
+        val source = ListSource(mutableListOf(WorkspaceEntry(handle("a"))))
+        source.rejectRemember = true
+        val controller = controller(source, testScope())
+
+        controller.addToList("content://tree/new")
+
+        assertTrue(controller.listRejected)
+        assertFalse(controller.isAddingWorkspace)
+    }
+
+    @Test
+    fun `addToList 在主状态为 None 时添加成功后置为 Idle 而不进入 Loading`() = runTest {
+        val newUri = "content://tree/first"
+        val source = ListSource(
+            mutableListOf(),
+            granted = setOf(newUri),
+        )
+        val controller = WorkspaceController(
+            source = source,
+            scope = testScope(),
+            nameResolver = { "first" },
+            ioDispatcher = Dispatchers.Unconfined,
+        )
+        assertEquals(WorkspaceState.None, controller.state)
+
+        controller.addToList(newUri)
+
+        assertIs<WorkspaceState.Idle>(controller.state)
+        assertEquals(newUri, controller.state.handleOrNull()?.treeUri)
+        assertEquals(0, source.loadCalls)
+        assertEquals(newUri, controller.listings.single().entry.handle.treeUri)
+    }
+
+    @Test
+    fun `addToList 与 refresh 各自独立互不取消`() = runTest {
+        val a = WorkspaceEntry(handle("a"))
+        val newUri = "content://tree/b"
+        val source = ListSource(
+            mutableListOf(a),
+            granted = setOf(a.handle.treeUri, newUri),
+            result = LoadResult.Success(collections()),
+        )
+        val controller = WorkspaceController(
+            source = source,
+            scope = testScope(),
+            nameResolver = { "b" },
+            ioDispatcher = StandardTestDispatcher(testScheduler),
+        )
+        controller.open(a.handle.treeUri)
+        testScheduler.advanceUntilIdle()
+        source.loadCalls = 0
+
+        controller.refresh()
+        assertTrue(controller.isRefreshing)
+
+        controller.addToList(newUri)
+        assertTrue(controller.isRefreshing, "addToList 不得取消正在进行的 refresh")
+        assertTrue(controller.isAddingWorkspace)
+
+        testScheduler.advanceUntilIdle()
+
+        assertFalse(controller.isRefreshing)
+        assertFalse(controller.isAddingWorkspace)
+        assertEquals(1, source.loadCalls)
+        assertTrue(newUri in controller.listings.map { it.entry.handle.treeUri })
     }
 }

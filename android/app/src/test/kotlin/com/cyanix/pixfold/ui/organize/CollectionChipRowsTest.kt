@@ -14,9 +14,13 @@ import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performTouchInput
+import androidx.compose.ui.test.swipeDown
+import androidx.compose.ui.test.swipeUp
 import com.cyanix.pixfold.domain.model.ImageCollection
 import com.cyanix.pixfold.domain.model.SourceItem
 import com.cyanix.pixfold.domain.source.SERIES_PREFIX
+import com.cyanix.pixfold.ui.assertAccessibleTargets
 import com.cyanix.pixfold.ui.theme.PixFoldTheme
 import org.junit.Rule
 import org.junit.Test
@@ -318,6 +322,58 @@ class CollectionChipRowsTest {
             rule.onAllNodesWithTag(TAG_COLLECTION_ROW).fetchSemanticsNodes().isEmpty(),
             "只有一个单本集合时不该渲染芯片行",
         )
+        assertTrue(
+            rule.onAllNodesWithTag(TAG_COLLECTION_WATERFALL_HANDLE).fetchSemanticsNodes().isEmpty(),
+            "只有一个集合时瀑布流本就不存在，不该显示拉手横条",
+        )
+    }
+
+    @Test
+    fun `多集合时上拉与下拉横条可收起和展开瀑布流并满足无障碍要求`() {
+        setContent(listOf(collection("trip"), collection("scan")), initial = "trip")
+
+        rule.onNodeWithTag(TAG_COLLECTION_ROW).assertIsDisplayed()
+        rule.onNodeWithTag(TAG_COLLECTION_WATERFALL_HANDLE).assertIsDisplayed()
+        assertAccessibleTargets(rule)
+
+        // 上拉横条收起瀑布流
+        rule.onNodeWithTag(TAG_COLLECTION_WATERFALL_HANDLE).performTouchInput {
+            swipeUp(startY = centerY, endY = centerY - 140f)
+        }
+        rule.waitForIdle()
+
+        assertTrue(
+            rule.onAllNodesWithTag(TAG_COLLECTION_ROW).fetchSemanticsNodes().isEmpty(),
+            "上拉横条后顶部集合瀑布流应隐藏",
+        )
+        rule.onNodeWithTag(TAG_COLLECTION_WATERFALL_HANDLE).assertIsDisplayed()
+        assertAccessibleTargets(rule)
+
+        // 下拉横条重新展开瀑布流
+        rule.onNodeWithTag(TAG_COLLECTION_WATERFALL_HANDLE).performTouchInput {
+            swipeDown(startY = centerY, endY = centerY + 140f)
+        }
+        rule.waitForIdle()
+
+        rule.onNodeWithTag(TAG_COLLECTION_ROW).assertIsDisplayed()
+    }
+
+    @Test
+    fun `轻点横条同样可切换瀑布流收起与展开`() {
+        setContent(listOf(collection("trip"), collection("scan")), initial = "trip")
+
+        rule.onNodeWithTag(TAG_COLLECTION_ROW).assertIsDisplayed()
+        rule.onNodeWithTag(TAG_COLLECTION_WATERFALL_HANDLE).performClick()
+        rule.waitForIdle()
+
+        assertTrue(
+            rule.onAllNodesWithTag(TAG_COLLECTION_ROW).fetchSemanticsNodes().isEmpty(),
+            "轻点横条后顶部集合瀑布流应收起",
+        )
+
+        rule.onNodeWithTag(TAG_COLLECTION_WATERFALL_HANDLE).performClick()
+        rule.waitForIdle()
+        rule.onNodeWithTag(TAG_COLLECTION_ROW).assertIsDisplayed()
     }
 
     // ---- 夹具 ----
