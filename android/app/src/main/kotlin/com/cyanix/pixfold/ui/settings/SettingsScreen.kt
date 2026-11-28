@@ -148,9 +148,10 @@ const val TAG_SETTINGS_RESET_CONFIRM = "settings-reset-confirm"
 const val TAG_CHOICE_DIALOG = "settings-choice-dialog"
 fun choiceOptionTag(key: String) = "settings-choice-$key"
 
-/** 关于页链接(仓库 / 发布页)。 */
+/** 关于页链接(仓库 / 发布页 / 作者)。 */
 private const val URL_REPO = "https://github.com/Cyanix-0721/pixfold"
 private const val URL_RELEASES = "https://github.com/Cyanix-0721/pixfold/releases"
+internal const val URL_AUTHOR = "https://github.com/Cyanix-0721"
 private const val AUTHOR = "Cyanix-0721"
 
 /**
@@ -412,7 +413,7 @@ fun SettingsScreen(
                     iconTone = SettingIconTone.About,
                     tag = TAG_SETTINGS_REPO,
                     shapes = ListItemDefaults.segmentedShapes(index = 1, count = 5),
-                    onClick = { openUrl(context, URL_REPO, openFailedMessage) },
+                    onClick = { openExternalUrl(context, URL_REPO, openFailedMessage) },
                 )
                 ActionRow(
                     label = stringResource(R.string.settings_release),
@@ -421,15 +422,16 @@ fun SettingsScreen(
                     iconTone = SettingIconTone.About,
                     tag = TAG_SETTINGS_RELEASE,
                     shapes = ListItemDefaults.segmentedShapes(index = 2, count = 5),
-                    onClick = { openUrl(context, URL_RELEASES, openFailedMessage) },
+                    onClick = { openExternalUrl(context, URL_RELEASES, openFailedMessage) },
                 )
-                InfoRow(
+                ActionRow(
                     label = stringResource(R.string.settings_author),
-                    value = AUTHOR,
+                    description = AUTHOR,
                     iconRes = R.drawable.ic_person,
                     iconTone = SettingIconTone.About,
                     tag = TAG_SETTINGS_AUTHOR,
                     shapes = ListItemDefaults.segmentedShapes(index = 3, count = 5),
+                    onClick = { openExternalUrl(context, URL_AUTHOR, openFailedMessage) },
                 )
                 ActionRow(
                     label = stringResource(R.string.settings_licenses),
@@ -1086,7 +1088,7 @@ private fun ActionRow(
  * `startActivity` 会抛 [android.content.ActivityNotFoundException] ——
  * 不处理就是崩溃。这里捕获后提示并降级(设置页不宜弹出阻塞式错误)。
  */
-private fun openUrl(context: android.content.Context, url: String, failedMessage: String) {
+internal fun openExternalUrl(context: android.content.Context, url: String, failedMessage: String) {
     runCatching {
         context.startActivity(
             Intent(Intent.ACTION_VIEW, url.toUri()).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),

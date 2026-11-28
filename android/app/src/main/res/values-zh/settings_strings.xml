@@ -75,4 +75,7 @@
     <string name="settings_columns_note">作用于网格视图；排序页的列数按钮可在本次进入时临时覆盖。</string>
     <string name="licenses_correction_title">许可更正</string>
     <string name="licenses_correction_body">com.materialkolor:material-color-utilities 的构件 POM 声明为 MIT，但其模块内 LICENSE 为 Apache-2.0（源码移植自 Google 的 material-foundation/material-color-utilities）。本应用按 Apache-2.0 履行声明义务。</string>
+    <string name="licenses_open_link_body">将在外部浏览器中打开以下链接：\n\n%1$s</string>
+    <string name="licenses_open_link_confirm">前往</string>
+    <string name="licenses_open_link_cancel">取消</string>
 </resources>

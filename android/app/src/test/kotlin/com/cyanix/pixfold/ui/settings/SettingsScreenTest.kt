@@ -1,5 +1,7 @@
 package com.cyanix.pixfold.ui.settings
 
+import android.app.Application
+import android.content.Intent
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -16,6 +18,7 @@ import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
+import androidx.test.core.app.ApplicationProvider
 import com.cyanix.pixfold.R
 import com.cyanix.pixfold.TestText
 import com.cyanix.pixfold.domain.settings.AccentChoice
@@ -31,10 +34,12 @@ import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
+import org.robolectric.Shadows
 import org.robolectric.annotation.Config
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertNotEquals
+import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
@@ -395,6 +400,20 @@ class SettingsScreenTest {
         show()
         rule.onNodeWithTag(TAG_SETTINGS_AUTHOR).assertExists()
         rule.onNodeWithTag(TAG_SETTINGS_VERSION).assertExists()
+    }
+
+    @Test
+    fun `tapping author row opens author github profile`() {
+        val shadowApp = Shadows.shadowOf(ApplicationProvider.getApplicationContext<Application>())
+        show()
+        shadowApp.clearNextStartedActivities()
+
+        tap(TAG_SETTINGS_AUTHOR)
+
+        val launched = shadowApp.nextStartedActivity
+        assertNotNull(launched, "点击「作者」行应拉起外部浏览器 Intent")
+        assertEquals(Intent.ACTION_VIEW, launched.action)
+        assertEquals("https://github.com/Cyanix-0721", launched.dataString)
     }
 
     @Test

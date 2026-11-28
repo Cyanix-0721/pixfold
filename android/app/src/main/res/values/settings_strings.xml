@@ -75,4 +75,7 @@
     <string name="settings_columns_note">Applies to the grid view. The column button on the sort page overrides it for the current visit only.</string>
     <string name="licenses_correction_title">License correction</string>
     <string name="licenses_correction_body">The artifact POM for com.materialkolor:material-color-utilities declares MIT, but the module ships an Apache-2.0 LICENSE (ported from the official material-foundation/material-color-utilities). This app complies with Apache-2.0.</string>
+    <string name="licenses_open_link_body">Open this link in an external browser?\n\n%1$s</string>
+    <string name="licenses_open_link_confirm">Open</string>
+    <string name="licenses_open_link_cancel">Cancel</string>
 </resources>

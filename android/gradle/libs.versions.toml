@@ -64,4 +64,3 @@ core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx"
 coil = { group = "io.coil-kt.coil3", name = "coil", version.ref = "coil" }
 roborazzi = { group = "io.github.takahirom.roborazzi", name = "roborazzi", version.ref = "roborazzi" }
 roborazzi-compose = { group = "io.github.takahirom.roborazzi", name = "roborazzi-compose", version.ref = "roborazzi" }
-roborazzi-junit-rule = { group = "io.github.takahirom.roborazzi", name = "roborazzi-junit-rule", version.ref = "roborazzi" }
